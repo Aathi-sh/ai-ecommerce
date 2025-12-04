@@ -1,0 +1,64 @@
+node_modules/
+
+# WhatsApp session folders
+sessions/
+session*/
+webjs_auth/
+.webjs_auth/
+.wwwbjs_auth/
+.whwebjs_auth/
+webwhatsapp*/ 
+whatsapp-sessions/
+*.sqlite
+*.db
+*.ldb
+
+# LevelDB / IndexedDB / Chrome storage
+*indexeddb*
+*leveldb*
+Default/
+Service Worker/
+Local Storage/
+Session Storage/
+shared_proto_db/
+
+# System + temp files
+*.log
+*.old
+.DS_Store
+.env
+
+
+
+
+# Node modules
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Next.js build outputs
+.next/
+out/
+
+# Production build for backend (if any)
+dist/
+
+# OS or Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Optional: lock files if you want to ignore
+# package-lock.json
+# yarn.lock

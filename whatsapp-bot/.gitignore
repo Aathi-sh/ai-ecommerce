@@ -1,0 +1,29 @@
+node_modules/
+
+# WhatsApp session folders
+sessions/
+session*/
+webjs_auth/
+.webjs_auth/
+.wwwbjs_auth/
+.whwebjs_auth/
+webwhatsapp*/ 
+whatsapp-sessions/
+*.sqlite
+*.db
+*.ldb
+
+# LevelDB / IndexedDB / Chrome storage
+*indexeddb*
+*leveldb*
+Default/
+Service Worker/
+Local Storage/
+Session Storage/
+shared_proto_db/
+
+# System + temp files
+*.log
+*.old
+.DS_Store
+.env
