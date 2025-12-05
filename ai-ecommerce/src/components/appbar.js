@@ -28,8 +28,7 @@ export default function AppBar({
         padding: "0 25px",
         boxShadow: appTheme.shadows.lg,
         borderBottom: `1px solid ${appTheme.colors.border}`,
-        // Removed sticky positioning
-        zIndex: 100,
+        zIndex: 1100, // Increased to be higher than sidebar's zIndex: 1000
       }}
     >
       {/* --------------------------- LEFT SECTION --------------------------- */}

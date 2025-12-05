@@ -1649,7 +1649,6 @@
 // export { createWhatsAppBot, getWhatsAppBot };
 // export default bot;
 
-
 import pkg from 'whatsapp-web.js';
 import qrcode from 'qrcode-terminal';
 import dotenv from 'dotenv';
@@ -1657,6 +1656,8 @@ import handleMessage from "./messageHandler.js";
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+// Import qrSocketServer
 import { qrSocketServer } from '../services/qrSocketServer.js';
 
 dotenv.config();
@@ -1680,6 +1681,7 @@ class WhatsAppBot {
         this.connectionTime = null;
         this.botInfo = null;
         this.isShuttingDown = false;
+        this.socketServerReady = false;
         
         // Initialize statistics
         this.stats = {
@@ -1692,30 +1694,60 @@ class WhatsAppBot {
         };
         
         this.statsInterval = null;
+        
+        // Check socket server status periodically
+        this.checkSocketServer();
     }
 
-    // Broadcast methods using the socket server
+    // Check if socket server is ready
+    checkSocketServer() {
+        const checkInterval = setInterval(() => {
+            if (qrSocketServer && qrSocketServer.wss) {
+                this.socketServerReady = true;
+                console.log('✅ WebSocket server is ready');
+                clearInterval(checkInterval);
+            }
+        }, 1000);
+    }
+
+    // Safe broadcast methods
     broadcastQR(qr) {
-        if (qrSocketServer && qrSocketServer.broadcastQR) {
-            qrSocketServer.broadcastQR(qr);
+        if (this.socketServerReady && qrSocketServer && typeof qrSocketServer.broadcastQR === 'function') {
+            try {
+                qrSocketServer.broadcastQR(qr);
+            } catch (error) {
+                console.error('❌ Error broadcasting QR:', error);
+            }
         }
     }
 
     broadcastStatus(status, message) {
-        if (qrSocketServer && qrSocketServer.broadcastStatus) {
-            qrSocketServer.broadcastStatus(status, message);
+        if (this.socketServerReady && qrSocketServer && typeof qrSocketServer.broadcastStatus === 'function') {
+            try {
+                qrSocketServer.broadcastStatus(status, message);
+            } catch (error) {
+                console.error('❌ Error broadcasting status:', error);
+            }
         }
     }
 
     broadcastStats(stats) {
-        if (qrSocketServer && qrSocketServer.broadcastStats) {
-            qrSocketServer.broadcastStats(stats);
+        if (this.socketServerReady && qrSocketServer && typeof qrSocketServer.broadcastStats === 'function') {
+            try {
+                qrSocketServer.broadcastStats(stats);
+            } catch (error) {
+                console.error('❌ Error broadcasting stats:', error);
+            }
         }
     }
 
     broadcastBotInfo(info) {
-        if (qrSocketServer && qrSocketServer.broadcastBotInfo) {
-            qrSocketServer.broadcastBotInfo(info);
+        if (this.socketServerReady && qrSocketServer && typeof qrSocketServer.broadcastBotInfo === 'function') {
+            try {
+                qrSocketServer.broadcastBotInfo(info);
+            } catch (error) {
+                console.error('❌ Error broadcasting bot info:', error);
+            }
         }
     }
 
@@ -1730,6 +1762,7 @@ class WhatsAppBot {
         
         try {
             console.log('🚀 Initializing WhatsApp E-commerce Bot...');
+            console.log('📡 Socket server ready:', this.socketServerReady);
             
             // Clear any existing client
             if (this.client) {
@@ -1739,7 +1772,7 @@ class WhatsAppBot {
             // Initialize WhatsApp client
             await this.initializeClient();
             
-            this.reconnectAttempts = 0; // Reset on successful initialization
+            this.reconnectAttempts = 0;
             console.log('✅ Bot initialization completed successfully');
             
         } catch (error) {
@@ -1816,6 +1849,9 @@ class WhatsAppBot {
             
             this.currentQR = qr;
             
+            console.log('📱 QR Code generated');
+            console.log('📡 Attempting to broadcast QR. Socket ready:', this.socketServerReady);
+            
             // Broadcast QR to frontend
             this.broadcastQR(qr);
             this.broadcastStatus('qr_required', 'Scan QR code to connect WhatsApp');
@@ -1849,6 +1885,8 @@ class WhatsAppBot {
             console.log('💼 Session: PERSISTENT');
             console.log('🛍️  Ready to process customer orders');
             console.log('========================================\n');
+            
+            console.log('📡 Broadcasting connection status. Socket ready:', this.socketServerReady);
             
             // Broadcast connection status
             this.broadcastStatus('connected', 'WhatsApp is connected and ready');
@@ -1940,7 +1978,7 @@ class WhatsAppBot {
             this.broadcastStatus('loading', `Loading: ${percent}% - ${message}`);
         });
 
-        // Handle page errors - IGNORE page closure errors during shutdown
+        // Handle page errors
         this.client.on('page_error', (error) => {
             if (this.isShuttingDown && (
                 error.message.includes('Session closed') || 
@@ -1963,7 +2001,7 @@ class WhatsAppBot {
         }
 
         this.reconnectAttempts++;
-        const delay = 5000 * this.reconnectAttempts; // Exponential backoff
+        const delay = 5000 * this.reconnectAttempts;
         
         console.log(`🔄 Attempting to reconnect in ${delay/1000} seconds... (Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
         this.broadcastStatus('reconnecting', `Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
@@ -1982,14 +2020,13 @@ class WhatsAppBot {
         try {
             if (this.client) {
                 console.log('🛑 Safely destroying existing client...');
-                this.isShuttingDown = true; // Set flag to prevent reconnection
+                this.isShuttingDown = true;
                 await this.client.destroy();
                 this.client = null;
                 console.log('✅ Client destroyed safely');
                 this.broadcastStatus('client_destroyed', 'WhatsApp client destroyed');
             }
         } catch (error) {
-            // Ignore errors during destruction (like page already closed)
             if (!error.message.includes('Session closed') && 
                 !error.message.includes('page has been closed') &&
                 !error.message.includes('Protocol error')) {
@@ -1997,7 +2034,7 @@ class WhatsAppBot {
             } else {
                 console.log('⚠️ Client destruction error (expected):', error.message);
             }
-            this.client = null; // Force nullify even if destruction fails
+            this.client = null;
         } finally {
             this.isShuttingDown = false;
         }
@@ -2019,30 +2056,30 @@ class WhatsAppBot {
         }
     }
 
-    // Update statistics when message is received
     updateMessageStats(from) {
         this.stats.totalMessages++;
         this.stats.totalCustomers.add(from);
         this.stats.totalChats = this.stats.totalCustomers.size;
         
-        // Broadcast updated stats immediately
         this.broadcastCurrentStats();
     }
 
-    // Start broadcasting stats periodically
     startStatsBroadcasting() {
-        // Broadcast initial stats
+        // Initial broadcast
         this.broadcastCurrentStats();
         
-        // Update stats every 3 seconds
+        // Set up interval for regular updates
+        if (this.statsInterval) {
+            clearInterval(this.statsInterval);
+        }
+        
         this.statsInterval = setInterval(() => {
             this.broadcastCurrentStats();
         }, 3000);
         
-        console.log('📊 Started statistics broadcasting');
+        console.log('📊 Started statistics broadcasting. Socket ready:', this.socketServerReady);
     }
 
-    // Stop broadcasting stats
     stopStatsBroadcasting() {
         if (this.statsInterval) {
             clearInterval(this.statsInterval);
@@ -2051,7 +2088,6 @@ class WhatsAppBot {
         }
     }
 
-    // Broadcast current statistics
     broadcastCurrentStats() {
         const statsData = {
             totalOrders: this.stats.totalOrders,
@@ -2066,7 +2102,6 @@ class WhatsAppBot {
         this.broadcastStats(statsData);
     }
 
-    // Display bot information
     async displayBotInfo() {
         try {
             if (!this.client) {
@@ -2091,7 +2126,7 @@ class WhatsAppBot {
             console.log(`📊 Version: ${this.botInfo.version}`);
             console.log('───────────────────\n');
             
-            // Broadcast bot info
+            console.log('📡 Broadcasting bot info. Socket ready:', this.socketServerReady);
             this.broadcastBotInfo(this.botInfo);
             
         } catch (error) {
@@ -2111,26 +2146,22 @@ class WhatsAppBot {
         console.error('❌ Initialization error:', error.message);
         this.broadcastStatus('error', `Initialization error: ${error.message}`);
         
-        // For session-related errors, wait and retry
         if (error.message.includes('session') || error.message.includes('auth') || error.message.includes('context')) {
             console.log('🔄 Session/context issue detected. Retrying in 10 seconds...');
             this.broadcastStatus('retrying', 'Session issue detected. Retrying...');
             
-            // Clear session and retry
             await this.clearSession();
             
             setTimeout(() => {
                 this.initialize().catch(console.error);
             }, 10000);
         } else {
-            // For other errors, use reconnection logic
             await this.handleReconnection();
         }
     }
 
     async handleMessageError(message, error) {
         try {
-            // Don't send error response for context destroyed errors (user won't see it anyway)
             if (error.message.includes('Execution context was destroyed') ||
                 error.message.includes('Session closed') ||
                 error.message.includes('page has been closed')) {
@@ -2147,12 +2178,10 @@ class WhatsAppBot {
         }
     }
 
-    // Get current QR code (for API endpoints)
     getCurrentQR() {
         return this.currentQR;
     }
 
-    // Get connection status
     getStatus() {
         return {
             connected: this.isConnected,
@@ -2171,11 +2200,11 @@ class WhatsAppBot {
             reconnectAttempts: this.reconnectAttempts,
             maxReconnectAttempts: this.maxReconnectAttempts,
             uptime: this.getUptime(),
-            formattedUptime: this.getFormattedUptime()
+            formattedUptime: this.getFormattedUptime(),
+            socketServerReady: this.socketServerReady
         };
     }
 
-    // Method to send message
     async sendMessage(phoneNumber, message) {
         try {
             if (!this.client || !this.isConnected) {
@@ -2218,13 +2247,12 @@ class WhatsAppBot {
         }
     }
 
-    // Method to manually logout (clear session)
     async logout() {
         console.log('\n🚪 Manual logout requested...');
         this.broadcastStatus('logging_out', 'Manual logout requested...');
         
         try {
-            this.isShuttingDown = true; // Prevent reconnection attempts
+            this.isShuttingDown = true;
             await this.safeDestroyClient();
             await this.clearSession();
             
@@ -2236,7 +2264,6 @@ class WhatsAppBot {
             console.log('🔓 Logout completed. QR code will be required on next start.');
             this.broadcastStatus('logged_out', 'Logout completed. QR code required.');
             
-            // Restart the bot after a delay
             setTimeout(() => {
                 this.isShuttingDown = false;
                 this.initialize().catch(console.error);
@@ -2249,7 +2276,6 @@ class WhatsAppBot {
         }
     }
 
-    // Method to restart the bot
     async restart() {
         console.log('\n🔄 Manual restart requested...');
         this.broadcastStatus('restarting', 'Manual restart requested...');
@@ -2265,13 +2291,11 @@ class WhatsAppBot {
         }
     }
 
-    // Get uptime in seconds
     getUptime() {
         if (!this.connectionTime) return 0;
         return Math.floor((new Date() - this.connectionTime) / 1000);
     }
 
-    // Format uptime as HH:MM:SS
     getFormattedUptime() {
         const seconds = this.getUptime();
         const hours = Math.floor(seconds / 3600);
@@ -2280,7 +2304,6 @@ class WhatsAppBot {
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
 
-    // Track orders (for messageHandler to call)
     trackNewOrder() {
         this.stats.totalOrders++;
         this.broadcastCurrentStats();
@@ -2300,7 +2323,7 @@ class WhatsAppBot {
     }
 }
 
-// Create bot instance as singleton
+// Create singleton instance
 let botInstance = null;
 
 function createWhatsAppBot() {
@@ -2320,7 +2343,7 @@ function getWhatsAppBot() {
 // Default export for backward compatibility
 const bot = createWhatsAppBot();
 
-// Enhanced global error handlers with proper filtering
+// Global error handlers
 process.on('SIGINT', async () => {
     console.log('\n🛑 Received shutdown signal (SIGINT)');
     await bot.shutdown();
@@ -2333,71 +2356,30 @@ process.on('SIGTERM', async () => {
     process.exit(0);
 });
 
-// Handle uncaught exceptions - IGNORE page closure errors
-process.on('uncaughtException', (error) => {
-    // Filter out expected Puppeteer errors during shutdown
-    if (error.message.includes('Session closed') || 
-        error.message.includes('page has been closed') ||
-        error.message.includes('Protocol error') ||
-        error.message.includes('Execution context was destroyed')) {
-        console.log('⚠️ Uncaught exception (expected during shutdown):', error.message);
-        return;
-    }
-    
-    console.error('❌ Uncaught Exception:', error);
-    if (bot.broadcastStatus) {
-        bot.broadcastStatus('error', `Uncaught exception: ${error.message}`);
-    }
-});
-
-// Handle unhandled rejections - IGNORE page closure errors
-process.on('unhandledRejection', (reason, promise) => {
-    // Filter out expected Puppeteer errors during shutdown
-    if (reason.message && (
-        reason.message.includes('Session closed') || 
-        reason.message.includes('page has been closed') ||
-        reason.message.includes('Protocol error') ||
-        reason.message.includes('Execution context was destroyed'))) {
-        console.log('⚠️ Unhandled rejection (expected during shutdown):', reason.message);
-        return;
-    }
-    
-    console.error('❌ Unhandled Rejection at:', promise);
-    console.error('Reason:', reason);
-    
-    if (bot.broadcastStatus) {
-        bot.broadcastStatus('error', `Unhandled rejection: ${reason.message || reason}`);
-    }
-});
-
-// Initialize bot with retry logic
-const startBot = async (attempt = 1) => {
-    try {
-        await bot.initialize();
-    } catch (error) {
-        console.error(`❌ Bot startup failed (attempt ${attempt}):`, error);
-        if (bot.broadcastStatus) {
-            bot.broadcastStatus('startup_failed', `Bot startup failed (attempt ${attempt}): ${error.message}`);
-        }
-        
-        if (attempt < 3) {
-            console.log(`🔄 Retrying startup in 10 seconds... (${attempt + 1}/3)`);
-            if (bot.broadcastStatus) {
-                bot.broadcastStatus('retrying_startup', `Retrying startup... (${attempt + 1}/3)`);
+// Delay bot startup to ensure WebSocket server is ready
+setTimeout(() => {
+    const startBot = async (attempt = 1) => {
+        try {
+            console.log(`🚀 Starting WhatsApp bot (attempt ${attempt}/3)...`);
+            console.log('📡 Checking WebSocket server status...');
+            
+            await bot.initialize();
+            console.log('✅ WhatsApp bot started successfully');
+            
+        } catch (error) {
+            console.error(`❌ Bot startup failed (attempt ${attempt}):`, error);
+            
+            if (attempt < 3) {
+                console.log(`🔄 Retrying startup in 10 seconds... (${attempt + 1}/3)`);
+                setTimeout(() => startBot(attempt + 1), 10000);
+            } else {
+                console.error('💥 Maximum startup attempts reached. Bot will continue in disconnected state.');
             }
-            setTimeout(() => startBot(attempt + 1), 10000);
-        } else {
-            console.error('💥 Maximum startup attempts reached. Exiting.');
-            if (bot.broadcastStatus) {
-                bot.broadcastStatus('startup_failed', 'Bot failed to start after multiple attempts');
-            }
-            process.exit(1);
         }
-    }
-};
-
-// Start the bot
-startBot().catch(console.error);
+    };
+    
+    startBot();
+}, 3000); // Wait 3 seconds for WebSocket server to initialize
 
 export { createWhatsAppBot, getWhatsAppBot };
 export default bot;

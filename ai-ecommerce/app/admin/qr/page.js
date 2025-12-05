@@ -764,11 +764,26 @@ export default function WhatsAppDashboard() {
   const reconnectTimerRef = useRef(null);
   const statsIntervalRef = useRef(null);
 
-  // WebSocket connection
+  // Add activity log entry
+  const addToActivityLog = useCallback((message, type = 'info') => {
+    const entry = {
+      id: Date.now(),
+      message,
+      type,
+      timestamp: new Date().toLocaleTimeString(),
+      date: new Date().toLocaleDateString()
+    };
+    
+    setActivityLog(prev => [entry, ...prev.slice(0, 19)]);
+  }, []);
+
+  // WebSocket connection with better stability
   const connectWebSocket = useCallback(() => {
     // Clean up existing connection
     if (wsRef.current) {
-      wsRef.current.close();
+      if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
+        wsRef.current.close();
+      }
     }
     
     if (reconnectTimerRef.current) {
@@ -783,19 +798,19 @@ export default function WhatsAppDashboard() {
       wsRef.current = new WebSocket(wsUrl);
       
       wsRef.current.onopen = () => {
-        console.log('✅ WebSocket connected');
+        console.log('✅ WebSocket connected successfully');
         setWsConnected(true);
         setWsStatus('connected');
         setReconnectCount(0);
+        addToActivityLog('WebSocket connected', 'success');
         
-        // Request initial status
-        wsRef.current.send(JSON.stringify({ type: 'get_status' }));
+        // Send initial ping
+        wsRef.current.send(JSON.stringify({ type: 'ping' }));
       };
       
       wsRef.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('📨 WebSocket message:', data.type);
           
           switch (data.type) {
             case 'qr':
@@ -837,6 +852,13 @@ export default function WhatsAppDashboard() {
               setStatusMessage(data.message);
               addToActivityLog(`Error: ${data.message}`, 'error');
               break;
+              
+            case 'pong':
+              // Ping response received, connection is alive
+              break;
+              
+            default:
+              console.log('📨 Unknown WebSocket message type:', data.type);
           }
         } catch (error) {
           console.error('❌ Error parsing WebSocket message:', error);
@@ -844,54 +866,55 @@ export default function WhatsAppDashboard() {
       };
       
       wsRef.current.onclose = (event) => {
-        console.log('🔌 WebSocket disconnected:', event.code, event.reason);
+        console.log('🔌 WebSocket disconnected:', {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean
+        });
+        
         setWsConnected(false);
         setWsStatus('disconnected');
+        addToActivityLog('WebSocket disconnected', 'warning');
+        
+        // Don't reconnect immediately for normal closures
+        if (event.code === 1000) { // Normal closure
+          console.log('🛑 Normal WebSocket closure, not reconnecting');
+          return;
+        }
         
         // Auto-reconnect with exponential backoff
-        const delay = Math.min(3000 * Math.pow(1.5, reconnectCount), 30000);
-        setReconnectCount(prev => prev + 1);
+        const delay = Math.min(5000 * Math.pow(1.5, reconnectCount), 30000);
+        const nextAttempt = reconnectCount + 1;
+        
+        console.log(`🔄 Reconnecting in ${delay/1000} seconds... (Attempt ${nextAttempt})`);
+        addToActivityLog(`WebSocket reconnecting in ${delay/1000}s (Attempt ${nextAttempt})`, 'info');
         
         reconnectTimerRef.current = setTimeout(() => {
-          console.log(`🔄 Reconnecting (attempt ${reconnectCount + 1})...`);
+          console.log('🔄 Attempting WebSocket reconnection...');
           connectWebSocket();
         }, delay);
+        
+        setReconnectCount(nextAttempt);
       };
       
       wsRef.current.onerror = (error) => {
-        console.log('❌ WebSocket connection error');
+        console.log('⚠️ WebSocket error occurred');
         setWsConnected(false);
         setWsStatus('error');
-        setStatus('error');
-        setStatusMessage('WebSocket connection failed. Using fallback polling...');
       };
       
     } catch (error) {
       console.error('❌ WebSocket setup failed:', error);
       setWsConnected(false);
       setWsStatus('error');
-      setStatus('error');
-      setStatusMessage('Failed to setup WebSocket connection');
+      addToActivityLog('WebSocket setup failed', 'error');
       
-      // Retry connection after error
+      // Retry after 10 seconds
       reconnectTimerRef.current = setTimeout(() => {
         connectWebSocket();
-      }, 5000);
+      }, 10000);
     }
-  }, [reconnectCount]);
-
-  // Add activity log entry
-  const addToActivityLog = (message, type = 'info') => {
-    const entry = {
-      id: Date.now(),
-      message,
-      type,
-      timestamp: new Date().toLocaleTimeString(),
-      date: new Date().toLocaleDateString()
-    };
-    
-    setActivityLog(prev => [entry, ...prev.slice(0, 19)]);
-  };
+  }, [reconnectCount, addToActivityLog]);
 
   // Fetch bot status from API
   const fetchBotStatus = useCallback(async () => {
@@ -905,11 +928,14 @@ export default function WhatsAppDashboard() {
         if (data.message) setStatusMessage(data.message);
         if (data.stats) setStats(prev => ({ ...prev, ...data.stats }));
         if (data.botInfo) setBotInfo(data.botInfo);
+      } else {
+        console.error('❌ API returned error:', data.error);
       }
     } catch (error) {
       console.error('❌ Failed to fetch bot status:', error);
+      addToActivityLog('Failed to fetch bot status', 'error');
     }
-  }, []);
+  }, [addToActivityLog]);
 
   // Bot control functions
   const handleBotAction = async (action, confirmMessage = null) => {
@@ -918,6 +944,7 @@ export default function WhatsAppDashboard() {
     }
     
     setIsLoading(true);
+    addToActivityLog(`Starting action: ${action}`, 'info');
     
     try {
       const response = await fetch('/api/whatsapp', {
@@ -948,12 +975,19 @@ export default function WhatsAppDashboard() {
 
   const sendTestMessage = async () => {
     const phoneNumber = prompt('Enter phone number (with country code, e.g., 919876543210):');
-    if (!phoneNumber) return;
+    if (!phoneNumber) {
+      addToActivityLog('Test message cancelled: No phone number provided', 'warning');
+      return;
+    }
     
     const message = prompt('Enter message:');
-    if (!message) return;
+    if (!message) {
+      addToActivityLog('Test message cancelled: No message provided', 'warning');
+      return;
+    }
     
     setIsLoading(true);
+    addToActivityLog(`Sending test message to ${phoneNumber}`, 'info');
     
     try {
       const response = await fetch('/api/whatsapp', {
@@ -978,6 +1012,7 @@ export default function WhatsAppDashboard() {
     } catch (error) {
       console.error('❌ Send message error:', error);
       addToActivityLog('Failed to send test message', 'error');
+      alert('❌ Failed to send message. Check console for details.');
     } finally {
       setIsLoading(false);
     }
@@ -1038,20 +1073,44 @@ export default function WhatsAppDashboard() {
     { name: 'Customers', value: stats.totalCustomers, color: '#06b6d4' }
   ];
 
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Never';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleTimeString();
+    } catch {
+      return 'Invalid date';
+    }
+  };
+
   // Initialize
   useEffect(() => {
-    connectWebSocket();
+    // Start WebSocket connection with a delay
+    const wsTimeout = setTimeout(() => {
+      connectWebSocket();
+    }, 1000);
     
     // Fetch initial status
     fetchBotStatus();
     
-    // Set up stats polling (fallback if WebSocket fails)
-    statsIntervalRef.current = setInterval(fetchBotStatus, 10000);
+    // Set up fallback polling (every 30 seconds)
+    statsIntervalRef.current = setInterval(fetchBotStatus, 30000);
     
     return () => {
-      if (wsRef.current) wsRef.current.close();
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-      if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
+      clearTimeout(wsTimeout);
+      
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+      
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
+      
+      if (statsIntervalRef.current) {
+        clearInterval(statsIntervalRef.current);
+      }
     };
   }, [connectWebSocket, fetchBotStatus]);
 
@@ -1081,27 +1140,47 @@ export default function WhatsAppDashboard() {
                 </span>
               </div>
               <div className={`px-3 py-1 rounded-full ${wsConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} text-sm font-medium`}>
-                {wsConnected ? 'Live' : 'Offline'}
+                {wsConnected ? 'Live WS' : 'No WS'}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Connection Warning */}
-        {!wsConnected && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600" />
-              <div>
-                <p className="font-medium text-amber-800">Real-time updates disabled</p>
-                <p className="text-sm text-amber-700">
-                  Cannot connect to WebSocket server. Make sure the WhatsApp bot server is running on port 3001.
-                  Using fallback polling every 10 seconds.
-                </p>
-              </div>
+        {/* Connection Status Card */}
+        <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-200 mb-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">Connection Status</h2>
+              <p className="text-gray-600">{statusMessage}</p>
+            </div>
+            
+            <div className="mt-4 md:mt-0">
+              <button
+                onClick={() => fetchBotStatus()}
+                disabled={isLoading}
+                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Refresh Status
+              </button>
             </div>
           </div>
-        )}
+          
+          {!wsConnected && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600" />
+                <div>
+                  <p className="text-amber-800 font-medium">WebSocket Disconnected</p>
+                  <p className="text-amber-700 text-sm">
+                    Real-time updates are disabled. Using fallback polling every 30 seconds.
+                    {reconnectCount > 0 && ` Reconnection attempts: ${reconnectCount}`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Main Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1251,7 +1330,10 @@ export default function WhatsAppDashboard() {
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip 
+                        formatter={(value) => [value, 'Orders']}
+                        labelFormatter={(name) => `Category: ${name}`}
+                      />
                       <Legend />
                     </PieChart>
                   </ResponsiveContainer>
@@ -1268,10 +1350,21 @@ export default function WhatsAppDashboard() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={messagesData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
+                      <XAxis 
+                        dataKey="name" 
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
                       <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="value" fill="#8884d8" />
+                      <Tooltip 
+                        formatter={(value) => [value, 'Count']}
+                      />
+                      <Bar 
+                        dataKey="value" 
+                        fill="#8884d8"
+                        radius={[4, 4, 0, 0]}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1400,7 +1493,7 @@ export default function WhatsAppDashboard() {
                 </button>
                 
                 <button
-                  onClick={() => handleBotAction('clear_session', 'Clear all sessions?')}
+                  onClick={() => handleBotAction('clear_session', 'Clear all sessions? This will log out WhatsApp.')}
                   disabled={isLoading}
                   className="w-full flex items-center gap-3 p-4 text-left rounded-xl border border-gray-200 hover:bg-red-50 hover:border-red-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -1454,7 +1547,7 @@ export default function WhatsAppDashboard() {
           <p>WhatsApp Business Dashboard • Professional Edition • Real-time Monitoring</p>
           <p className="mt-1">
             Bot Server: localhost:3001 • WebSocket: {wsConnected ? 'Connected' : 'Disconnected'} • 
-            Last Update: {stats.lastUpdated ? new Date(stats.lastUpdated).toLocaleTimeString() : 'Never'}
+            Last Update: {formatDate(stats.lastUpdated)}
           </p>
         </div>
       </div>
