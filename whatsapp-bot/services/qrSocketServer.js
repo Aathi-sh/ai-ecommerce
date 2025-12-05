@@ -1,112 +1,392 @@
+// import WebSocket from 'ws';
+
+// class QRSocketServer {
+//     constructor() {
+//         this.wss = null;
+//         this.clients = new Set();
+//         this.broadcastQueue = [];
+//         this.isProcessingQueue = false;
+//     }
+
+//     initialize(server) {
+//         this.wss = new WebSocket.Server({ server, path: '/ws' });
+        
+//         this.wss.on('connection', (ws) => {
+//             console.log('🔗 New WebSocket client connected');
+//             this.clients.add(ws);
+            
+//             // Send welcome message
+//             ws.send(JSON.stringify({
+//                 type: 'connected',
+//                 message: 'Connected to WhatsApp bot server',
+//                 timestamp: new Date().toISOString()
+//             }));
+            
+//             ws.on('message', (message) => {
+//                 try {
+//                     const data = JSON.parse(message);
+//                     this.handleMessage(ws, data);
+//                 } catch (error) {
+//                     console.error('❌ WebSocket message error:', error);
+//                 }
+//             });
+            
+//             ws.on('close', () => {
+//                 console.log('🔌 WebSocket client disconnected');
+//                 this.clients.delete(ws);
+//             });
+            
+//             ws.on('error', (error) => {
+//                 console.error('❌ WebSocket error:', error);
+//                 this.clients.delete(ws);
+//             });
+//         });
+        
+//         console.log('📡 WebSocket server initialized');
+        
+//         // Start processing broadcast queue
+//         this.processQueue();
+//     }
+
+//     handleMessage(ws, data) {
+//         switch (data.type) {
+//             case 'get_status':
+//                 // You can implement status request handling here
+//                 break;
+                
+//             case 'ping':
+//                 ws.send(JSON.stringify({ type: 'pong', timestamp: new Date().toISOString() }));
+//                 break;
+//         }
+//     }
+
+//     broadcastQR(qr) {
+//         this.broadcast({
+//             type: 'qr',
+//             qr: qr,
+//             timestamp: new Date().toISOString()
+//         });
+//     }
+
+//     broadcastStatus(status, message, data = {}) {
+//         this.broadcast({
+//             type: 'status',
+//             status: status,
+//             message: message,
+//             data: data,
+//             timestamp: new Date().toISOString()
+//         });
+//     }
+
+//     broadcastStats(stats) {
+//         this.broadcast({
+//             type: 'stats',
+//             stats: stats,
+//             timestamp: new Date().toISOString()
+//         });
+//     }
+
+//     // ADD THIS METHOD - This was missing
+//     broadcastBotInfo(botInfo) {
+//         this.broadcast({
+//             type: 'bot_info',
+//             botInfo: botInfo,
+//             timestamp: new Date().toISOString()
+//         });
+//     }
+
+//     broadcastConnected(botInfo = {}) {
+//         this.broadcast({
+//             type: 'connected',
+//             message: 'WhatsApp connected successfully',
+//             botInfo: botInfo,
+//             timestamp: new Date().toISOString()
+//         });
+//     }
+
+//     broadcastDisconnected(reason) {
+//         this.broadcast({
+//             type: 'disconnected',
+//             reason: reason,
+//             timestamp: new Date().toISOString()
+//         });
+//     }
+
+//     broadcastError(error, context = '') {
+//         this.broadcast({
+//             type: 'error',
+//             message: error.message || error,
+//             context: context,
+//             timestamp: new Date().toISOString()
+//         });
+//     }
+
+//     broadcastMessageSent(phoneNumber, message) {
+//         this.broadcast({
+//             type: 'message_sent',
+//             phoneNumber: phoneNumber,
+//             message: message.substring(0, 100), // Truncate long messages
+//             timestamp: new Date().toISOString()
+//         });
+//     }
+
+//     broadcastMessageError(phoneNumber, error) {
+//         this.broadcast({
+//             type: 'message_error',
+//             phoneNumber: phoneNumber,
+//             error: error.message || error,
+//             timestamp: new Date().toISOString()
+//         });
+//     }
+
+//     broadcast(data) {
+//         this.broadcastQueue.push(data);
+//     }
+
+//     async processQueue() {
+//         if (this.isProcessingQueue || this.broadcastQueue.length === 0) {
+//             return;
+//         }
+        
+//         this.isProcessingQueue = true;
+        
+//         while (this.broadcastQueue.length > 0) {
+//             const data = this.broadcastQueue.shift();
+//             const message = JSON.stringify(data);
+            
+//             // Send to all connected clients
+//             this.clients.forEach(client => {
+//                 if (client.readyState === WebSocket.OPEN) {
+//                     try {
+//                         client.send(message);
+//                     } catch (error) {
+//                         console.error('❌ Failed to send WebSocket message:', error);
+//                         this.clients.delete(client);
+//                     }
+//                 }
+//             });
+//         }
+        
+//         this.isProcessingQueue = false;
+        
+//         // Schedule next processing
+//         setTimeout(() => this.processQueue(), 100);
+//     }
+
+//     getClientCount() {
+//         return this.clients.size;
+//     }
+
+//     close() {
+//         if (this.wss) {
+//             this.clients.forEach(client => {
+//                 if (client.readyState === WebSocket.OPEN) {
+//                     client.close();
+//                 }
+//             });
+//             this.clients.clear();
+//             this.wss.close();
+//         }
+//     }
+// }
+
+// // Create singleton instance
+// const qrSocketServer = new QRSocketServer();
+// export { qrSocketServer };
+
+
+
 import { WebSocketServer } from 'ws';
 
 class QRSocketServer {
     constructor() {
         this.wss = null;
         this.clients = new Set();
-        this.currentQR = null;
-        this.currentStats = {
-            totalOrders: 0,
-            totalChats: 0,
-            totalCustomers: 0,
-            totalMessages: 0
-        };
+        this.broadcastQueue = [];
+        this.isProcessingQueue = false;
     }
 
     initialize(server) {
-        try {
-            this.wss = new WebSocketServer({ 
-                server,
-                path: '/ws'
+        this.wss = new WebSocketServer({ server, path: '/ws' });
+        
+        this.wss.on('connection', (ws) => {
+            console.log('🔗 New WebSocket client connected');
+            this.clients.add(ws);
+            
+            // Send welcome message
+            ws.send(JSON.stringify({
+                type: 'connected',
+                message: 'Connected to WhatsApp bot server',
+                timestamp: new Date().toISOString()
+            }));
+            
+            ws.on('message', (message) => {
+                try {
+                    const data = JSON.parse(message);
+                    this.handleMessage(ws, data);
+                } catch (error) {
+                    console.error('❌ WebSocket message error:', error);
+                }
             });
             
-            this.wss.on('connection', (ws) => {
-                console.log('🔗 New client connected to WebSocket');
-                this.clients.add(ws);
-
-                // Send current QR if exists
-                if (this.currentQR) {
-                    this.sendToClient(ws, {
-                        type: 'qr',
-                        data: this.currentQR
-                    });
-                }
-
-                // Send current stats
-                this.sendToClient(ws, {
-                    type: 'stats',
-                    data: this.currentStats
-                });
-
-                // Send connection confirmation
-                this.sendToClient(ws, {
-                    type: 'connected',
-                    message: 'WebSocket connected successfully'
-                });
-
-                ws.on('close', () => {
-                    console.log('🔌 Client disconnected from WebSocket');
-                    this.clients.delete(ws);
-                });
-
-                ws.on('error', (error) => {
-                    console.error('❌ WebSocket client error:', error.message);
-                    this.clients.delete(ws);
-                });
-            });
-
-            console.log('✅ WebSocket server initialized on path /ws');
-
-        } catch (error) {
-            console.error('❌ WebSocket server initialization failed:', error);
-        }
-    }
-
-    sendToClient(ws, message) {
-        if (ws.readyState === 1) { // OPEN state
-            try {
-                ws.send(JSON.stringify(message));
-            } catch (error) {
-                console.error('❌ Failed to send message to client:', error);
+            ws.on('close', () => {
+                console.log('🔌 WebSocket client disconnected');
                 this.clients.delete(ws);
-            }
+            });
+            
+            ws.on('error', (error) => {
+                console.error('❌ WebSocket error:', error);
+                this.clients.delete(ws);
+            });
+        });
+        
+        console.log('📡 WebSocket server initialized');
+        
+        // Start processing broadcast queue
+        this.processQueue();
+    }
+
+    handleMessage(ws, data) {
+        switch (data.type) {
+            case 'get_status':
+                // You can implement status request handling here
+                break;
+                
+            case 'ping':
+                ws.send(JSON.stringify({ type: 'pong', timestamp: new Date().toISOString() }));
+                break;
         }
     }
 
-    broadcastQR(qrCode) {
-        this.currentQR = qrCode;
-        this.broadcastToAll({
+    broadcastQR(qr) {
+        this.broadcast({
             type: 'qr',
-            data: qrCode
+            qr: qr,
+            timestamp: new Date().toISOString()
         });
     }
 
-    broadcastStatus(status, message = '') {
-        this.broadcastToAll({
+    broadcastStatus(status, message, data = {}) {
+        this.broadcast({
             type: 'status',
             status: status,
-            message: message
+            message: message,
+            data: data,
+            timestamp: new Date().toISOString()
         });
     }
 
     broadcastStats(stats) {
-        this.currentStats = { ...stats };
-        this.broadcastToAll({
+        this.broadcast({
             type: 'stats',
-            data: stats
+            stats: stats,
+            timestamp: new Date().toISOString()
         });
     }
 
-    broadcastToAll(message) {
-        const messageString = JSON.stringify(message);
-        this.clients.forEach(client => {
-            this.sendToClient(client, message);
+    broadcastBotInfo(botInfo) {
+        this.broadcast({
+            type: 'bot_info',
+            botInfo: botInfo,
+            timestamp: new Date().toISOString()
         });
+    }
+
+    broadcastConnected(botInfo = {}) {
+        this.broadcast({
+            type: 'connected',
+            message: 'WhatsApp connected successfully',
+            botInfo: botInfo,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    broadcastDisconnected(reason) {
+        this.broadcast({
+            type: 'disconnected',
+            reason: reason,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    broadcastError(error, context = '') {
+        this.broadcast({
+            type: 'error',
+            message: error.message || error,
+            context: context,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    broadcastMessageSent(phoneNumber, message) {
+        this.broadcast({
+            type: 'message_sent',
+            phoneNumber: phoneNumber,
+            message: message.substring(0, 100),
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    broadcastMessageError(phoneNumber, error) {
+        this.broadcast({
+            type: 'message_error',
+            phoneNumber: phoneNumber,
+            error: error.message || error,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    broadcast(data) {
+        this.broadcastQueue.push(data);
+    }
+
+    async processQueue() {
+        if (this.isProcessingQueue || this.broadcastQueue.length === 0) {
+            return;
+        }
+        
+        this.isProcessingQueue = true;
+        
+        while (this.broadcastQueue.length > 0) {
+            const data = this.broadcastQueue.shift();
+            const message = JSON.stringify(data);
+            
+            // Send to all connected clients
+            this.clients.forEach(client => {
+                if (client.readyState === 1) { // WebSocket.OPEN
+                    try {
+                        client.send(message);
+                    } catch (error) {
+                        console.error('❌ Failed to send WebSocket message:', error);
+                        this.clients.delete(client);
+                    }
+                }
+            });
+        }
+        
+        this.isProcessingQueue = false;
+        
+        // Schedule next processing
+        setTimeout(() => this.processQueue(), 100);
     }
 
     getClientCount() {
         return this.clients.size;
     }
+
+    close() {
+        if (this.wss) {
+            this.clients.forEach(client => {
+                if (client.readyState === 1) {
+                    client.close();
+                }
+            });
+            this.clients.clear();
+            this.wss.close();
+        }
+    }
 }
 
-export const qrSocketServer = new QRSocketServer();
+// Create singleton instance
+const qrSocketServer = new QRSocketServer();
+export { qrSocketServer };
