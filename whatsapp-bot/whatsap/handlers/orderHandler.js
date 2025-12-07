@@ -2401,36 +2401,40 @@ async function sendPaymentInstructions(message, userSession, order) {
 /**
  * Send order confirmation to customer
  */
+/**
+ * Send order confirmation to customer - UPDATED VERSION (admin only)
+ */
 async function sendOrderConfirmation(message, userSession, customerPhone) {
     try {
-        // Send confirmation notification to customer if they have app
-        await notificationManager.sendNotification('CUSTOMER_NOTIFICATION', {
-            customerPhone: customerPhone,
-            customerName: userSession.orderData.customerName,
-            title: '🎉 Order Confirmed!',
-            body: `${userSession.orderData.customerName}, your order #${userSession.orderData.orderNumber} has been received. Amount: ₹${userSession.orderData.totalPrice}`,
-            notificationData: {
-                category: 'order',
-                priority: 'normal',
-                referenceId: userSession.orderData.orderNumber,
-                actionUrl: `/orders/${userSession.orderData.orderNumber}`,
-                extraData: {
-                    customerName: userSession.orderData.customerName,
-                    orderNumber: userSession.orderData.orderNumber,
-                    amount: userSession.orderData.totalPrice,
-                    product: userSession.orderData.productName,
-                    quantity: userSession.orderData.quantity,
-                    estimatedProcessing: '24-48 hours',
-                    supportContact: '+91 XXXXX XXXXX'
-                }
-            }
-        });
-        console.log(`📱 Order confirmation sent to customer: ${userSession.orderData.customerName} (${customerPhone})`);
+        // Remove customer notification - only send WhatsApp message
+        await message.reply(
+            `✅ *Order Confirmed Successfully!*\n\n` +
+            `Dear ${userSession.orderData.customerName},\n\n` +
+            `Your order #${userSession.orderData.orderNumber} has been confirmed!\n\n` +
+            `📊 *Order Details:*\n` +
+            `• Order #: ${userSession.orderData.orderNumber}\n` +
+            `• Amount: ₹${userSession.orderData.totalPrice}\n` +
+            `• Product: ${userSession.orderData.productName} x${userSession.orderData.quantity}\n\n` +
+            `⏰ *Next Steps:*\n` +
+            `1. Make payment to UPI ID: posterpro.store@upi\n` +
+            `2. Send payment screenshot here\n` +
+            `3. Order will be processed after payment verification\n\n` +
+            `🕒 *Processing Time:* 24-48 hours after payment\n\n` +
+            `📞 *Need Help?* Contact: +91 XXXXX XXXXX`
+        );
+        
+        console.log(`📱 Order confirmation sent via WhatsApp to: ${userSession.orderData.customerName} (${customerPhone})`);
+        
     } catch (error) {
-        console.log('ℹ️ Customer notification skipped (no FCM token):', error.message);
+        console.error('❌ Error sending order confirmation:', error);
+        // Fallback simple message
+        await message.reply(
+            `✅ Order #${userSession.orderData.orderNumber} confirmed!\n` +
+            `Amount: ₹${userSession.orderData.totalPrice}\n` +
+            `Please make payment and send screenshot.`
+        );
     }
 }
-
 /**
  * Schedule payment reminder
  */

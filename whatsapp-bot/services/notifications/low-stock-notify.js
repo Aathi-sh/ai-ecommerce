@@ -1,49 +1,34 @@
 // services/notifications/low-stock-notify.js
 
+/**
+ * Low Stock Notification Service
+ * Handles all stock-related notifications to admin
+ */
+
 class LowStockNotification {
   constructor() {
-    // Define categories locally to avoid circular dependency
-    this.categories = {
-      ORDER: 'order',
-      PAYMENT: 'payment',
-      STOCK: 'stock',
-      INVOICE: 'invoice',
-      SYSTEM: 'system'
-    };
-
+    this.category = 'stock';
     this.priorities = {
       HIGH: 'high',
       NORMAL: 'normal',
       LOW: 'low'
     };
-
-    this.category = this.categories.STOCK;
-    this.lowStockThreshold = 5; // Default threshold
-    this.criticalStockThreshold = 2; // Critical threshold
-    console.log('📦 Low Stock Notification service initialized');
+    
+    this.lowStockThreshold = 5;
+    this.criticalStockThreshold = 2;
+    this.notificationService = null;
+    console.log('📦 Low Stock Notification service initialized (Admin Only)');
   }
 
   /**
-   * Lazy load notification service to avoid circular dependency
+   * Lazy load notification service
    */
   async getNotificationService() {
     if (!this.notificationService) {
-      // Dynamic import to break circular dependency
       const { default: notificationService } = await import('./notification-service.js');
       this.notificationService = notificationService;
     }
     return this.notificationService;
-  }
-
-  /**
-   * Lazy load API service
-   */
-  async getApiService() {
-    if (!this.apiService) {
-      const { default: apiService } = await import('../apiService.js');
-      this.apiService = apiService;
-    }
-    return this.apiService;
   }
 
   /**
@@ -53,11 +38,12 @@ class LowStockNotification {
     try {
       console.log('🔍 Checking for low stock products...');
 
-      const apiService = await this.getApiService();
-      const products = await apiService.getProducts();
+      // This should query your database for products
+      // const products = await Product.find({});
+      const products = []; // Placeholder
       
       if (!products || products.length === 0) {
-        console.log('📦 No products found');
+        console.log('📦 No products found for stock check');
         return { checked: 0, notified: 0 };
       }
 
@@ -120,7 +106,7 @@ class LowStockNotification {
       }
 
       // Send summary if there are multiple notifications
-      if (notifications.length > 1) {
+      if (notifications.length > 0) {
         await this.sendStockSummaryNotification(
           lowStockProducts.length,
           criticalStockProducts.length,
@@ -164,18 +150,19 @@ class LowStockNotification {
         body: `${product.productName} has only ${currentStock} units left!`,
         category: this.category,
         priority: this.priorities.HIGH,
-        referenceId: product._id,
-        actionUrl: `/admin/products/${product._id}`,
+        referenceId: product._id || product.productId,
+        actionUrl: `/admin/products/${product._id || product.productId}`,
         sound: 'alert',
         extraData: {
-          productId: product._id,
+          productId: product._id || product.productId,
           productName: product.productName,
           currentStock,
           threshold: this.criticalStockThreshold,
           sku: product.sku || 'N/A',
           price: product.price || 0,
           urgency: 'URGENT',
-          requiredAction: 'RESTOCK IMMEDIATELY'
+          requiredAction: 'RESTOCK IMMEDIATELY',
+          category: product.category || 'Uncategorized'
         }
       };
 
@@ -185,10 +172,12 @@ class LowStockNotification {
         notificationData
       );
 
+      // Log notification
       await this.logNotification({
         ...notificationData,
         notificationType: 'critical_stock',
-        productId: product._id
+        productId: product._id || product.productId,
+        success: result.success
       });
 
       return result;
@@ -212,10 +201,10 @@ class LowStockNotification {
         body: `${product.productName} is running low. Only ${currentStock} units left.`,
         category: this.category,
         priority: this.priorities.HIGH,
-        referenceId: product._id,
-        actionUrl: `/admin/products/${product._id}`,
+        referenceId: product._id || product.productId,
+        actionUrl: `/admin/products/${product._id || product.productId}`,
         extraData: {
-          productId: product._id,
+          productId: product._id || product.productId,
           productName: product.productName,
           currentStock,
           threshold: this.lowStockThreshold,
@@ -232,10 +221,12 @@ class LowStockNotification {
         notificationData
       );
 
+      // Log notification
       await this.logNotification({
         ...notificationData,
         notificationType: 'low_stock',
-        productId: product._id
+        productId: product._id || product.productId,
+        success: result.success
       });
 
       return result;
@@ -258,17 +249,18 @@ class LowStockNotification {
         body: `${product.productName} is now out of stock. No units available.`,
         category: this.category,
         priority: this.priorities.HIGH,
-        referenceId: product._id,
-        actionUrl: `/admin/products/${product._id}`,
+        referenceId: product._id || product.productId,
+        actionUrl: `/admin/products/${product._id || product.productId}`,
         extraData: {
-          productId: product._id,
+          productId: product._id || product.productId,
           productName: product.productName,
           lastStockDate: new Date().toISOString(),
           sku: product.sku || 'N/A',
           price: product.price || 0,
           category: product.category || 'Uncategorized',
           averageSales: 'N/A',
-          suggestedReorder: 20 // Suggested reorder quantity
+          suggestedReorder: 20, // Suggested reorder quantity
+          impact: 'Sales affected'
         }
       };
 
@@ -278,64 +270,18 @@ class LowStockNotification {
         notificationData
       );
 
-      // If product is popular, send to multiple admins
-      if (product.isPopular || product.category === 'bestseller') {
-        await this.sendBroadcastOutOfStock(product);
-      }
-
+      // Log notification
       await this.logNotification({
         ...notificationData,
         notificationType: 'out_of_stock',
-        productId: product._id
+        productId: product._id || product.productId,
+        success: result.success
       });
 
       return result;
 
     } catch (error) {
       console.error('❌ Error sending out of stock notification:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Send broadcast out of stock for important products
-   */
-  async sendBroadcastOutOfStock(product) {
-    try {
-      const notificationService = await this.getNotificationService();
-      
-      // Get all admin users
-      const adminTokens = process.env.ADMIN_FCM_TOKENS 
-        ? process.env.ADMIN_FCM_TOKENS.split(',') 
-        : [];
-
-      if (adminTokens.length <= 1) return; // Only broadcast if multiple admins
-
-      const notificationData = {
-        title: '📢 IMPORTANT: Product Out of Stock',
-        body: `${product.productName} (Bestseller) is out of stock. Affects sales.`,
-        category: this.category,
-        priority: this.priorities.HIGH,
-        referenceId: product._id,
-        actionUrl: `/admin/products/${product._id}`,
-        extraData: {
-          productId: product._id,
-          productName: product.productName,
-          importance: 'HIGH',
-          impact: 'Sales affected',
-          actionRequired: 'Priority restocking'
-        }
-      };
-
-      const result = await notificationService.sendPushNotification(
-        adminTokens,
-        notificationData
-      );
-
-      return result;
-
-    } catch (error) {
-      console.error('❌ Error sending broadcast out of stock:', error);
       return { success: false, error: error.message };
     }
   }
@@ -365,7 +311,8 @@ class LowStockNotification {
           lowStock: lowStockCount,
           outOfStock: outOfStockCount,
           totalProducts: 'N/A',
-          stockHealth: this.calculateStockHealth(lowStockCount, criticalStockCount, outOfStockCount)
+          stockHealth: this.calculateStockHealth(lowStockCount, criticalStockCount, outOfStockCount),
+          actionRequired: 'Review and reorder stock'
         }
       };
 
@@ -415,10 +362,10 @@ class LowStockNotification {
         body: `${changeText} units ${action}. Now: ${newStock} units.`,
         category: this.category,
         priority: this.priorities.NORMAL,
-        referenceId: product._id,
-        actionUrl: `/admin/products/${product._id}`,
+        referenceId: product._id || product.productId,
+        actionUrl: `/admin/products/${product._id || product.productId}`,
         extraData: {
-          productId: product._id,
+          productId: product._id || product.productId,
           productName: product.productName,
           previousStock,
           newStock,
@@ -436,10 +383,12 @@ class LowStockNotification {
         notificationData
       );
 
+      // Log notification
       await this.logNotification({
         ...notificationData,
         notificationType: 'stock_updated',
-        productId: product._id
+        productId: product._id || product.productId,
+        success: result.success
       });
 
       return result;
@@ -484,15 +433,14 @@ class LowStockNotification {
       const logEntry = {
         ...notification,
         sentAt: new Date().toISOString(),
-        status: 'sent'
+        status: notification.success ? 'sent' : 'failed'
       };
 
       // Here you would save to your database
       console.log('📝 Stock notification logged:', {
-        title: notification.title,
-        product: notification.extraData?.productName,
-        category: notification.category,
-        type: notification.notificationType
+        type: notification.notificationType,
+        productName: notification.extraData?.productName,
+        success: notification.success
       });
 
       return logEntry;
@@ -538,8 +486,9 @@ class LowStockNotification {
    */
   async getStockStatistics() {
     try {
-      const apiService = await this.getApiService();
-      const products = await apiService.getProducts();
+      // This should query your database
+      // const products = await Product.find({});
+      const products = []; // Placeholder
       
       if (!products || products.length === 0) {
         return {
@@ -548,7 +497,8 @@ class LowStockNotification {
           lowStock: 0,
           criticalStock: 0,
           outOfStock: 0,
-          health: 'Unknown'
+          health: 'Unknown',
+          timestamp: new Date().toISOString()
         };
       }
 
@@ -583,7 +533,8 @@ class LowStockNotification {
         criticalStock: 0,
         outOfStock: 0,
         health: 'Error',
-        error: error.message
+        error: error.message,
+        timestamp: new Date().toISOString()
       };
     }
   }

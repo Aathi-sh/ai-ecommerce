@@ -1,47 +1,32 @@
 // services/notifications/new-order-notify.js
 
+/**
+ * New Order Notification Service
+ * Handles all order-related notifications to admin
+ */
+
 class NewOrderNotification {
   constructor() {
-    // Define categories locally to avoid circular dependency
-    this.categories = {
-      ORDER: 'order',
-      PAYMENT: 'payment',
-      STOCK: 'stock',
-      INVOICE: 'invoice',
-      SYSTEM: 'system'
-    };
-
+    this.category = 'order';
     this.priorities = {
       HIGH: 'high',
       NORMAL: 'normal',
       LOW: 'low'
     };
-
-    this.category = this.categories.ORDER;
+    
+    this.notificationService = null;
     console.log('🛍️ New Order Notification service initialized');
   }
 
   /**
-   * Lazy load notification service to avoid circular dependency
+   * Lazy load notification service
    */
   async getNotificationService() {
     if (!this.notificationService) {
-      // Dynamic import to break circular dependency
-      const { default: notificationService } = await import('./notification-service.js');
+      const { default: notificationService } = await import("./notifictaion-service.js");
       this.notificationService = notificationService;
     }
     return this.notificationService;
-  }
-
-  /**
-   * Lazy load API service
-   */
-  async getApiService() {
-    if (!this.apiService) {
-      const { default: apiService } = await import('../apiService.js');
-      this.apiService = apiService;
-    }
-    return this.apiService;
   }
 
   /**
@@ -66,53 +51,35 @@ class NewOrderNotification {
         actionUrl: `/admin/orders/${orderData.orderNumber}`,
         extraData: {
           orderId: orderData._id || orderData.orderNumber,
+          orderNumber: orderData.orderNumber,
           customerName: orderData.customerName || 'Customer',
+          customerPhone: orderData.phoneNumber,
+          totalAmount: orderData.totalPrice,
           itemsCount: orderData.items?.length || 0,
+          paymentStatus: orderData.paymentStatus || 'pending',
           shippingAddress: orderData.shippingAddress?.substring(0, 50) + '...',
-          paymentStatus: orderData.paymentStatus || 'pending'
+          timestamp: new Date().toISOString()
         }
       };
 
-      // Send to admin
-      const adminResult = await notificationService.sendAdminNotification(
+      const result = await notificationService.sendAdminNotification(
         notificationData.title,
         notificationData.body,
         notificationData
       );
 
-      // Send to customer if they have app
-      const customerResult = await notificationService.sendCustomerNotification(
-        orderData.phoneNumber,
-        '🎉 Order Confirmed!',
-        `Your order #${orderData.orderNumber} has been received. We'll notify you once it's processed.`,
-        {
-          category: this.category,
-          priority: this.priorities.NORMAL,
-          referenceId: orderData.orderNumber,
-          actionUrl: `/orders/${orderData.orderNumber}`,
-          extraData: {
-            orderNumber: orderData.orderNumber,
-            totalAmount: orderData.totalPrice,
-            estimatedDelivery: '3-5 business days'
-          }
-        }
-      );
-
       // Log notification
       await this.logNotification({
         ...notificationData,
-        recipientPhone: orderData.phoneNumber,
-        orderNumber: orderData.orderNumber,
         notificationType: 'new_order',
-        adminNotified: adminResult.success,
-        customerNotified: customerResult.success
+        success: result.success,
+        orderNumber: orderData.orderNumber
       });
 
       return {
-        success: adminResult.success || customerResult.success,
-        adminNotification: adminResult,
-        customerNotification: customerResult,
-        orderNumber: orderData.orderNumber
+        success: result.success,
+        orderNumber: orderData.orderNumber,
+        notification: result
       };
 
     } catch (error) {
@@ -132,13 +99,11 @@ class NewOrderNotification {
     try {
       console.log(`🔄 Sending order status update: ${orderId} from ${previousStatus} to ${newStatus}`);
 
-      const apiService = await this.getApiService();
       const notificationService = await this.getNotificationService();
 
-      const order = await apiService.getOrderById(orderId);
-      if (!order) {
-        throw new Error(`Order ${orderId} not found`);
-      }
+      // In production, fetch order details from database
+      // const order = await Order.findById(orderId);
+      const orderNumber = orderId; // For now, assume orderId is orderNumber
 
       const statusMessages = {
         'processing': 'is now being processed',
@@ -146,7 +111,8 @@ class NewOrderNotification {
         'shipped': 'has been shipped',
         'out_for_delivery': 'is out for delivery',
         'delivered': 'has been delivered',
-        'cancelled': 'has been cancelled'
+        'cancelled': 'has been cancelled',
+        'refunded': 'has been refunded'
       };
 
       const statusEmoji = {
@@ -155,49 +121,47 @@ class NewOrderNotification {
         'shipped': '🚚',
         'out_for_delivery': '📦',
         'delivered': '🎉',
-        'cancelled': '❌'
+        'cancelled': '❌',
+        'refunded': '💸'
       };
 
       const message = statusMessages[newStatus] || 'status has been updated';
       const emoji = statusEmoji[newStatus] || '📋';
 
-      // Send to customer
-      const customerNotification = await notificationService.sendCustomerNotification(
-        order.phoneNumber,
-        `${emoji} Order Update: ${newStatus.toUpperCase()}`,
-        `Your order #${order.orderNumber} ${message}.`,
-        {
-          category: this.category,
-          priority: newStatus === 'cancelled' ? this.priorities.HIGH : this.priorities.NORMAL,
-          referenceId: order.orderNumber,
-          actionUrl: `/orders/${order.orderNumber}`,
-          extraData: {
-            previousStatus,
-            newStatus,
-            updatedAt: new Date().toISOString()
-          }
+      const notificationData = {
+        title: `${emoji} Order ${newStatus.toUpperCase()}: ${orderNumber}`,
+        body: `Order #${orderNumber} ${message}.`,
+        category: this.category,
+        priority: ['cancelled', 'refunded'].includes(newStatus) ? this.priorities.HIGH : this.priorities.NORMAL,
+        referenceId: orderNumber,
+        actionUrl: `/admin/orders/${orderNumber}`,
+        extraData: {
+          orderNumber,
+          previousStatus,
+          newStatus,
+          updatedAt: new Date().toISOString()
         }
+      };
+
+      const result = await notificationService.sendAdminNotification(
+        notificationData.title,
+        notificationData.body,
+        notificationData
       );
 
-      // Send to admin for important status changes
-      if (['cancelled', 'delivered'].includes(newStatus)) {
-        await notificationService.sendAdminNotification(
-          `📊 Order ${newStatus.toUpperCase()}: ${order.orderNumber}`,
-          `Order #${order.orderNumber} has been marked as ${newStatus}`,
-          {
-            category: this.category,
-            priority: this.priorities.NORMAL,
-            referenceId: order.orderNumber,
-            actionUrl: `/admin/orders/${order.orderNumber}`
-          }
-        );
-      }
+      // Log notification
+      await this.logNotification({
+        ...notificationData,
+        notificationType: 'order_status_update',
+        success: result.success,
+        orderNumber
+      });
 
       return {
-        success: customerNotification.success,
-        orderNumber: order.orderNumber,
+        success: result.success,
+        orderNumber,
         status: newStatus,
-        customerNotified: customerNotification.success
+        notification: result
       };
 
     } catch (error) {
@@ -218,17 +182,18 @@ class NewOrderNotification {
       const notificationData = {
         title: '⚠️ Low Stock Alert!',
         body: `${product.productName} is running low. Only ${currentStock} units left.`,
-        category: this.category,
-        priority: this.priorities.HIGH,
-        referenceId: product._id,
-        actionUrl: `/admin/products/${product._id}`,
+        category: 'stock',
+        priority: currentStock <= 2 ? this.priorities.HIGH : this.priorities.NORMAL,
+        referenceId: product._id || product.productId,
+        actionUrl: `/admin/products/${product._id || product.productId}`,
         extraData: {
-          productId: product._id,
+          productId: product._id || product.productId,
           productName: product.productName,
           currentStock,
           threshold,
           sku: product.sku || 'N/A',
-          category: product.category || 'Uncategorized'
+          category: product.category || 'Uncategorized',
+          alertLevel: currentStock <= 2 ? 'critical' : 'warning'
         }
       };
 
@@ -241,8 +206,8 @@ class NewOrderNotification {
       await this.logNotification({
         ...notificationData,
         notificationType: 'low_stock',
-        threshold,
-        productId: product._id
+        success: result.success,
+        productId: product._id || product.productId
       });
 
       return result;
@@ -265,12 +230,12 @@ class NewOrderNotification {
       const notificationData = {
         title: '🚫 Product Out of Stock!',
         body: `${product.productName} is now out of stock. Please restock.`,
-        category: this.category,
+        category: 'stock',
         priority: this.priorities.HIGH,
-        referenceId: product._id,
-        actionUrl: `/admin/products/${product._id}`,
+        referenceId: product._id || product.productId,
+        actionUrl: `/admin/products/${product._id || product.productId}`,
         extraData: {
-          productId: product._id,
+          productId: product._id || product.productId,
           productName: product.productName,
           lastStock: product.stock || 0,
           sku: product.sku || 'N/A',
@@ -287,13 +252,66 @@ class NewOrderNotification {
       await this.logNotification({
         ...notificationData,
         notificationType: 'out_of_stock',
-        productId: product._id
+        success: result.success,
+        productId: product._id || product.productId
       });
 
       return result;
 
     } catch (error) {
       console.error('❌ Error sending out of stock notification:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send stock updated notification
+   */
+  async sendStockUpdatedNotification(product, previousStock, newStock, updatedBy = 'system') {
+    try {
+      const notificationService = await this.getNotificationService();
+
+      const stockChange = newStock - previousStock;
+      const action = stockChange > 0 ? 'restocked' : 'sold';
+      const changeText = Math.abs(stockChange);
+
+      const notificationData = {
+        title: `📦 Stock ${stockChange > 0 ? 'Added' : 'Updated'}: ${product.productName}`,
+        body: `${changeText} units ${action}. Now: ${newStock} units.`,
+        category: 'stock',
+        priority: this.priorities.NORMAL,
+        referenceId: product._id || product.productId,
+        actionUrl: `/admin/products/${product._id || product.productId}`,
+        extraData: {
+          productId: product._id || product.productId,
+          productName: product.productName,
+          previousStock,
+          newStock,
+          change: stockChange,
+          updatedBy,
+          updatedAt: new Date().toISOString(),
+          stockStatus: newStock <= 2 ? 'critical' : 
+                      newStock <= 5 ? 'low' : 'good'
+        }
+      };
+
+      const result = await notificationService.sendAdminNotification(
+        notificationData.title,
+        notificationData.body,
+        notificationData
+      );
+
+      await this.logNotification({
+        ...notificationData,
+        notificationType: 'stock_updated',
+        success: result.success,
+        productId: product._id || product.productId
+      });
+
+      return result;
+
+    } catch (error) {
+      console.error('❌ Error sending stock updated notification:', error);
       return { success: false, error: error.message };
     }
   }
@@ -325,7 +343,12 @@ class NewOrderNotification {
           totalAmount,
           customerCount: uniqueCustomers.length,
           averageOrderValue: totalAmount / orders.length,
-          date: new Date().toISOString().split('T')[0]
+          date: new Date().toISOString().split('T')[0],
+          summary: orders.map(order => ({
+            orderNumber: order.orderNumber,
+            amount: order.totalPrice,
+            customer: order.phoneNumber
+          }))
         }
       };
 
@@ -344,57 +367,6 @@ class NewOrderNotification {
   }
 
   /**
-   * Send notification when stock is updated
-   */
-  async sendStockUpdatedNotification(product, previousStock, newStock, updatedBy = 'system') {
-    try {
-      const notificationService = await this.getNotificationService();
-
-      const stockChange = newStock - previousStock;
-      const action = stockChange > 0 ? 'restocked' : 'sold';
-      const changeText = Math.abs(stockChange);
-
-      const notificationData = {
-        title: `📦 Stock ${stockChange > 0 ? 'Added' : 'Updated'}: ${product.productName}`,
-        body: `${changeText} units ${action}. Now: ${newStock} units.`,
-        category: this.category,
-        priority: this.priorities.NORMAL,
-        referenceId: product._id,
-        actionUrl: `/admin/products/${product._id}`,
-        extraData: {
-          productId: product._id,
-          productName: product.productName,
-          previousStock,
-          newStock,
-          change: stockChange,
-          updatedBy,
-          updatedAt: new Date().toISOString(),
-          stockStatus: newStock <= 2 ? 'critical' : 
-                      newStock <= 5 ? 'low' : 'good'
-        }
-      };
-
-      const result = await notificationService.sendAdminNotification(
-        notificationData.title,
-        notificationData.body,
-        notificationData
-      );
-
-      await this.logNotification({
-        ...notificationData,
-        notificationType: 'stock_updated',
-        productId: product._id
-      });
-
-      return result;
-
-    } catch (error) {
-      console.error('❌ Error sending stock updated notification:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
    * Log notification
    */
   async logNotification(notification) {
@@ -402,14 +374,14 @@ class NewOrderNotification {
       const logEntry = {
         ...notification,
         sentAt: new Date().toISOString(),
-        status: 'sent'
+        status: notification.success ? 'sent' : 'failed'
       };
 
       // Here you would save to your database
-      console.log('📝 Notification logged:', {
-        title: notification.title,
-        recipient: notification.recipientPhone,
-        category: notification.category
+      console.log('📝 Order notification logged:', {
+        type: notification.notificationType,
+        orderNumber: notification.orderNumber,
+        success: notification.success
       });
 
       return logEntry;
@@ -453,11 +425,12 @@ class NewOrderNotification {
     try {
       console.log('🔍 Checking for low stock products...');
 
-      const apiService = await this.getApiService();
-      const products = await apiService.getProducts();
+      // In production, fetch products from database
+      // const products = await Product.find({});
+      const products = []; // Placeholder
       
       if (!products || products.length === 0) {
-        console.log('📦 No products found');
+        console.log('📦 No products found for stock check');
         return { checked: 0, notified: 0 };
       }
 
@@ -523,21 +496,22 @@ class NewOrderNotification {
       }
 
       // Send summary if there are multiple notifications
-      if (notifications.length > 1) {
+      if (notifications.length > 0) {
         const notificationService = await this.getNotificationService();
         
         await notificationService.sendAdminNotification(
           `📦 Stock Status Report (${notifications.length} issues)`,
           `Critical: ${criticalStockProducts.length}, Low: ${lowStockProducts.length - criticalStockProducts.length}, Out of Stock: ${outOfStockProducts.length}`,
           {
-            category: this.category,
+            category: 'stock',
             priority: this.priorities.NORMAL,
             actionUrl: '/admin/products/stock',
             extraData: {
               reportDate: new Date().toISOString(),
               criticalStock: criticalStockProducts.length,
               lowStock: lowStockProducts.length,
-              outOfStock: outOfStockProducts.length
+              outOfStock: outOfStockProducts.length,
+              details: notifications
             }
           }
         );

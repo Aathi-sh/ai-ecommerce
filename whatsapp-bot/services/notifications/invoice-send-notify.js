@@ -1,32 +1,28 @@
 // services/notifications/invoice-send-notify.js
 
+/**
+ * Invoice Send Notification Service
+ * Handles all invoice-related notifications to admin
+ */
+
 class InvoiceSendNotification {
   constructor() {
-    // Define categories locally to avoid circular dependency
-    this.categories = {
-      ORDER: 'order',
-      PAYMENT: 'payment',
-      STOCK: 'stock',
-      INVOICE: 'invoice',
-      SYSTEM: 'system'
-    };
-
+    this.category = 'invoice';
     this.priorities = {
       HIGH: 'high',
       NORMAL: 'normal',
       LOW: 'low'
     };
-
-    this.category = this.categories.INVOICE;
-    console.log('🧾 Invoice Send Notification service initialized');
+    
+    this.notificationService = null;
+    console.log('🧾 Invoice Send Notification service initialized (Admin Only)');
   }
 
   /**
-   * Lazy load notification service to avoid circular dependency
+   * Lazy load notification service
    */
   async getNotificationService() {
     if (!this.notificationService) {
-      // Dynamic import to break circular dependency
       const { default: notificationService } = await import('./notification-service.js');
       this.notificationService = notificationService;
     }
@@ -56,6 +52,7 @@ class InvoiceSendNotification {
           invoiceNumber: invoiceData.invoiceNumber,
           orderNumber: invoiceData.orderNumber,
           customerName: invoiceData.customerName || 'Customer',
+          customerPhone: invoiceData.customerPhone,
           amount: invoiceData.totalAmount,
           generatedAt: new Date().toISOString(),
           status: 'generated',
@@ -70,14 +67,19 @@ class InvoiceSendNotification {
         notificationData
       );
 
+      // Log notification
       await this.logNotification({
         ...notificationData,
         notificationType: 'invoice_generated',
-        recipientPhone: invoiceData.customerPhone,
-        orderNumber: invoiceData.orderNumber
+        orderNumber: invoiceData.orderNumber,
+        success: result.success
       });
 
-      return result;
+      return {
+        success: result.success,
+        invoiceNumber: invoiceData.invoiceNumber,
+        notification: result
+      };
 
     } catch (error) {
       console.error('❌ Error sending invoice generated notification:', error);
@@ -115,68 +117,44 @@ class InvoiceSendNotification {
       const emoji = channelEmoji[sentVia] || '📄';
       const channel = channelText[sentVia] || sentVia;
 
-      // Send to admin
-      const adminNotification = await notificationService.sendAdminNotification(
-        `${emoji} Invoice Sent via ${channel}`,
-        `Invoice #${invoiceData.invoiceNumber} sent to customer. Order #${invoiceData.orderNumber}`,
-        {
-          category: this.category,
-          priority: this.priorities.NORMAL,
-          referenceId: invoiceData.invoiceNumber || invoiceData.orderNumber,
-          actionUrl: `/admin/invoices/${invoiceData.invoiceNumber || invoiceData.orderNumber}`,
-          extraData: {
-            invoiceNumber: invoiceData.invoiceNumber,
-            orderNumber: invoiceData.orderNumber,
-            customerPhone: invoiceData.customerPhone,
-            sentVia,
-            sentAt: new Date().toISOString(),
-            amount: invoiceData.totalAmount,
-            deliveryStatus: 'sent'
-          }
+      const notificationData = {
+        title: `${emoji} Invoice Sent via ${channel}`,
+        body: `Invoice #${invoiceData.invoiceNumber} sent to customer. Order #${invoiceData.orderNumber}`,
+        category: this.category,
+        priority: this.priorities.NORMAL,
+        referenceId: invoiceData.invoiceNumber || invoiceData.orderNumber,
+        actionUrl: `/admin/invoices/${invoiceData.invoiceNumber || invoiceData.orderNumber}`,
+        extraData: {
+          invoiceNumber: invoiceData.invoiceNumber,
+          orderNumber: invoiceData.orderNumber,
+          customerPhone: invoiceData.customerPhone,
+          sentVia,
+          sentAt: new Date().toISOString(),
+          amount: invoiceData.totalAmount,
+          deliveryStatus: 'sent'
         }
-      );
+      };
 
-      // Send to customer (if they have the app)
-      const customerNotification = await notificationService.sendCustomerNotification(
-        invoiceData.customerPhone,
-        '📄 Your Invoice is Ready!',
-        `Invoice #${invoiceData.invoiceNumber} for your order has been generated. Amount: ₹${invoiceData.totalAmount}`,
-        {
-          category: this.category,
-          priority: this.priorities.NORMAL,
-          referenceId: invoiceData.orderNumber,
-          actionUrl: `/invoices/${invoiceData.invoiceNumber || invoiceData.orderNumber}`,
-          extraData: {
-            invoiceNumber: invoiceData.invoiceNumber,
-            orderNumber: invoiceData.orderNumber,
-            amount: invoiceData.totalAmount,
-            date: invoiceData.date || new Date().toISOString().split('T')[0],
-            downloadUrl: invoiceData.downloadUrl || '',
-            paymentStatus: invoiceData.paymentStatus || 'paid',
-            itemsCount: invoiceData.items?.length || 0
-          }
-        }
+      const result = await notificationService.sendAdminNotification(
+        notificationData.title,
+        notificationData.body,
+        notificationData
       );
 
       // Log notification
       await this.logNotification({
-        title: `Invoice Sent via ${channel}`,
-        body: `Invoice #${invoiceData.invoiceNumber} for Order #${invoiceData.orderNumber}`,
-        category: this.category,
-        priority: this.priorities.NORMAL,
-        recipientPhone: invoiceData.customerPhone,
-        orderNumber: invoiceData.orderNumber,
+        ...notificationData,
         notificationType: 'invoice_sent',
+        orderNumber: invoiceData.orderNumber,
         sentVia,
-        adminNotified: adminNotification.success,
-        customerNotified: customerNotification.success
+        success: result.success
       });
 
       return {
-        success: adminNotification.success || customerNotification.success,
-        adminNotification,
-        customerNotification,
-        invoiceNumber: invoiceData.invoiceNumber
+        success: result.success,
+        invoiceNumber: invoiceData.invoiceNumber,
+        sentVia,
+        notification: result
       };
 
     } catch (error) {
@@ -199,69 +177,45 @@ class InvoiceSendNotification {
       const notificationService = await this.getNotificationService();
 
       const reminderType = isFirstReminder ? 'First' : 'Final';
-      const urgency = isFirstReminder ? 'Please complete payment' : 'URGENT: Payment required';
 
-      // Send to customer
-      const customerNotification = await notificationService.sendCustomerNotification(
-        orderData.phoneNumber,
-        `⏰ ${reminderType} Payment Reminder`,
-        `${urgency} for Order #${orderData.orderNumber}. Amount: ₹${orderData.totalPrice}`,
-        {
-          category: this.category,
-          priority: isFirstReminder ? this.priorities.NORMAL : this.priorities.HIGH,
-          referenceId: orderData.orderNumber,
-          actionUrl: `/orders/${orderData.orderNumber}/pay`,
-          extraData: {
-            orderNumber: orderData.orderNumber,
-            amount: orderData.totalPrice,
-            dueDate: this.calculateDueDate(orderData.createdAt),
-            reminderType,
-            paymentMethods: ['UPI: posterpro.store@upi'],
-            invoiceUrl: `/invoices/order/${orderData.orderNumber}`,
-            actionRequired: 'Pay now to confirm order'
-          }
+      const notificationData = {
+        title: `⏰ ${reminderType} Payment Reminder Sent`,
+        body: `Invoice reminder sent for Order #${orderData.orderNumber}. Customer: ${orderData.phoneNumber}`,
+        category: this.category,
+        priority: isFirstReminder ? this.priorities.NORMAL : this.priorities.HIGH,
+        referenceId: orderData.orderNumber,
+        actionUrl: `/admin/orders/${orderData.orderNumber}`,
+        extraData: {
+          orderNumber: orderData.orderNumber,
+          customerPhone: orderData.phoneNumber,
+          amount: orderData.totalPrice,
+          dueDate: this.calculateDueDate(orderData.createdAt),
+          reminderType,
+          daysPending: this.calculateDaysPending(orderData.createdAt),
+          actionRequired: isFirstReminder ? 'Monitor payment' : 'Consider cancellation'
         }
-      );
+      };
 
-      // Send to admin for final reminder
-      if (!isFirstReminder) {
-        await notificationService.sendAdminNotification(
-          '⏰ Final Payment Reminder Sent',
-          `Final reminder sent for Order #${orderData.orderNumber}. Customer: ${orderData.phoneNumber}`,
-          {
-            category: this.category,
-            priority: this.priorities.NORMAL,
-            referenceId: orderData.orderNumber,
-            actionUrl: `/admin/orders/${orderData.orderNumber}`,
-            extraData: {
-              orderNumber: orderData.orderNumber,
-              customerPhone: orderData.phoneNumber,
-              amount: orderData.totalPrice,
-              daysPending: this.calculateDaysPending(orderData.createdAt),
-              nextAction: 'Consider order cancellation if no payment'
-            }
-          }
-        );
-      }
+      const result = await notificationService.sendAdminNotification(
+        notificationData.title,
+        notificationData.body,
+        notificationData
+      );
 
       // Log notification
       await this.logNotification({
-        title: `${reminderType} Payment Reminder`,
-        body: `Order #${orderData.orderNumber} - ₹${orderData.totalPrice}`,
-        category: this.category,
-        priority: isFirstReminder ? this.priorities.NORMAL : this.priorities.HIGH,
-        recipientPhone: orderData.phoneNumber,
-        orderNumber: orderData.orderNumber,
+        ...notificationData,
         notificationType: 'payment_reminder',
+        orderNumber: orderData.orderNumber,
         reminderType: reminderType.toLowerCase(),
-        customerNotified: customerNotification.success
+        success: result.success
       });
 
       return {
-        success: customerNotification.success,
-        customerNotification,
+        success: result.success,
         orderNumber: orderData.orderNumber,
-        reminderType
+        reminderType,
+        notification: result
       };
 
     } catch (error) {
@@ -311,69 +265,45 @@ class InvoiceSendNotification {
 
       const notificationService = await this.getNotificationService();
 
-      // Send to admin
-      const adminNotification = await notificationService.sendAdminNotification(
-        '💰 Invoice Paid',
-        `Invoice #${invoiceData.invoiceNumber} paid. Amount: ₹${paymentData.amount}`,
-        {
-          category: this.category,
-          priority: this.priorities.NORMAL,
-          referenceId: invoiceData.invoiceNumber,
-          actionUrl: `/admin/invoices/${invoiceData.invoiceNumber}`,
-          extraData: {
-            invoiceNumber: invoiceData.invoiceNumber,
-            orderNumber: invoiceData.orderNumber,
-            customerName: invoiceData.customerName || 'Customer',
-            amount: paymentData.amount,
-            paidAt: new Date().toISOString(),
-            paymentMethod: paymentData.method || 'UPI',
-            transactionId: paymentData.transactionId || '',
-            invoiceStatus: 'paid'
-          }
+      const notificationData = {
+        title: '💰 Invoice Paid',
+        body: `Invoice #${invoiceData.invoiceNumber} paid. Amount: ₹${paymentData.amount}`,
+        category: this.category,
+        priority: this.priorities.NORMAL,
+        referenceId: invoiceData.invoiceNumber,
+        actionUrl: `/admin/invoices/${invoiceData.invoiceNumber}`,
+        extraData: {
+          invoiceNumber: invoiceData.invoiceNumber,
+          orderNumber: invoiceData.orderNumber,
+          customerName: invoiceData.customerName || 'Customer',
+          customerPhone: invoiceData.customerPhone,
+          amount: paymentData.amount,
+          paidAt: new Date().toISOString(),
+          paymentMethod: paymentData.method || 'UPI',
+          transactionId: paymentData.transactionId || '',
+          invoiceStatus: 'paid',
+          confirmedBy: 'system'
         }
-      );
+      };
 
-      // Send to customer
-      const customerNotification = await notificationService.sendCustomerNotification(
-        invoiceData.customerPhone,
-        '✅ Invoice Payment Received',
-        `Thank you! We've received payment of ₹${paymentData.amount} for Invoice #${invoiceData.invoiceNumber}`,
-        {
-          category: this.category,
-          priority: this.priorities.NORMAL,
-          referenceId: invoiceData.orderNumber,
-          actionUrl: `/invoices/${invoiceData.invoiceNumber}`,
-          extraData: {
-            invoiceNumber: invoiceData.invoiceNumber,
-            orderNumber: invoiceData.orderNumber,
-            amount: paymentData.amount,
-            paidAt: new Date().toISOString(),
-            paymentMethod: paymentData.method || 'UPI',
-            receiptNumber: `RCPT-${Date.now()}`,
-            nextStep: 'Order processing'
-          }
-        }
+      const result = await notificationService.sendAdminNotification(
+        notificationData.title,
+        notificationData.body,
+        notificationData
       );
 
       // Log notification
       await this.logNotification({
-        title: 'Invoice Paid',
-        body: `Invoice #${invoiceData.invoiceNumber} - ₹${paymentData.amount}`,
-        category: this.category,
-        priority: this.priorities.NORMAL,
-        recipientPhone: invoiceData.customerPhone,
-        invoiceNumber: invoiceData.invoiceNumber,
+        ...notificationData,
         notificationType: 'invoice_paid',
-        amount: paymentData.amount,
-        adminNotified: adminNotification.success,
-        customerNotified: customerNotification.success
+        invoiceNumber: invoiceData.invoiceNumber,
+        success: result.success
       });
 
       return {
-        success: adminNotification.success || customerNotification.success,
-        adminNotification,
-        customerNotification,
-        invoiceNumber: invoiceData.invoiceNumber
+        success: result.success,
+        invoiceNumber: invoiceData.invoiceNumber,
+        notification: result
       };
 
     } catch (error) {
@@ -419,14 +349,21 @@ class InvoiceSendNotification {
         notificationData
       );
 
+      // Log notification
       await this.logNotification({
         ...notificationData,
         notificationType: 'invoice_overdue',
+        invoiceNumber: invoiceData.invoiceNumber,
         daysOverdue,
-        invoiceNumber: invoiceData.invoiceNumber
+        success: result.success
       });
 
-      return result;
+      return {
+        success: result.success,
+        invoiceNumber: invoiceData.invoiceNumber,
+        daysOverdue,
+        notification: result
+      };
 
     } catch (error) {
       console.error('❌ Error sending overdue invoice notification:', error);
@@ -508,13 +445,21 @@ class InvoiceSendNotification {
         notificationData
       );
 
+      // Log notification
       await this.logNotification({
         ...notificationData,
         notificationType: 'invoice_delivery_failed',
-        invoiceNumber: invoiceData.invoiceNumber
+        invoiceNumber: invoiceData.invoiceNumber,
+        failureReason,
+        success: result.success
       });
 
-      return result;
+      return {
+        success: result.success,
+        invoiceNumber: invoiceData.invoiceNumber,
+        failureReason,
+        notification: result
+      };
 
     } catch (error) {
       console.error('❌ Error sending invoice delivery failed notification:', error);
@@ -548,7 +493,8 @@ class InvoiceSendNotification {
           viewedAt: viewedAt || new Date().toISOString(),
           viewerInfo,
           ipAddress: viewerInfo.ip || 'Unknown',
-          device: viewerInfo.device || 'Unknown'
+          device: viewerInfo.device || 'Unknown',
+          engagement: 'Customer is viewing invoice'
         }
       };
 
@@ -558,13 +504,19 @@ class InvoiceSendNotification {
         notificationData
       );
 
+      // Log notification
       await this.logNotification({
         ...notificationData,
         notificationType: 'invoice_viewed',
-        invoiceNumber: invoiceData.invoiceNumber
+        invoiceNumber: invoiceData.invoiceNumber,
+        success: result.success
       });
 
-      return result;
+      return {
+        success: result.success,
+        invoiceNumber: invoiceData.invoiceNumber,
+        notification: result
+      };
 
     } catch (error) {
       console.error('❌ Error sending invoice viewed notification:', error);
@@ -596,7 +548,7 @@ class InvoiceSendNotification {
           customerPhone: invoiceData.customerPhone,
           downloadedAt: downloadedAt || new Date().toISOString(),
           format: 'PDF',
-          action: 'Customer downloaded invoice'
+          action: 'Customer downloaded invoice for records'
         }
       };
 
@@ -606,13 +558,19 @@ class InvoiceSendNotification {
         notificationData
       );
 
+      // Log notification
       await this.logNotification({
         ...notificationData,
         notificationType: 'invoice_downloaded',
-        invoiceNumber: invoiceData.invoiceNumber
+        invoiceNumber: invoiceData.invoiceNumber,
+        success: result.success
       });
 
-      return result;
+      return {
+        success: result.success,
+        invoiceNumber: invoiceData.invoiceNumber,
+        notification: result
+      };
 
     } catch (error) {
       console.error('❌ Error sending invoice downloaded notification:', error);
@@ -628,15 +586,14 @@ class InvoiceSendNotification {
       const logEntry = {
         ...notification,
         sentAt: new Date().toISOString(),
-        status: 'sent'
+        status: notification.success ? 'sent' : 'failed'
       };
 
       // Here you would save to your database
       console.log('📝 Invoice notification logged:', {
-        title: notification.title,
         type: notification.notificationType,
         invoiceNumber: notification.invoiceNumber,
-        recipient: notification.recipientPhone || 'admin'
+        success: notification.success
       });
 
       return logEntry;

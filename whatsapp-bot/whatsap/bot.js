@@ -1649,6 +1649,8 @@
 // export { createWhatsAppBot, getWhatsAppBot };
 // export default bot;
 
+
+
 import pkg from 'whatsapp-web.js';
 import qrcode from 'qrcode-terminal';
 import dotenv from 'dotenv';

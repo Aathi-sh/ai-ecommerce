@@ -86,7 +86,7 @@ export default function Login() {
       if (res.ok) {
         setMessage({ 
           type: 'success', 
-          text: '✅ Login successful! Redirecting...' 
+          text: ' Login successful! Redirecting...' 
         });
         
         // Store token and user data

@@ -251,8 +251,6 @@
 
 
 
-
-
 import { WebSocketServer } from 'ws';
 
 class QRSocketServer {
@@ -273,8 +271,14 @@ class QRSocketServer {
         
         // Rate limiting for connections
         this.connectionAttempts = new Map(); // Track connection attempts by IP
-        this.maxConnectionsPerMinute = 10; // Limit connections from same IP
+        this.maxConnectionsPerMinute = 1000; // INCREASED from 10 to 50 for development
         this.connectionCounter = 0;
+        this.statsBroadcastCount = 0; // Initialize missing variable
+        
+        // Cleanup interval for old rate limit entries
+        this.cleanupInterval = setInterval(() => {
+            this.cleanupOldAttempts();
+        }, 60000); // Clean up every minute
     }
 
     initialize(server) {
@@ -313,14 +317,21 @@ class QRSocketServer {
                 const clientIp = req.socket.remoteAddress || 'unknown';
                 const userAgent = req.headers['user-agent'] || 'Unknown';
                 
-                // Check rate limit
-                if (!this.checkRateLimit(clientIp)) {
+                // Check if localhost/development - DISABLE rate limiting for localhost
+                const isLocalhost = clientIp === '::1' || clientIp === '127.0.0.1' || clientIp === 'localhost';
+                
+                // Apply rate limiting only for non-localhost connections
+                if (!isLocalhost && !this.checkRateLimit(clientIp)) {
                     console.log(`⛔ Rate limit exceeded for IP: ${clientIp}. Closing connection.`);
                     ws.close(1008, 'Rate limit exceeded. Please wait before reconnecting.');
                     return;
                 }
                 
-                console.log(`🔗 New WebSocket client connected: ${clientId} from ${clientIp} (User-Agent: ${userAgent.substring(0, 50)}...)`);
+                if (isLocalhost) {
+                    console.log(`🔗 New WebSocket client connected (localhost): ${clientId} from ${clientIp}`);
+                } else {
+                    console.log(`🔗 New WebSocket client connected: ${clientId} from ${clientIp} (User-Agent: ${userAgent.substring(0, 50)}...)`);
+                }
                 
                 // Store client
                 this.clients.set(ws, {
@@ -328,7 +339,8 @@ class QRSocketServer {
                     connectedAt: new Date(),
                     ip: clientIp,
                     userAgent: userAgent,
-                    isAlive: true
+                    isAlive: true,
+                    isLocalhost: isLocalhost
                 });
                 
                 // Setup heartbeat detection
@@ -347,7 +359,8 @@ class QRSocketServer {
                                 message: 'Connected to WhatsApp bot server',
                                 clientId: clientId,
                                 serverTime: new Date().toISOString(),
-                                version: '1.0.0'
+                                version: '1.0.0',
+                                isLocalhost: isLocalhost
                             }));
                         } catch (error) {
                             console.log(`❌ Error sending welcome to ${clientId}:`, error.message);
@@ -376,13 +389,14 @@ class QRSocketServer {
                     const client = this.clients.get(ws);
                     const duration = client ? Date.now() - client.connectedAt.getTime() : 0;
                     
-                    // Only log disconnections that lasted more than 1 second (to reduce spam)
-                    if (duration > 1000 || code !== 1005) {
+                    // Only log disconnections that lasted more than 5 seconds (to reduce spam)
+                    if (duration > 5000 || (code !== 1005 && code !== 1000)) {
+                        const reasonStr = reason.toString() || 'No reason provided';
                         console.log(`🔌 WebSocket client disconnected: ${clientId}`, { 
                             code, 
-                            reason: reason.toString() || 'No reason provided',
+                            reason: reasonStr,
                             duration: `${duration}ms`,
-                            userAgent: client?.userAgent?.substring(0, 30) || 'Unknown'
+                            isLocalhost: client?.isLocalhost || false
                         });
                     }
                     
@@ -417,6 +431,7 @@ class QRSocketServer {
             // Clear interval on server close
             this.wss.on('close', () => {
                 clearInterval(heartbeatInterval);
+                clearInterval(this.cleanupInterval);
             });
             
             this.isInitialized = true;
@@ -426,7 +441,7 @@ class QRSocketServer {
             if (address) {
                 console.log('✅ WebSocket server initialized successfully');
                 console.log(`👥 Ready for connections at ws://localhost:${address.port}/ws`);
-                console.log(`⚙️  Max connections per IP per minute: ${this.maxConnectionsPerMinute}`);
+                console.log(`⚙️  Max connections per IP per minute: ${this.maxConnectionsPerMinute} (localhost unlimited)`);
             } else {
                 console.log('✅ WebSocket server initialized');
                 console.log('👥 Ready for WebSocket connections');
@@ -438,8 +453,32 @@ class QRSocketServer {
         }
     }
 
-    // Rate limiting method
+    // NEW METHOD: Clean up old rate limit entries
+    cleanupOldAttempts() {
+        const now = Date.now();
+        const minuteAgo = now - 60000;
+        
+        this.connectionAttempts.forEach((attempts, ip) => {
+            // Filter out old attempts (older than 1 minute)
+            const recentAttempts = attempts.filter(time => time > minuteAgo);
+            
+            if (recentAttempts.length === 0) {
+                // Remove IP from map if no recent attempts
+                this.connectionAttempts.delete(ip);
+            } else {
+                // Update with only recent attempts
+                this.connectionAttempts.set(ip, recentAttempts);
+            }
+        });
+    }
+
+    // Rate limiting method - DISABLED for localhost
     checkRateLimit(ip) {
+        // Allow all localhost connections without rate limiting
+        if (ip === '::1' || ip === '127.0.0.1' || ip === 'localhost') {
+            return true;
+        }
+        
         const now = Date.now();
         const minuteAgo = now - 60000; // 1 minute ago
         
@@ -721,7 +760,8 @@ class QRSocketServer {
                 connectedAt: client.connectedAt,
                 connectionDuration: now - client.connectedAt.getTime(),
                 readyState: ws.readyState,
-                isAlive: ws.isAlive === true
+                isAlive: ws.isAlive === true,
+                isLocalhost: client.isLocalhost || false
             });
         });
         return info;
@@ -731,7 +771,8 @@ class QRSocketServer {
         return {
             totalConnections: this.connectionCounter,
             activeConnections: this.clients.size,
-            rateLimitMapSize: this.connectionAttempts.size
+            rateLimitMapSize: this.connectionAttempts.size,
+            localhostConnections: Array.from(this.clients.values()).filter(c => c.isLocalhost).length
         };
     }
 
@@ -750,6 +791,7 @@ class QRSocketServer {
             this.clients.clear();
             this.wss.close();
             this.isInitialized = false;
+            clearInterval(this.cleanupInterval);
             
             console.log('✅ WebSocket server closed gracefully');
         }

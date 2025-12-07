@@ -1,3 +1,10 @@
+// services/firebase/firebase-admin.js
+
+/**
+ * Firebase Admin SDK Initialization
+ * Singleton pattern to ensure single initialization
+ */
+
 import admin from 'firebase-admin';
 import serviceAccount from './firebase-service-account.js';
 

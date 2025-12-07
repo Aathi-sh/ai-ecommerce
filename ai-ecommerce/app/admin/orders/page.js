@@ -432,7 +432,7 @@ export default function OrdersPage() {
             fontSize: "1rem",
             transition: "all 0.3s ease",
             backgroundColor: `${appTheme.colors.surface}80`,
-            backdropFilter: "blur(10px)",
+            //backdropFilter: "blur(10px)",
           }}
           onFocus={(e) => {
             e.target.style.borderColor = appTheme.colors.primary;

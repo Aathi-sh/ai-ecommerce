@@ -1,11 +1,19 @@
-// Import individual notification services directly
+// services/notifications/notification-manager.js
+
+/**
+ * Notification Manager
+ * Main orchestrator for all notification services
+ * ADMIN-ONLY notifications
+ */
+
+// Import individual notification services
 import newOrderNotify from './new-order-notify.js';
 import paymentUploadNotify from './payment-upload-notify.js';
 import lowStockNotify from './low-stock-notify.js';
 import invoiceSendNotify from './invoice-send-notify.js';
 
-// Import notification service from separate base service
-import  notificationService from "../../services/notifications/notifictaion-service.js";
+// Import base notification service
+import notificationService from "./notifictaion-service.js";
 
 class NotificationManager {
   constructor() {
@@ -15,8 +23,8 @@ class NotificationManager {
       stock: lowStockNotify,
       invoice: invoiceSendNotify
     };
-    this.baseService =  notificationService;
-    console.log('🎯 Notification Manager initialized');
+    this.baseService = notificationService;
+    console.log('🎯 Notification Manager initialized (Admin Only)');
   }
 
   /**
@@ -24,12 +32,13 @@ class NotificationManager {
    */
   async sendNotification(eventType, data) {
     try {
-      console.log(`🎯 Processing notification event: ${eventType}`, {
+      console.log(`🎯 Processing admin notification event: ${eventType}`, {
         orderNumber: data.orderNumber || data.orderId,
-        customerPhone: data.customerPhone || data.phoneNumber || data.phone
+        referenceId: data.referenceId
       });
 
       switch (eventType) {
+        // Order events
         case 'NEW_ORDER':
           return await this.services.order.sendNewOrderNotification(data);
 
@@ -40,6 +49,10 @@ class NotificationManager {
             data.previousStatus
           );
 
+        case 'BULK_ORDERS':
+          return await this.services.order.sendBulkOrdersNotification(data.orders);
+
+        // Payment events
         case 'PAYMENT_UPLOADED':
           return await this.services.payment.sendPaymentUploadedNotification(data);
 
@@ -63,6 +76,7 @@ class NotificationManager {
             data.markedBy
           );
 
+        // Stock events
         case 'LOW_STOCK_CHECK':
           return await this.services.stock.checkAndSendLowStockNotifications();
 
@@ -74,14 +88,12 @@ class NotificationManager {
             data.updatedBy
           );
 
+        // Invoice events
         case 'INVOICE_GENERATED':
           return await this.services.invoice.sendInvoiceGeneratedNotification(data);
 
         case 'INVOICE_SENT':
-          return await this.services.invoice.sendInvoiceSentToCustomerNotification(
-            data,
-            data.sentVia
-          );
+          return await this.services.invoice.sendInvoiceSentToCustomerNotification(data);
 
         case 'PAYMENT_REMINDER':
           return await this.services.invoice.sendPaymentReminderNotification(
@@ -95,9 +107,7 @@ class NotificationManager {
             data.paymentData
           );
 
-        case 'BULK_ORDERS':
-          return await this.services.order.sendBulkOrdersNotification(data.orders);
-
+        // System events
         case 'ADMIN_ALERT':
           return await this.baseService.sendAdminNotification(
             data.title,
@@ -105,12 +115,11 @@ class NotificationManager {
             data.notificationData
           );
 
-        case 'CUSTOMER_NOTIFICATION':
-          return await this.baseService.sendCustomerNotification(
-            data.customerPhone,
+        case 'SYSTEM_ALERT':
+          return await this.baseService.sendAlertNotification(
             data.title,
             data.body,
-            data.notificationData
+            data.alertData
           );
 
         default:
@@ -133,45 +142,17 @@ class NotificationManager {
   }
 
   /**
-   * Send test notification
+   * Send test notification to admin
    */
-  async sendTestNotification(recipientType = 'admin', customData = {}) {
+  async sendTestNotification(customData = {}) {
     try {
       const testData = {
         title: '🔔 Test Notification',
-        body: 'This is a test notification from your WhatsApp Bot',
+        body: 'This is a test notification to admin devices',
         ...customData
       };
 
-      if (recipientType === 'admin') {
-        return await this.baseService.sendAdminNotification(
-          testData.title,
-          testData.body,
-          {
-            category: 'SYSTEM',
-            priority: 'NORMAL',
-            extraData: {
-              test: true,
-              timestamp: new Date().toISOString(),
-              botVersion: '1.0.0'
-            }
-          }
-        );
-      } else {
-        return await this.baseService.sendCustomerNotification(
-          recipientType, // assuming recipientType is phone number for customer
-          testData.title,
-          testData.body,
-          {
-            category: 'SYSTEM',
-            priority: 'NORMAL',
-            extraData: {
-              test: true,
-              timestamp: new Date().toISOString()
-            }
-          }
-        );
-      }
+      return await this.baseService.sendTestNotification(testData);
 
     } catch (error) {
       console.error('❌ Error sending test notification:', error);
@@ -192,7 +173,8 @@ class NotificationManager {
         failed: 0,
         byCategory: {},
         byPriority: {},
-        timeframe
+        timeframe,
+        recipients: 'admin-only'
       };
     } catch (error) {
       console.error('❌ Error getting notification stats:', error);
@@ -204,34 +186,39 @@ class NotificationManager {
    * Initialize scheduled notifications
    */
   initializeScheduledNotifications() {
-    // Schedule daily stock check at 9 AM
-    if (this.services.stock.scheduleDailyStockCheck) {
-      this.services.stock.scheduleDailyStockCheck();
-    }
+    try {
+      // Schedule daily stock check at 9 AM
+      if (this.services.stock.scheduleDailyStockCheck) {
+        this.services.stock.scheduleDailyStockCheck();
+      }
 
-    // Schedule payment reminder checks (every 6 hours)
-    setInterval(() => {
-      this.checkAndSendPaymentReminders();
-    }, 6 * 60 * 60 * 1000);
-
-    // Schedule overdue invoice checks (daily at 10 AM)
-    const now = new Date();
-    const invoiceCheckTime = new Date(now);
-    invoiceCheckTime.setHours(10, 0, 0, 0);
-    
-    if (now > invoiceCheckTime) {
-      invoiceCheckTime.setDate(invoiceCheckTime.getDate() + 1);
-    }
-    
-    setTimeout(() => {
-      this.checkAndSendOverdueInvoices();
-      // Repeat daily
+      // Schedule payment reminder checks (every 6 hours)
       setInterval(() => {
-        this.checkAndSendOverdueInvoices();
-      }, 24 * 60 * 60 * 1000);
-    }, invoiceCheckTime - now);
+        this.checkAndSendPaymentReminders();
+      }, 6 * 60 * 60 * 1000);
 
-    console.log('⏰ Scheduled notifications initialized');
+      // Schedule overdue invoice checks (daily at 10 AM)
+      const now = new Date();
+      const invoiceCheckTime = new Date(now);
+      invoiceCheckTime.setHours(10, 0, 0, 0);
+      
+      if (now > invoiceCheckTime) {
+        invoiceCheckTime.setDate(invoiceCheckTime.getDate() + 1);
+      }
+      
+      setTimeout(() => {
+        this.checkAndSendOverdueInvoices();
+        // Repeat daily
+        setInterval(() => {
+          this.checkAndSendOverdueInvoices();
+        }, 24 * 60 * 60 * 1000);
+      }, invoiceCheckTime - now);
+
+      console.log('⏰ Scheduled notifications initialized');
+
+    } catch (error) {
+      console.error('❌ Error initializing scheduled notifications:', error);
+    }
   }
 
   /**
@@ -240,9 +227,12 @@ class NotificationManager {
   async checkAndSendPaymentReminders() {
     try {
       console.log('⏰ Checking for payment reminders...');
-      // This would query pending orders and send reminders
-      // Implementation depends on your database structure
-      return { success: true, message: 'Payment reminder check completed' };
+      // This would query pending payments and send admin reminders
+      return { 
+        success: true, 
+        message: 'Payment reminder check completed',
+        timestamp: new Date().toISOString()
+      };
     } catch (error) {
       console.error('❌ Error checking payment reminders:', error);
       return { success: false, error: error.message };
@@ -255,14 +245,61 @@ class NotificationManager {
   async checkAndSendOverdueInvoices() {
     try {
       console.log('⚠️ Checking for overdue invoices...');
-      // This would query overdue invoices and send notifications
-      // Implementation depends on your database structure
-      return { success: true, message: 'Overdue invoice check completed' };
+      // This would query overdue invoices and send admin notifications
+      return { 
+        success: true, 
+        message: 'Overdue invoice check completed',
+        timestamp: new Date().toISOString()
+      };
     } catch (error) {
       console.error('❌ Error checking overdue invoices:', error);
       return { success: false, error: error.message };
     }
   }
+
+  /**
+   * Check Firebase connectivity
+   */
+  async checkFirebaseConnection() {
+    return await this.baseService.checkConnection();
+  }
+
+  /**
+   * Get all available notification event types
+   */
+  getAvailableEventTypes() {
+    return {
+      ORDER_EVENTS: [
+        'NEW_ORDER',
+        'ORDER_STATUS_UPDATE',
+        'BULK_ORDERS'
+      ],
+      PAYMENT_EVENTS: [
+        'PAYMENT_UPLOADED',
+        'PAYMENT_VERIFIED',
+        'PAYMENT_REJECTED',
+        'PAYMENT_FRAUD'
+      ],
+      STOCK_EVENTS: [
+        'LOW_STOCK_CHECK',
+        'STOCK_UPDATED'
+      ],
+      INVOICE_EVENTS: [
+        'INVOICE_GENERATED',
+        'INVOICE_SENT',
+        'PAYMENT_REMINDER',
+        'INVOICE_PAID'
+      ],
+      SYSTEM_EVENTS: [
+        'ADMIN_ALERT',
+        'SYSTEM_ALERT'
+      ]
+    };
+  }
 }
 
-export default NotificationManager;
+// Create singleton instance
+const notificationManager = new NotificationManager();
+
+// Export as default for easier imports
+export default notificationManager;

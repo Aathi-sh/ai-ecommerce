@@ -1,4 +1,10 @@
-// Load from environment variables (production best practice)
+// services/firebase/firebase-service-account.js
+
+/**
+ * Firebase Service Account Configuration
+ * Loads credentials from environment variables with fallback to local file
+ */
+
 const serviceAccount = {
   type: process.env.FIREBASE_TYPE || 'service_account',
   project_id: process.env.FIREBASE_PROJECT_ID,
