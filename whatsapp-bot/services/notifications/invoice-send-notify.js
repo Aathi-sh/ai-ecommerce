@@ -44,6 +44,7 @@ class InvoiceSendNotification {
       const notificationData = {
         title: '🧾 Invoice Generated',
         body: `Invoice #${invoiceData.invoiceNumber} has been generated for Order #${invoiceData.orderNumber}`,
+        type: 'INVOICE_GENERATED',
         category: this.category,
         priority: this.priorities.NORMAL,
         referenceId: invoiceData.invoiceNumber || invoiceData.orderNumber,
@@ -53,7 +54,7 @@ class InvoiceSendNotification {
           orderNumber: invoiceData.orderNumber,
           customerName: invoiceData.customerName || 'Customer',
           customerPhone: invoiceData.customerPhone,
-          amount: invoiceData.totalAmount,
+          amount: invoiceData.totalAmount || invoiceData.amount,
           generatedAt: new Date().toISOString(),
           status: 'generated',
           downloadUrl: invoiceData.downloadUrl || '',
@@ -120,6 +121,7 @@ class InvoiceSendNotification {
       const notificationData = {
         title: `${emoji} Invoice Sent via ${channel}`,
         body: `Invoice #${invoiceData.invoiceNumber} sent to customer. Order #${invoiceData.orderNumber}`,
+        type: 'INVOICE_SENT',
         category: this.category,
         priority: this.priorities.NORMAL,
         referenceId: invoiceData.invoiceNumber || invoiceData.orderNumber,
@@ -130,7 +132,7 @@ class InvoiceSendNotification {
           customerPhone: invoiceData.customerPhone,
           sentVia,
           sentAt: new Date().toISOString(),
-          amount: invoiceData.totalAmount,
+          amount: invoiceData.totalAmount || invoiceData.amount,
           deliveryStatus: 'sent'
         }
       };
@@ -170,7 +172,7 @@ class InvoiceSendNotification {
     try {
       console.log('⏰ Payment reminder notification:', {
         orderNumber: orderData.orderNumber,
-        customerPhone: orderData.phoneNumber,
+        customerPhone: orderData.phoneNumber || orderData.customerPhone,
         isFirstReminder
       });
 
@@ -180,18 +182,19 @@ class InvoiceSendNotification {
 
       const notificationData = {
         title: `⏰ ${reminderType} Payment Reminder Sent`,
-        body: `Invoice reminder sent for Order #${orderData.orderNumber}. Customer: ${orderData.phoneNumber}`,
+        body: `Invoice reminder sent for Order #${orderData.orderNumber}. Customer: ${orderData.phoneNumber || orderData.customerPhone}`,
+        type: 'PAYMENT_REMINDER',
         category: this.category,
         priority: isFirstReminder ? this.priorities.NORMAL : this.priorities.HIGH,
         referenceId: orderData.orderNumber,
         actionUrl: `/admin/orders/${orderData.orderNumber}`,
         extraData: {
           orderNumber: orderData.orderNumber,
-          customerPhone: orderData.phoneNumber,
-          amount: orderData.totalPrice,
-          dueDate: this.calculateDueDate(orderData.createdAt),
+          customerPhone: orderData.phoneNumber || orderData.customerPhone,
+          amount: orderData.totalPrice || orderData.totalAmount,
+          dueDate: this.calculateDueDate(orderData.createdAt || orderData.orderDate),
           reminderType,
-          daysPending: this.calculateDaysPending(orderData.createdAt),
+          daysPending: this.calculateDaysPending(orderData.createdAt || orderData.orderDate),
           actionRequired: isFirstReminder ? 'Monitor payment' : 'Consider cancellation'
         }
       };
@@ -268,6 +271,7 @@ class InvoiceSendNotification {
       const notificationData = {
         title: '💰 Invoice Paid',
         body: `Invoice #${invoiceData.invoiceNumber} paid. Amount: ₹${paymentData.amount}`,
+        type: 'INVOICE_PAID',
         category: this.category,
         priority: this.priorities.NORMAL,
         referenceId: invoiceData.invoiceNumber,
@@ -326,7 +330,8 @@ class InvoiceSendNotification {
 
       const notificationData = {
         title: `⚠️ Invoice Overdue (${daysOverdue} days)`,
-        body: `Invoice #${invoiceData.invoiceNumber} for Order #${invoiceData.orderNumber} is overdue. Amount: ₹${invoiceData.totalAmount}`,
+        body: `Invoice #${invoiceData.invoiceNumber} for Order #${invoiceData.orderNumber} is overdue. Amount: ₹${invoiceData.totalAmount || invoiceData.amount}`,
+        type: 'INVOICE_OVERDUE',
         category: this.category,
         priority: this.priorities.HIGH,
         referenceId: invoiceData.invoiceNumber,
@@ -335,10 +340,10 @@ class InvoiceSendNotification {
           invoiceNumber: invoiceData.invoiceNumber,
           orderNumber: invoiceData.orderNumber,
           customerPhone: invoiceData.customerPhone,
-          amount: invoiceData.totalAmount,
+          amount: invoiceData.totalAmount || invoiceData.amount,
           dueDate: invoiceData.dueDate,
           daysOverdue,
-          overdueAmount: invoiceData.totalAmount,
+          overdueAmount: invoiceData.totalAmount || invoiceData.amount,
           actionRequired: 'Follow up with customer'
         }
       };
@@ -381,6 +386,7 @@ class InvoiceSendNotification {
       const notificationData = {
         title: `📤 ${count} Invoices Sent`,
         body: `Sent ${count} invoices with total amount ₹${totalAmount}`,
+        type: 'BULK_INVOICES_SENT',
         category: this.category,
         priority: this.priorities.NORMAL,
         actionUrl: '/admin/invoices',
@@ -423,6 +429,7 @@ class InvoiceSendNotification {
       const notificationData = {
         title: '❌ Invoice Delivery Failed',
         body: `Failed to send invoice #${invoiceData.invoiceNumber} via ${deliveryMethod}. Reason: ${failureReason}`,
+        type: 'INVOICE_DELIVERY_FAILED',
         category: this.category,
         priority: this.priorities.HIGH,
         referenceId: invoiceData.invoiceNumber,
@@ -482,6 +489,7 @@ class InvoiceSendNotification {
       const notificationData = {
         title: '👁️ Invoice Viewed by Customer',
         body: `Invoice #${invoiceData.invoiceNumber} was viewed by customer.`,
+        type: 'INVOICE_VIEWED',
         category: this.category,
         priority: this.priorities.NORMAL,
         referenceId: invoiceData.invoiceNumber,
@@ -538,6 +546,7 @@ class InvoiceSendNotification {
       const notificationData = {
         title: '📥 Invoice Downloaded by Customer',
         body: `Invoice #${invoiceData.invoiceNumber} was downloaded by customer.`,
+        type: 'INVOICE_DOWNLOADED',
         category: this.category,
         priority: this.priorities.NORMAL,
         referenceId: invoiceData.invoiceNumber,
@@ -610,7 +619,14 @@ class InvoiceSendNotification {
   async getInvoiceStats(timeframe = 'month') {
     try {
       // This would query your database for invoice statistics
+      // Example:
+      // const stats = await Invoice.aggregate([
+      //   { $match: { createdAt: { $gte: startDate } } },
+      //   { $group: { _id: "$status", count: { $sum: 1 } } }
+      // ]);
+      
       return {
+        success: true,
         totalInvoices: 0,
         paid: 0,
         pending: 0,
@@ -624,14 +640,15 @@ class InvoiceSendNotification {
     } catch (error) {
       console.error('❌ Error getting invoice stats:', error);
       return {
+        success: false,
+        error: error.message,
         totalInvoices: 0,
         paid: 0,
         pending: 0,
         overdue: 0,
         sent: 0,
         delivered: 0,
-        failed: 0,
-        error: error.message
+        failed: 0
       };
     }
   }
@@ -640,18 +657,28 @@ class InvoiceSendNotification {
    * Schedule overdue invoice checks
    */
   scheduleOverdueInvoiceChecks(checkIntervalHours = 24) {
-    // Run immediately first
-    setTimeout(() => {
-      this.checkAndNotifyOverdueInvoices();
-    }, 5000); // Start after 5 seconds
-    
-    // Then schedule periodic checks
-    const intervalMs = checkIntervalHours * 60 * 60 * 1000;
-    setInterval(() => {
-      this.checkAndNotifyOverdueInvoices();
-    }, intervalMs);
-    
-    console.log(`⏰ Overdue invoice checks scheduled every ${checkIntervalHours} hours`);
+    try {
+      // Run immediately first
+      setTimeout(() => {
+        this.checkAndNotifyOverdueInvoices();
+      }, 5000); // Start after 5 seconds
+      
+      // Then schedule periodic checks
+      const intervalMs = checkIntervalHours * 60 * 60 * 1000;
+      setInterval(() => {
+        this.checkAndNotifyOverdueInvoices();
+      }, intervalMs);
+      
+      console.log(`⏰ Overdue invoice checks scheduled every ${checkIntervalHours} hours`);
+      return {
+        success: true,
+        checkIntervalHours,
+        nextCheck: new Date(Date.now() + intervalMs)
+      };
+    } catch (error) {
+      console.error('❌ Error scheduling overdue invoice checks:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   /**
@@ -662,10 +689,11 @@ class InvoiceSendNotification {
       console.log('🔍 Checking for overdue invoices...');
       
       // This would query your database for overdue invoices
+      // Example:
       // const overdueInvoices = await Invoice.find({ 
       //   status: 'pending', 
       //   dueDate: { $lt: new Date() } 
-      // });
+      // }).populate('orderId');
       
       // For now, placeholder logic
       const overdueInvoices = [];
@@ -677,12 +705,16 @@ class InvoiceSendNotification {
           const daysOverdue = Math.ceil((new Date() - new Date(invoice.dueDate)) / (1000 * 60 * 60 * 24));
           await this.sendOverdueInvoiceNotification(invoice, daysOverdue);
         }
+      } else {
+        console.log('✅ No overdue invoices found');
       }
       
       return {
         success: true,
-        checked: overdueInvoices.length,
-        notified: overdueInvoices.length
+        checked: true,
+        found: overdueInvoices.length,
+        notified: overdueInvoices.length,
+        timestamp: new Date().toISOString()
       };
       
     } catch (error) {

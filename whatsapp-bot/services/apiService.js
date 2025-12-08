@@ -1350,6 +1350,345 @@ class ApiService {
             return false;
         }
     }
+    // ========== FCM TOKEN MANAGEMENT APIS ==========
+
+/**
+ * Save FCM token for admin device
+ */
+async saveFCMToken(tokenData) {
+  try {
+    console.log('📱 Saving FCM token for admin device:', {
+      deviceType: tokenData.deviceInfo?.deviceType,
+      tokenPreview: tokenData.token ? tokenData.token.substring(0, 20) + '...' : 'No token'
+    });
+
+    if (!tokenData.token) {
+      throw new Error('FCM token is required');
+    }
+
+    const response = await this.client.post('/api/auth/fcm-token', tokenData);
+    
+    console.log('✅ FCM token saved successfully');
+    return this.extractData(response.data);
+
+  } catch (error) {
+    console.error('❌ Save FCM token error:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
+    
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Admin login required');
+    }
+    throw new Error('Failed to save FCM token: ' + (error.message || 'Unknown error'));
+  }
+}
+
+/**
+ * Delete FCM token (when logging out or token invalid)
+ */
+async deleteFCMToken(token) {
+  try {
+    console.log('🗑️ Deleting FCM token:', token ? token.substring(0, 20) + '...' : 'No token');
+
+    if (!token) {
+      throw new Error('FCM token is required');
+    }
+
+    const response = await this.client.delete('/api/auth/fcm-token', {
+      data: { token }
+    });
+    
+    console.log('✅ FCM token deleted successfully');
+    return this.extractData(response.data);
+
+  } catch (error) {
+    console.error('❌ Delete FCM token error:', error.message);
+    // Don't throw error for deletion failures - just log
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Get all FCM tokens for admin (for debugging)
+ */
+async getAdminFCMTokens() {
+  try {
+    console.log('📱 Fetching admin FCM tokens');
+    
+    const response = await this.client.get('/api/auth/fcm-token');
+    const result = this.extractData(response.data);
+    
+    console.log(`✅ Found ${result.tokens?.length || 0} FCM tokens`);
+    return result;
+
+  } catch (error) {
+    console.error('❌ Get FCM tokens error:', error.message);
+    return { tokens: [], count: 0 };
+  }
+}
+
+/**
+ * Send test notification to admin devices
+ */
+async sendTestNotificationToAdmin(notificationData = {}) {
+  try {
+    console.log('🧪 Sending test notification to admin devices');
+    
+    const response = await this.client.post('/api/admin/notifications/test', {
+      title: notificationData.title || 'Test Notification',
+      body: notificationData.body || 'This is a test notification',
+      ...notificationData
+    });
+    
+    console.log('✅ Test notification sent successfully');
+    return this.extractData(response.data);
+
+  } catch (error) {
+    console.error('❌ Send test notification error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Get admin notification statistics
+ */
+async getAdminNotificationStats(timeframe = 'day') {
+  try {
+    console.log('📊 Fetching admin notification statistics');
+    
+    const response = await this.client.get(`/api/admin/notifications/stats?timeframe=${timeframe}`);
+    return this.extractData(response.data);
+
+  } catch (error) {
+    console.error('❌ Get notification stats error:', error.message);
+    return {
+      totalSent: 0,
+      successful: 0,
+      failed: 0,
+      timeframe
+    };
+  }
+}
+
+/**
+ * Update admin notification preferences
+ */
+async updateNotificationSettings(settings) {
+  try {
+    console.log('⚙️ Updating admin notification settings');
+    
+    const response = await this.client.patch('/api/admin/notifications/settings', settings);
+    
+    console.log('✅ Notification settings updated successfully');
+    return this.extractData(response.data);
+
+  } catch (error) {
+    console.error('❌ Update notification settings error:', error.message);
+    throw new Error('Failed to update notification settings: ' + error.message);
+  }
+}
+
+/**
+ * Get admin notification preferences
+ */
+async getNotificationSettings() {
+  try {
+    console.log('⚙️ Fetching admin notification settings');
+    
+    const response = await this.client.get('/api/admin/notifications/settings');
+    const result = this.extractData(response.data);
+    
+    return result || {
+      pushNotifications: { enabled: true },
+      notificationTypes: {
+        newOrders: { enabled: true, priority: 'high' },
+        payments: { enabled: true, priority: 'high' },
+        lowStock: { enabled: true, priority: 'normal' },
+        systemAlerts: { enabled: true, priority: 'high' }
+      },
+      quietHours: { enabled: false, startTime: '22:00', endTime: '08:00' }
+    };
+
+  } catch (error) {
+    console.error('❌ Get notification settings error:', error.message);
+    // Return default settings if API fails
+    return {
+      pushNotifications: { enabled: true },
+      notificationTypes: {
+        newOrders: { enabled: true, priority: 'high' },
+        payments: { enabled: true, priority: 'high' },
+        lowStock: { enabled: true, priority: 'normal' },
+        systemAlerts: { enabled: true, priority: 'high' }
+      },
+      quietHours: { enabled: false, startTime: '22:00', endTime: '08:00' }
+    };
+  }
+}
+
+// ========== NOTIFICATION TRIGGER APIS ==========
+
+/**
+ * Trigger new order notification (for testing)
+ */
+async triggerNewOrderNotification(orderData) {
+  try {
+    console.log('🛍️ Triggering new order notification:', {
+      orderNumber: orderData.orderNumber
+    });
+    
+    const response = await this.client.post('/api/admin/notifications/trigger/new-order', orderData);
+    
+    console.log('✅ New order notification triggered');
+    return this.extractData(response.data);
+
+  } catch (error) {
+    console.error('❌ Trigger new order notification error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Trigger payment notification (for testing)
+ */
+async triggerPaymentNotification(paymentData) {
+  try {
+    console.log('💰 Triggering payment notification:', {
+      orderNumber: paymentData.orderNumber
+    });
+    
+    const response = await this.client.post('/api/admin/notifications/trigger/payment', paymentData);
+    
+    console.log('✅ Payment notification triggered');
+    return this.extractData(response.data);
+
+  } catch (error) {
+    console.error('❌ Trigger payment notification error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Trigger low stock notification (for testing)
+ */
+async triggerLowStockNotification(stockData) {
+  try {
+    console.log('📉 Triggering low stock notification:', {
+      productName: stockData.productName
+    });
+    
+    const response = await this.client.post('/api/admin/notifications/trigger/low-stock', stockData);
+    
+    console.log('✅ Low stock notification triggered');
+    return this.extractData(response.data);
+
+  } catch (error) {
+    console.error('❌ Trigger low stock notification error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Check FCM connectivity
+ */
+async checkFCMConnectivity() {
+  try {
+    console.log('🔗 Checking FCM connectivity');
+    
+    const response = await this.client.get('/api/admin/notifications/health');
+    return this.extractData(response.data);
+
+  } catch (error) {
+    console.error('❌ FCM connectivity check failed:', error.message);
+    return {
+      success: false,
+      message: 'FCM connectivity check failed',
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Get active admin devices
+ */
+async getActiveAdminDevices() {
+  try {
+    console.log('📱 Fetching active admin devices');
+    
+    const response = await this.client.get('/api/admin/devices/active');
+    const result = this.extractData(response.data);
+    
+    console.log(`✅ Found ${result.devices?.length || 0} active devices`);
+    return result;
+
+  } catch (error) {
+    console.error('❌ Get active devices error:', error.message);
+    return { devices: [], count: 0 };
+  }
+}
+
+// ========== COMPATIBILITY WITH FCM-TOKEN-SERVICE ==========
+
+/**
+ * Compatibility method for fcm-token-service.js
+ * Saves token with device info
+ */
+async saveTokenToBackend(token, deviceInfo = {}) {
+  return await this.saveFCMToken({
+    token,
+    deviceInfo: {
+      userAgent: deviceInfo.userAgent || navigator.userAgent,
+      platform: deviceInfo.platform || navigator.platform,
+      deviceName: deviceInfo.deviceName || this.getDeviceName(),
+      deviceType: deviceInfo.deviceType || this.getDeviceType(),
+      os: deviceInfo.os || this.getOS(),
+      browser: deviceInfo.browser || this.getBrowser(),
+      screenResolution: deviceInfo.screenResolution || `${window.screen.width}x${window.screen.height}`,
+      ipAddress: deviceInfo.ipAddress || '',
+      timestamp: new Date().toISOString(),
+      ...deviceInfo
+    }
+  });
+}
+
+// Helper methods for device detection
+getDeviceName() {
+  const ua = navigator.userAgent;
+  if (/mobile/i.test(ua)) return 'Mobile Device';
+  if (/tablet/i.test(ua)) return 'Tablet';
+  if (/mac/i.test(ua)) return 'Mac';
+  if (/windows/i.test(ua)) return 'Windows PC';
+  if (/linux/i.test(ua)) return 'Linux PC';
+  return 'Unknown Device';
+}
+
+getDeviceType() {
+  const ua = navigator.userAgent;
+  if (/mobile/i.test(ua)) return 'mobile';
+  if (/tablet/i.test(ua)) return 'tablet';
+  return 'desktop';
+}
+
+getOS() {
+  const ua = navigator.userAgent;
+  if (/windows/i.test(ua)) return 'Windows';
+  if (/mac/i.test(ua)) return 'macOS';
+  if (/linux/i.test(ua)) return 'Linux';
+  if (/android/i.test(ua)) return 'Android';
+  if (/ios|iphone|ipad|ipod/i.test(ua)) return 'iOS';
+  return 'Unknown OS';
+}
+
+getBrowser() {
+  const ua = navigator.userAgent;
+  if (/chrome/i.test(ua) && !/edg/i.test(ua)) return 'Chrome';
+  if (/firefox/i.test(ua)) return 'Firefox';
+  if (/safari/i.test(ua) && !/chrome/i.test(ua)) return 'Safari';
+  if (/edg/i.test(ua)) return 'Edge';
+  if (/opera|opr/i.test(ua)) return 'Opera';
+  return 'Unknown Browser';
+}
 }
 
 // Create and export singleton instance

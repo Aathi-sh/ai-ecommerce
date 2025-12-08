@@ -44,13 +44,14 @@ class PaymentUploadNotification {
       const notificationData = {
         title: '📸 Payment Proof Uploaded',
         body: `Payment proof for Order #${paymentData.orderNumber} has been uploaded.`,
+        type: 'PAYMENT_UPLOADED',
         category: this.category,
         priority: this.priorities.HIGH,
         referenceId: paymentData.orderNumber,
         actionUrl: `/admin/payments/verify/${paymentData._id || paymentData.orderNumber}`,
         extraData: {
           orderNumber: paymentData.orderNumber,
-          amount: paymentData.orderDetails?.totalAmount || paymentData.amount,
+          amount: paymentData.orderDetails?.totalAmount || paymentData.amount || 0,
           customerPhone: paymentData.customerPhone,
           uploadedAt: new Date().toISOString(),
           verificationStatus: paymentData.status || 'pending',
@@ -108,7 +109,8 @@ class PaymentUploadNotification {
 
       const notificationData = {
         title: `${emoji} Payment Verified: ${paymentData.orderNumber}`,
-        body: `Payment of ₹${paymentData.orderDetails?.totalAmount} verified ${verificationSource}.`,
+        body: `Payment of ₹${paymentData.orderDetails?.totalAmount || paymentData.amount || 0} verified ${verificationSource}.`,
+        type: 'PAYMENT_VERIFIED',
         category: this.category,
         priority: this.priorities.NORMAL,
         referenceId: paymentData.orderNumber,
@@ -116,7 +118,7 @@ class PaymentUploadNotification {
         extraData: {
           orderNumber: paymentData.orderNumber,
           customerPhone: paymentData.customerPhone,
-          amount: paymentData.orderDetails?.totalAmount,
+          amount: paymentData.orderDetails?.totalAmount || paymentData.amount || 0,
           verificationMethod,
           confidenceScore: paymentData.validationResults?.confidenceScore || 0,
           verifiedBy: verificationMethod === 'auto' ? 'system' : paymentData.verifiedBy,
@@ -169,6 +171,7 @@ class PaymentUploadNotification {
       const notificationData = {
         title: '❌ Payment Rejected',
         body: `Payment for Order #${paymentData.orderNumber} was rejected. Reason: ${reason}`,
+        type: 'PAYMENT_REJECTED',
         category: this.category,
         priority: this.priorities.HIGH,
         referenceId: paymentData.orderNumber,
@@ -176,7 +179,7 @@ class PaymentUploadNotification {
         extraData: {
           orderNumber: paymentData.orderNumber,
           customerPhone: paymentData.customerPhone,
-          amount: paymentData.orderDetails?.totalAmount,
+          amount: paymentData.orderDetails?.totalAmount || paymentData.amount || 0,
           rejectionReason: reason,
           rejectedBy,
           rejectedAt: new Date().toISOString(),
@@ -231,15 +234,15 @@ class PaymentUploadNotification {
       const notificationData = {
         title: '🚨 FRAUD ALERT!',
         body: `Order #${paymentData.orderNumber} marked as fraud. Reasons: ${reasonText}`,
+        type: 'PAYMENT_FRAUD',
         category: this.category,
         priority: this.priorities.HIGH,
         referenceId: paymentData.orderNumber,
         actionUrl: `/admin/payments/fraud/${paymentData._id || paymentData.orderNumber}`,
-        sound: 'alert',
         extraData: {
           orderNumber: paymentData.orderNumber,
           customerPhone: paymentData.customerPhone,
-          amount: paymentData.orderDetails?.totalAmount,
+          amount: paymentData.orderDetails?.totalAmount || paymentData.amount || 0,
           fraudReasons: Array.isArray(reasons) ? reasons : [reasons],
           markedBy,
           markedAt: new Date().toISOString(),
@@ -289,7 +292,8 @@ class PaymentUploadNotification {
       
       const notificationData = {
         title: `⏳ Pending Verification: ${pendingCount}`,
-        body: `Order #${paymentData.orderNumber} needs verification. Amount: ₹${paymentData.orderDetails?.totalAmount}`,
+        body: `Order #${paymentData.orderNumber} needs verification. Amount: ₹${paymentData.orderDetails?.totalAmount || paymentData.amount || 0}`,
+        type: 'PENDING_VERIFICATION',
         category: this.category,
         priority: this.priorities.NORMAL,
         referenceId: paymentData.orderNumber,
@@ -297,7 +301,7 @@ class PaymentUploadNotification {
         extraData: {
           orderNumber: paymentData.orderNumber,
           customerPhone: paymentData.customerPhone,
-          amount: paymentData.orderDetails?.totalAmount,
+          amount: paymentData.orderDetails?.totalAmount || paymentData.amount || 0,
           pendingCount,
           uploadedAt: paymentData.createdAt || new Date().toISOString(),
           waitingTime: this.calculateWaitingTime(paymentData.createdAt)
@@ -356,6 +360,8 @@ class PaymentUploadNotification {
   async getPendingVerificationCount() {
     try {
       // This should query your database
+      // Example:
+      // const PaymentVerification = require('../../../../models/PaymentVerification');
       // const count = await PaymentVerification.countDocuments({ status: 'pending' });
       // return count;
       
@@ -382,6 +388,7 @@ class PaymentUploadNotification {
       const notificationData = {
         title: '💰 Invoice Paid',
         body: `Invoice #${invoiceData.invoiceNumber} paid. Amount: ₹${paymentData.amount}`,
+        type: 'INVOICE_PAID',
         category: 'invoice',
         priority: this.priorities.NORMAL,
         referenceId: invoiceData.invoiceNumber,
@@ -433,7 +440,7 @@ class PaymentUploadNotification {
     try {
       console.log('⏰ Payment reminder notification:', {
         orderNumber: orderData.orderNumber,
-        customerPhone: orderData.phoneNumber,
+        customerPhone: orderData.phoneNumber || orderData.customerPhone,
         isFirstReminder
       });
 
@@ -445,17 +452,18 @@ class PaymentUploadNotification {
       const notificationData = {
         title: `⏰ ${reminderType} Payment Reminder Sent`,
         body: `Reminder sent for Order #${orderData.orderNumber}. ${urgency}`,
+        type: 'PAYMENT_REMINDER',
         category: this.category,
         priority: isFirstReminder ? this.priorities.NORMAL : this.priorities.HIGH,
         referenceId: orderData.orderNumber,
         actionUrl: `/admin/orders/${orderData.orderNumber}`,
         extraData: {
           orderNumber: orderData.orderNumber,
-          customerPhone: orderData.phoneNumber,
-          amount: orderData.totalPrice,
-          dueDate: this.calculateDueDate(orderData.createdAt),
+          customerPhone: orderData.phoneNumber || orderData.customerPhone,
+          amount: orderData.totalPrice || orderData.totalAmount || 0,
+          dueDate: this.calculateDueDate(orderData.createdAt || orderData.orderDate),
           reminderType,
-          daysPending: this.calculateDaysPending(orderData.createdAt),
+          daysPending: this.calculateDaysPending(orderData.createdAt || orderData.orderDate),
           actionRequired: isFirstReminder ? 'Monitor payment' : 'Consider cancellation'
         }
       };
@@ -526,6 +534,7 @@ class PaymentUploadNotification {
       const notificationData = {
         title: `⏰ Verification Delayed (${delayHours} hours)`,
         body: `Payment for Order #${paymentData.orderNumber} pending for ${delayHours} hours.`,
+        type: 'VERIFICATION_DELAY',
         category: this.category,
         priority: this.priorities.NORMAL,
         referenceId: paymentData.orderNumber,
@@ -533,7 +542,7 @@ class PaymentUploadNotification {
         extraData: {
           orderNumber: paymentData.orderNumber,
           customerPhone: paymentData.customerPhone,
-          amount: paymentData.orderDetails?.totalAmount,
+          amount: paymentData.orderDetails?.totalAmount || paymentData.amount || 0,
           uploadedAt: paymentData.createdAt,
           delayHours,
           actionRequired: 'Verify manually'
@@ -550,6 +559,53 @@ class PaymentUploadNotification {
 
     } catch (error) {
       console.error('❌ Error sending verification delay notification:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send notification for partial payment
+   */
+  async sendPartialPaymentNotification(paymentData, paidAmount, dueAmount) {
+    try {
+      console.log('⚠️ Partial payment notification:', {
+        orderNumber: paymentData.orderNumber,
+        paidAmount,
+        dueAmount
+      });
+
+      const notificationService = await this.getNotificationService();
+
+      const notificationData = {
+        title: '⚠️ Partial Payment Received',
+        body: `Order #${paymentData.orderNumber}: Paid ₹${paidAmount}, Due ₹${dueAmount}`,
+        type: 'PARTIAL_PAYMENT',
+        category: this.category,
+        priority: this.priorities.NORMAL,
+        referenceId: paymentData.orderNumber,
+        actionUrl: `/admin/payments/${paymentData._id || paymentData.orderNumber}`,
+        extraData: {
+          orderNumber: paymentData.orderNumber,
+          customerPhone: paymentData.customerPhone,
+          paidAmount,
+          dueAmount,
+          totalAmount: paidAmount + dueAmount,
+          paymentPercentage: Math.round((paidAmount / (paidAmount + dueAmount)) * 100),
+          receivedAt: new Date().toISOString(),
+          actionRequired: 'Wait for full payment or follow up'
+        }
+      };
+
+      const result = await notificationService.sendAdminNotification(
+        notificationData.title,
+        notificationData.body,
+        notificationData
+      );
+
+      return result;
+
+    } catch (error) {
+      console.error('❌ Error sending partial payment notification:', error);
       return { success: false, error: error.message };
     }
   }
@@ -586,18 +642,116 @@ class PaymentUploadNotification {
   async getPaymentStats(timeframe = 'day') {
     try {
       // This would query your database for payment statistics
+      // Example:
+      // const stats = await PaymentVerification.aggregate([
+      //   { $match: { createdAt: { $gte: startDate } } },
+      //   { $group: { _id: "$status", count: { $sum: 1 } } }
+      // ]);
+      
       return {
+        success: true,
         totalPayments: 0,
         verified: 0,
         pending: 0,
         rejected: 0,
         fraud: 0,
+        partial: 0,
         averageVerificationTime: 0,
         timeframe,
         timestamp: new Date().toISOString()
       };
     } catch (error) {
       console.error('❌ Error getting payment stats:', error);
+      return { 
+        success: false, 
+        error: error.message,
+        totalPayments: 0,
+        verified: 0,
+        pending: 0,
+        rejected: 0,
+        fraud: 0,
+        partial: 0
+      };
+    }
+  }
+
+  /**
+   * Schedule automated payment verification checks
+   */
+  schedulePaymentVerificationChecks(checkIntervalHours = 6) {
+    try {
+      // Run immediately first
+      setTimeout(() => {
+        this.checkAndNotifyPendingVerifications();
+      }, 10000); // Start after 10 seconds
+      
+      // Then schedule periodic checks
+      const intervalMs = checkIntervalHours * 60 * 60 * 1000;
+      setInterval(() => {
+        this.checkAndNotifyPendingVerifications();
+      }, intervalMs);
+      
+      console.log(`⏰ Payment verification checks scheduled every ${checkIntervalHours} hours`);
+      return {
+        success: true,
+        checkIntervalHours,
+        nextCheck: new Date(Date.now() + intervalMs)
+      };
+    } catch (error) {
+      console.error('❌ Error scheduling payment verification checks:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Check and notify pending verifications
+   */
+  async checkAndNotifyPendingVerifications() {
+    try {
+      console.log('🔍 Checking for pending payment verifications...');
+      
+      // This would query your database for pending verifications
+      // Example:
+      // const pendingPayments = await PaymentVerification.find({ 
+      //   status: 'pending',
+      //   createdAt: { $lt: new Date(Date.now() - 2 * 60 * 60 * 1000) } // Older than 2 hours
+      // }).limit(10);
+      
+      // For now, placeholder logic
+      const pendingPayments = [];
+      
+      if (pendingPayments.length > 0) {
+        console.log(`⚠️ Found ${pendingPayments.length} pending verifications needing attention`);
+        
+        // Send summary notification
+        const notificationService = await this.getNotificationService();
+        await notificationService.sendAdminNotification(
+          `⏳ ${pendingPayments.length} Pending Payments Need Attention`,
+          `${pendingPayments.length} payment verifications are pending for more than 2 hours.`,
+          {
+            type: 'PENDING_VERIFICATIONS_SUMMARY',
+            category: this.category,
+            priority: this.priorities.NORMAL,
+            actionUrl: '/admin/payments/pending',
+            extraData: {
+              pendingCount: pendingPayments.length,
+              checkedAt: new Date().toISOString(),
+              oldestPending: pendingPayments[0]?.createdAt || 'N/A',
+              actionRequired: 'Review pending verifications'
+            }
+          }
+        );
+      }
+      
+      return {
+        success: true,
+        checked: true,
+        found: pendingPayments.length,
+        timestamp: new Date().toISOString()
+      };
+      
+    } catch (error) {
+      console.error('❌ Error checking pending verifications:', error);
       return { success: false, error: error.message };
     }
   }

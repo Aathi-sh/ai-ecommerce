@@ -40,7 +40,7 @@ class LowStockNotification {
 
       // This should query your database for products
       // const products = await Product.find({});
-      const products = []; // Placeholder
+      const products = []; // Placeholder - replace with actual DB query
       
       if (!products || products.length === 0) {
         console.log('📦 No products found for stock check');
@@ -148,11 +148,11 @@ class LowStockNotification {
       const notificationData = {
         title: '🚨 CRITICAL STOCK ALERT!',
         body: `${product.productName} has only ${currentStock} units left!`,
+        type: 'CRITICAL_STOCK',
         category: this.category,
         priority: this.priorities.HIGH,
         referenceId: product._id || product.productId,
         actionUrl: `/admin/products/${product._id || product.productId}`,
-        sound: 'alert',
         extraData: {
           productId: product._id || product.productId,
           productName: product.productName,
@@ -199,6 +199,7 @@ class LowStockNotification {
       const notificationData = {
         title: '⚠️ Low Stock Warning',
         body: `${product.productName} is running low. Only ${currentStock} units left.`,
+        type: 'LOW_STOCK',
         category: this.category,
         priority: this.priorities.HIGH,
         referenceId: product._id || product.productId,
@@ -247,6 +248,7 @@ class LowStockNotification {
       const notificationData = {
         title: '🚫 Product Out of Stock',
         body: `${product.productName} is now out of stock. No units available.`,
+        type: 'OUT_OF_STOCK',
         category: this.category,
         priority: this.priorities.HIGH,
         referenceId: product._id || product.productId,
@@ -302,6 +304,7 @@ class LowStockNotification {
       const notificationData = {
         title: `📦 Stock Status Report (${totalIssues} issues)`,
         body: message,
+        type: 'STOCK_SUMMARY',
         category: this.category,
         priority: this.priorities.NORMAL,
         actionUrl: '/admin/products/stock',
@@ -360,6 +363,7 @@ class LowStockNotification {
       const notificationData = {
         title: `📦 Stock ${stockChange > 0 ? 'Added' : 'Updated'}: ${product.productName}`,
         body: `${changeText} units ${action}. Now: ${newStock} units.`,
+        type: 'STOCK_UPDATED',
         category: this.category,
         priority: this.priorities.NORMAL,
         referenceId: product._id || product.productId,
@@ -403,26 +407,32 @@ class LowStockNotification {
    * Schedule daily stock check
    */
   scheduleDailyStockCheck() {
-    // Schedule at 9 AM daily
-    const now = new Date();
-    const targetTime = new Date(now);
-    targetTime.setHours(9, 0, 0, 0);
-    
-    if (now > targetTime) {
-      targetTime.setDate(targetTime.getDate() + 1);
-    }
-    
-    const timeUntilCheck = targetTime - now;
-    
-    setTimeout(() => {
-      this.checkAndSendLowStockNotifications();
-      // Schedule next check (24 hours later)
-      setInterval(() => {
+    try {
+      // Schedule at 9 AM daily
+      const now = new Date();
+      const targetTime = new Date(now);
+      targetTime.setHours(9, 0, 0, 0);
+      
+      if (now > targetTime) {
+        targetTime.setDate(targetTime.getDate() + 1);
+      }
+      
+      const timeUntilCheck = targetTime - now;
+      
+      setTimeout(() => {
         this.checkAndSendLowStockNotifications();
-      }, 24 * 60 * 60 * 1000);
-    }, timeUntilCheck);
-    
-    console.log(`⏰ Daily stock check scheduled for ${targetTime.toLocaleTimeString()}`);
+        // Schedule next check (24 hours later)
+        setInterval(() => {
+          this.checkAndSendLowStockNotifications();
+        }, 24 * 60 * 60 * 1000);
+      }, timeUntilCheck);
+      
+      console.log(`⏰ Daily stock check scheduled for ${targetTime.toLocaleTimeString()}`);
+      return { success: true, nextCheck: targetTime };
+    } catch (error) {
+      console.error('❌ Error scheduling daily stock check:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   /**
@@ -479,6 +489,12 @@ class LowStockNotification {
     this.lowStockThreshold = lowThreshold;
     this.criticalStockThreshold = criticalThreshold;
     console.log(`📊 Stock thresholds updated: Low=${lowThreshold}, Critical=${criticalThreshold}`);
+    return {
+      success: true,
+      lowThreshold,
+      criticalThreshold,
+      updatedAt: new Date().toISOString()
+    };
   }
 
   /**
@@ -487,11 +503,14 @@ class LowStockNotification {
   async getStockStatistics() {
     try {
       // This should query your database
+      // Replace with actual DB query:
       // const products = await Product.find({});
       const products = []; // Placeholder
       
       if (!products || products.length === 0) {
         return {
+          success: false,
+          message: 'No products found',
           totalProducts: 0,
           inStock: 0,
           lowStock: 0,
@@ -516,24 +535,30 @@ class LowStockNotification {
       const health = this.calculateStockHealth(lowStock, criticalStock, outOfStock);
 
       return {
+        success: true,
         totalProducts: products.length,
         inStock,
         lowStock,
         criticalStock,
         outOfStock,
         health,
+        thresholds: {
+          low: this.lowStockThreshold,
+          critical: this.criticalStockThreshold
+        },
         timestamp: new Date().toISOString()
       };
     } catch (error) {
       console.error('❌ Error getting stock statistics:', error);
       return {
+        success: false,
+        error: error.message,
         totalProducts: 0,
         inStock: 0,
         lowStock: 0,
         criticalStock: 0,
         outOfStock: 0,
         health: 'Error',
-        error: error.message,
         timestamp: new Date().toISOString()
       };
     }
