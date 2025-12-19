@@ -1,77 +1,4 @@
-// import { NextResponse } from "next/server";
-// import { connectDB } from "@/utils/db";
-// import User from "@/models/user";
-// import { generateToken } from "@/utils/jwt";
-
-// export async function POST(req) {
-//   try {
-//     await connectDB();
-
-//     const { email, password } = await req.json();
-
-//     if (!email || !password) {
-//       return NextResponse.json(
-//         { message: "Email and password are required" },
-//         { status: 400 }
-//       );
-//     }
-
-//     // Find user and include password
-//     const user = await User.findOne({ email }).select('+password');
-
-//     if (!user) {
-//       return NextResponse.json(
-//         { message: "Invalid credentials" },
-//         { status: 401 }
-//       );
-//     }
-
-//     // Check password
-//     const isPasswordValid = await user.comparePassword(password);
-
-//     if (!isPasswordValid) {
-//       return NextResponse.json(
-//         { message: "Invalid credentials" },
-//         { status: 401 }
-//       );
-//     }
-
-//     // Check if email is verified
-//     if (!user.isVerified) {
-//       return NextResponse.json(
-//         { message: "Please verify your email first" },
-//         { status: 401 }
-//       );
-//     }
-
-//     // Update last login
-//     user.lastLogin = new Date();
-//     await user.save({ validateBeforeSave: false });
-
-//     // Generate token
-//     const token = generateToken({ userId: user._id });
-
-//     return NextResponse.json({
-//       message: "Login successful",
-//       user: {
-//         id: user._id,
-//         fullName: user.fullName,
-//         email: user.email,
-//         role: user.role,
-//         isVerified: user.isVerified
-//       },
-//       token
-//     });
-//   } catch (error) {
-//     console.error("Login Error:", error);
-//     return NextResponse.json(
-//       { message: "Server error" },
-//       { status: 500 }
-//     );
-//   }
-// }
-
-
+// app/api/auth/login/route.js
 import { NextResponse } from "next/server";
 import { connectDB } from "@/utils/db";
 import User from "@/models/user";
@@ -83,7 +10,7 @@ export async function POST(req) {
 
     const { email, password } = await req.json();
 
-    // Validate input more thoroughly
+    // Validate input
     if (!email || !password) {
       return NextResponse.json(
         { 
@@ -186,31 +113,34 @@ export async function POST(req) {
       userId: user._id,
       role: user.role,
       email: user.email,
-      sessionId: sessionData.sessionId
+      sessionId: sessionData.sessionId,
+      name: user.fullName
     });
 
-    // Prepare user response
+    // Prepare user response - RETURN AT ROOT LEVEL
     const userResponse = {
-      id: user._id,
+      id: user._id.toString(),
+      _id: user._id.toString(), // Include both for compatibility
       fullName: user.fullName,
+      name: user.fullName, // Include as 'name' for compatibility
       email: user.email,
       role: user.role,
       isVerified: user.isVerified,
       phone: user.phone,
+      status: user.status,
       hasActiveNotifications: user.notificationSettings?.pushNotifications?.enabled || false,
       activeSessionsCount: user.activeSessions?.filter(s => s.status === 'active').length || 0,
       lastLogin: user.lastLogin
     };
 
+    // RETURN DATA AT ROOT LEVEL (not nested in 'data')
     return NextResponse.json({
       success: true,
       message: "Login successful",
-      data: {
-        user: userResponse,
-        token,
-        sessionId: sessionData.sessionId,
-        expiresAt: sessionData.expiresAt
-      }
+      token: token, // Direct token at root
+      user: userResponse, // Direct user at root
+      sessionId: sessionData.sessionId,
+      expiresAt: sessionData.expiresAt
     });
     
   } catch (error) {

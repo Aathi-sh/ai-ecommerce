@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { appTheme } from "../../src/constants/theme";
+import { useAuth } from '../../context/authContext';
 
 export default function Login() {
   const [formData, setFormData] = useState({
@@ -13,6 +14,15 @@ export default function Login() {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [errors, setErrors] = useState({ email: '', password: '' });
   const router = useRouter();
+  const { login, isAuthenticated, user } = useAuth();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('✅ Already authenticated, redirecting to dashboard...');
+      router.push('/admin/dashboards');
+    }
+  }, [isAuthenticated, user, router]);
 
   const validateForm = () => {
     const newErrors = { email: '', password: '' };
@@ -73,6 +83,8 @@ export default function Login() {
     setMessage({ type: '', text: '' });
 
     try {
+      console.log('🔐 Attempting login for:', formData.email);
+      
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -82,50 +94,109 @@ export default function Login() {
       });
 
       const data = await res.json();
+      console.log('📋 Login response:', { 
+        status: res.status, 
+        success: data.success,
+        hasToken: !!data.token,
+        hasUser: !!data.user,
+        dataStructure: data 
+      });
 
-      if (res.ok) {
-        setMessage({ 
-          type: 'success', 
-          text: ' Login successful! Redirecting...' 
+      if (res.ok && data.success) {
+        console.log('✅ Login successful!');
+        
+        // FIXED: Get token and user from ROOT LEVEL, not nested in data.data
+        const token = data.token; // Direct from data.token
+        const userData = data.user; // Direct from data.user
+        
+        console.log('📊 Extracted data:', {
+          tokenExists: !!token,
+          userDataExists: !!userData,
+          tokenLength: token?.length,
+          userEmail: userData?.email
         });
         
-        // Store token and user data
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        if (!token || !userData) {
+          console.error('❌ Missing token or user data:', { token, userData });
+          throw new Error('No token or user data received from server');
+        }
         
-        // Redirect after 1.5 seconds
-        setTimeout(() => {
-          // Always redirect to admin dashboard regardless of role
-          // You can customize this based on your needs
-          router.push('/admin/dashboards');
-        }, 1500);
+        console.log('💾 Storing auth data in localStorage...');
+        
+        // Store in localStorage
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        // Set token expiry (7 days from now, matching JWT expiry)
+        const expiryTime = Date.now() + (7 * 24 * 60 * 60 * 1000);
+        localStorage.setItem('token_expiry', expiryTime.toString());
+        
+        // Also store sessionId if available
+        if (data.sessionId) {
+          localStorage.setItem('sessionId', data.sessionId);
+        }
+        
+        console.log('🔄 Updating auth context...');
+        
+        // Update auth context
+        const loginResult = await login(userData, token, {
+          rememberMe: true,
+          expiresIn: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
+        
+        if (loginResult.success) {
+          console.log('✅ Auth context updated successfully');
+          setMessage({ 
+            type: 'success', 
+            text: '✅ Login successful! Redirecting...' 
+          });
+          
+          // Force reload to ensure auth state is updated
+          setTimeout(() => {
+            window.location.href = '/admin/dashboards';
+          }, 1000);
+          
+        } else {
+          console.error('❌ Auth context update failed:', loginResult.error);
+          throw new Error(loginResult.error || 'Failed to update auth context');
+        }
         
       } else {
-        // Handle specific error cases
+        // Handle error response
+        const errorMessage = data.message || 'Login failed';
+        console.error('❌ Login failed:', errorMessage);
+        
         if (res.status === 401) {
-          setMessage({ 
-            type: 'error', 
-            text: ' Incorrect email or password. Please try again.' 
-          });
-        } else if (res.status === 404) {
-          setMessage({ 
-            type: 'error', 
-            text: ' Account not found. Please check your email.' 
-          });
+          if (data.requiresVerification) {
+            setMessage({ 
+              type: 'error', 
+              text: '⚠️ Please verify your email first' 
+            });
+          } else {
+            setMessage({ 
+              type: 'error', 
+              text: '❌ Incorrect email or password' 
+            });
+          }
         } else if (res.status === 403) {
           setMessage({ 
             type: 'error', 
-            text: ' Account is disabled. Please contact support.' 
+            text: '⛔ Account is disabled. Please contact support.' 
           });
         } else if (res.status === 429) {
           setMessage({ 
             type: 'error', 
             text: '⚠️ Too many login attempts. Please try again later.' 
           });
+        } else if (res.status === 404) {
+          setMessage({ 
+            type: 'error', 
+            text: '❌ Account not found. Please check your email.' 
+          });
         } else {
           setMessage({ 
             type: 'error', 
-            text: data.message || 'Something went wrong. Please try again.' 
+            text: `❌ ${errorMessage}` 
           });
         }
         
@@ -136,15 +207,15 @@ export default function Login() {
       console.error('Login error:', error);
       
       // Handle network errors
-      if (error.name === 'TypeError' && error.message.includes('NetworkError')) {
+      if (error.name === 'TypeError' && (error.message.includes('NetworkError') || error.message.includes('Failed to fetch'))) {
         setMessage({ 
           type: 'error', 
-          text: 'Network error. Please check your internet connection.' 
+          text: '🌐 Network error. Please check your internet connection.' 
         });
       } else {
         setMessage({ 
           type: 'error', 
-          text: 'Something went wrong. Please try again later.' 
+          text: `❌ ${error.message || 'Something went wrong. Please try again.'}` 
         });
       }
       
@@ -313,7 +384,8 @@ export default function Login() {
               }}
             >
               <span style={{ fontSize: "16px" }}>
-                {message.type === 'success' ? '✅' : '❌'}
+                {message.type === 'success' ? '✅' : 
+                 message.text.includes('⚠️') ? '⚠️' : '❌'}
               </span>
               {message.text}
             </div>
@@ -444,134 +516,3 @@ export default function Login() {
     </div>
   );
 }
-
-
-
-
-// "use client";
-
-// import React, { useState } from "react";
-// import { useRouter } from "next/navigation";
-// import { appTheme } from "../../src/constants/theme";
-
-// export default function LoginPage() {
-//   const router = useRouter();
-
-//   const [email, setEmail] = useState("");
-//   const [password, setPassword] = useState("");
-//   const [loading, setLoading] = useState(false);
-
-//   const handleSubmit = async (e) => {
-//     e.preventDefault();
-//     setLoading(true);
-
-//     try {
-//       // 👉 Replace this with your actual login API later
-//       if (email === "admin@example.com" && password === "admin123") {
-//         alert("Login successful!");
-//         router.push("/admin/dashboard"); // Redirect to dashboard
-//       } else {
-//         alert("Invalid credentials!");
-//       }
-//     } catch (error) {
-//       console.error("Login error:", error);
-//       alert("Something went wrong. Try again.");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   return (
-//     <div
-//       style={{
-//         minHeight: "100vh",
-//         display: "flex",
-//         alignItems: "center",
-//         justifyContent: "center",
-//         backgroundColor: appTheme.colors.background,
-//         fontFamily: appTheme.fonts.primary,
-//       }}
-//     >
-//       <div
-//         style={{
-//           width: "100%",
-//           maxWidth: "400px",
-//           backgroundColor: appTheme.colors.surface,
-//           padding: "40px",
-//           borderRadius: "20px",
-//           boxShadow: appTheme.shadows.lg,
-//           textAlign: "center",
-//         }}
-//       >
-//         <h1
-//           style={{
-//             color: appTheme.colors.primary,
-//             fontSize: "28px",
-//             marginBottom: "20px",
-//           }}
-//         >
-//           Admin Login
-//         </h1>
-
-//         <form onSubmit={handleSubmit} style={{ display: "grid", gap: "16px" }}>
-//           <input
-//             type="email"
-//             placeholder="Email"
-//             value={email}
-//             onChange={(e) => setEmail(e.target.value)}
-//             required
-//             style={{
-//               padding: "12px 16px",
-//               borderRadius: "10px",
-//               border: "1px solid #ccc",
-//               fontSize: "16px",
-//               outline: "none",
-//             }}
-//           />
-
-//           <input
-//             type="password"
-//             placeholder="Password"
-//             value={password}
-//             onChange={(e) => setPassword(e.target.value)}
-//             required
-//             style={{
-//               padding: "12px 16px",
-//               borderRadius: "10px",
-//               border: "1px solid #ccc",
-//               fontSize: "16px",
-//               outline: "none",
-//             }}
-//           />
-
-//           <button
-//             type="submit"
-//             disabled={loading}
-//             style={{
-//               backgroundColor: appTheme.colors.primary,
-//               color: "#fff",
-//               padding: "12px",
-//               border: "none",
-//               borderRadius: "12px",
-//               fontSize: "16px",
-//               cursor: loading ? "not-allowed" : "pointer",
-//               transition: "background 0.3s",
-//             }}
-//           >
-//             {loading ? "Logging in..." : "Login"}
-//           </button>
-//         </form>
-
-//         <p
-//           style={{
-//             marginTop: "20px",
-//             color: appTheme.colors.textSecondary,
-//             fontSize: "14px",
-//           }}
-//         >
-//           © {new Date().getFullYear()} WhatsApp AI E-Commerce
-//         </p>
-//       </div>
-//     </div>
-//   );
-// }

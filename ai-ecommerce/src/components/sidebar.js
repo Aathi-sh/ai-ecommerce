@@ -2,26 +2,116 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { appTheme } from "../constants/theme";
 import { FiHome, FiShoppingCart, FiUsers, FiBox, FiLogOut, FiShoppingBag, FiPlusCircle } from "react-icons/fi";
 import { AiOutlineQrcode } from "react-icons/ai";
 import { BsReceipt } from "react-icons/bs";
 
 export default function Sidebar({ collapsed = false }) {
-  const pathname = usePathname(); // current path
+  const pathname = usePathname();
+  const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(collapsed);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const menuItems = [
     { label: "QR Code", icon: <AiOutlineQrcode />, path: "/admin/qr" },
     { label: "Dashboard", icon: <FiHome />, path: "/admin/dashboards" },
-    { label: " Add New Products", icon: <FiPlusCircle />, path: "/admin/products/productForm" },
-    { label: "Products ", icon: <FiBox />, path: "/admin/products" },
+    { label: "Add New Products", icon: <FiPlusCircle />, path: "/admin/products/productForm" },
+    { label: "Products", icon: <FiBox />, path: "/admin/products" },
     { label: "Orders", icon: <FiShoppingCart />, path: "/admin/orders" },
     { label: "Create your own orders", icon: <FiShoppingBag />, path: "/admin/orders/orderForm" },
     { label: "Transactions", icon: <BsReceipt />, path: "/admin/transactions" },
-    { label: "Logout", icon: <FiLogOut />, path: "/login" },
+    // Removed: Logout from menuItems - handled separately
   ];
+
+  // Logout function
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    
+    setIsLoggingOut(true);
+    
+    try {
+      // Clear any FCM device token from localStorage
+      const deviceId = localStorage.getItem('fcm_device_id');
+      if (deviceId) {
+        // Optionally call API to delete device token
+        try {
+          await fetch('/api/auth/fcm-token', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceId, clearAll: false })
+          });
+        } catch (fcmError) {
+          console.warn('Could not delete FCM token:', fcmError);
+        }
+      }
+      
+      // Call logout API
+      const response = await fetch('/api/auth/signout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Logout failed');
+      }
+      
+      // Clear client-side storage
+      const storageKeys = [
+        'token', 'auth-token', 'refresh-token', 'user',
+        'fcm_token', 'fcm_device_id', 'pending_fcm_tokens',
+        'session', 'userId', 'userRole', 'userEmail'
+      ];
+      
+      storageKeys.forEach(key => {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
+      });
+      
+      // Clear all localStorage items (optional safety measure)
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('fcm') || key.startsWith('auth') || key.includes('token')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      console.log('✅ Logout successful, redirecting to login...');
+      
+      // Force redirect to login page
+      router.push('/login');
+      router.refresh();
+      
+      // Force hard reload to clear all state
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
+      
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+      
+      // Still try to redirect even if error
+      const storageKeys = ['token', 'user', 'auth-token'];
+      storageKeys.forEach(key => localStorage.removeItem(key));
+      
+      // Force redirect anyway
+      setTimeout(() => {
+        window.location.href = 'api/auth/login';
+      }, 500);
+      
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  // Logout confirmation modal
+  const confirmLogout = () => {
+    if (window.confirm('Are you sure you want to logout?\n\nYou will be redirected to the login page.')) {
+      handleLogout();
+    }
+  };
 
   return (
     <div
@@ -29,16 +119,16 @@ export default function Sidebar({ collapsed = false }) {
         width: isCollapsed ? "80px" : "240px",
         backgroundColor: appTheme.colors.surface,
         color: appTheme.colors.textPrimary,
-        height: "100vh", // Full viewport height
+        height: "100vh",
         display: "flex",
         flexDirection: "column",
         transition: "width 0.3s ease",
         boxShadow: appTheme.shadows.md,
-        position: "fixed", // Changed to fixed
+        position: "fixed",
         left: 0,
         top: 0,
         zIndex: 1000,
-        overflowY: "auto", // Enable scrolling if content is too tall
+        overflowY: "auto",
       }}
     >
       {/* Logo / Brand */}
@@ -62,7 +152,7 @@ export default function Sidebar({ collapsed = false }) {
       <div
         style={{
           position: "sticky",
-          top: "60px", // Below the logo
+          top: "60px",
           backgroundColor: appTheme.colors.surface,
           zIndex: 1001,
           padding: "10px 0",
@@ -85,7 +175,7 @@ export default function Sidebar({ collapsed = false }) {
         </button>
       </div>
 
-      {/* Menu Items - This part will scroll if content overflows */}
+      {/* Menu Items */}
       <nav
         style={{
           flex: 1,
@@ -93,7 +183,7 @@ export default function Sidebar({ collapsed = false }) {
           flexDirection: "column",
           gap: "8px",
           padding: "10px",
-          overflowY: "auto", // Enable scrolling for menu items
+          overflowY: "auto",
         }}
       >
         {menuItems.map((item) => {
@@ -114,7 +204,7 @@ export default function Sidebar({ collapsed = false }) {
                 fontWeight: isActive ? "600" : "400",
                 cursor: "pointer",
                 transition: "background-color 0.2s",
-                flexShrink: 0, // Prevent shrinking
+                flexShrink: 0,
               }}
             >
               <span style={{ fontSize: "1.2rem" }}>{item.icon}</span>
@@ -122,6 +212,36 @@ export default function Sidebar({ collapsed = false }) {
             </Link>
           );
         })}
+        
+        {/* LOGOUT BUTTON - Separated from other menu items */}
+        <div
+          onClick={confirmLogout}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            padding: "10px",
+            borderRadius: "8px",
+            backgroundColor: "#dc262620", // Light red background
+            color: "#dc2626", // Red text
+            fontWeight: "600",
+            cursor: isLoggingOut ? "not-allowed" : "pointer",
+            transition: "all 0.2s",
+            flexShrink: 0,
+            opacity: isLoggingOut ? 0.7 : 1,
+            marginTop: "auto", // Push to bottom
+            border: "1px solid #dc262630",
+          }}
+        >
+          <span style={{ fontSize: "1.2rem" }}>
+            <FiLogOut />
+          </span>
+          {!isCollapsed && (
+            <span>
+              {isLoggingOut ? "Logging out..." : "Logout"}
+            </span>
+          )}
+        </div>
       </nav>
 
       {/* Footer */}
@@ -135,7 +255,26 @@ export default function Sidebar({ collapsed = false }) {
           zIndex: 1001,
         }}
       >
-        {!isCollapsed && <small style={{ color: appTheme.colors.textSecondary }}>© 2025 Step On Next</small>}
+        {!isCollapsed && (
+          <small style={{ 
+            color: appTheme.colors.textSecondary,
+            fontSize: "0.75rem",
+            display: "block",
+            textAlign: "center"
+          }}>
+            © 2025 Step On Next
+          </small>
+        )}
+        {isLoggingOut && !isCollapsed && (
+          <div style={{
+            marginTop: "8px",
+            fontSize: "0.7rem",
+            color: appTheme.colors.warning,
+            textAlign: "center"
+          }}>
+            Logging out...
+          </div>
+        )}
       </div>
     </div>
   );

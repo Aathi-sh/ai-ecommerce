@@ -1,3 +1,4 @@
+
 // 'use client';
 
 // import { useState, useEffect, useRef, useCallback } from 'react';
@@ -39,16 +40,32 @@
 //   const [isLoading, setIsLoading] = useState(false);
 //   const [wsConnected, setWsConnected] = useState(false);
 //   const [reconnectCount, setReconnectCount] = useState(0);
+//   const [wsStatus, setWsStatus] = useState('disconnected');
   
 //   const wsRef = useRef(null);
 //   const reconnectTimerRef = useRef(null);
 //   const statsIntervalRef = useRef(null);
 
-//   // WebSocket connection
+//   // Add activity log entry
+//   const addToActivityLog = useCallback((message, type = 'info') => {
+//     const entry = {
+//       id: Date.now(),
+//       message,
+//       type,
+//       timestamp: new Date().toLocaleTimeString(),
+//       date: new Date().toLocaleDateString()
+//     };
+    
+//     setActivityLog(prev => [entry, ...prev.slice(0, 19)]);
+//   }, []);
+
+//   // WebSocket connection with better stability
 //   const connectWebSocket = useCallback(() => {
 //     // Clean up existing connection
 //     if (wsRef.current) {
-//       wsRef.current.close();
+//       if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
+//         wsRef.current.close();
+//       }
 //     }
     
 //     if (reconnectTimerRef.current) {
@@ -58,22 +75,24 @@
 //     try {
 //       const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws';
 //       console.log('🔗 Connecting to WebSocket:', wsUrl);
+//       setWsStatus('connecting');
       
 //       wsRef.current = new WebSocket(wsUrl);
       
 //       wsRef.current.onopen = () => {
-//         console.log('✅ WebSocket connected');
+//         console.log('✅ WebSocket connected successfully');
 //         setWsConnected(true);
+//         setWsStatus('connected');
 //         setReconnectCount(0);
+//         addToActivityLog('WebSocket connected', 'success');
         
-//         // Request initial status
-//         wsRef.current.send(JSON.stringify({ type: 'get_status' }));
+//         // Send initial ping
+//         wsRef.current.send(JSON.stringify({ type: 'ping' }));
 //       };
       
 //       wsRef.current.onmessage = (event) => {
 //         try {
 //           const data = JSON.parse(event.data);
-//           console.log('📨 WebSocket message:', data.type);
           
 //           switch (data.type) {
 //             case 'qr':
@@ -115,6 +134,13 @@
 //               setStatusMessage(data.message);
 //               addToActivityLog(`Error: ${data.message}`, 'error');
 //               break;
+              
+//             case 'pong':
+//               // Ping response received, connection is alive
+//               break;
+              
+//             default:
+//               console.log('📨 Unknown WebSocket message type:', data.type);
 //           }
 //         } catch (error) {
 //           console.error('❌ Error parsing WebSocket message:', error);
@@ -122,42 +148,55 @@
 //       };
       
 //       wsRef.current.onclose = (event) => {
-//         console.log('🔌 WebSocket disconnected:', event.code, event.reason);
+//         console.log('🔌 WebSocket disconnected:', {
+//           code: event.code,
+//           reason: event.reason,
+//           wasClean: event.wasClean
+//         });
+        
 //         setWsConnected(false);
+//         setWsStatus('disconnected');
+//         addToActivityLog('WebSocket disconnected', 'warning');
+        
+//         // Don't reconnect immediately for normal closures
+//         if (event.code === 1000) { // Normal closure
+//           console.log('🛑 Normal WebSocket closure, not reconnecting');
+//           return;
+//         }
         
 //         // Auto-reconnect with exponential backoff
-//         const delay = Math.min(3000 * Math.pow(1.5, reconnectCount), 30000);
-//         setReconnectCount(prev => prev + 1);
+//         const delay = Math.min(5000 * Math.pow(1.5, reconnectCount), 30000);
+//         const nextAttempt = reconnectCount + 1;
+        
+//         console.log(`🔄 Reconnecting in ${delay/1000} seconds... (Attempt ${nextAttempt})`);
+//         addToActivityLog(`WebSocket reconnecting in ${delay/1000}s (Attempt ${nextAttempt})`, 'info');
         
 //         reconnectTimerRef.current = setTimeout(() => {
-//           console.log(`🔄 Reconnecting (attempt ${reconnectCount + 1})...`);
+//           console.log('🔄 Attempting WebSocket reconnection...');
 //           connectWebSocket();
 //         }, delay);
+        
+//         setReconnectCount(nextAttempt);
 //       };
       
 //       wsRef.current.onerror = (error) => {
-//         console.error('❌ WebSocket error:', error);
+//         console.log('⚠️ WebSocket error occurred');
 //         setWsConnected(false);
+//         setWsStatus('error');
 //       };
       
 //     } catch (error) {
-//       console.error('❌ WebSocket connection failed:', error);
+//       console.error('❌ WebSocket setup failed:', error);
 //       setWsConnected(false);
+//       setWsStatus('error');
+//       addToActivityLog('WebSocket setup failed', 'error');
+      
+//       // Retry after 10 seconds
+//       reconnectTimerRef.current = setTimeout(() => {
+//         connectWebSocket();
+//       }, 10000);
 //     }
-//   }, [reconnectCount]);
-
-//   // Add activity log entry
-//   const addToActivityLog = (message, type = 'info') => {
-//     const entry = {
-//       id: Date.now(),
-//       message,
-//       type,
-//       timestamp: new Date().toLocaleTimeString(),
-//       date: new Date().toLocaleDateString()
-//     };
-    
-//     setActivityLog(prev => [entry, ...prev.slice(0, 19)]);
-//   };
+//   }, [reconnectCount, addToActivityLog]);
 
 //   // Fetch bot status from API
 //   const fetchBotStatus = useCallback(async () => {
@@ -171,11 +210,14 @@
 //         if (data.message) setStatusMessage(data.message);
 //         if (data.stats) setStats(prev => ({ ...prev, ...data.stats }));
 //         if (data.botInfo) setBotInfo(data.botInfo);
+//       } else {
+//         console.error('❌ API returned error:', data.error);
 //       }
 //     } catch (error) {
 //       console.error('❌ Failed to fetch bot status:', error);
+//       addToActivityLog('Failed to fetch bot status', 'error');
 //     }
-//   }, []);
+//   }, [addToActivityLog]);
 
 //   // Bot control functions
 //   const handleBotAction = async (action, confirmMessage = null) => {
@@ -184,6 +226,7 @@
 //     }
     
 //     setIsLoading(true);
+//     addToActivityLog(`Starting action: ${action}`, 'info');
     
 //     try {
 //       const response = await fetch('/api/whatsapp', {
@@ -199,11 +242,7 @@
         
 //         // Refresh status after action
 //         setTimeout(() => {
-//           if (wsRef.current?.readyState === WebSocket.OPEN) {
-//             wsRef.current.send(JSON.stringify({ type: 'get_status' }));
-//           } else {
-//             fetchBotStatus();
-//           }
+//           fetchBotStatus();
 //         }, 2000);
 //       } else {
 //         addToActivityLog(`Action "${action}" failed: ${data.error}`, 'error');
@@ -218,12 +257,19 @@
 
 //   const sendTestMessage = async () => {
 //     const phoneNumber = prompt('Enter phone number (with country code, e.g., 919876543210):');
-//     if (!phoneNumber) return;
+//     if (!phoneNumber) {
+//       addToActivityLog('Test message cancelled: No phone number provided', 'warning');
+//       return;
+//     }
     
 //     const message = prompt('Enter message:');
-//     if (!message) return;
+//     if (!message) {
+//       addToActivityLog('Test message cancelled: No message provided', 'warning');
+//       return;
+//     }
     
 //     setIsLoading(true);
+//     addToActivityLog(`Sending test message to ${phoneNumber}`, 'info');
     
 //     try {
 //       const response = await fetch('/api/whatsapp', {
@@ -248,6 +294,7 @@
 //     } catch (error) {
 //       console.error('❌ Send message error:', error);
 //       addToActivityLog('Failed to send test message', 'error');
+//       alert('❌ Failed to send message. Check console for details.');
 //     } finally {
 //       setIsLoading(false);
 //     }
@@ -308,20 +355,44 @@
 //     { name: 'Customers', value: stats.totalCustomers, color: '#06b6d4' }
 //   ];
 
+//   // Format date for display
+//   const formatDate = (dateString) => {
+//     if (!dateString) return 'Never';
+//     try {
+//       const date = new Date(dateString);
+//       return date.toLocaleTimeString();
+//     } catch {
+//       return 'Invalid date';
+//     }
+//   };
+
 //   // Initialize
 //   useEffect(() => {
-//     connectWebSocket();
+//     // Start WebSocket connection with a delay
+//     const wsTimeout = setTimeout(() => {
+//       connectWebSocket();
+//     }, 1000);
     
 //     // Fetch initial status
 //     fetchBotStatus();
     
-//     // Set up stats polling (fallback if WebSocket fails)
-//     statsIntervalRef.current = setInterval(fetchBotStatus, 10000);
+//     // Set up fallback polling (every 30 seconds)
+//     statsIntervalRef.current = setInterval(fetchBotStatus, 30000);
     
 //     return () => {
-//       if (wsRef.current) wsRef.current.close();
-//       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-//       if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
+//       clearTimeout(wsTimeout);
+      
+//       if (wsRef.current) {
+//         wsRef.current.close();
+//       }
+      
+//       if (reconnectTimerRef.current) {
+//         clearTimeout(reconnectTimerRef.current);
+//       }
+      
+//       if (statsIntervalRef.current) {
+//         clearInterval(statsIntervalRef.current);
+//       }
 //     };
 //   }, [connectWebSocket, fetchBotStatus]);
 
@@ -351,10 +422,46 @@
 //                 </span>
 //               </div>
 //               <div className={`px-3 py-1 rounded-full ${wsConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} text-sm font-medium`}>
-//                 {wsConnected ? 'Live' : 'Offline'}
+//                 {wsConnected ? 'Live WS' : 'No WS'}
 //               </div>
 //             </div>
 //           </div>
+//         </div>
+
+//         {/* Connection Status Card */}
+//         <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-200 mb-6">
+//           <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
+//             <div>
+//               <h2 className="text-xl font-bold text-gray-900 mb-1">Connection Status</h2>
+//               <p className="text-gray-600">{statusMessage}</p>
+//             </div>
+            
+//             <div className="mt-4 md:mt-0">
+//               <button
+//                 onClick={() => fetchBotStatus()}
+//                 disabled={isLoading}
+//                 className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+//               >
+//                 <RefreshCw className="w-4 h-4" />
+//                 Refresh Status
+//               </button>
+//             </div>
+//           </div>
+          
+//           {!wsConnected && (
+//             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-4">
+//               <div className="flex items-center gap-3">
+//                 <AlertCircle className="w-5 h-5 text-amber-600" />
+//                 <div>
+//                   <p className="text-amber-800 font-medium">WebSocket Disconnected</p>
+//                   <p className="text-amber-700 text-sm">
+//                     Real-time updates are disabled. Using fallback polling every 30 seconds.
+//                     {reconnectCount > 0 && ` Reconnection attempts: ${reconnectCount}`}
+//                   </p>
+//                 </div>
+//               </div>
+//             </div>
+//           )}
 //         </div>
 
 //         {/* Main Grid */}
@@ -505,7 +612,10 @@
 //                           <Cell key={`cell-${index}`} fill={entry.color} />
 //                         ))}
 //                       </Pie>
-//                       <Tooltip />
+//                       <Tooltip 
+//                         formatter={(value) => [value, 'Orders']}
+//                         labelFormatter={(name) => `Category: ${name}`}
+//                       />
 //                       <Legend />
 //                     </PieChart>
 //                   </ResponsiveContainer>
@@ -522,10 +632,21 @@
 //                   <ResponsiveContainer width="100%" height="100%">
 //                     <BarChart data={messagesData}>
 //                       <CartesianGrid strokeDasharray="3 3" />
-//                       <XAxis dataKey="name" />
+//                       <XAxis 
+//                         dataKey="name" 
+//                         angle={-45}
+//                         textAnchor="end"
+//                         height={60}
+//                       />
 //                       <YAxis />
-//                       <Tooltip />
-//                       <Bar dataKey="value" fill="#8884d8" />
+//                       <Tooltip 
+//                         formatter={(value) => [value, 'Count']}
+//                       />
+//                       <Bar 
+//                         dataKey="value" 
+//                         fill="#8884d8"
+//                         radius={[4, 4, 0, 0]}
+//                       />
 //                     </BarChart>
 //                   </ResponsiveContainer>
 //                 </div>
@@ -654,7 +775,7 @@
 //                 </button>
                 
 //                 <button
-//                   onClick={() => handleBotAction('clear_session', 'Clear all sessions?')}
+//                   onClick={() => handleBotAction('clear_session', 'Clear all sessions? This will log out WhatsApp.')}
 //                   disabled={isLoading}
 //                   className="w-full flex items-center gap-3 p-4 text-left rounded-xl border border-gray-200 hover:bg-red-50 hover:border-red-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
 //                 >
@@ -708,13 +829,16 @@
 //           <p>WhatsApp Business Dashboard • Professional Edition • Real-time Monitoring</p>
 //           <p className="mt-1">
 //             Bot Server: localhost:3001 • WebSocket: {wsConnected ? 'Connected' : 'Disconnected'} • 
-//             Last Update: {stats.lastUpdated ? new Date(stats.lastUpdated).toLocaleTimeString() : 'Never'}
+//             Last Update: {formatDate(stats.lastUpdated)}
 //           </p>
 //         </div>
 //       </div>
 //     </div>
 //   );
 // }
+
+
+
 
 
 'use client';
@@ -763,6 +887,7 @@ export default function WhatsAppDashboard() {
   const wsRef = useRef(null);
   const reconnectTimerRef = useRef(null);
   const statsIntervalRef = useRef(null);
+  const pingIntervalRef = useRef(null);
 
   // Add activity log entry
   const addToActivityLog = useCallback((message, type = 'info') => {
@@ -777,84 +902,172 @@ export default function WhatsAppDashboard() {
     setActivityLog(prev => [entry, ...prev.slice(0, 19)]);
   }, []);
 
-  // WebSocket connection with better stability
+  // SAFE WebSocket connection
   const connectWebSocket = useCallback(() => {
     // Clean up existing connection
     if (wsRef.current) {
-      if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
-        wsRef.current.close();
+      try {
+        if (wsRef.current.readyState === WebSocket.OPEN || 
+            wsRef.current.readyState === WebSocket.CONNECTING) {
+          wsRef.current.close();
+        }
+      } catch (error) {
+        console.log('⚠️ Error closing previous WebSocket:', error.message);
       }
+      wsRef.current = null;
     }
     
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
     }
     
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+    }
+    
     try {
-      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws';
-      console.log('🔗 Connecting to WebSocket:', wsUrl);
+      // IMPORTANT: Use the correct WebSocket URL for QR socket
+      const wsUrl = process.env.NEXT_PUBLIC_QR_WS_URL || 'ws://localhost:3001/ws/qr';
+      console.log('🔗 Connecting to QR WebSocket:', wsUrl);
       setWsStatus('connecting');
+      addToActivityLog(`Connecting to WebSocket: ${wsUrl}`, 'info');
       
       wsRef.current = new WebSocket(wsUrl);
       
       wsRef.current.onopen = () => {
-        console.log('✅ WebSocket connected successfully');
+        console.log('✅ QR WebSocket connected successfully');
         setWsConnected(true);
         setWsStatus('connected');
         setReconnectCount(0);
         addToActivityLog('WebSocket connected', 'success');
         
-        // Send initial ping
-        wsRef.current.send(JSON.stringify({ type: 'ping' }));
+        // Send initial identification
+        setTimeout(() => {
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            try {
+              wsRef.current.send(JSON.stringify({ 
+                type: 'identify', 
+                clientName: 'Admin Dashboard' 
+              }));
+            } catch (error) {
+              console.log('❌ Error sending identification:', error.message);
+            }
+          }
+        }, 500);
+        
+        // Start ping interval
+        pingIntervalRef.current = setInterval(() => {
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            try {
+              wsRef.current.send(JSON.stringify({ type: 'ping' }));
+            } catch (error) {
+              console.log('❌ Error sending ping:', error.message);
+            }
+          }
+        }, 25000);
       };
       
       wsRef.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
           
+          if (data.type === 'connected' && data.endpoint === 'qr') {
+            console.log('✅ Connected to QR WebSocket endpoint');
+            addToActivityLog('Connected to QR WebSocket service', 'success');
+            
+            // Request initial status
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+              setTimeout(() => {
+                try {
+                  wsRef.current.send(JSON.stringify({ type: 'get_status' }));
+                  wsRef.current.send(JSON.stringify({ type: 'get_stats' }));
+                } catch (error) {
+                  console.log('❌ Error requesting initial data:', error.message);
+                }
+              }, 1000);
+            }
+          }
+          
           switch (data.type) {
             case 'qr':
-              setQrCode(data.qr);
-              setStatus('qr_required');
-              setStatusMessage('Scan QR code with WhatsApp to connect');
-              addToActivityLog('QR code generated', 'info');
+            case 'qr_update':
+              if (data.qr) {
+                setQrCode(data.qr);
+                setStatus('qr_required');
+                setStatusMessage('Scan QR code with WhatsApp to connect');
+                addToActivityLog('QR code generated', 'info');
+              }
+              break;
+              
+            case 'qr_response':
+              if (data.qr) {
+                setQrCode(data.qr);
+                setStatus('qr_required');
+                setStatusMessage('Scan QR code with WhatsApp to connect');
+              }
               break;
               
             case 'status':
-              setStatus(data.status);
-              setStatusMessage(data.message);
-              if (data.botInfo) setBotInfo(data.botInfo);
+            case 'status_update':
+              if (data.status) setStatus(data.status);
+              if (data.message) setStatusMessage(data.message);
+              if (data.connected !== undefined) {
+                setStatus(data.connected ? 'connected' : 'disconnected');
+              }
+              if (data.qr) setQrCode(data.qr);
               break;
               
             case 'stats':
-              setStats(prev => ({
-                ...prev,
-                ...data.stats,
-                lastUpdated: new Date().toISOString()
-              }));
+            case 'stats_update':
+              if (data.stats) {
+                setStats(prev => ({
+                  ...prev,
+                  ...data.stats,
+                  lastUpdated: new Date().toISOString()
+                }));
+              }
               break;
               
-            case 'connected':
+            case 'bot_connected':
               setStatus('connected');
               setStatusMessage('WhatsApp is connected and ready');
               setQrCode(null);
               addToActivityLog('WhatsApp connected successfully', 'success');
               break;
               
-            case 'disconnected':
+            case 'bot_disconnected':
               setStatus('disconnected');
-              setStatusMessage(`Disconnected: ${data.reason}`);
-              addToActivityLog(`Disconnected: ${data.reason}`, 'warning');
+              setStatusMessage(`Disconnected: ${data.reason || 'Unknown reason'}`);
+              addToActivityLog(`Disconnected: ${data.reason || 'Unknown reason'}`, 'warning');
               break;
               
-            case 'error':
-              setStatus('error');
-              setStatusMessage(data.message);
-              addToActivityLog(`Error: ${data.message}`, 'error');
+            case 'bot_info':
+              if (data.botInfo) setBotInfo(data.botInfo);
+              break;
+              
+            case 'connected':
+              // Initial connection message
+              if (data.botStatus) {
+                if (data.botStatus.qr) {
+                  setQrCode(data.botStatus.qr);
+                  setStatus('qr_required');
+                } else if (data.botStatus.connected) {
+                  setStatus('connected');
+                  setQrCode(null);
+                }
+              }
               break;
               
             case 'pong':
               // Ping response received, connection is alive
+              break;
+              
+            case 'error':
+              addToActivityLog(`Error: ${data.message || 'Unknown error'}`, 'error');
+              break;
+              
+            case 'identified':
+              console.log('✅ WebSocket identification confirmed:', data.message);
               break;
               
             default:
@@ -862,11 +1075,12 @@ export default function WhatsAppDashboard() {
           }
         } catch (error) {
           console.error('❌ Error parsing WebSocket message:', error);
+          addToActivityLog('Error parsing WebSocket message', 'error');
         }
       };
       
       wsRef.current.onclose = (event) => {
-        console.log('🔌 WebSocket disconnected:', {
+        console.log('🔌 QR WebSocket disconnected:', {
           code: event.code,
           reason: event.reason,
           wasClean: event.wasClean
@@ -874,37 +1088,45 @@ export default function WhatsAppDashboard() {
         
         setWsConnected(false);
         setWsStatus('disconnected');
-        addToActivityLog('WebSocket disconnected', 'warning');
         
-        // Don't reconnect immediately for normal closures
-        if (event.code === 1000) { // Normal closure
-          console.log('🛑 Normal WebSocket closure, not reconnecting');
-          return;
+        if (event.code !== 1000) { // Not a normal closure
+          addToActivityLog(`WebSocket disconnected: ${event.reason || 'Code ' + event.code}`, 'warning');
         }
         
-        // Auto-reconnect with exponential backoff
-        const delay = Math.min(5000 * Math.pow(1.5, reconnectCount), 30000);
-        const nextAttempt = reconnectCount + 1;
+        // Clean up ping interval
+        if (pingIntervalRef.current) {
+          clearInterval(pingIntervalRef.current);
+          pingIntervalRef.current = null;
+        }
         
-        console.log(`🔄 Reconnecting in ${delay/1000} seconds... (Attempt ${nextAttempt})`);
-        addToActivityLog(`WebSocket reconnecting in ${delay/1000}s (Attempt ${nextAttempt})`, 'info');
-        
-        reconnectTimerRef.current = setTimeout(() => {
-          console.log('🔄 Attempting WebSocket reconnection...');
-          connectWebSocket();
-        }, delay);
-        
-        setReconnectCount(nextAttempt);
+        // Auto-reconnect with exponential backoff (except for normal closures)
+        if (event.code !== 1000 && reconnectCount < 10) {
+          const delay = Math.min(3000 * Math.pow(1.5, reconnectCount), 30000);
+          const nextAttempt = reconnectCount + 1;
+          
+          console.log(`🔄 Reconnecting in ${delay/1000} seconds... (Attempt ${nextAttempt})`);
+          
+          reconnectTimerRef.current = setTimeout(() => {
+            console.log('🔄 Attempting WebSocket reconnection...');
+            connectWebSocket();
+          }, delay);
+          
+          setReconnectCount(nextAttempt);
+        } else if (event.code === 1000) {
+          console.log('🛑 Normal WebSocket closure, not reconnecting');
+          addToActivityLog('WebSocket connection closed normally', 'info');
+        }
       };
       
       wsRef.current.onerror = (error) => {
+        // SAFE error handling - don't try to access error object properties
         console.log('⚠️ WebSocket error occurred');
         setWsConnected(false);
         setWsStatus('error');
       };
       
     } catch (error) {
-      console.error('❌ WebSocket setup failed:', error);
+      console.error('❌ WebSocket setup failed:', error.message);
       setWsConnected(false);
       setWsStatus('error');
       addToActivityLog('WebSocket setup failed', 'error');
@@ -930,12 +1152,28 @@ export default function WhatsAppDashboard() {
         if (data.botInfo) setBotInfo(data.botInfo);
       } else {
         console.error('❌ API returned error:', data.error);
+        addToActivityLog(`API error: ${data.error}`, 'error');
       }
     } catch (error) {
       console.error('❌ Failed to fetch bot status:', error);
       addToActivityLog('Failed to fetch bot status', 'error');
     }
   }, [addToActivityLog]);
+
+  // Request QR code via WebSocket
+  const requestQRCode = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      try {
+        wsRef.current.send(JSON.stringify({ type: 'get_qr' }));
+        addToActivityLog('Requested QR code refresh', 'info');
+      } catch (error) {
+        console.log('❌ Error requesting QR code:', error.message);
+      }
+    } else {
+      // Fallback to API
+      fetchBotStatus();
+    }
+  }, [fetchBotStatus, addToActivityLog]);
 
   // Bot control functions
   const handleBotAction = async (action, confirmMessage = null) => {
@@ -962,6 +1200,17 @@ export default function WhatsAppDashboard() {
         setTimeout(() => {
           fetchBotStatus();
         }, 2000);
+        
+        // Request updated status via WebSocket
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          setTimeout(() => {
+            try {
+              wsRef.current.send(JSON.stringify({ type: 'get_status' }));
+            } catch (error) {
+              console.log('❌ Error requesting status update:', error.message);
+            }
+          }, 1500);
+        }
       } else {
         addToActivityLog(`Action "${action}" failed: ${data.error}`, 'error');
       }
@@ -1091,7 +1340,7 @@ export default function WhatsAppDashboard() {
       connectWebSocket();
     }, 1000);
     
-    // Fetch initial status
+    // Fetch initial status via API
     fetchBotStatus();
     
     // Set up fallback polling (every 30 seconds)
@@ -1100,16 +1349,30 @@ export default function WhatsAppDashboard() {
     return () => {
       clearTimeout(wsTimeout);
       
+      // Clean up WebSocket
       if (wsRef.current) {
-        wsRef.current.close();
+        try {
+          if (wsRef.current.readyState === WebSocket.OPEN || 
+              wsRef.current.readyState === WebSocket.CONNECTING) {
+            wsRef.current.close(1000, 'Component unmounting');
+          }
+        } catch (error) {
+          console.log('⚠️ Error closing WebSocket on unmount:', error.message);
+        }
+        wsRef.current = null;
       }
       
+      // Clean up timers
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
       }
       
       if (statsIntervalRef.current) {
         clearInterval(statsIntervalRef.current);
+      }
+      
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
       }
     };
   }, [connectWebSocket, fetchBotStatus]);
@@ -1142,6 +1405,11 @@ export default function WhatsAppDashboard() {
               <div className={`px-3 py-1 rounded-full ${wsConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} text-sm font-medium`}>
                 {wsConnected ? 'Live WS' : 'No WS'}
               </div>
+              {reconnectCount > 0 && (
+                <div className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full">
+                  Retry: {reconnectCount}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1150,18 +1418,32 @@ export default function WhatsAppDashboard() {
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-200 mb-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-1">Connection Status</h2>
-              <p className="text-gray-600">{statusMessage}</p>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">QR WebSocket Connection</h2>
+              <p className="text-gray-600">
+                {wsConnected ? 'Connected to real-time service' : 'Connecting to WebSocket...'}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                Endpoint: ws://localhost:3001/ws/qr
+              </p>
             </div>
             
-            <div className="mt-4 md:mt-0">
+            <div className="flex gap-2 mt-4 md:mt-0">
+              <button
+                onClick={requestQRCode}
+                disabled={!wsConnected || isLoading}
+                className="flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Refresh QR
+              </button>
+              
               <button
                 onClick={() => fetchBotStatus()}
                 disabled={isLoading}
                 className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <RefreshCw className="w-4 h-4" />
-                Refresh Status
+                API Refresh
               </button>
             </div>
           </div>
@@ -1547,7 +1829,7 @@ export default function WhatsAppDashboard() {
           <p>WhatsApp Business Dashboard • Professional Edition • Real-time Monitoring</p>
           <p className="mt-1">
             Bot Server: localhost:3001 • WebSocket: {wsConnected ? 'Connected' : 'Disconnected'} • 
-            Last Update: {formatDate(stats.lastUpdated)}
+            Last Update: {formatDate(stats.lastUpdated)} • QR Endpoint: /ws/qr
           </p>
         </div>
       </div>

@@ -31,9 +31,24 @@ export async function POST(req) {
       );
     }
 
+    // ⭐⭐⭐ ADD EXPIRY CHECK HERE ⭐⭐⭐
+    if (user.verificationTokenExpires && user.verificationTokenExpires < Date.now()) {
+      // Clear expired token
+      user.verificationToken = undefined;
+      user.verificationTokenExpires = undefined;
+      await user.save();
+      
+      return NextResponse.json(
+        { message: "Verification token has expired. Please request a new one." },
+        { status: 400 }
+      );
+    }
+
     // Verify user
     user.isVerified = true;
     user.verificationToken = undefined;
+    // ⭐⭐⭐ ALSO CLEAR THE EXPIRY FIELD ⭐⭐⭐
+    user.verificationTokenExpires = undefined;
     await user.save();
 
     return NextResponse.json({

@@ -1,7 +1,488 @@
-import admin from "../firebase/firebase-admin.js";
-import User from '../../../ai-ecommerce/models/user.js';
-import DeviceToken from '../../../ai-ecommerce/models/AdminDeviceToken.js';
+// // services/notifications/notification-service.js - COMPLETE FIXED VERSION
+// import { createHmac } from 'crypto';
+// import apiService from "../apiService.js";
 
+// // Firebase import with fallback
+// let firebaseAdmin = null;
+// let firebaseEnabled = false;
+
+// try {
+//     const { messaging } = await import("../firebase/firebase-admin.js");
+//     firebaseAdmin = { messaging };
+//     firebaseEnabled = process.env.FIREBASE_ENABLED === 'true';
+//     console.log('✅ Firebase Admin SDK loaded successfully');
+// } catch (error) {
+//     console.log('⚠️ Firebase Admin SDK not available:', error.message);
+//     firebaseEnabled = false;
+// }
+
+// class NotificationService {
+//   constructor() {
+//     this.categories = {
+//       ORDER: 'order',
+//       PAYMENT: 'payment',
+//       STOCK: 'stock',
+//       INVOICE: 'invoice',
+//       SYSTEM: 'system',
+//       ALERT: 'alert'
+//     };
+
+//     this.priorities = {
+//       HIGH: 'high',
+//       NORMAL: 'normal',
+//       LOW: 'low',
+//       URGENT: 'urgent'
+//     };
+
+//     console.log('🔔 Notification Service Initialized:', {
+//       firebase: firebaseEnabled ? 'ENABLED' : 'DISABLED'
+//     });
+//   }
+
+//   /**
+//    * Get admin tokens via Next.js API
+//    */
+//   async getAdminTokensFromDB() {
+//     try {
+//       console.log('📱 Fetching admin FCM tokens via Next.js API...');
+      
+//       // Use your existing apiService that calls Next.js API
+//       // Check which method actually exists in your apiService
+//       let tokenResponse;
+      
+//       if (typeof apiService.getAdminFCMTokens === 'function') {
+//         tokenResponse = await apiService.getAdminFCMTokens();
+//       } else if (typeof apiService.getAdminFCMTokensFromNextJS === 'function') {
+//         // Alternative method name
+//         tokenResponse = await apiService.getAdminFCMTokensFromNextJS();
+//       } else {
+//         console.error('❌ No FCM token method found in apiService');
+//         return [];
+//       }
+      
+//       console.log('🔍 Token API Response:', {
+//         success: tokenResponse?.success,
+//         count: tokenResponse?.tokens?.length || 0
+//       });
+
+//       if (!tokenResponse?.success || !tokenResponse?.tokens) {
+//         console.warn('⚠️ No tokens received from API or invalid response');
+//         return [];
+//       }
+
+//       // Extract token strings from API response
+//       const fcmTokens = tokenResponse.tokens
+//         .map(t => t.fcmToken || t.token || t)
+//         .filter(token => {
+//           const isValid = token && typeof token === 'string' && token.trim().length > 50;
+//           return isValid;
+//         });
+
+//       console.log(`✅ Retrieved ${fcmTokens.length} valid tokens from Next.js API`);
+//       return fcmTokens;
+
+//     } catch (error) {
+//       console.error('❌ Failed to fetch tokens from Next.js API:', error.message);
+//       return [];
+//     }
+//   }
+
+//   async sendPushNotification(notificationData) {
+//     try {
+//       // Check if Firebase is available
+//       if (!firebaseEnabled || !firebaseAdmin?.messaging) {
+//         console.log('⚠️ Firebase not available, skipping push notification');
+//         return {
+//           success: false,
+//           error: 'Firebase not configured or disabled',
+//           message: 'Push notifications disabled'
+//         };
+//       }
+
+//       // Get tokens via API
+//       const tokens = await this.getAdminTokensFromDB();
+      
+//       if (tokens.length === 0) {
+//         return { 
+//           success: false, 
+//           error: 'No active admin devices found',
+//           message: 'Please login as admin and enable notifications'
+//         };
+//       }
+
+//       const message = {
+//         notification: {
+//           title: notificationData.title,
+//           body: notificationData.body,
+//           imageUrl: notificationData.imageUrl || undefined
+//         },
+//         data: {
+//           type: notificationData.type || 'general',
+//           category: notificationData.category || this.categories.SYSTEM,
+//           priority: notificationData.priority || this.priorities.NORMAL,
+//           referenceId: notificationData.referenceId || '',
+//           orderNumber: notificationData.orderNumber || '',
+//           actionUrl: notificationData.actionUrl || '',
+//           timestamp: new Date().toISOString(),
+//           ...(notificationData.extraData || {})
+//         },
+//         android: {
+//           priority: notificationData.priority === this.priorities.HIGH ? 'high' : 'normal',
+//           notification: {
+//             sound: 'default',
+//             channelId: notificationData.channelId || 'admin_channel',
+//             icon: notificationData.icon || 'ic_notification',
+//             color: notificationData.color || '#FF6B35',
+//             clickAction: notificationData.clickAction || 'FLUTTER_NOTIFICATION_CLICK'
+//           }
+//         },
+//         apns: {
+//           payload: {
+//             aps: {
+//               sound: 'default',
+//               badge: notificationData.badge || 1,
+//               category: notificationData.category || 'SYSTEM'
+//             }
+//           }
+//         }
+//       };
+
+//       // Send to each token individually
+//       const results = [];
+//       for (const token of tokens) {
+//         try {
+//           const result = await firebaseAdmin.messaging.send({
+//             ...message,
+//             token: token.trim()
+//           });
+          
+//           results.push({
+//             token: token.substring(0, 20) + '...',
+//             success: true,
+//             messageId: result
+//           });
+          
+//         } catch (tokenError) {
+//           console.error(`❌ Failed to send to token ${token.substring(0, 20)}...:`, tokenError.message);
+          
+//           results.push({
+//             token: token.substring(0, 20) + '...',
+//             success: false,
+//             error: tokenError.message,
+//             code: tokenError.code
+//           });
+//         }
+//       }
+
+//       const successCount = results.filter(r => r.success).length;
+//       const failureCount = results.filter(r => !r.success).length;
+      
+//       return {
+//         success: successCount > 0,
+//         successCount,
+//         failureCount,
+//         tokensSent: tokens.length,
+//         results,
+//         message: `Sent to ${successCount}/${tokens.length} devices`
+//       };
+
+//     } catch (error) {
+//       console.error('❌ Error sending push notification:', error.message);
+//       return {
+//         success: false,
+//         error: error.message,
+//         code: error.code || 'UNKNOWN_ERROR'
+//       };
+//     }
+//   }
+
+//   async sendNewOrderNotification(orderData) {
+//     try {
+//       const result = await this.sendPushNotification({
+//         title: '🛒 New Order Received!',
+//         body: `Order #${orderData.orderNumber} has been placed`,
+//         type: 'NEW_ORDER',
+//         category: this.categories.ORDER,
+//         priority: this.priorities.HIGH,
+//         orderNumber: orderData.orderNumber,
+//         referenceId: orderData.referenceId || orderData.orderNumber,
+//         extraData: {
+//           orderId: orderData._id || orderData.orderId || '',
+//           customerName: orderData.customerName || '',
+//           totalAmount: orderData.totalAmount || orderData.totalPrice || 0,
+//           source: 'whatsapp-bot',
+//           timestamp: new Date().toISOString()
+//         }
+//       });
+      
+//       return result;
+      
+//     } catch (error) {
+//       console.error('❌ Order notification error:', error.message);
+//       return { success: false, error: error.message };
+//     }
+//   }
+
+//   async sendPaymentNotification(paymentData) {
+//     try {
+//       return await this.sendPushNotification({
+//         title: '💰 Payment Received',
+//         body: `Payment of ₹${paymentData.amount} received for Order #${paymentData.orderNumber}`,
+//         type: 'PAYMENT_RECEIVED',
+//         category: this.categories.PAYMENT,
+//         priority: this.priorities.HIGH,
+//         orderNumber: paymentData.orderNumber,
+//         extraData: paymentData
+//       });
+//     } catch (error) {
+//       console.error('❌ Payment notification error:', error);
+//       return { success: false, error: error.message };
+//     }
+//   }
+
+//   async sendLowStockNotification(productData) {
+//     try {
+//       return await this.sendPushNotification({
+//         title: '📦 Low Stock Alert',
+//         body: `${productData.name} is running low (${productData.stock} left)`,
+//         type: 'LOW_STOCK',
+//         category: this.categories.STOCK,
+//         priority: this.priorities.NORMAL,
+//         extraData: productData
+//       });
+//     } catch (error) {
+//       console.error('❌ Low stock notification error:', error);
+//       return { success: false, error: error.message };
+//     }
+//   }
+
+//   async sendWhatsAppNotification(orderData) {
+//     try {
+//       console.log('📱 Sending WhatsApp dashboard notification for order:', orderData.orderNumber);
+
+//       // First check if we can send via Socket.IO (real-time)
+//       let socketResult = null;
+//       try {
+//         if (global.io) {
+//           // Emit Socket.IO event for real-time dashboard
+//           global.io.of('/notifications').emit('NEW_ORDER', {
+//             type: 'NEW_ORDER',
+//             order: orderData,
+//             timestamp: new Date().toISOString()
+//           });
+//           socketResult = { success: true, method: 'socket.io' };
+//           console.log('✅ Socket.IO notification sent');
+//         }
+//       } catch (socketError) {
+//         console.error('❌ Socket.IO notification failed:', socketError.message);
+//         socketResult = { success: false, error: socketError.message };
+//       }
+
+//       // Then try Next.js API if available
+//       let apiResult = null;
+//       if (typeof apiService.sendNotificationToDashboard === 'function') {
+//         try {
+//           const notificationPayload = {
+//             type: 'NEW_ORDER',
+//             priority: 'urgent',
+//             data: {
+//               orderId: orderData._id || orderData.id || '',
+//               orderNumber: orderData.orderNumber || '',
+//               customerName: orderData.customerName || 'Customer',
+//               customerPhone: orderData.customerPhone || orderData.phoneNumber || '',
+//               totalAmount: orderData.totalAmount || orderData.totalPrice || 0,
+//               items: orderData.items || [],
+//               paymentStatus: orderData.paymentStatus || 'pending',
+//               status: orderData.status || 'pending',
+//               createdAt: orderData.createdAt || new Date().toISOString(),
+//               source: 'whatsapp-bot'
+//             }
+//           };
+
+//           const response = await apiService.sendNotificationToDashboard(notificationPayload);
+//           apiResult = {
+//             success: true,
+//             notificationId: response.notificationId,
+//             dashboardResponse: response
+//           };
+//           console.log('✅ Next.js API notification sent');
+//         } catch (apiError) {
+//           console.error('❌ Next.js API notification failed:', apiError.message);
+//           apiResult = { success: false, error: apiError.message };
+//         }
+//       } else {
+//         console.log('ℹ️ apiService.sendNotificationToDashboard not available');
+//       }
+
+//       return {
+//         success: socketResult?.success || apiResult?.success || false,
+//         orderNumber: orderData.orderNumber,
+//         socket: socketResult,
+//         api: apiResult,
+//         timestamp: new Date().toISOString()
+//       };
+
+//     } catch (error) {
+//       console.error('❌ WhatsApp notification failed:', error.message);
+//       return {
+//         success: false,
+//         error: error.message
+//       };
+//     }
+//   }
+
+//   async sendCompleteNotification(orderData) {
+//     try {
+//       console.log('🚀 Sending complete notification for order:', orderData.orderNumber);
+
+//       // 1. Send Firebase push notification (for mobile apps)
+//       const firebaseResult = await this.sendNewOrderNotification(orderData);
+      
+//       // 2. Send WhatsApp dashboard notification (real-time + API)
+//       const dashboardResult = await this.sendWhatsAppNotification(orderData);
+
+//       return {
+//         success: firebaseResult.success || dashboardResult.success,
+//         orderNumber: orderData.orderNumber,
+//         firebase: firebaseResult,
+//         dashboard: dashboardResult,
+//         timestamp: new Date().toISOString(),
+//         message: 'Notifications sent through all channels'
+//       };
+
+//     } catch (error) {
+//       console.error('❌ Complete notification failed:', error.message);
+//       return {
+//         success: false,
+//         error: error.message
+//       };
+//     }
+//   }
+
+//   async sendTestNotification(customData = {}) {
+//     try {
+//       const testOrderData = {
+//         orderNumber: `TEST-${Date.now()}`,
+//         customerName: customData.customerName || 'Test Customer',
+//         customerPhone: customData.customerPhone || '9876543210',
+//         totalAmount: customData.totalAmount || 1999,
+//         totalPrice: customData.totalAmount || 1999,
+//         items: customData.items || [{ name: 'Test Product', quantity: 1, price: 1999 }],
+//         paymentStatus: customData.paymentStatus || 'pending',
+//         status: customData.status || 'pending',
+//         createdAt: new Date().toISOString(),
+//         ...customData
+//       };
+
+//       console.log('🧪 Sending test notification...');
+      
+//       const result = await this.sendCompleteNotification(testOrderData);
+      
+//       console.log('✅ Test notification result:', result.success);
+      
+//       return {
+//         test: true,
+//         orderNumber: testOrderData.orderNumber,
+//         timestamp: new Date().toISOString(),
+//         result
+//       };
+      
+//     } catch (error) {
+//       console.error('❌ Test notification failed:', error.message);
+//       return {
+//         test: true,
+//         success: false,
+//         error: error.message
+//       };
+//     }
+//   }
+
+//   async checkDashboardHealth() {
+//     try {
+//       const response = await apiService.healthCheck();
+      
+//       return {
+//         healthy: response.status === 'healthy',
+//         dashboard: response.status,
+//         timestamp: new Date().toISOString(),
+//         details: response.data
+//       };
+//     } catch (error) {
+//       console.error('❌ Dashboard health check failed:', error.message);
+//       return {
+//         healthy: false,
+//         error: error.message,
+//         timestamp: new Date().toISOString()
+//       };
+//     }
+//   }
+
+//   /**
+//    * Get notification status
+//    */
+//   async getNotificationStatus() {
+//     try {
+//       // Get Firebase status
+//       const firebaseStatus = {
+//         enabled: firebaseEnabled,
+//         messaging: !!firebaseAdmin?.messaging
+//       };
+
+//       // Get tokens via API
+//       let tokenInfo = { success: false, count: 0 };
+//       try {
+//         const tokenResponse = await this.getAdminTokensFromDB();
+//         tokenInfo = {
+//           success: true,
+//           count: tokenResponse.length,
+//           hasTokens: tokenResponse.length > 0
+//         };
+//       } catch (tokenError) {
+//         tokenInfo.error = tokenError.message;
+//       }
+
+//       // Check dashboard health
+//       const dashboardHealth = await this.checkDashboardHealth();
+
+//       return {
+//         firebase: firebaseStatus,
+//         tokens: tokenInfo,
+//         dashboard: dashboardHealth,
+//         timestamp: new Date().toISOString(),
+//         overallStatus: firebaseStatus.enabled && tokenInfo.hasTokens ? 'healthy' : 'degraded'
+//       };
+
+//     } catch (error) {
+//       console.error('❌ Error getting notification status:', error.message);
+//       return { 
+//         error: error.message,
+//         timestamp: new Date().toISOString()
+//       };
+//     }
+//   }
+// }
+
+// // Create singleton instance
+// const notificationService = new NotificationService();
+// export default notificationService;
+
+
+// services/notifications/notification-service.js - COMPLETE FIXED VERSION
+import apiService from "../apiService.js";
+
+// Firebase import with fallback
+let firebaseAdmin = null;
+let firebaseEnabled = false;
+
+try {
+    const { messaging } = await import("../firebase/firebase-admin.js");
+    firebaseAdmin = { messaging };
+    firebaseEnabled = process.env.FIREBASE_ENABLED === 'true';
+    console.log('✅ Firebase Admin SDK loaded successfully');
+} catch (error) {
+    console.log('⚠️ Firebase Admin SDK not available:', error.message);
+    firebaseEnabled = false;
+}
 
 class NotificationService {
   constructor() {
@@ -17,321 +498,564 @@ class NotificationService {
     this.priorities = {
       HIGH: 'high',
       NORMAL: 'normal',
-      LOW: 'low'
+      LOW: 'low',
+      URGENT: 'urgent'
     };
 
-    console.log('🔔 Admin Notification Service initialized');
+    console.log('🔔 Notification Service Initialized:', {
+      firebase: firebaseEnabled ? 'ENABLED' : 'DISABLED'
+    });
   }
 
   /**
-   * Get all active admin FCM tokens from database
+   * Get admin tokens via Next.js API
    */
   async getAdminTokensFromDB() {
-  try {
-    console.log('🔍 Fetching admin tokens...');
-    
-    // Quick and safe query with timeout
-    const admins = await User.find({ 
-      role: 'admin', 
-      status: 'active',
-      'notificationSettings.pushNotifications.enabled': true 
-    })
-    .select('_id')
-    .limit(10) // ✅ Add limit to prevent huge queries
-    .maxTimeMS(3000) // ✅ MongoDB timeout (3 seconds)
-    .lean(); // ✅ Faster response
+    try {
+      console.log('📱 Fetching admin FCM tokens via Next.js API...');
+      
+      // Use apiService to call Next.js API
+      let tokenResponse;
+      
+      // Try different method names that might exist
+      if (typeof apiService.getAdminFCMTokens === 'function') {
+        tokenResponse = await apiService.getAdminFCMTokens();
+      } else if (typeof apiService.saveFCMToken === 'function') {
+        // If no get method, try to check if we have a different approach
+        console.log('ℹ️ Using fallback method for tokens');
+        // Return empty array for now - we'll handle this differently
+        return [];
+      } else {
+        console.error('❌ No FCM token method found in apiService');
+        return [];
+      }
+      
+      console.log('🔍 Token API Response:', {
+        success: tokenResponse?.success,
+        count: tokenResponse?.tokens?.length || tokenResponse?.count || 0
+      });
 
-    if (!admins || admins.length === 0) {
-      console.log('⚠️ No active admin users found');
+      if (!tokenResponse || (!tokenResponse.success && !Array.isArray(tokenResponse))) {
+        console.warn('⚠️ No valid tokens received from API');
+        return [];
+      }
+
+      // Extract token strings from API response (handle different response formats)
+      let fcmTokens = [];
+      
+      if (Array.isArray(tokenResponse)) {
+        fcmTokens = tokenResponse.map(t => t.fcmToken || t.token || t);
+      } else if (tokenResponse.tokens && Array.isArray(tokenResponse.tokens)) {
+        fcmTokens = tokenResponse.tokens.map(t => t.fcmToken || t.token || t);
+      } else if (tokenResponse.data && Array.isArray(tokenResponse.data)) {
+        fcmTokens = tokenResponse.data.map(t => t.fcmToken || t.token || t);
+      }
+      
+      // Filter valid tokens
+      const validTokens = fcmTokens.filter(token => {
+        return token && typeof token === 'string' && token.trim().length > 50;
+      });
+
+      console.log(`✅ Retrieved ${validTokens.length} valid tokens from Next.js API`);
+      return validTokens;
+
+    } catch (error) {
+      console.error('❌ Failed to fetch tokens from Next.js API:', error.message);
       return [];
     }
-
-    const adminIds = admins.map(admin => admin._id);
-    
-    const deviceTokens = await DeviceToken.find({
-      userId: { $in: adminIds },
-      isActive: true
-    })
-    .select('fcmToken')
-    .maxTimeMS(3000) // ✅ Another timeout
-    .lean();
-
-    const tokens = deviceTokens.map(dt => dt.fcmToken);
-    
-    console.log(`📱 Found ${tokens.length} active FCM tokens`);
-    return tokens;
-
-  } catch (error) {
-    // ✅ LOG BUT DON'T CRASH - return empty array
-    console.log('⏱️ Token fetch timed out, continuing without push notifications');
-    return [];
   }
-}
+
   /**
-   * Send push notification to all admin devices
+   * Convert all values to strings for Firebase data payload
    */
+  _stringifyFirebaseData(data) {
+    const stringified = {};
+    
+    for (const [key, value] of Object.entries(data)) {
+      if (value === null || value === undefined) {
+        stringified[key] = '';
+      } else if (typeof value === 'object') {
+        stringified[key] = JSON.stringify(value);
+      } else {
+        stringified[key] = String(value);
+      }
+    }
+    
+    return stringified;
+  }
+
   async sendPushNotification(notificationData) {
     try {
-      const tokens = await this.getAdminTokensFromDB();
-      
-      if (tokens.length === 0) {
-        console.warn('⚠️ No active FCM tokens found for admin users');
-        return { 
-          success: false, 
-          error: 'No active admin devices found',
-          action: 'Admin needs to login and enable notifications'
+      // Check if Firebase is available
+      if (!firebaseEnabled || !firebaseAdmin?.messaging) {
+        console.log('⚠️ Firebase not available, skipping push notification');
+        return {
+          success: false,
+          error: 'Firebase not configured or disabled',
+          message: 'Push notifications disabled'
         };
       }
 
+      // Get tokens via API
+      const tokens = await this.getAdminTokensFromDB();
+      
+      if (tokens.length === 0) {
+        console.log('⚠️ No FCM tokens available for admin devices');
+        return { 
+          success: false, 
+          error: 'No active admin devices found',
+          message: 'Please login as admin and enable notifications'
+        };
+      }
+
+      // Create notification message with STRINGIFIED data
       const message = {
         notification: {
-          title: notificationData.title,
-          body: notificationData.body,
-          imageUrl: notificationData.imageUrl
+          title: String(notificationData.title || ''),
+          body: String(notificationData.body || ''),
         },
-        data: {
+        // CRITICAL FIX: Ensure all data values are strings
+        data: this._stringifyFirebaseData({
           type: notificationData.type || 'general',
           category: notificationData.category || this.categories.SYSTEM,
           priority: notificationData.priority || this.priorities.NORMAL,
           referenceId: notificationData.referenceId || '',
+          orderNumber: notificationData.orderNumber || '',
           actionUrl: notificationData.actionUrl || '',
           timestamp: new Date().toISOString(),
-          ...notificationData.extraData
-        },
+          ...(notificationData.extraData || {})
+        }),
         android: {
           priority: notificationData.priority === this.priorities.HIGH ? 'high' : 'normal',
           notification: {
             sound: 'default',
-            channelId: notificationData.channelId || 'admin_channel',
-            icon: notificationData.icon || 'ic_notification',
-            color: notificationData.color || '#FF6B35',
-            clickAction: notificationData.clickAction || 'FLUTTER_NOTIFICATION_CLICK'
+            channelId: 'admin_channel',
+            icon: 'ic_notification',
+            color: '#FF6B35',
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK'
           }
         },
         apns: {
           payload: {
             aps: {
               sound: 'default',
-              badge: notificationData.badge || 1,
-              category: notificationData.category || 'SYSTEM'
+              badge: 1,
+              category: 'SYSTEM'
             }
           }
-        },
-        tokens: tokens
-      };
-
-      console.log(`📤 Sending push notification to ${tokens.length} admin devices:`, {
-        title: notificationData.title,
-        category: notificationData.category,
-        referenceId: notificationData.referenceId
-      });
-
-      const response = await admin.messaging().sendEachForMulticast(message);
-      
-      // Handle failed tokens
-      if (response.failureCount > 0) {
-        await this.handleFailedTokens(response.responses, tokens);
-      }
-
-      console.log(`✅ Admin notification sent:`, {
-        successCount: response.successCount,
-        failureCount: response.failureCount
-      });
-
-      return {
-        success: response.successCount > 0,
-        response,
-        successCount: response.successCount,
-        failureCount: response.failureCount,
-        tokensSent: tokens.length
-      };
-
-    } catch (error) {
-      console.error('❌ Error sending push notification:', error);
-      return {
-        success: false,
-        error: error.message,
-        code: error.code || 'UNKNOWN_ERROR'
-      };
-    }
-  }
-
-  /**
-   * Handle failed FCM tokens (mark as inactive)
-   */
-  async handleFailedTokens(responses, tokens) {
-    try {
-      const failedTokens = [];
-      
-      responses.forEach((response, index) => {
-        if (!response.success) {
-          failedTokens.push({
-            token: tokens[index],
-            error: response.error?.message || 'Unknown error'
-          });
         }
-      });
+      };
 
-      if (failedTokens.length > 0) {
-        console.log(`⚠️ ${failedTokens.length} tokens failed, marking as inactive`);
-        
-        // Mark failed tokens as inactive in database
-        for (const failedToken of failedTokens) {
-          await DeviceToken.findOneAndUpdate(
-            { fcmToken: failedToken.token },
-            { 
-              isActive: false,
-              lastActive: new Date(),
-              invalidReason: failedToken.error.substring(0, 200)
-            }
-          );
-        }
-        
-        console.log(`✅ Marked ${failedTokens.length} tokens as inactive`);
-      }
-
-    } catch (error) {
-      console.error('❌ Error handling failed tokens:', error);
-    }
-  }
-
-  /**
-   * Send notification to admin users with specific notification type
-   */
-  async sendAdminNotification(title, body, notificationData = {}) {
-    try {
-      // Check if this notification type is enabled for admins
-      const admins = await User.find({ 
-        role: 'admin', 
-        status: 'active' 
-      });
-
-      let tokens = [];
+      // Send to each token individually
+      const results = [];
+      let successCount = 0;
       
-      // Filter admins based on notification preferences
-      for (const admin of admins) {
-        if (admin.isNotificationEnabled(notificationData.type)) {
-          // Get this admin's active tokens
-          const adminTokens = await DeviceToken.find({
-            userId: admin._id,
-            isActive: true
+      for (const token of tokens) {
+        try {
+          const cleanToken = token.trim();
+          
+          // Send individual message
+          const result = await firebaseAdmin.messaging.send({
+            ...message,
+            token: cleanToken
           });
           
-          tokens = tokens.concat(adminTokens.map(t => t.fcmToken));
+          successCount++;
+          results.push({
+            token: cleanToken.substring(0, 20) + '...',
+            success: true,
+            messageId: result
+          });
+          
+          console.log(`✅ Sent to token ${cleanToken.substring(0, 20)}...`);
+          
+        } catch (tokenError) {
+          console.error(`❌ Failed to send to token ${token.substring(0, 20)}...:`, tokenError.message);
+          
+          results.push({
+            token: token.substring(0, 20) + '...',
+            success: false,
+            error: tokenError.message
+          });
         }
       }
 
-      if (tokens.length === 0) {
-        console.log(`🔕 No admin devices found or notifications disabled for type: ${notificationData.type}`);
-        return { 
-          success: false, 
-          message: 'No admin devices to notify or notifications disabled'
-        };
+      const failureCount = results.filter(r => !r.success).length;
+      
+      return {
+        success: successCount > 0,
+        successCount,
+        failureCount,
+        tokensSent: tokens.length,
+        results,
+        message: `Sent to ${successCount}/${tokens.length} devices`
+      };
+
+    } catch (error) {
+      console.error('❌ Error sending push notification:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  async sendNewOrderNotification(orderData) {
+    try {
+      console.log(`🔥 Sending Firebase push notification for order: ${orderData.orderNumber}`);
+      
+      // Prepare data with ALL STRINGS for Firebase
+      const result = await this.sendPushNotification({
+        title: `🛒 New Order #${orderData.orderNumber}`,
+        body: `${orderData.customerName || 'Customer'} placed a new order for ₹${orderData.totalPrice || orderData.totalAmount || 0}`,
+        type: 'NEW_ORDER',
+        category: this.categories.ORDER,
+        priority: this.priorities.HIGH,
+        orderNumber: String(orderData.orderNumber || ''),
+        referenceId: String(orderData._id || orderData.orderNumber || ''),
+        extraData: {
+          orderId: String(orderData._id || ''),
+          orderNumber: String(orderData.orderNumber || ''),
+          customerName: String(orderData.customerName || 'Customer'),
+          totalAmount: String(orderData.totalAmount || orderData.totalPrice || '0'),
+          source: 'whatsapp-bot',
+          timestamp: new Date().toISOString(),
+          status: String(orderData.status || 'pending'),
+          paymentStatus: String(orderData.paymentStatus || 'pending')
+        }
+      });
+      
+      console.log(`✅ Firebase result:`, {
+        success: result.success,
+        devices: result.successCount || 0,
+        message: result.message
+      });
+      
+      return result;
+      
+    } catch (error) {
+      console.error('❌ Order notification error:', error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async sendPaymentNotification(paymentData) {
+    try {
+      return await this.sendPushNotification({
+        title: '💰 Payment Received',
+        body: `₹${paymentData.amount} received for Order #${paymentData.orderNumber}`,
+        type: 'PAYMENT_RECEIVED',
+        category: this.categories.PAYMENT,
+        priority: this.priorities.HIGH,
+        orderNumber: String(paymentData.orderNumber || ''),
+        extraData: {
+          amount: String(paymentData.amount || '0'),
+          orderNumber: String(paymentData.orderNumber || ''),
+          paymentMethod: String(paymentData.paymentMethod || ''),
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      console.error('❌ Payment notification error:', error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async sendLowStockNotification(productData) {
+    try {
+      return await this.sendPushNotification({
+        title: '📦 Low Stock Alert',
+        body: `${productData.productName || productData.name} is running low (${productData.stock} left)`,
+        type: 'LOW_STOCK',
+        category: this.categories.STOCK,
+        priority: this.priorities.NORMAL,
+        extraData: {
+          productName: String(productData.productName || productData.name || ''),
+          stock: String(productData.stock || '0'),
+          threshold: String(productData.threshold || '10'),
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      console.error('❌ Low stock notification error:', error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async sendWhatsAppNotification(orderData) {
+    try {
+      console.log(`📱 Sending WhatsApp dashboard notification for order: ${orderData.orderNumber}`);
+
+      let socketResult = null;
+      let apiResult = null;
+
+      // 1. Try Socket.IO first
+      try {
+        if (global.io && global.io.of) {
+          const notificationNamespace = global.io.of('/notifications');
+          
+          // Emit to all clients in notifications namespace
+          notificationNamespace.emit('NEW_ORDER', {
+            type: 'NEW_ORDER',
+            order: {
+              _id: orderData._id || orderData.id || '',
+              orderNumber: orderData.orderNumber || '',
+              customerName: orderData.customerName || 'Customer',
+              customerPhone: orderData.customerPhone || orderData.phoneNumber || '',
+              totalPrice: orderData.totalPrice || orderData.totalAmount || 0,
+              totalAmount: orderData.totalAmount || orderData.totalPrice || 0,
+              items: orderData.items || [],
+              status: orderData.status || 'pending',
+              paymentStatus: orderData.paymentStatus || 'pending',
+              createdAt: orderData.createdAt || new Date().toISOString()
+            },
+            timestamp: new Date().toISOString(),
+            priority: 'high'
+          });
+          
+          socketResult = { success: true, method: 'socket.io' };
+          console.log('✅ Socket.IO notification sent');
+        } else {
+          console.log('⚠️ Socket.IO not available globally');
+        }
+      } catch (socketError) {
+        console.error('❌ Socket.IO notification failed:', socketError.message);
+        socketResult = { success: false, error: socketError.message };
       }
 
-      const result = await admin.messaging().sendEachForMulticast({
-        notification: { title, body },
-        data: {
-          type: notificationData.type || 'general',
-          category: notificationData.category || this.categories.SYSTEM,
-          ...notificationData
-        },
-        tokens
-      });
+      // 2. Try Next.js API
+      try {
+        // Check if apiService has the method, if not use a simpler approach
+        if (typeof apiService.sendNotificationToDashboard === 'function') {
+          const notificationPayload = {
+            type: 'NEW_ORDER',
+            priority: 'urgent',
+            data: {
+              orderId: orderData._id || orderData.id || '',
+              orderNumber: orderData.orderNumber || '',
+              customerName: orderData.customerName || 'Customer',
+              customerPhone: orderData.customerPhone || orderData.phoneNumber || '',
+              totalAmount: orderData.totalAmount || orderData.totalPrice || 0,
+              items: orderData.items || [],
+              paymentStatus: orderData.paymentStatus || 'pending',
+              status: orderData.status || 'pending',
+              createdAt: orderData.createdAt || new Date().toISOString(),
+              source: 'whatsapp-bot'
+            }
+          };
+
+          const response = await apiService.sendNotificationToDashboard(notificationPayload);
+          apiResult = {
+            success: true,
+            data: response
+          };
+          console.log('✅ Next.js API notification sent');
+        } else {
+          // Fallback: Try a simpler API call
+          console.log('ℹ️ Using fallback API method');
+          try {
+            const response = await apiService.client.post('/api/notifications', {
+              type: 'NEW_ORDER',
+              order: orderData,
+              timestamp: new Date().toISOString()
+            });
+            apiResult = { success: true, data: response.data };
+          } catch (fallbackError) {
+            console.log('⚠️ Fallback API also failed, dashboard may not be configured');
+          }
+        }
+      } catch (apiError) {
+        console.error('❌ Next.js API notification failed:', apiError.message);
+        apiResult = { success: false, error: apiError.message };
+      }
 
       return {
-        success: result.successCount > 0,
-        successCount: result.successCount,
-        failureCount: result.failureCount,
-        totalTokens: tokens.length
+        success: socketResult?.success || apiResult?.success || false,
+        orderNumber: orderData.orderNumber,
+        socket: socketResult,
+        api: apiResult,
+        timestamp: new Date().toISOString()
       };
 
     } catch (error) {
-      console.error('❌ Error in sendAdminNotification:', error);
-      return { success: false, error: error.message };
+      console.error('❌ WhatsApp notification failed:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
     }
   }
 
-  /**
-   * Send system alert notification
-   */
-  async sendAlertNotification(title, body, alertData = {}) {
-    return await this.sendAdminNotification(title, body, {
-      ...alertData,
-      type: 'SYSTEM_ALERT',
-      category: this.categories.ALERT,
-      priority: this.priorities.HIGH
-    });
+  async sendCompleteNotification(orderData) {
+    try {
+      console.log(`🚀 Sending complete notification for order: ${orderData.orderNumber}`);
+
+      // 1. Send Firebase push notification
+      const firebaseResult = await this.sendNewOrderNotification(orderData);
+      
+      // 2. Send WhatsApp/dashboard notification
+      const dashboardResult = await this.sendWhatsAppNotification(orderData);
+
+      return {
+        success: firebaseResult.success || dashboardResult.success,
+        orderNumber: orderData.orderNumber,
+        firebase: firebaseResult,
+        dashboard: dashboardResult,
+        timestamp: new Date().toISOString(),
+        message: 'Notifications sent through available channels'
+      };
+
+    } catch (error) {
+      console.error('❌ Complete notification failed:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 
-  /**
-   * Send test notification
-   */
   async sendTestNotification(customData = {}) {
     try {
-      const testData = {
-        title: '🔔 Test Notification',
-        body: 'This is a test notification to admin devices',
-        category: this.categories.SYSTEM,
-        priority: this.priorities.NORMAL,
-        type: 'TEST',
-        extraData: {
-          test: true,
-          timestamp: new Date().toISOString(),
-          environment: process.env.NODE_ENV || 'development',
-          ...customData
-        }
+      const testOrderData = {
+        orderNumber: `TEST-${Date.now().toString().slice(-6)}`,
+        customerName: customData.customerName || 'Test Customer',
+        customerPhone: customData.customerPhone || '9876543210',
+        totalAmount: customData.totalAmount || 1999,
+        totalPrice: customData.totalAmount || 1999,
+        items: customData.items || [{ name: 'Test Product', quantity: 1, price: 1999 }],
+        paymentStatus: customData.paymentStatus || 'pending',
+        status: customData.status || 'pending',
+        createdAt: new Date().toISOString(),
+        _id: `test-${Date.now()}`,
+        ...customData
       };
 
-      const result = await this.sendPushNotification(testData);
-
-      console.log('🧪 Test notification result:', {
-        success: result.success,
-        successCount: result.successCount,
-        failureCount: result.failureCount
-      });
-
-      return result;
-
+      console.log('🧪 Sending test notification...');
+      
+      const result = await this.sendCompleteNotification(testOrderData);
+      
+      console.log('✅ Test notification result:', result.success);
+      
+      return {
+        test: true,
+        orderNumber: testOrderData.orderNumber,
+        timestamp: new Date().toISOString(),
+        result
+      };
+      
     } catch (error) {
-      console.error('❌ Error sending test notification:', error);
-      return { success: false, error: error.message };
+      console.error('❌ Test notification failed:', error.message);
+      return {
+        test: true,
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  async checkDashboardHealth() {
+    try {
+      if (typeof apiService.healthCheck === 'function') {
+        const response = await apiService.healthCheck();
+        
+        return {
+          healthy: response.status === 'healthy',
+          dashboard: response.status,
+          timestamp: new Date().toISOString(),
+          details: response.data
+        };
+      } else {
+        // Simple check - just ping the server
+        try {
+          const response = await fetch(`${process.env.NEXTJS_API_URL || 'http://localhost:3000'}/api/health`, {
+            timeout: 5000
+          });
+          
+          return {
+            healthy: response.ok,
+            dashboard: response.ok ? 'healthy' : 'unhealthy',
+            timestamp: new Date().toISOString()
+          };
+        } catch (fetchError) {
+          return {
+            healthy: false,
+            error: fetchError.message,
+            timestamp: new Date().toISOString()
+          };
+        }
+      }
+    } catch (error) {
+      console.error('❌ Dashboard health check failed:', error.message);
+      return {
+        healthy: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
     }
   }
 
   /**
-   * Check Firebase connectivity and configuration
+   * Get notification status
    */
-  async checkConnection() {
+  async getNotificationStatus() {
     try {
-      const tokens = await this.getAdminTokensFromDB();
-      
-      if (tokens.length === 0) {
-        return { 
-          success: false, 
-          message: 'No active admin devices found',
-          action: 'Admin needs to login from devices'
+      // Get Firebase status
+      const firebaseStatus = {
+        enabled: firebaseEnabled,
+        messaging: !!firebaseAdmin?.messaging
+      };
+
+      // Get tokens info
+      let tokenInfo = { success: false, count: 0 };
+      try {
+        const tokens = await this.getAdminTokensFromDB();
+        tokenInfo = {
+          success: true,
+          count: tokens.length,
+          hasTokens: tokens.length > 0
         };
+      } catch (tokenError) {
+        tokenInfo.error = tokenError.message;
       }
 
-      // Try to send a silent test message
-      await admin.messaging().sendEachForMulticast({
-        data: { test: 'connection_check' },
-        tokens: [tokens[0]] // Test with first token only
-      });
-      
-      return { 
-        success: true, 
-        message: 'Firebase connection is working',
-        activeDevices: tokens.length,
-        environment: process.env.NODE_ENV || 'development'
+      // Check dashboard health
+      const dashboardHealth = await this.checkDashboardHealth();
+
+      return {
+        firebase: firebaseStatus,
+        tokens: tokenInfo,
+        dashboard: dashboardHealth,
+        timestamp: new Date().toISOString(),
+        overallStatus: (firebaseStatus.enabled && tokenInfo.hasTokens) ? 'healthy' : 'degraded'
       };
+
     } catch (error) {
+      console.error('❌ Error getting notification status:', error.message);
       return { 
-        success: false, 
         error: error.message,
-        message: 'Firebase connection failed' 
+        timestamp: new Date().toISOString()
       };
+    }
+  }
+
+  /**
+   * Simple method to send notification (for backward compatibility)
+   */
+  async sendNotification(type, data) {
+    switch (type) {
+      case 'NEW_ORDER':
+        return await this.sendCompleteNotification(data);
+      case 'PAYMENT_RECEIVED':
+        return await this.sendPaymentNotification(data);
+      case 'LOW_STOCK_ALERT':
+        return await this.sendLowStockNotification(data);
+      case 'TEST':
+        return await this.sendTestNotification(data);
+      default:
+        return {
+          success: false,
+          error: `Unknown notification type: ${type}`
+        };
     }
   }
 }

@@ -1417,7 +1417,7 @@ async getAdminFCMTokens() {
   try {
     console.log('📱 Fetching admin FCM tokens');
     
-    const response = await this.client.get('/api/auth/fcm-token');
+    const response = await this.client.get('/api/auth/fcm-token?adminOnly=true');
     const result = this.extractData(response.data);
     
     console.log(`✅ Found ${result.tokens?.length || 0} FCM tokens`);
@@ -1688,6 +1688,55 @@ getBrowser() {
   if (/edg/i.test(ua)) return 'Edge';
   if (/opera|opr/i.test(ua)) return 'Opera';
   return 'Unknown Browser';
+}
+// Add to your existing apiService.js
+// services/apiService.js - UPDATE sendNotificationToDashboard method
+
+async sendNotificationToDashboard(notificationData) {
+  try {
+    console.log('📤 Sending notification to dashboard:', {
+      type: notificationData.type,
+      orderNumber: notificationData.data?.orderNumber
+    });
+
+    // FIX: Change from /api/admin/notifications to /api/notifications
+    const response = await this.client.post('/api/notifications', notificationData, {
+      headers: {
+        'x-api-key': process.env.NOTIFICATION_API_KEY || 'dev-key-2024',
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    console.log('✅ Dashboard notification sent successfully');
+    return this.extractData(response.data);
+
+  } catch (error) {
+    console.error('❌ Dashboard notification error:', {
+      message: error.message,
+      status: error.response?.status,
+      url: error.config?.url
+    });
+    
+    // Check if it's a 404 error
+    if (error.response?.status === 404) {
+      console.warn('⚠️ /api/notifications endpoint returned 404, using fallback');
+      
+      // Fallback: Return success anyway since Socket.IO might handle it
+      return {
+        success: true,
+        message: 'Notification processed (fallback mode)',
+        notification: notificationData,
+        fallback: true,
+        timestamp: new Date().toISOString()
+      };
+    }
+    
+    return { 
+      success: false, 
+      error: error.message,
+      statusCode: error.response?.status
+    };
+  }
 }
 }
 

@@ -1,553 +1,414 @@
-/**
- * Notification Manager
- * Main orchestrator for all notification services
- * ADMIN-ONLY notifications
- */
-
-// Import individual notification services
-import newOrderNotify from './new-order-notify.js';
-import paymentUploadNotify from './payment-upload-notify.js';
-import lowStockNotify from './low-stock-notify.js';
-import invoiceSendNotify from './invoice-send-notify.js';
-
-// Import base notification service
-import notificationService from "./notification-service.js";
+// services/notifications/notification-manager.js - COMPLETE FIXED VERSION
+import notificationService from './notification-service.js';
 
 class NotificationManager {
   constructor() {
-    this.services = {
-      order: newOrderNotify,
-      payment: paymentUploadNotify,
-      stock: lowStockNotify,
-      invoice: invoiceSendNotify
-    };
-    this.baseService = notificationService;
-    console.log('🎯 Notification Manager initialized (Admin Only)');
+    this.firebaseEnabled = process.env.FIREBASE_ENABLED === 'true';
+    this.socketEnabled = false;
+    
+    // Initialize Socket.IO connection
+    this.initializeSocketIO();
+    
+    console.log('🚀 Notification Manager Initialized:', {
+      firebase: this.firebaseEnabled,
+      socket: this.socketEnabled
+    });
   }
 
   /**
-   * Unified method to send notifications based on event type
+   * Initialize Socket.IO connection
    */
-  async sendNotification(eventType, data) {
+  initializeSocketIO() {
     try {
-      console.log(`🎯 Processing admin notification event: ${eventType}`, {
-        orderNumber: data.orderNumber || data.orderId,
-        referenceId: data.referenceId
+      // Check if Socket.IO is available globally (from server.js)
+      if (global.io && typeof global.io.of === 'function') {
+        this.io = global.io;
+        this.socketEnabled = true;
+        console.log('✅ Socket.IO connected to Notification Manager');
+      } else {
+        console.log('⚠️ Socket.IO not available globally');
+        this.socketEnabled = false;
+      }
+    } catch (error) {
+      console.error('❌ Failed to initialize Socket.IO:', error.message);
+      this.socketEnabled = false;
+    }
+  }
+
+  /**
+   * Send Socket.IO notification to admin dashboard
+   */
+  async sendSocketNotification(orderData) {
+    if (!this.socketEnabled || !this.io) {
+      return { 
+        success: false, 
+        reason: 'Socket.IO not available or disabled' 
+      };
+    }
+
+    try {
+      console.log('📡 Sending Socket.IO notification...');
+      
+      // Emit to all connected admin clients in notifications namespace
+      this.io.of('/notifications').emit('NEW_ORDER', {
+        type: 'NEW_ORDER',
+        order: orderData,
+        timestamp: new Date().toISOString(),
+        priority: 'high'
       });
 
-      switch (eventType) {
-        // Order events
-        case 'NEW_ORDER':
-          return await this.sendOrderNotification('NEW_ORDER', data);
-          
-        case 'ORDER_STATUS_UPDATE':
-          return await this.sendOrderNotification('ORDER_STATUS_UPDATE', data);
+      // Also emit to QR namespace if needed (for admin dashboards)
+      this.io.of('/qr').emit('order-update', {
+        type: 'order-update',
+        order: orderData,
+        timestamp: new Date().toISOString()
+      });
 
-        case 'BULK_ORDERS':
-          return await this.sendOrderNotification('BULK_ORDERS', data);
-
-        // Payment events
-        case 'PAYMENT_UPLOADED':
-          return await this.sendPaymentNotification('PAYMENT_UPLOADED', data);
-
-        case 'PAYMENT_VERIFIED':
-          return await this.sendPaymentNotification('PAYMENT_VERIFIED', data);
-
-        case 'PAYMENT_REJECTED':
-          return await this.sendPaymentNotification('PAYMENT_REJECTED', data);
-
-        case 'PAYMENT_FRAUD':
-          return await this.sendPaymentNotification('PAYMENT_FRAUD', data);
-
-        // Stock events
-        case 'LOW_STOCK_CHECK':
-          return await this.sendStockNotification('LOW_STOCK_CHECK', data);
-
-        case 'STOCK_UPDATED':
-          return await this.sendStockNotification('STOCK_UPDATED', data);
-
-        // Invoice events
-        case 'INVOICE_GENERATED':
-          return await this.sendInvoiceNotification('INVOICE_GENERATED', data);
-
-        case 'INVOICE_SENT':
-          return await this.sendInvoiceNotification('INVOICE_SENT', data);
-
-        case 'PAYMENT_REMINDER':
-          return await this.sendInvoiceNotification('PAYMENT_REMINDER', data);
-
-        case 'INVOICE_PAID':
-          return await this.sendInvoiceNotification('INVOICE_PAID', data);
-
-        // System events
-        case 'ADMIN_ALERT':
-          return await this.baseService.sendAdminNotification(
-            data.title || 'Admin Alert',
-            data.body || 'You have a new alert',
-            {
-              type: 'ADMIN_ALERT',
-              category: 'alert',
-              priority: 'high',
-              ...data.notificationData
-            }
-          );
-
-        case 'SYSTEM_ALERT':
-          return await this.baseService.sendAlertNotification(
-            data.title || 'System Alert',
-            data.body || 'System notification',
-            data.alertData
-          );
-
-        default:
-          console.warn(`⚠️ Unknown notification event type: ${eventType}`);
-          return {
-            success: false,
-            error: `Unknown event type: ${eventType}`,
-            eventType
-          };
-      }
+      return { 
+        success: true, 
+        method: 'socket.io',
+        namespace: ['/notifications', '/qr']
+      };
 
     } catch (error) {
-      console.error(`❌ Error in notification manager for ${eventType}:`, error);
-      return {
-        success: false,
+      console.error('❌ Socket.IO notification failed:', error.message);
+      return { 
+        success: false, 
         error: error.message,
-        eventType
+        method: 'socket.io'
       };
     }
   }
 
   /**
-   * Send order notification
+   * Main method to send notifications through all channels
    */
-  async sendOrderNotification(type, data) {
+  async sendNewOrderNotification(orderData) {
+    console.log(`🎯 Processing notification for order: ${orderData.orderNumber}`);
+    
+    const results = {
+      firebase: null,
+      socket: null,
+      dashboard: null
+    };
+
+    // 1. Send Firebase Push Notification (for mobile apps)
+    if (this.firebaseEnabled) {
+      try {
+        console.log('🔥 Sending Firebase push notification...');
+        results.firebase = await notificationService.sendNewOrderNotification(orderData);
+        console.log('✅ Firebase result:', {
+          success: results.firebase.success,
+          devices: results.firebase.successCount || 0,
+          message: results.firebase.message
+        });
+      } catch (firebaseError) {
+        console.error('❌ Firebase notification failed:', firebaseError.message);
+        results.firebase = { 
+          success: false, 
+          error: firebaseError.message,
+          channel: 'firebase'
+        };
+      }
+    } else {
+      results.firebase = { 
+        success: false, 
+        reason: 'Firebase disabled in settings',
+        channel: 'firebase'
+      };
+    }
+
+    // 2. Send Socket.IO Notification (for real-time admin dashboard)
+    if (this.socketEnabled) {
+      try {
+        console.log('📡 Sending Socket.IO notification...');
+        results.socket = await this.sendSocketNotification(orderData);
+        console.log('✅ Socket.IO result:', results.socket.success);
+      } catch (socketError) {
+        console.error('❌ Socket.IO notification failed:', socketError.message);
+        results.socket = { 
+          success: false, 
+          error: socketError.message,
+          channel: 'socket.io'
+        };
+      }
+    } else {
+      results.socket = { 
+        success: false, 
+        reason: 'Socket.IO not initialized',
+        channel: 'socket.io'
+      };
+    }
+
+    // 3. Send Dashboard API Notification (fallback/backup)
     try {
-      const notificationData = this.getOrderNotificationData(type, data);
+      console.log('📊 Sending dashboard API notification...');
+      results.dashboard = await notificationService.sendWhatsAppNotification(orderData);
+      console.log('✅ Dashboard API result:', results.dashboard.success);
+    } catch (dashboardError) {
+      console.error('❌ Dashboard API notification failed:', dashboardError.message);
+      results.dashboard = { 
+        success: false, 
+        error: dashboardError.message,
+        channel: 'dashboard-api'
+      };
+    }
+
+    // Calculate overall success
+    const successfulChannels = Object.values(results)
+      .filter(channel => channel?.success)
+      .length;
+    
+    const overallSuccess = successfulChannels > 0;
+    
+    console.log(`📊 Notification Summary for ${orderData.orderNumber}:`, {
+      success: overallSuccess ? '✅' : '❌',
+      channels: {
+        firebase: results.firebase?.success ? '✅' : '❌',
+        socket: results.socket?.success ? '✅' : '❌',
+        dashboard: results.dashboard?.success ? '✅' : '❌'
+      },
+      successfulChannels
+    });
+
+    return {
+      success: overallSuccess,
+      orderNumber: orderData.orderNumber,
+      timestamp: new Date().toISOString(),
+      successfulChannels,
+      channels: results,
+      summary: {
+        firebaseEnabled: this.firebaseEnabled,
+        socketEnabled: this.socketEnabled,
+        firebaseSuccess: results.firebase?.success || false,
+        socketSuccess: results.socket?.success || false,
+        dashboardSuccess: results.dashboard?.success || false
+      }
+    };
+  }
+
+  /**
+   * Generic method to send any type of notification
+   */
+  async sendNotification(type, data) {
+    console.log(`📤 Sending ${type} notification...`);
+    
+    switch (type) {
+      case 'NEW_ORDER':
+        return await this.sendNewOrderNotification(data);
       
-      return await this.baseService.sendAdminNotification(
-        notificationData.title,
-        notificationData.body,
-        {
-          type: 'ORDER',
-          category: 'order',
-          priority: 'high',
-          referenceId: data.orderNumber || data.orderId,
-          orderId: data.orderId || data._id,
-          customerPhone: data.customerPhone,
-          totalAmount: data.totalAmount,
-          ...notificationData.extraData
-        }
-      );
-    } catch (error) {
-      console.error(`❌ Error sending order notification:`, error);
-      return { success: false, error: error.message };
+      case 'PAYMENT_RECEIVED':
+        return await this.sendPaymentNotification(data);
+      
+      case 'ORDER_STATUS_UPDATE':
+        return await this.sendOrderStatusUpdate(data);
+      
+      case 'LOW_STOCK_ALERT':
+        return await this.sendLowStockNotification(data);
+      
+      case 'TEST':
+        return await this.test();
+      
+      default:
+        console.warn(`⚠️ Unknown notification type: ${type}`);
+        return { 
+          success: false, 
+          error: `Unknown notification type: ${type}`,
+          timestamp: new Date().toISOString()
+        };
     }
   }
 
   /**
    * Send payment notification
    */
-  async sendPaymentNotification(type, data) {
+  async sendPaymentNotification(paymentData) {
     try {
-      const notificationData = this.getPaymentNotificationData(type, data);
+      console.log(`💰 Sending payment notification for order: ${paymentData.orderNumber}`);
       
-      return await this.baseService.sendAdminNotification(
-        notificationData.title,
-        notificationData.body,
-        {
-          type: 'PAYMENT',
-          category: 'payment',
-          priority: 'high',
-          referenceId: data.orderNumber || data.referenceId,
-          amount: data.amount,
-          status: data.status,
-          ...notificationData.extraData
-        }
-      );
-    } catch (error) {
-      console.error(`❌ Error sending payment notification:`, error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Send stock notification
-   */
-  async sendStockNotification(type, data) {
-    try {
-      const notificationData = this.getStockNotificationData(type, data);
-      
-      return await this.baseService.sendAdminNotification(
-        notificationData.title,
-        notificationData.body,
-        {
-          type: 'STOCK',
-          category: 'stock',
-          priority: data.priority || 'normal',
-          productId: data.product?._id || data.productId,
-          productName: data.product?.name || data.productName,
-          currentStock: data.newStock || data.currentStock,
-          ...notificationData.extraData
-        }
-      );
-    } catch (error) {
-      console.error(`❌ Error sending stock notification:`, error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Send invoice notification
-   */
-  async sendInvoiceNotification(type, data) {
-    try {
-      const notificationData = this.getInvoiceNotificationData(type, data);
-      
-      return await this.baseService.sendAdminNotification(
-        notificationData.title,
-        notificationData.body,
-        {
-          type: 'INVOICE',
-          category: 'invoice',
-          priority: 'normal',
-          invoiceId: data.invoiceId || data._id,
-          orderNumber: data.orderNumber,
-          amount: data.amount,
-          status: data.status,
-          ...notificationData.extraData
-        }
-      );
-    } catch (error) {
-      console.error(`❌ Error sending invoice notification:`, error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Get order notification data
-   */
-  getOrderNotificationData(type, data) {
-    const templates = {
-      'NEW_ORDER': {
-        title: '🛍️ New Order Received',
-        body: `Order #${data.orderNumber} from ${data.customerPhone || 'Customer'}`,
-        extraData: {
-          orderStatus: 'new',
-          itemCount: data.items?.length || 0
-        }
-      },
-      'ORDER_STATUS_UPDATE': {
-        title: '📦 Order Status Updated',
-        body: `Order #${data.orderNumber} updated to ${data.newStatus}`,
-        extraData: {
-          previousStatus: data.previousStatus,
-          newStatus: data.newStatus
-        }
-      },
-      'BULK_ORDERS': {
-        title: '📦 Multiple New Orders',
-        body: `${data.orders?.length || 0} new orders received`,
-        extraData: {
-          orderCount: data.orders?.length || 0
-        }
+      // Send Firebase notification
+      let firebaseResult = null;
+      if (this.firebaseEnabled) {
+        firebaseResult = await notificationService.sendPaymentNotification(paymentData);
       }
-    };
 
-    return templates[type] || {
-      title: 'Order Update',
-      body: 'Your order has been updated',
-      extraData: {}
-    };
-  }
-
-  /**
-   * Get payment notification data
-   */
-  getPaymentNotificationData(type, data) {
-    const templates = {
-      'PAYMENT_UPLOADED': {
-        title: '💰 Payment Uploaded',
-        body: `Payment for Order #${data.orderNumber} uploaded`,
-        extraData: {
-          amount: data.amount,
-          method: data.method || 'Unknown'
-        }
-      },
-      'PAYMENT_VERIFIED': {
-        title: '✅ Payment Verified',
-        body: `Payment for Order #${data.orderNumber} verified ${data.verificationMethod === 'auto' ? '(Auto)' : '(Manual)'}`,
-        extraData: {
-          verifiedBy: data.verificationMethod || 'manual',
-          amount: data.amount
-        }
-      },
-      'PAYMENT_REJECTED': {
-        title: '❌ Payment Rejected',
-        body: `Payment for Order #${data.orderNumber} rejected`,
-        extraData: {
-          reason: data.reason,
-          rejectedBy: data.rejectedBy
-        }
-      },
-      'PAYMENT_FRAUD': {
-        title: '🚨 Fraud Alert',
-        body: `Payment for Order #${data.orderNumber} marked as fraud`,
-        extraData: {
-          reasons: data.reasons,
-          markedBy: data.markedBy
-        }
+      // Send Socket.IO notification
+      let socketResult = null;
+      if (this.socketEnabled && this.io) {
+        this.io.of('/notifications').emit('PAYMENT_RECEIVED', {
+          type: 'PAYMENT_RECEIVED',
+          payment: paymentData,
+          timestamp: new Date().toISOString()
+        });
+        socketResult = { success: true };
       }
-    };
 
-    return templates[type] || {
-      title: 'Payment Update',
-      body: 'Payment status updated',
-      extraData: {}
-    };
-  }
-
-  /**
-   * Get stock notification data
-   */
-  getStockNotificationData(type, data) {
-    const templates = {
-      'LOW_STOCK_CHECK': {
-        title: '📉 Low Stock Alert',
-        body: `${data.lowStockCount || 'Some'} products are running low on stock`,
-        extraData: {
-          lowStockCount: data.lowStockCount,
-          criticalCount: data.criticalCount
-        }
-      },
-      'STOCK_UPDATED': {
-        title: '📊 Stock Updated',
-        body: `${data.product?.name || 'Product'} stock updated to ${data.newStock}`,
-        extraData: {
-          productName: data.product?.name,
-          previousStock: data.previousStock,
-          newStock: data.newStock,
-          updatedBy: data.updatedBy
-        }
-      }
-    };
-
-    return templates[type] || {
-      title: 'Stock Update',
-      body: 'Stock information updated',
-      extraData: {}
-    };
-  }
-
-  /**
-   * Get invoice notification data
-   */
-  getInvoiceNotificationData(type, data) {
-    const templates = {
-      'INVOICE_GENERATED': {
-        title: '🧾 Invoice Generated',
-        body: `Invoice #${data.invoiceNumber || data.invoiceId} generated`,
-        extraData: {
-          invoiceNumber: data.invoiceNumber,
-          orderNumber: data.orderNumber,
-          amount: data.amount
-        }
-      },
-      'INVOICE_SENT': {
-        title: '📤 Invoice Sent',
-        body: `Invoice sent to customer for Order #${data.orderNumber}`,
-        extraData: {
-          customerPhone: data.customerPhone,
-          sentMethod: data.sentMethod || 'whatsapp'
-        }
-      },
-      'PAYMENT_REMINDER': {
-        title: '⏰ Payment Reminder',
-        body: `Reminder sent for Order #${data.orderNumber}`,
-        extraData: {
-          isFirstReminder: data.isFirstReminder || false,
-          daysOverdue: data.daysOverdue || 0
-        }
-      },
-      'INVOICE_PAID': {
-        title: '✅ Invoice Paid',
-        body: `Invoice #${data.invoiceNumber} has been paid`,
-        extraData: {
-          invoiceNumber: data.invoiceNumber,
-          paymentMethod: data.paymentData?.method,
-          amount: data.paymentData?.amount
-        }
-      }
-    };
-
-    return templates[type] || {
-      title: 'Invoice Update',
-      body: 'Invoice status updated',
-      extraData: {}
-    };
-  }
-
-  /**
-   * Send test notification to admin
-   */
-  async sendTestNotification(customData = {}) {
-    try {
-      const testData = {
-        title: '🔔 Test Notification',
-        body: 'This is a test notification to admin devices',
-        ...customData
-      };
-
-      return await this.baseService.sendTestNotification(testData);
-
-    } catch (error) {
-      console.error('❌ Error sending test notification:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Get notification statistics
-   */
-  async getNotificationStats(timeframe = 'day') {
-    try {
-      // You would query your database for notification logs
-      // For now, return placeholder stats
       return {
-        totalSent: 0,
-        successful: 0,
-        failed: 0,
-        byCategory: {},
-        byPriority: {},
-        timeframe,
-        recipients: 'admin-only'
-      };
-    } catch (error) {
-      console.error('❌ Error getting notification stats:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Initialize scheduled notifications
-   */
-  initializeScheduledNotifications() {
-    try {
-      // Schedule daily stock check at 9 AM
-      if (this.services.stock && this.services.stock.scheduleDailyStockCheck) {
-        this.services.stock.scheduleDailyStockCheck();
-      }
-
-      // Schedule payment reminder checks (every 6 hours)
-      setInterval(() => {
-        this.checkAndSendPaymentReminders();
-      }, 6 * 60 * 60 * 1000);
-
-      // Schedule overdue invoice checks (daily at 10 AM)
-      const now = new Date();
-      const invoiceCheckTime = new Date(now);
-      invoiceCheckTime.setHours(10, 0, 0, 0);
-      
-      if (now > invoiceCheckTime) {
-        invoiceCheckTime.setDate(invoiceCheckTime.getDate() + 1);
-      }
-      
-      setTimeout(() => {
-        this.checkAndSendOverdueInvoices();
-        // Repeat daily
-        setInterval(() => {
-          this.checkAndSendOverdueInvoices();
-        }, 24 * 60 * 60 * 1000);
-      }, invoiceCheckTime - now);
-
-      console.log('⏰ Scheduled notifications initialized');
-
-    } catch (error) {
-      console.error('❌ Error initializing scheduled notifications:', error);
-    }
-  }
-
-  /**
-   * Check and send payment reminders
-   */
-  async checkAndSendPaymentReminders() {
-    try {
-      console.log('⏰ Checking for payment reminders...');
-      // This would query pending payments and send admin reminders
-      // Implement your payment reminder logic here
-      return { 
-        success: true, 
-        message: 'Payment reminder check completed',
+        success: (firebaseResult?.success || socketResult?.success || false),
+        paymentNumber: paymentData.orderNumber,
+        amount: paymentData.amount,
+        firebase: firebaseResult,
+        socket: socketResult,
         timestamp: new Date().toISOString()
       };
+
     } catch (error) {
-      console.error('❌ Error checking payment reminders:', error);
+      console.error('❌ Payment notification failed:', error.message);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * Check and send overdue invoices
+   * Send order status update notification
    */
-  async checkAndSendOverdueInvoices() {
+  async sendOrderStatusUpdate(updateData) {
     try {
-      console.log('⚠️ Checking for overdue invoices...');
-      // This would query overdue invoices and send admin notifications
-      // Implement your overdue invoice logic here
-      return { 
-        success: true, 
-        message: 'Overdue invoice check completed',
+      console.log(`📦 Sending order status update: ${updateData.orderNumber} (${updateData.oldStatus} → ${updateData.newStatus})`);
+      
+      // You can add Firebase/Socket.IO notifications for status updates
+      if (this.socketEnabled && this.io) {
+        this.io.of('/notifications').emit('ORDER_STATUS_CHANGED', {
+          type: 'ORDER_STATUS_CHANGED',
+          orderNumber: updateData.orderNumber,
+          oldStatus: updateData.oldStatus,
+          newStatus: updateData.newStatus,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      return {
+        success: true,
+        orderNumber: updateData.orderNumber,
+        statusChange: `${updateData.oldStatus} → ${updateData.newStatus}`,
         timestamp: new Date().toISOString()
       };
+
     } catch (error) {
-      console.error('❌ Error checking overdue invoices:', error);
+      console.error('❌ Order status update failed:', error.message);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * Check Firebase connectivity
+   * Send low stock notification
    */
-  async checkFirebaseConnection() {
-    return await this.baseService.checkConnection();
+  async sendLowStockNotification(stockData) {
+    try {
+      console.log(`📉 Sending low stock alert for: ${stockData.productName}`);
+      
+      if (this.firebaseEnabled) {
+        await notificationService.sendLowStockNotification(stockData);
+      }
+
+      if (this.socketEnabled && this.io) {
+        this.io.of('/notifications').emit('LOW_STOCK_ALERT', {
+          type: 'LOW_STOCK_ALERT',
+          product: stockData,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      return {
+        success: true,
+        productName: stockData.productName,
+        currentStock: stockData.stock,
+        timestamp: new Date().toISOString()
+      };
+
+    } catch (error) {
+      console.error('❌ Low stock notification failed:', error.message);
+      return { success: false, error: error.message };
+    }
   }
 
   /**
-   * Get all available notification event types
+   * Get system status
    */
-  getAvailableEventTypes() {
-    return {
-      ORDER_EVENTS: [
-        'NEW_ORDER',
-        'ORDER_STATUS_UPDATE',
-        'BULK_ORDERS'
-      ],
-      PAYMENT_EVENTS: [
-        'PAYMENT_UPLOADED',
-        'PAYMENT_VERIFIED',
-        'PAYMENT_REJECTED',
-        'PAYMENT_FRAUD'
-      ],
-      STOCK_EVENTS: [
-        'LOW_STOCK_CHECK',
-        'STOCK_UPDATED'
-      ],
-      INVOICE_EVENTS: [
-        'INVOICE_GENERATED',
-        'INVOICE_SENT',
-        'PAYMENT_REMINDER',
-        'INVOICE_PAID'
-      ],
-      SYSTEM_EVENTS: [
-        'ADMIN_ALERT',
-        'SYSTEM_ALERT'
-      ]
+  async getStatus() {
+    try {
+      const serviceStatus = await notificationService.getNotificationStatus();
+      const dashboardHealth = await notificationService.checkDashboardHealth();
+      
+      return {
+        manager: {
+          firebaseEnabled: this.firebaseEnabled,
+          socketEnabled: this.socketEnabled,
+          socketConnected: !!this.io,
+          status: 'running'
+        },
+        service: serviceStatus,
+        dashboard: dashboardHealth,
+        timestamp: new Date().toISOString(),
+        overallStatus: this.socketEnabled && dashboardHealth.healthy ? 'healthy' : 'degraded'
+      };
+
+    } catch (error) {
+      console.error('❌ Error getting status:', error);
+      return {
+        manager: {
+          firebaseEnabled: this.firebaseEnabled,
+          socketEnabled: this.socketEnabled,
+          socketConnected: !!this.io,
+          status: 'error'
+        },
+        error: error.message,
+        timestamp: new Date().toISOString(),
+        overallStatus: 'error'
+      };
+    }
+  }
+
+  /**
+   * Test the notification system
+   */
+  async test() {
+    console.log('🧪 Testing notification system...');
+    
+    const testOrder = {
+      orderNumber: `TEST-${Date.now().toString().slice(-6)}`,
+      customerName: 'Test Customer',
+      customerPhone: '9876543210',
+      totalPrice: 1999,
+      totalAmount: 1999,
+      items: [{ productName: 'Test Product', quantity: 1, price: 1999 }],
+      status: 'pending',
+      paymentStatus: 'pending',
+      createdAt: new Date().toISOString(),
+      _id: `test-${Date.now()}`
     };
+
+    const result = await this.sendNewOrderNotification(testOrder);
+    
+    return {
+      test: true,
+      orderNumber: testOrder.orderNumber,
+      timestamp: new Date().toISOString(),
+      result
+    };
+  }
+
+  /**
+   * Enable/disable Firebase notifications
+   */
+  setFirebaseEnabled(enabled) {
+    this.firebaseEnabled = enabled;
+    console.log(`🔥 Firebase notifications ${enabled ? 'ENABLED' : 'DISABLED'}`);
+    return this.firebaseEnabled;
+  }
+
+  /**
+   * Enable/disable Socket.IO notifications
+   */
+  setSocketEnabled(enabled) {
+    this.socketEnabled = enabled;
+    console.log(`📡 Socket.IO notifications ${enabled ? 'ENABLED' : 'DISABLED'}`);
+    return this.socketEnabled;
   }
 }
 
 // Create singleton instance
 const notificationManager = new NotificationManager();
 
-// Export as default for easier imports
+// Export for use in server.js to set up Socket.IO
+export { NotificationManager };
 export default notificationManager;
