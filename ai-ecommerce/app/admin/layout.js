@@ -319,6 +319,29 @@ export default function AdminLayout({ children }) {
     };
   }, []);
 
+  // Add this useEffect
+  useEffect(() => {
+    if (isClient && user && user.role === 'admin') {
+      // Load saved notifications on page load
+      const loadSavedNotifications = async () => {
+        try {
+          const response = await fetch('/api/notifications?limit=10');
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.notifications) {
+              console.log(`Loaded ${data.notifications.length} saved notifications`);
+              // You could store these in context or pass to NotificationToast
+            }
+          }
+        } catch (error) {
+          console.error('Error loading saved notifications:', error);
+        }
+      };
+      
+      loadSavedNotifications();
+    }
+  }, [isClient, user]);
+
   // ==================== UI HANDLERS ====================
   const handleToggleSidebar = useCallback(() => {
     setSidebarOpen(prev => !prev);
@@ -476,7 +499,7 @@ export default function AdminLayout({ children }) {
         </div>  
 
         {/* Page Content */}  
-        <main style={{   
+        <div style={{   
           flex: 1,   
           padding: '25px',  
           background: '#f8f9fa',  
@@ -485,7 +508,7 @@ export default function AdminLayout({ children }) {
           zIndex: 1
         }}>  
           {children}  
-        </main>  
+        </div>  
 
         {/* Footer */}  
         <Footer />  
@@ -525,15 +548,6 @@ export default function AdminLayout({ children }) {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
 
 // // app/admin/layout.js - SIMPLIFIED CORRECT VERSION
 // "use client";

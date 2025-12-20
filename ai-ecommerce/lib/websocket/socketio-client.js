@@ -781,6 +781,44 @@ class SocketIOClient {
       console.log(`${CONFIG.LOG_PREFIX} ❌ ${message} ${errorMessage ? `- ${errorMessage}` : ''}`);
     }
   }
+  _handleNewOrder = async (data) => {
+  this._log(`New order: ${data.order?.orderNumber || 'Unknown'}`);
+  
+  // Save to local state immediately
+  this._dispatchNotification('NEW_ORDER', {
+    title: '🛍️ New Order Received',
+    message: `Order #${data.order?.orderNumber} from ${data.order?.customerName || 'Customer'}`,
+    data: data.order,
+    priority: 'high',
+    timestamp: new Date().toISOString()
+  });
+  
+  // ✅ IMPORTANT: Also save to your notifications collection via API
+  try {
+    await fetch('/api/notifications', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}` // If using auth
+      },
+      body: JSON.stringify({
+        type: 'NEW_ORDER',
+        data: data.order,
+        priority: 'high',
+        source: 'socketio'
+      })
+    });
+    
+    console.log('✅ Notification saved to database via API');
+  } catch (error) {
+    console.error('❌ Failed to save notification to database:', error);
+  }
+  
+  // Dispatch window event for other components
+  window.dispatchEvent(new CustomEvent('new-order-received', {
+    detail: data.order || data
+  }));
+};
 
   // ========== GETTERS ==========
 
