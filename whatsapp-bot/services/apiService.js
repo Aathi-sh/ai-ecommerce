@@ -1738,6 +1738,83 @@ async sendNotificationToDashboard(notificationData) {
     };
   }
 }
+// Add these methods to your ApiService class:
+
+/**
+ * Send payment notification via API
+ */
+async sendPaymentNotification(paymentData) {
+  try {
+    console.log('💰 Sending payment notification via API:', {
+      orderNumber: paymentData.orderNumber,
+      amount: paymentData.amount
+    });
+
+    const response = await this.client.post('/api/notifications', {
+      type: 'PAYMENT_RECEIVED',
+      priority: 'high',
+      data: {
+        orderNumber: paymentData.orderNumber || '',
+        amount: paymentData.amount || 0,
+        customerName: paymentData.customerName || '',
+        customerPhone: paymentData.customerPhone || '',
+        paymentMethod: paymentData.paymentMethod || 'upi',
+        timestamp: paymentData.timestamp || new Date().toISOString(),
+        confidence: paymentData.confidence || 0,
+        verifiedBy: paymentData.verifiedBy || 'auto_ocr'
+      }
+    }, {
+      headers: {
+        'x-api-key': process.env.NOTIFICATION_API_KEY || 'dev-key-2024'
+      }
+    });
+    
+    console.log('✅ Payment notification sent successfully');
+    return this.extractData(response.data);
+
+  } catch (error) {
+    console.error('❌ Send payment notification API error:', error.message);
+    return { 
+      success: false, 
+      error: error.message,
+      statusCode: error.response?.status 
+    };
+  }
+}
+
+/**
+ * Send invoice notification via API
+ */
+async sendInvoiceNotification(invoiceData) {
+  try {
+    console.log('📄 Sending invoice notification via API:', {
+      orderNumber: invoiceData.orderNumber
+    });
+
+    const response = await this.client.post('/api/notifications', {
+      type: 'INVOICE_GENERATED',
+      priority: 'normal',
+      data: {
+        orderNumber: invoiceData.orderNumber || '',
+        customerPhone: invoiceData.customerPhone || '',
+        amount: invoiceData.amount || 0,
+        invoiceGeneratedAt: invoiceData.invoiceGeneratedAt || new Date().toISOString(),
+        timestamp: new Date().toISOString()
+      }
+    }, {
+      headers: {
+        'x-api-key': process.env.NOTIFICATION_API_KEY || 'dev-key-2024'
+      }
+    });
+    
+    console.log('✅ Invoice notification sent successfully');
+    return this.extractData(response.data);
+
+  } catch (error) {
+    console.error('❌ Send invoice notification API error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
 }
 
 // Create and export singleton instance

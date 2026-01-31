@@ -272,27 +272,78 @@ class NotificationService {
     }
   }
 
-  async sendPaymentNotification(paymentData) {
-    try {
-      return await this.sendPushNotification({
-        title: '💰 Payment Received',
-        body: `₹${paymentData.amount} received for Order #${paymentData.orderNumber}`,
-        type: 'PAYMENT_RECEIVED',
-        category: this.categories.PAYMENT,
-        priority: this.priorities.HIGH,
-        orderNumber: String(paymentData.orderNumber || ''),
-        extraData: {
-          amount: String(paymentData.amount || '0'),
-          orderNumber: String(paymentData.orderNumber || ''),
-          paymentMethod: String(paymentData.paymentMethod || ''),
+  // In notification-service.js, update the sendPaymentNotification method:
+
+async sendPaymentNotification(paymentData) {
+  try {
+    console.log(`💰 Sending payment notification for order: ${paymentData.orderNumber}`);
+    
+    // 1. Send to Socket.IO (real-time)
+    let socketResult = null;
+    if (global.io && global.io.of) {
+      try {
+        global.io.of('/notifications').emit('PAYMENT_RECEIVED', {
+          type: 'PAYMENT_RECEIVED',
+          payment: paymentData,
           timestamp: new Date().toISOString()
-        }
-      });
-    } catch (error) {
-      console.error('❌ Payment notification error:', error.message);
-      return { success: false, error: error.message };
+        });
+        socketResult = { success: true, channel: 'socket.io' };
+        console.log('✅ Socket.IO payment notification sent');
+      } catch (socketError) {
+        socketResult = { success: false, error: socketError.message, channel: 'socket.io' };
+      }
     }
+    
+    // 2. Send to Next.js API (for database storage)
+    let apiResult = null;
+    try {
+      // Use the new apiService method
+      apiResult = await apiService.sendPaymentNotification(paymentData);
+      console.log('✅ API payment notification sent');
+    } catch (apiError) {
+      apiResult = { success: false, error: apiError.message, channel: 'api' };
+    }
+    
+    // 3. Send Firebase push notification
+    let firebaseResult = null;
+    if (firebaseEnabled) {
+      try {
+        firebaseResult = await this.sendPushNotification({
+          title: '💰 Payment Received',
+          body: `₹${paymentData.amount} received for Order #${paymentData.orderNumber}`,
+          type: 'PAYMENT_RECEIVED',
+          category: 'payment',
+          priority: 'high',
+          orderNumber: String(paymentData.orderNumber || ''),
+          extraData: {
+            amount: String(paymentData.amount || '0'),
+            orderNumber: String(paymentData.orderNumber || ''),
+            paymentMethod: String(paymentData.paymentMethod || 'upi'),
+            timestamp: new Date().toISOString()
+          }
+        });
+      } catch (firebaseError) {
+        firebaseResult = { success: false, error: firebaseError.message, channel: 'firebase' };
+      }
+    }
+    
+    return {
+      success: socketResult?.success || apiResult?.success || firebaseResult?.success || false,
+      orderNumber: paymentData.orderNumber,
+      amount: paymentData.amount,
+      channels: {
+        socket: socketResult,
+        api: apiResult,
+        firebase: firebaseResult
+      },
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('❌ Payment notification error:', error.message);
+    return { success: false, error: error.message };
   }
+}
 
   async sendLowStockNotification(productData) {
     try {
