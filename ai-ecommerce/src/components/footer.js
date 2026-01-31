@@ -28,7 +28,7 @@ export function Footer() {
       {/* Footer Content */}
       <div style={{ marginBottom: "10px" }}>
         <p style={{ fontSize: "15px", fontWeight: 500, color: appTheme.colors.textPrimary }}>
-          © {currentYear} Step On Next — All Rights Reserved.
+          © {currentYear} Steponext — All Rights Reserved.
         </p>
       </div>
 
@@ -69,7 +69,7 @@ export function Footer() {
       {/* Tagline */}
       <div style={{ marginTop: "10px" }}>
         <p style={{ fontSize: "16px", color: appTheme.colors.textSecondary }}>
-          Designed & Developed with ❤️ by Step On Next
+          Designed & Developed with ❤️ by Steponext
         </p>
       </div>
     </footer>

@@ -493,7 +493,7 @@ export default function Login() {
             borderTop: `1px solid ${appTheme.colors.border}`,
           }}
         >
-          © {new Date().getFullYear()} Step On Next. All rights reserved.
+          © {new Date().getFullYear()} Steponext. All rights reserved.
         </p>
       </div>
 

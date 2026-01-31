@@ -145,7 +145,7 @@ export default function Sidebar({ collapsed = false }) {
           zIndex: 1001,
         }}
       >
-        {isCollapsed ? "AI" : "Step On Next"}
+        {isCollapsed ? "AI" : "Steponext"}
       </div>
 
       {/* Toggle Button */}
@@ -262,7 +262,7 @@ export default function Sidebar({ collapsed = false }) {
             display: "block",
             textAlign: "center"
           }}>
-            © 2025 Step On Next
+            © 2025 Steponext
           </small>
         )}
         {isLoggingOut && !isCollapsed && (
