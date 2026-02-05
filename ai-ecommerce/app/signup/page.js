@@ -332,7 +332,7 @@ export default function Signup() {
           
           setTimeout(() => {
             if (data.user.role === 'admin') {
-              router.push('/admin/dashboard');
+              router.push('/admin/dashboards');
             } else if (data.user.role === 'manager') {
               router.push('/manager/dashboard');
             } else {

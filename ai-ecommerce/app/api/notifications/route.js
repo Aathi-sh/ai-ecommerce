@@ -1130,7 +1130,7 @@ export async function OPTIONS() {
 //   try {
 //     await connectDB();
     
-//     const session = await getServerSession(authOptions);
+//     const session = await getServerSession();
     
 //     if (!session || !isAdminUser(session)) {
 //       return NextResponse.json({

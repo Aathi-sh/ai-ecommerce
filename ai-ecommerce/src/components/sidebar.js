@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { appTheme } from "../constants/theme";
-import { FiHome, FiShoppingCart, FiUsers, FiBox, FiLogOut, FiShoppingBag, FiPlusCircle } from "react-icons/fi";
+import { FiHome, FiShoppingCart, FiUsers, FiBox, FiLogOut, FiShoppingBag,FiCalendar,FiTool,FiSettings,FiPlusCircle } from "react-icons/fi";
 import { AiOutlineQrcode } from "react-icons/ai";
 import { BsReceipt } from "react-icons/bs";
 
@@ -22,6 +22,11 @@ export default function Sidebar({ collapsed = false }) {
     { label: "Orders", icon: <FiShoppingCart />, path: "/admin/orders" },
     { label: "Create your own orders", icon: <FiShoppingBag />, path: "/admin/orders/orderForm" },
     { label: "Transactions", icon: <BsReceipt />, path: "/admin/transactions" },
+    { label: "Booking Manager", icon: <FiCalendar />, path: "/admin/bookingService/bookingmng" },
+    { label: "Transact", icon: <FiTool />, path: "/admin/bookingService/service" },
+    { label: "Create Booking Service", icon: <FiPlusCircle />, path: "/admin/bookingservice/service/create" },
+    { label: "Tran", icon: <FiSettings />, path: "/admin/bookingService/serviceCreate" },
+    
     // Removed: Logout from menuItems - handled separately
   ];
 
@@ -206,7 +211,7 @@ export default function Sidebar({ collapsed = false }) {
                 transition: "background-color 0.2s",
                 flexShrink: 0,
               }}
-            >
+               >
               <span style={{ fontSize: "1.2rem" }}>{item.icon}</span>
               {!isCollapsed && <span>{item.label}</span>}
             </Link>
