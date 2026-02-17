@@ -16,7 +16,7 @@ const bookingSchema = new mongoose.Schema({
   },
   professionalId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Professional',
+    ref: 'Bookingmng',
     required: true
   },
   serviceId: {
@@ -25,9 +25,9 @@ const bookingSchema = new mongoose.Schema({
     required: true
   },
   
-  // Service Details
+  // Service Details (snapshot at time of booking)
   serviceName: String,
-  serviceDuration: Number, // in minutes
+  serviceDuration: Number,
   servicePrice: Number,
   selectedAddons: [{
     name: String,
@@ -35,7 +35,8 @@ const bookingSchema = new mongoose.Schema({
   }],
   selectedVariation: {
     name: String,
-    price: Number
+    price: Number,
+    duration: Number
   },
   
   // Scheduling
@@ -44,7 +45,7 @@ const bookingSchema = new mongoose.Schema({
     required: true
   },
   startTime: {
-    type: String, // "14:30"
+    type: String,
     required: true
   },
   endTime: {
@@ -119,7 +120,7 @@ const bookingSchema = new mongoose.Schema({
   bookingSource: {
     type: String,
     enum: ['whatsapp', 'web', 'app', 'admin', 'phone'],
-    default: 'whatsapp'
+    default: 'web'
   },
   whatsappSessionId: String,
   whatsappMessageId: String,
@@ -142,7 +143,7 @@ const bookingSchema = new mongoose.Schema({
     default: 'scheduled'
   },
   recurrence: {
-    pattern: String, // daily, weekly, monthly
+    pattern: String,
     endDate: Date
   },
   
@@ -180,4 +181,4 @@ bookingSchema.index({ status: 1 });
 bookingSchema.index({ bookingSource: 1 });
 bookingSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model('Booking', bookingSchema);
+module.exports = mongoose.models.Booking || mongoose.model('Booking', bookingSchema);

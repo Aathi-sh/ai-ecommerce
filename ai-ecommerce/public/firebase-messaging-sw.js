@@ -93,7 +93,7 @@ self.addEventListener('notificationclick', (event) => {
   const notificationType = data.type || 'general';
   
   // Determine URL to open based on notification type
-  let urlToOpen = '/admin/dashboard';
+  let urlToOpen = '/admin/dashboards';
   
   switch (notificationType) {
     case 'NEW_ORDER':

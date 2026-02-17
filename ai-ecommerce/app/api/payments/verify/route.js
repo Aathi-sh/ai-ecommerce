@@ -1,4 +1,4 @@
-// app/api/payments/verify/route.js - Complete Single File Solution
+// app/api/payments/verify/route.js
 import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 
@@ -686,5 +686,6 @@ export async function DELETE(request) {
   }
 }
 
-// Export all HTTP methods correctly
-export { POST, GET, PATCH, PUT, DELETE };
+// ✅ FIXED: Export only once, not duplicate
+// The functions are already exported above with 'export async function'
+// No need for additional export statement

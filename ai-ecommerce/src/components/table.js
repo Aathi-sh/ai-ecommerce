@@ -5,6 +5,7 @@ import { appTheme } from "../constants/theme";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import { FaFilePdf, FaFileExcel, FaPrint, FaEdit, FaTrash, FaSearch, FaSortUp, FaSortDown, FaCaretLeft, FaCaretRight, FaAngleDoubleLeft, FaAngleDoubleRight, FaInbox, FaTimesCircle } from 'react-icons/fa';
 
 export function DataTable({
   columns,
@@ -12,11 +13,16 @@ export function DataTable({
   title = "Data Table",
   onEdit = () => {},
   onDelete = () => {},
+  onToggleStatus = () => {},
+  itemsPerPage = 10,
+  searchable = true,
+  pagination = true,
+  exportable = true,
+  isMobile = false,
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  const itemsPerPage = 8;
 
   // Sort logic
   const sortedData = useMemo(() => {
@@ -56,21 +62,6 @@ export function DataTable({
     });
   };
 
-  // Fixed: Properly handle edit and delete clicks
-  const handleEdit = (row) => {
-    console.log("Edit clicked:", row);
-    if (onEdit && typeof onEdit === 'function') {
-      onEdit(row);
-    }
-  };
-
-  const handleDelete = (row) => {
-    console.log("Delete clicked:", row);
-    if (onDelete && typeof onDelete === 'function') {
-      onDelete(row);
-    }
-  };
-
   // PDF Download
   const downloadPDF = () => {
     const doc = new jsPDF();
@@ -87,7 +78,19 @@ export function DataTable({
 
     const tableColumn = columns.map((col) => col.header);
     const tableRows = filteredData.map((row) =>
-      columns.map((col) => String(row[col.accessor] || ""))
+      columns.map((col) => {
+        const value = row[col.accessor];
+        if (col.cell && typeof col.cell === 'function') {
+          // Extract text from React element
+          const tempDiv = document.createElement('div');
+          const element = col.cell(value, row);
+          if (typeof element === 'string') {
+            return element;
+          }
+          return String(value || "");
+        }
+        return String(value || "");
+      })
     );
 
     autoTable(doc, {
@@ -108,7 +111,6 @@ export function DataTable({
                    parseInt(appTheme.colors.primary.slice(5, 7), 16)],
         textColor: [255, 255, 255],
         fontStyle: 'bold',
-        textColor: [255, 255, 255],
       },
       alternateRowStyles: {
         fillColor: [248, 248, 248]
@@ -121,26 +123,24 @@ export function DataTable({
 
   // Excel Download
   const downloadExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(filteredData);
+    const flattenedData = filteredData.map(row => {
+      const flatRow = {};
+      columns.forEach(col => {
+        const value = row[col.accessor];
+        flatRow[col.header] = value;
+      });
+      return flatRow;
+    });
+    
+    const worksheet = XLSX.utils.json_to_sheet(flattenedData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
-    
-    // Add some basic styling
-    if (!worksheet['!cols']) {
-      worksheet['!cols'] = [];
-      columns.forEach((_, index) => {
-        worksheet['!cols'][index] = { width: 15 };
-      });
-    }
     
     XLSX.writeFile(workbook, `${title.replace(/\s+/g, '_')}.xlsx`);
   };
 
   // Print Table
   const handlePrint = () => {
-    const tableElement = document.getElementById("data-table");
-    const printContent = tableElement.outerHTML;
-    
     const printWindow = window.open('', '_blank', 'width=1200,height=800');
     
     printWindow.document.write(`
@@ -148,13 +148,8 @@ export function DataTable({
       <html>
         <head>
           <title>${title}</title>
-          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
           <style>
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
             body { 
               font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
               margin: 40px;
@@ -188,7 +183,7 @@ export function DataTable({
               font-size: 14px;
             }
             th { 
-              background: linear-gradient(135deg, ${appTheme.colors.primary}, ${appTheme.colors.secondary}) !important; 
+              background: ${appTheme.colors.primary};
               color: white !important;
               padding: 16px 12px;
               text-align: left;
@@ -225,11 +220,32 @@ export function DataTable({
               <span>Page 1 of 1</span>
             </div>
           </div>
-          ${printContent}
-          <script>
-            // Remove action buttons for print
-            document.querySelectorAll('.action-buttons').forEach(btn => btn.remove());
-          </script>
+          <table>
+            <thead>
+              <tr>
+                ${columns.map(col => `<th>${col.header}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredData.map(row => `
+                <tr>
+                  ${columns.map(col => {
+                    const value = row[col.accessor];
+                    let displayValue = value;
+                    if (col.cell && typeof col.cell === 'function') {
+                      const element = col.cell(value, row);
+                      if (typeof element === 'string') {
+                        displayValue = element;
+                      } else if (element && element.props && element.props.children) {
+                        displayValue = element.props.children;
+                      }
+                    }
+                    return `<td>${displayValue || ''}</td>`;
+                  }).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
         </body>
       </html>
     `);
@@ -243,17 +259,22 @@ export function DataTable({
     }, 500);
   };
 
+  // Don't render DataTable on mobile - should be handled by parent
+  if (isMobile) {
+    return null;
+  }
+
   return (
     <div
       style={{
-        background: `linear-gradient(135deg, ${appTheme.colors.surface} 0%, ${appTheme.colors.background} 100%)`,
-        padding: appTheme.spacing.xl,
-        borderRadius: "24px",
-        boxShadow: "0 20px 60px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.05)",
+        background: appTheme.colors.surface,
+        padding: "24px",
+        borderRadius: "12px",
         fontFamily: appTheme.fonts.primary,
         color: appTheme.colors.textPrimary,
-        border: `1px solid ${appTheme.colors.border}30`,
-        backdropFilter: "blur(10px)",
+        border: `1px solid ${appTheme.colors.border}`,
+        width: "100%",
+        overflow: "hidden"
       }}
     >
       {/* Header Section */}
@@ -262,38 +283,25 @@ export function DataTable({
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
-          marginBottom: appTheme.spacing.xl,
+          marginBottom: "24px",
           flexWrap: "wrap",
-          gap: appTheme.spacing.lg,
+          gap: "16px",
         }}
       >
         <div style={{ flex: 1 }}>
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: appTheme.spacing.md,
-            marginBottom: appTheme.spacing.xs,
+          <h1 style={{ 
+            color: appTheme.colors.textPrimary, 
+            fontWeight: "700",
+            fontSize: "1.5rem",
+            margin: 0,
+            lineHeight: 1.2,
           }}>
-            <div style={{
-              width: "4px",
-              height: "32px",
-              background: `linear-gradient(135deg, ${appTheme.colors.primary}, ${appTheme.colors.secondary})`,
-              borderRadius: "2px",
-            }}></div>
-            <h1 style={{ 
-              color: appTheme.colors.textPrimary, 
-              fontWeight: "800",
-              fontSize: "clamp(1.5rem, 2.5vw, 2rem)",
-              margin: 0,
-              lineHeight: 1.2,
-            }}>
-              {title}
-            </h1>
-          </div>
+            {title}
+          </h1>
           <p style={{ 
             color: appTheme.colors.textSecondary, 
-            margin: "8px 0 0 6px",
-            fontSize: "0.95rem",
+            margin: "8px 0 0 0",
+            fontSize: "0.9rem",
             fontWeight: "500",
           }}>
             {filteredData.length} records • Page {currentPage} of {totalPages}
@@ -301,52 +309,116 @@ export function DataTable({
         </div>
 
         {/* Actions */}
-        <div style={{ 
-          display: "flex", 
-          gap: appTheme.spacing.sm,
-          flexWrap: "wrap"
-        }}>
-          <button
-            onClick={downloadPDF}
-            style={glassButtonStyle(appTheme.colors.secondary, "file-pdf")}
-          >
-            <i className="fas fa-file-pdf"></i>
-            PDF
-          </button>
-          <button
-            onClick={downloadExcel}
-            style={glassButtonStyle(appTheme.colors.success, "file-excel")}
-          >
-            <i className="fas fa-file-excel"></i>
-            Excel
-          </button>
-          <button
-            onClick={handlePrint}
-            style={glassButtonStyle(appTheme.colors.warning, "print")}
-          >
-            <i className="fas fa-print"></i>
-            Print
-          </button>
-        </div>
+        {exportable && (
+          <div style={{ 
+            display: "flex", 
+            gap: "8px",
+            flexWrap: "wrap"
+          }}>
+            <button
+              onClick={downloadPDF}
+              style={{
+                backgroundColor: `${appTheme.colors.secondary}15`,
+                border: `1px solid ${appTheme.colors.secondary}30`,
+                color: appTheme.colors.secondary,
+                padding: "10px 16px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontSize: "0.85rem",
+                fontWeight: "600",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                transition: "all 0.2s ease"
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = appTheme.colors.secondary;
+                e.currentTarget.style.color = "white";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = `${appTheme.colors.secondary}15`;
+                e.currentTarget.style.color = appTheme.colors.secondary;
+              }}
+            >
+              <FaFilePdf size={14} />
+              PDF
+            </button>
+            <button
+              onClick={downloadExcel}
+              style={{
+                backgroundColor: `${appTheme.colors.success}15`,
+                border: `1px solid ${appTheme.colors.success}30`,
+                color: appTheme.colors.success,
+                padding: "10px 16px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontSize: "0.85rem",
+                fontWeight: "600",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                transition: "all 0.2s ease"
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = appTheme.colors.success;
+                e.currentTarget.style.color = "white";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = `${appTheme.colors.success}15`;
+                e.currentTarget.style.color = appTheme.colors.success;
+              }}
+            >
+              <FaFileExcel size={14} />
+              Excel
+            </button>
+            <button
+              onClick={handlePrint}
+              style={{
+                backgroundColor: `${appTheme.colors.warning}15`,
+                border: `1px solid ${appTheme.colors.warning}30`,
+                color: appTheme.colors.warning,
+                padding: "10px 16px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontSize: "0.85rem",
+                fontWeight: "600",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                transition: "all 0.2s ease"
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = appTheme.colors.warning;
+                e.currentTarget.style.color = "white";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = `${appTheme.colors.warning}15`;
+                e.currentTarget.style.color = appTheme.colors.warning;
+              }}
+            >
+              <FaPrint size={14} />
+              Print
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Search and Stats Bar */}
-      <div style={{
-        display: "flex",
-        gap: appTheme.spacing.lg,
-        marginBottom: appTheme.spacing.xl,
-        flexWrap: "wrap",
-        alignItems: "center",
-      }}>
-        <div style={{ position: "relative", flex: "1 1 300px" }}>
-          <i className="fas fa-search" style={{
-            position: "absolute",
-            left: "16px",
-            top: "50%",
-            transform: "translateY(-50%)",
-            color: appTheme.colors.textSecondary,
-            fontSize: "14px",
-          }}></i>
+      {/* Search Bar */}
+      {searchable && (
+        <div style={{
+          marginBottom: "24px",
+          position: "relative"
+        }}>
+          <FaSearch 
+            size={16}
+            style={{
+              position: "absolute",
+              left: "16px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: appTheme.colors.textSecondary
+            }}
+          />
           <input
             type="text"
             placeholder="Search across all columns..."
@@ -357,110 +429,85 @@ export function DataTable({
             }}
             style={{
               width: "100%",
-              padding: "14px 16px 14px 44px",
-              border: `1.5px solid ${appTheme.colors.border}60`,
-              borderRadius: "16px",
+              padding: "12px 16px 12px 44px",
+              border: `1px solid ${appTheme.colors.border}`,
+              borderRadius: "8px",
               outline: "none",
-              fontSize: "0.95rem",
-              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              backgroundColor: `${appTheme.colors.background}80`,
-              backdropFilter: "blur(10px)",
+              fontSize: "0.9rem",
+              backgroundColor: appTheme.colors.background,
+              transition: "all 0.2s ease"
             }}
             onFocus={(e) => {
               e.target.style.borderColor = appTheme.colors.primary;
-              e.target.style.boxShadow = `0 0 0 4px ${appTheme.colors.primary}15`;
-              e.target.style.backgroundColor = appTheme.colors.surface;
+              e.target.style.boxShadow = `0 0 0 3px ${appTheme.colors.primary}20`;
             }}
             onBlur={(e) => {
-              e.target.style.borderColor = `${appTheme.colors.border}60`;
+              e.target.style.borderColor = appTheme.colors.border;
               e.target.style.boxShadow = "none";
-              e.target.style.backgroundColor = `${appTheme.colors.background}80`;
             }}
           />
         </div>
-        
-        <div style={{
-          display: "flex",
-          gap: appTheme.spacing.lg,
-          fontSize: "0.875rem",
-          color: appTheme.colors.textSecondary,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div style={{
-              width: "12px",
-              height: "12px",
-              borderRadius: "50%",
-              background: `linear-gradient(135deg, ${appTheme.colors.primary}, ${appTheme.colors.secondary})`,
-            }}></div>
-            <span>Sorted: {sortConfig.key ? columns.find(col => col.accessor === sortConfig.key)?.header : 'None'}</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <i className="fas fa-filter" style={{ fontSize: "12px" }}></i>
-            <span>Filtered: {filteredData.length} of {data.length}</span>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Table Container */}
       <div style={{ 
         overflowX: "auto",
-        borderRadius: "20px",
-        border: `1.5px solid ${appTheme.colors.border}30`,
-        background: `linear-gradient(145deg, ${appTheme.colors.surface}, ${appTheme.colors.background})`,
-        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.06)",
-        position: "relative",
+        borderRadius: "8px",
+        border: `1px solid ${appTheme.colors.border}`,
+        background: appTheme.colors.background,
+        width: "100%"
       }}>
         <table
-          id="data-table"
           style={{
             width: "100%",
-            borderCollapse: "separate",
-            borderSpacing: 0,
+            borderCollapse: "collapse",
             textAlign: "left",
             minWidth: "800px",
-            background: "transparent",
           }}
         >
           <thead>
-            <tr>
+            <tr style={{
+              background: `linear-gradient(135deg, ${appTheme.colors.primary}, ${appTheme.colors.secondary})`,
+            }}>
               {columns.map((col, idx) => (
                 <th 
                   key={idx} 
-                  style={modernHeaderStyle}
-                  onClick={() => handleSort(col.accessor)}
-                >
-                  <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
+                  style={{
+                    padding: "16px",
+                    fontWeight: "600",
+                    fontSize: "0.8rem",
+                    textTransform: "uppercase",
+                    color: "white",
                     cursor: "pointer",
                     userSelect: "none",
-                  }}>
+                    whiteSpace: "nowrap"
+                  }}
+                  onClick={() => handleSort(col.accessor)}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     {col.header}
-                    <div style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      opacity: sortConfig.key === col.accessor ? 1 : 0.3,
-                    }}>
-                      <i className={`fas fa-caret-up`} style={{
-                        fontSize: "10px",
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <FaSortUp size={10} style={{ 
                         color: sortConfig.key === col.accessor && sortConfig.direction === 'asc' ? 'white' : 'rgba(255,255,255,0.5)',
-                        lineHeight: "6px",
-                      }}></i>
-                      <i className={`fas fa-caret-down`} style={{
-                        fontSize: "10px",
+                        marginBottom: "-2px"
+                      }} />
+                      <FaSortDown size={10} style={{ 
                         color: sortConfig.key === col.accessor && sortConfig.direction === 'desc' ? 'white' : 'rgba(255,255,255,0.5)',
-                        lineHeight: "6px",
-                      }}></i>
+                        marginTop: "-2px"
+                      }} />
                     </div>
                   </div>
                 </th>
               ))}
-              <th style={modernHeaderStyle}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <i className="fas fa-bolt"></i>
-                  Actions
-                </div>
+              <th style={{
+                padding: "16px",
+                fontWeight: "600",
+                fontSize: "0.8rem",
+                textTransform: "uppercase",
+                color: "white",
+                whiteSpace: "nowrap"
+              }}>
+                Actions
               </th>
             </tr>
           </thead>
@@ -470,61 +517,111 @@ export function DataTable({
                 <tr
                   key={rowIdx}
                   style={{
-                    background: rowIdx % 2 === 0 ? 'transparent' : 'rgba(0, 0, 0, 0.02)',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    position: 'relative',
+                    borderBottom: `1px solid ${appTheme.colors.border}`,
+                    background: rowIdx % 2 === 0 ? appTheme.colors.surface : appTheme.colors.background,
+                    transition: "background 0.2s ease",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = `linear-gradient(90deg, ${appTheme.colors.primary}08, ${appTheme.colors.secondary}08)`;
-                    e.currentTarget.style.transform = "translateX(4px)";
+                    e.currentTarget.style.background = `${appTheme.colors.primary}08`;
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = rowIdx % 2 === 0 ? 'transparent' : 'rgba(0, 0, 0, 0.02)';
-                    e.currentTarget.style.transform = "translateX(0)";
+                    e.currentTarget.style.background = rowIdx % 2 === 0 ? appTheme.colors.surface : appTheme.colors.background;
                   }}
                 >
                   {columns.map((col, colIdx) => (
-                    <td key={colIdx} style={modernCellStyle}>
-                      <div style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}>
-                        {colIdx === 0 && (
-                          <div style={{
-                            width: "4px",
-                            height: "20px",
-                            background: `linear-gradient(135deg, ${appTheme.colors.primary}, ${appTheme.colors.secondary})`,
-                            borderRadius: "2px",
-                            opacity: 0.6,
-                          }}></div>
-                        )}
-                        {row[col.accessor]}
-                      </div>
+                    <td key={colIdx} style={{ 
+                      padding: "14px 16px", 
+                      fontSize: "0.875rem",
+                      verticalAlign: "middle"
+                    }}>
+                      {col.cell ? col.cell(row[col.accessor], row) : row[col.accessor]}
                     </td>
                   ))}
-                  <td style={modernCellStyle}>
-                    <div style={{ 
-                      display: "flex", 
-                      gap: "8px", 
-                      flexWrap: "wrap",
-                      position: "relative",
-                      zIndex: 2,
-                    }}>
+                  <td style={{ padding: "14px 16px" }}>
+                    <div style={{ display: "flex", gap: "8px" }}>
                       <button
-                        style={modernActionButtonStyle(appTheme.colors.primary, "edit")}
-                        onClick={() => handleEdit(row)}
-                        title="Edit record"
+                        onClick={() => onEdit(row)}
+                        style={{
+                          backgroundColor: `${appTheme.colors.primary}15`,
+                          color: appTheme.colors.primary,
+                          border: `1px solid ${appTheme.colors.primary}30`,
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          fontSize: "0.8rem",
+                          fontWeight: "600",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          transition: "all 0.2s ease"
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = appTheme.colors.primary;
+                          e.currentTarget.style.color = "white";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = `${appTheme.colors.primary}15`;
+                          e.currentTarget.style.color = appTheme.colors.primary;
+                        }}
                       >
-                        <i className="fas fa-edit"></i>
+                        <FaEdit size={12} />
                         Edit
                       </button>
+                      {onToggleStatus && (
+                        <button
+                          onClick={() => onToggleStatus(row)}
+                          style={{
+                            backgroundColor: `${appTheme.colors.warning}15`,
+                            color: appTheme.colors.warning,
+                            border: `1px solid ${appTheme.colors.warning}30`,
+                            padding: "6px 12px",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            fontSize: "0.8rem",
+                            fontWeight: "600",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            transition: "all 0.2s ease"
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = appTheme.colors.warning;
+                            e.currentTarget.style.color = "white";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = `${appTheme.colors.warning}15`;
+                            e.currentTarget.style.color = appTheme.colors.warning;
+                          }}
+                        >
+                          {row.isActive ? "Deactivate" : "Activate"}
+                        </button>
+                      )}
                       <button
-                        style={modernActionButtonStyle(appTheme.colors.error, "trash")}
-                        onClick={() => handleDelete(row)}
-                        title="Delete record"
+                        onClick={() => onDelete(row)}
+                        style={{
+                          backgroundColor: `${appTheme.colors.error}15`,
+                          color: appTheme.colors.error,
+                          border: `1px solid ${appTheme.colors.error}30`,
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          fontSize: "0.8rem",
+                          fontWeight: "600",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          transition: "all 0.2s ease"
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = appTheme.colors.error;
+                          e.currentTarget.style.color = "white";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = `${appTheme.colors.error}15`;
+                          e.currentTarget.style.color = appTheme.colors.error;
+                        }}
                       >
-                        <i className="fas fa-trash-alt"></i>
+                        <FaTrash size={12} />
                         Delete
                       </button>
                     </div>
@@ -539,59 +636,58 @@ export function DataTable({
                     textAlign: "center",
                     padding: "60px 40px",
                     color: appTheme.colors.textSecondary,
-                    fontStyle: "italic",
                     background: "transparent",
                   }}
                 >
+                  <FaInbox size={48} style={{ marginBottom: "16px", opacity: 0.5 }} />
                   <div style={{ 
-                    fontSize: "4rem", 
-                    marginBottom: appTheme.spacing.md,
-                    opacity: 0.5,
-                  }}>
-                    <i className="fas fa-inbox"></i>
-                  </div>
-                  <div style={{ 
-                    fontSize: "1.25rem", 
+                    fontSize: "1.1rem", 
                     fontWeight: "600",
-                    marginBottom: appTheme.spacing.xs,
+                    marginBottom: "8px",
+                    color: appTheme.colors.textPrimary
                   }}>
                     No records found
                   </div>
                   {searchTerm && (
                     <div style={{ 
-                      fontSize: "0.95rem", 
-                      marginTop: appTheme.spacing.xs,
+                      fontSize: "0.9rem", 
+                      marginBottom: "16px",
                       opacity: 0.7,
                     }}>
-                      No results for "<strong>{searchTerm}</strong>". Try different keywords.
+                      No results for "<strong>{searchTerm}</strong>"
                     </div>
                   )}
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    style={{
-                      marginTop: appTheme.spacing.md,
-                      padding: "10px 20px",
-                      border: `1.5px solid ${appTheme.colors.primary}30`,
-                      background: "transparent",
-                      color: appTheme.colors.primary,
-                      borderRadius: "12px",
-                      cursor: "pointer",
-                      fontSize: "0.9rem",
-                      fontWeight: "600",
-                      transition: "all 0.3s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = appTheme.colors.primary;
-                      e.target.style.color = "white";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = "transparent";
-                      e.target.style.color = appTheme.colors.primary;
-                    }}
-                  >
-                    <i className="fas fa-times-circle" style={{ marginRight: "6px" }}></i>
-                    Clear Search
-                  </button>
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      style={{
+                        padding: "8px 16px",
+                        border: `1px solid ${appTheme.colors.primary}30`,
+                        background: "transparent",
+                        color: appTheme.colors.primary,
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontSize: "0.9rem",
+                        fontWeight: "600",
+                        transition: "all 0.2s ease",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        margin: "0 auto"
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = appTheme.colors.primary;
+                        e.currentTarget.style.color = "white";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.color = appTheme.colors.primary;
+                      }}
+                    >
+                      <FaTimesCircle size={14} />
+                      Clear Search
+                    </button>
+                  )}
                 </td>
               </tr>
             )}
@@ -600,252 +696,118 @@ export function DataTable({
       </div>
 
       {/* Pagination */}
-      {filteredData.length > 0 && (
+      {pagination && filteredData.length > 0 && (
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginTop: appTheme.spacing.xl,
-            padding: appTheme.spacing.lg,
-            background: `linear-gradient(135deg, ${appTheme.colors.surface}, ${appTheme.colors.background})`,
-            borderRadius: "20px",
-            border: `1.5px solid ${appTheme.colors.border}20`,
+            marginTop: "24px",
+            paddingTop: "16px",
+            borderTop: `1px solid ${appTheme.colors.border}`,
             flexWrap: "wrap",
-            gap: appTheme.spacing.md,
+            gap: "12px",
           }}
         >
           <div style={{ 
             color: appTheme.colors.textSecondary,
-            fontSize: "0.9rem",
+            fontSize: "0.875rem",
             fontWeight: "500",
           }}>
             Showing <strong>{((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredData.length)}</strong> of <strong>{filteredData.length}</strong> entries
           </div>
           
-          <div style={{ 
-            display: "flex", 
-            alignItems: "center", 
-            gap: appTheme.spacing.sm,
-            flexWrap: "wrap",
-          }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage(1)}
-              style={modernPaginationButtonStyle(currentPage === 1, "first")}
+              style={{
+                backgroundColor: currentPage === 1 ? `${appTheme.colors.border}20` : `${appTheme.colors.primary}10`,
+                border: `1px solid ${currentPage === 1 ? appTheme.colors.border : appTheme.colors.primary}30`,
+                color: currentPage === 1 ? appTheme.colors.textSecondary : appTheme.colors.primary,
+                padding: "8px 12px",
+                borderRadius: "6px",
+                cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                fontSize: "0.875rem",
+                opacity: currentPage === 1 ? 0.5 : 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minWidth: "40px"
+              }}
             >
-              <i className="fas fa-angle-double-left"></i>
+              <FaAngleDoubleLeft size={12} />
             </button>
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage(currentPage - 1)}
-              style={modernPaginationButtonStyle(currentPage === 1, "prev")}
+              style={{
+                backgroundColor: currentPage === 1 ? `${appTheme.colors.border}20` : `${appTheme.colors.primary}10`,
+                border: `1px solid ${currentPage === 1 ? appTheme.colors.border : appTheme.colors.primary}30`,
+                color: currentPage === 1 ? appTheme.colors.textSecondary : appTheme.colors.primary,
+                padding: "8px 12px",
+                borderRadius: "6px",
+                cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                fontSize: "0.875rem",
+                opacity: currentPage === 1 ? 0.5 : 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minWidth: "40px"
+              }}
             >
-              <i className="fas fa-angle-left"></i>
+              <FaCaretLeft size={12} />
             </button>
             
-            <div style={{ 
-              display: "flex", 
-              gap: "4px",
-              margin: "0 8px",
-            }}>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-                
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    style={{
-                      padding: "10px 16px",
-                      border: "none",
-                      borderRadius: "12px",
-                      cursor: "pointer",
-                      fontSize: "0.875rem",
-                      fontWeight: "600",
-                      transition: "all 0.3s ease",
-                      background: currentPage === pageNum 
-                        ? `linear-gradient(135deg, ${appTheme.colors.primary}, ${appTheme.colors.secondary})`
-                        : "transparent",
-                      color: currentPage === pageNum ? "white" : appTheme.colors.textSecondary,
-                      minWidth: "44px",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (currentPage !== pageNum) {
-                        e.target.style.background = `${appTheme.colors.primary}15`;
-                        e.target.style.color = appTheme.colors.primary;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (currentPage !== pageNum) {
-                        e.target.style.background = "transparent";
-                        e.target.style.color = appTheme.colors.textSecondary;
-                      }
-                    }}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
+            <div style={{ margin: "0 8px", fontSize: "0.875rem", color: appTheme.colors.textPrimary, fontWeight: "500" }}>
+              Page {currentPage} of {totalPages}
             </div>
             
             <button
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage(currentPage + 1)}
-              style={modernPaginationButtonStyle(currentPage === totalPages, "next")}
+              style={{
+                backgroundColor: currentPage === totalPages ? `${appTheme.colors.border}20` : `${appTheme.colors.primary}10`,
+                border: `1px solid ${currentPage === totalPages ? appTheme.colors.border : appTheme.colors.primary}30`,
+                color: currentPage === totalPages ? appTheme.colors.textSecondary : appTheme.colors.primary,
+                padding: "8px 12px",
+                borderRadius: "6px",
+                cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+                fontSize: "0.875rem",
+                opacity: currentPage === totalPages ? 0.5 : 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minWidth: "40px"
+              }}
             >
-              <i className="fas fa-angle-right"></i>
+              <FaCaretRight size={12} />
             </button>
             <button
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage(totalPages)}
-              style={modernPaginationButtonStyle(currentPage === totalPages, "last")}
+              style={{
+                backgroundColor: currentPage === totalPages ? `${appTheme.colors.border}20` : `${appTheme.colors.primary}10`,
+                border: `1px solid ${currentPage === totalPages ? appTheme.colors.border : appTheme.colors.primary}30`,
+                color: currentPage === totalPages ? appTheme.colors.textSecondary : appTheme.colors.primary,
+                padding: "8px 12px",
+                borderRadius: "6px",
+                cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+                fontSize: "0.875rem",
+                opacity: currentPage === totalPages ? 0.5 : 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minWidth: "40px"
+              }}
             >
-              <i className="fas fa-angle-double-right"></i>
+              <FaAngleDoubleRight size={12} />
             </button>
           </div>
         </div>
       )}
     </div>
   );
-}
-
-// Glassmorphism Button Style
-const glassButtonStyle = (color, icon) => ({
-  backgroundColor: `${color}15`,
-  border: `1.5px solid ${color}30`,
-  color: color,
-  padding: "12px 20px",
-  borderRadius: "14px",
-  cursor: "pointer",
-  fontSize: "0.9rem",
-  fontWeight: "600",
-  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
-  backdropFilter: "blur(10px)",
-  position: "relative",
-  overflow: "hidden",
-});
-
-const modernActionButtonStyle = (color, icon) => ({
-  backgroundColor: `${color}10`,
-  border: `1.5px solid ${color}25`,
-  color: color,
-  padding: "8px 16px",
-  borderRadius: "10px",
-  cursor: "pointer",
-  fontSize: "0.8rem",
-  fontWeight: "600",
-  transition: "all 0.3s ease",
-  display: "flex",
-  alignItems: "center",
-  gap: "6px",
-});
-
-const modernPaginationButtonStyle = (disabled, type) => ({
-  backgroundColor: disabled ? `${appTheme.colors.border}20` : `${appTheme.colors.primary}10`,
-  border: `1.5px solid ${disabled ? appTheme.colors.border : appTheme.colors.primary}30`,
-  color: disabled ? appTheme.colors.textSecondary : appTheme.colors.primary,
-  padding: "10px 14px",
-  borderRadius: "12px",
-  cursor: disabled ? "not-allowed" : "pointer",
-  fontSize: "0.875rem",
-  fontWeight: "600",
-  transition: "all 0.3s ease",
-  opacity: disabled ? 0.5 : 1,
-  minWidth: "44px",
-});
-
-const modernHeaderStyle = {
-  padding: "20px 16px",
-  fontWeight: "700",
-  fontSize: "0.8rem",
-  textTransform: "uppercase",
-  letterSpacing: "0.5px",
-  background: `linear-gradient(135deg, ${appTheme.colors.primary}, ${appTheme.colors.secondary})`,
-  color: "white",
-  border: "none",
-  position: "sticky",
-  top: 0,
-  backdropFilter: "blur(10px)",
-};
-
-const modernCellStyle = {
-  padding: "18px 16px",
-  borderBottom: `1.5px solid ${appTheme.colors.border}20`,
-  fontSize: "0.9rem",
-  color: appTheme.colors.textPrimary,
-  fontWeight: "500",
-  position: "relative",
-};
-
-// Add Font Awesome for icons
-const addFontAwesome = () => {
-  if (!document.querySelector('link[href*="font-awesome"]')) {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css';
-    document.head.appendChild(link);
-  }
-};
-
-// Add global styles for hover effects
-const addGlobalStyles = () => {
-  const style = document.createElement('style');
-  style.textContent = `
-    button:not(:disabled) {
-      position: relative;
-      overflow: hidden;
-    }
-    
-    button:not(:disabled)::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-      transition: left 0.5s;
-    }
-    
-    button:not(:disabled):hover::before {
-      left: 100%;
-    }
-    
-    button:not(:disabled):hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-    }
-    
-    button:not(:disabled):active {
-      transform: translateY(0);
-    }
-    
-    @media (max-width: 768px) {
-      .data-table-container {
-        padding: 1rem !important;
-      }
-    }
-  `;
-  document.head.appendChild(style);
-};
-
-// Initialize styles
-if (typeof window !== 'undefined') {
-  addFontAwesome();
-  addGlobalStyles();
 }
 
 export default DataTable;

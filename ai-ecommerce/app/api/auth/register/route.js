@@ -1,331 +1,518 @@
-// import { NextResponse } from "next/server";
-// import { connectDB } from "@/utils/db";
-// import User from "@/models/user";
-// import { sendEmail } from "@/utils/email";
-// import { generateToken } from "@/utils/jwt";
-
-// export async function POST(req) {
-//   try {
-//     console.log("📌 Starting signup request...");
-
-//     await connectDB();
-//     console.log("📌 DB Connected");
-
-//     const body = await req.json();
-//     console.log("📌 Received Data:", body);
-
-//     const { fullName, email, phone, password } = body;
-
-//     // Validation
-//     if (!fullName || !email || !phone || !password) {
-//       console.log("❌ Validation failed");
-//       return NextResponse.json(
-//         { message: "All fields are required" },
-//         { status: 400 }
-//       );
-//     }
-
-//     // Check existing user
-//     const existingUser = await User.findOne({
-//       $or: [{ email }, { phone }],
-//     });
-
-//     if (existingUser) {
-//       console.log("❌ User already exists");
-//       return NextResponse.json(
-//         { message: "Email or phone already exists" },
-//         { status: 400 }
-//       );
-//     }
-
-//     // Create user
-//     const user = await User.create({
-//       fullName,
-//       email,
-//       phone,
-//       password,
-//     });
-
-//     console.log("📌 User created:", user._id);
-
-//     // Token for email verification
-//     const verificationToken = user.createVerificationToken();
-//     await user.save({ validateBeforeSave: false });
-
-//     console.log("📌 Verification token generated:", verificationToken);
-
-//     const verificationUrl = `${process.env.FRONTEND_URL}/verifyEmail?token=${verificationToken}`;
-//     console.log("📌 Verification URL:", verificationUrl);
-
-//     // Send email
-//     try {
-//       await sendEmail({
-//         to: user.email,
-//         subject: "Verify Your Email",
-//         html: `
-//           <h2>Email Verification</h2>
-//           <p>Click the link below to verify your email:</p>
-//           <a href="${verificationUrl}" style="padding: 10px 20px; background: #0070f3; color: white; text-decoration: none; border-radius: 5px;">
-//             Verify Email
-//           </a>
-//           <p>Or copy this link: ${verificationUrl}</p>
-//         `,
-//       });
-//       console.log("📌 Verification email sent");
-//     } catch (emailError) {
-//       console.error("❌ Email sending failed:", emailError);
-//       return NextResponse.json(
-//         {
-//           message: "Failed to send verification email",
-//           error: emailError.message,
-//         },
-//         { status: 500 }
-//       );
-//     }
-
-//     // Generate JWT token
-//     const token = generateToken({ userId: user._id });
-//     console.log("📌 JWT token generated");
-
-//     return NextResponse.json(
-//       {
-//         message:
-//           "User registered successfully. Please check your email for verification.",
-//         user: {
-//           id: user._id,
-//           fullName: user.fullName,
-//           email: user.email,
-//           role: user.role,
-//         },
-//         token,
-//       },
-//       { status: 201 }
-//     );
-//   } catch (error) {
-//     console.error("❌ Registration Error:", error);
-
-//     // Mongoose duplicate key error (11000)
-//     if (error.code === 11000) {
-//       return NextResponse.json(
-//         {
-//           message: "Duplicate field value",
-//           field: Object.keys(error.keyPattern)[0],
-//         },
-//         { status: 400 }
-//       );
-//     }
-
-//     return NextResponse.json(
-//       {
-//         message: "Server error",
-//         error: error.message,
-//         stack: error.stack, // 🔥 shows exact error cause
-//       },
-//       { status: 500 }
-//     );
-//   }
-// }
-
-
-
 import { NextResponse } from "next/server";
 import { connectDB } from "@/utils/db";
 import User from "@/models/user";
 import { sendEmail } from "@/utils/email";
-import { generateToken } from "@/utils/jwt";
+import crypto from "crypto";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/nextauth";
 
-export async function POST(req) {
+// CORS headers configuration
+const corsHeaders = {
+  'Access-Control-Allow-Origin': process.env.NODE_ENV === 'production' 
+    ? process.env.FRONTEND_URL || 'http://localhost:3000' 
+    : '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Credentials': 'true',
+};
+
+// Handle preflight requests
+export async function OPTIONS(request) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: corsHeaders,
+  });
+}
+
+export async function POST(request) {
   try {
-    console.log("📌 Starting signup request...");
+    console.log("📝 [REGISTER API] Starting registration process...");
 
-    await connectDB();
-    console.log("📌 DB Connected");
+    // Prevent authenticated users from registering new accounts
+    const session = await getServerSession(authOptions);
+    if (session?.user) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "You are already logged in. Please log out to create a new account.",
+        },
+        {
+          status: 400,
+          headers: corsHeaders,
+        }
+      );
+    }
 
-    const body = await req.json();
-    console.log("📌 Received Data:", body);
+    // Parse and validate request body
+    let body;
+    try {
+      body = await request.json();
+      console.log("📋 [REGISTER API] Request body received");
+    } catch (error) {
+      console.error("❌ [REGISTER API] JSON parse error:", error);
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Invalid JSON data in request",
+          error: "JSON_PARSE_ERROR",
+        },
+        {
+          status: 400,
+          headers: corsHeaders,
+        }
+      );
+    }
 
-    // Extract data with role - if not provided, it will use model default ("user")
     const { fullName, email, phone, password, role } = body;
 
-    // Validation
+    // Validate required fields
     if (!fullName || !email || !phone || !password) {
-      console.log("❌ Validation failed");
       return NextResponse.json(
-        { message: "All fields are required" },
-        { status: 400 }
+        {
+          success: false,
+          message: "All fields are required: fullName, email, phone, password",
+        },
+        {
+          status: 400,
+          headers: corsHeaders,
+        }
       );
     }
 
-    // Validate role if provided
-    const allowedRoles = ["admin", "user", "manager"];
-    if (role && !allowedRoles.includes(role)) {
-      console.log("❌ Invalid role specified:", role);
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
       return NextResponse.json(
-        { message: "Invalid role specified" },
-        { status: 400 }
+        {
+          success: false,
+          message: "Invalid email format",
+          field: "email",
+        },
+        {
+          status: 400,
+          headers: corsHeaders,
+        }
       );
     }
 
-    // Check existing user
+    // Validate phone number
+    const phoneRegex = /^\d{10,15}$/;
+    if (!phoneRegex.test(phone.trim())) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Phone number must be 10-15 digits",
+          field: "phone",
+        },
+        {
+          status: 400,
+          headers: corsHeaders,
+        }
+      );
+    }
+
+    // Validate password strength
+    if (password.length < 6) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Password must be at least 6 characters",
+          field: "password",
+        },
+        {
+          status: 400,
+          headers: corsHeaders,
+        }
+      );
+    }
+
+    // Validate role
+    const allowedRoles = ['user', 'admin', 'manager'];
+    const selectedRole = role && allowedRoles.includes(role) ? role : 'user';
+    
+    // Restrict admin registration in production (admins should be created manually)
+    if (process.env.NODE_ENV === 'production' && selectedRole === 'admin') {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Admin registration is restricted. Please contact support.",
+        },
+        {
+          status: 403,
+          headers: corsHeaders,
+        }
+      );
+    }
+
+    // Connect to database
+    try {
+      await connectDB();
+      console.log("✅ [REGISTER API] Database connected");
+    } catch (dbError) {
+      console.error("❌ [REGISTER API] Database connection error:", dbError);
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Database connection failed",
+          error: "DB_CONNECTION_ERROR",
+        },
+        {
+          status: 500,
+          headers: corsHeaders,
+        }
+      );
+    }
+
+    // Check for existing user with email or phone
     const existingUser = await User.findOne({
-      $or: [{ email }, { phone }],
+      $or: [
+        { email: email.toLowerCase().trim() },
+        { phone: phone.trim() }
+      ]
     });
 
     if (existingUser) {
-      console.log("❌ User already exists");
+      const field = existingUser.email === email.toLowerCase().trim() ? 'email' : 'phone';
       return NextResponse.json(
-        { message: "Email or phone already exists" },
-        { status: 400 }
+        {
+          success: false,
+          message: `${field === 'email' ? 'Email' : 'Phone number'} is already registered`,
+          field,
+        },
+        {
+          status: 409, // Conflict
+          headers: corsHeaders,
+        }
       );
     }
 
     // Create user object
     const userData = {
-      fullName,
-      email,
-      phone,
-      password,
-    };
-    
-    // Only add role if provided (otherwise model default will be used)
-    if (role) {
-      userData.role = role;
-    }
-
-    // Create user
-    const user = await User.create(userData);
-    console.log("📌 User created:", user._id, "with role:", user.role);
-
-    // Token for email verification
-    const verificationToken = user.createVerificationToken();
-    await user.save({ validateBeforeSave: false });
-    console.log("📌 Verification token generated");
-
-    const verificationUrl = `${process.env.FRONTEND_URL}/verifyEmail?token=${verificationToken}`;
-    console.log("📌 Verification URL:", verificationUrl);
-
-    // Send email
-    try {
-      await sendEmail({
-        to: user.email,
-        subject: "Verify Your Email - Account Created Successfully",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #333;">Welcome to Our Platform!</h2>
-            <p>Hello ${user.fullName},</p>
-            <p>Your account has been created successfully with <strong>${user.role.toUpperCase()}</strong> privileges.</p>
-            <p>Please click the button below to verify your email address:</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${verificationUrl}" 
-                 style="background-color: #0070f3; color: white; padding: 12px 24px; 
-                        text-decoration: none; border-radius: 5px; font-weight: bold;">
-                Verify Email Address
-              </a>
-            </div>
-            <p>Or copy and paste this link in your browser:</p>
-            <p style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; 
-                      word-break: break-all;">${verificationUrl}</p>
-            
-            <div style="margin-top: 30px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
-              <h4 style="margin-top: 0;">Account Details:</h4>
-              <p><strong>Name:</strong> ${user.fullName}</p>
-              <p><strong>Email:</strong> ${user.email}</p>
-              <p><strong>Role:</strong> ${user.role}</p>
-              <p><strong>Account Type:</strong> ${user.role === 'admin' ? 'Administrator (Full Access)' : 
-                user.role === 'manager' ? 'Manager (Limited Access)' : 'User (Basic Access)'}</p>
-            </div>
-            
-            <p style="margin-top: 30px; font-size: 12px; color: #666;">
-              If you didn't create this account, please ignore this email.
-            </p>
-          </div>
-        `,
-      });
-      console.log("📌 Verification email sent");
-    } catch (emailError) {
-      console.error("❌ Email sending failed:", emailError);
-      // Continue even if email fails
-    }
-
-    // Generate JWT token with user data
-    const token = generateToken({ 
-      userId: user._id,
-      role: user.role,
-      email: user.email,
-      name: user.fullName
-    });
-    console.log("📌 JWT token generated for role:", user.role);
-
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Account created successfully! Please check your email for verification.",
-        user: {
-          id: user._id,
-          fullName: user.fullName,
-          email: user.email,
-          role: user.role,
-          phone: user.phone,
-          isVerified: user.isVerified,
+      fullName: fullName.trim(),
+      email: email.toLowerCase().trim(),
+      phone: phone.trim(),
+      password: password,
+      role: selectedRole,
+      isVerified: false, // Email verification required
+      status: 'active',
+      notificationSettings: {
+        pushNotifications: {
+          enabled: selectedRole === 'admin', // Enable by default for admins
+          lastUpdated: new Date(),
         },
-        token,
-        redirectTo: user.role === 'admin' ? '/admin/dashboard' : '/dashboard'
+        settingsUpdatedAt: new Date(),
       },
-      { status: 201 }
-    );
+    };
+
+    let user;
+    try {
+      // Create user in database
+      user = await User.create(userData);
+      console.log("✅ [REGISTER API] User created successfully:", {
+        id: user._id.toString(),
+        email: user.email,
+        role: user.role
+      });
+    } catch (createError) {
+      console.error("❌ [REGISTER API] User creation error:", createError);
+      
+      // Handle duplicate key errors
+      if (createError.code === 11000) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Duplicate entry detected. Please try different credentials.",
+            error: "DUPLICATE_ENTRY",
+          },
+          {
+            status: 409,
+            headers: corsHeaders,
+          }
+        );
+      }
+      
+      // Handle validation errors
+      if (createError.name === 'ValidationError') {
+        const errors = Object.values(createError.errors).map(err => err.message);
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Validation failed",
+            errors,
+          },
+          {
+            status: 400,
+            headers: corsHeaders,
+          }
+        );
+      }
+      
+      return NextResponse.json(
+        {
+          success: false,
+          message: "User creation failed",
+          error: "USER_CREATION_FAILED",
+        },
+        {
+          status: 500,
+          headers: corsHeaders,
+        }
+      );
+    }
+
+    // Generate secure verification token
+    let verificationToken;
+    try {
+      verificationToken = crypto.randomBytes(32).toString("hex");
+      const hashedToken = crypto
+        .createHash("sha256")
+        .update(verificationToken)
+        .digest("hex");
+      
+      // Set token with 24-hour expiry
+      user.verificationToken = hashedToken;
+      user.verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+      
+      await user.save({ validateBeforeSave: false });
+      console.log("✅ [REGISTER API] Verification token generated");
+    } catch (tokenError) {
+      console.error("❌ [REGISTER API] Token generation error:", tokenError);
+      
+      // Clean up user if token generation fails
+      await User.findByIdAndDelete(user._id);
+      
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Failed to generate verification token",
+          error: "TOKEN_GENERATION_FAILED",
+        },
+        {
+          status: 500,
+          headers: corsHeaders,
+        }
+      );
+    }
+
+    // Send verification email
+    try {
+      const verificationUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+      
+      const emailSent = await sendEmail({
+        to: user.email,
+        subject: "Verify Your Email Address - Steponext",
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Email Verification</title>
+            <style>
+              body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 600px;
+                margin: 0 auto;
+                padding: 20px;
+              }
+              .header {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 30px;
+                text-align: center;
+                border-radius: 10px 10px 0 0;
+              }
+              .content {
+                background: #f9f9f9;
+                padding: 30px;
+                border-radius: 0 0 10px 10px;
+              }
+              .button {
+                display: inline-block;
+                padding: 14px 28px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                text-decoration: none;
+                border-radius: 8px;
+                font-weight: bold;
+                margin: 20px 0;
+              }
+              .footer {
+                margin-top: 30px;
+                padding-top: 20px;
+                border-top: 1px solid #e0e0e0;
+                color: #666;
+                font-size: 12px;
+              }
+              .expiry-note {
+                background: #fff3cd;
+                border: 1px solid #ffeaa7;
+                border-radius: 6px;
+                padding: 12px;
+                margin: 20px 0;
+                color: #856404;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Welcome to Steponext!</h1>
+            </div>
+            <div class="content">
+              <h2>Hello ${user.fullName},</h2>
+              <p>Thank you for registering with Steponext. To complete your registration and activate your account, please verify your email address by clicking the button below:</p>
+              
+              <div style="text-align: center;">
+                <a href="${verificationUrl}" class="button">Verify Email Address</a>
+              </div>
+              
+              <div class="expiry-note">
+                <strong>⚠️ Important:</strong> This verification link will expire in 24 hours. If you don't verify within this time, you'll need to request a new verification email.
+              </div>
+              
+              <p>If the button above doesn't work, you can copy and paste this link into your browser:</p>
+              <p style="word-break: break-all; background: #f0f0f0; padding: 10px; border-radius: 5px; font-size: 12px;">
+                ${verificationUrl}
+              </p>
+              
+              <p>If you didn't create an account with Steponext, please ignore this email.</p>
+              
+              <div class="footer">
+                <p>Best regards,<br>The Steponext Team</p>
+                <p><small>This is an automated message, please do not reply to this email.</small></p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `,
+        text: `Welcome to Steponext!
+
+Hello ${user.fullName},
+
+Thank you for registering with Steponext. To complete your registration and activate your account, please verify your email address by clicking the link below:
+
+${verificationUrl}
+
+Important: This verification link will expire in 24 hours. If you don't verify within this time, you'll need to request a new verification email.
+
+If you didn't create an account with Steponext, please ignore this email.
+
+Best regards,
+The Steponext Team
+
+This is an automated message, please do not reply to this email.`,
+      });
+
+      if (!emailSent) {
+        console.warn("⚠️ [REGISTER API] Email sending failed, but user was created");
+        // Continue without throwing error - user can request new verification email
+      } else {
+        console.log("✅ [REGISTER API] Verification email sent successfully");
+      }
+    } catch (emailError) {
+      console.error("❌ [REGISTER API] Email sending error:", emailError);
+      // Continue - user can request new verification email later
+    }
+
+    // Prepare success response
+    const response = {
+      success: true,
+      message: "Account created successfully! Please check your email to verify your account before logging in.",
+      data: {
+        id: user._id.toString(),
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        isVerified: user.isVerified,
+        verificationRequired: true,
+      },
+      instructions: {
+        verification: "Check your email for a verification link (valid for 24 hours)",
+        nextSteps: "After verifying your email, you can log in with your credentials",
+        support: "If you don't receive the email, check your spam folder or request a new verification link",
+      },
+    };
+
+    console.log("✅ [REGISTER API] Registration process completed successfully");
+
+    return NextResponse.json(response, {
+      status: 201,
+      headers: corsHeaders,
+    });
+
   } catch (error) {
-    console.error("❌ Registration Error:", error);
-    console.error("Error stack:", error.stack);
-
-    // Mongoose duplicate key error
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
-      const fieldName = field === 'email' ? 'Email' : 'Phone number';
-      return NextResponse.json(
-        {
-          success: false,
-          message: `${fieldName} is already registered. Please use a different ${fieldName}.`,
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validation error
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(err => err.message);
-      return NextResponse.json(
-        {
-          success: false,
-          message: messages.join(', '),
-        },
-        { status: 400 }
-      );
-    }
-
-    // General error
+    console.error("❌ [REGISTER API] Unexpected error:", error);
+    
     return NextResponse.json(
       {
         success: false,
-        message: "Registration failed. Please try again.",
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        message: "Internal server error",
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+        timestamp: new Date().toISOString(),
       },
-      { status: 500 }
+      {
+        status: 500,
+        headers: corsHeaders,
+      }
     );
   }
 }
 
-// Optional: GET endpoint for testing
-export async function GET() {
-  return NextResponse.json(
-    { 
-      success: true,
-      message: "Signup API endpoint is active",
+// GET endpoint for API information and testing
+export async function GET(request) {
+  try {
+    console.log("🔧 [REGISTER API] GET request received");
+    
+    const info = {
       endpoint: "/api/auth/register",
       method: "POST",
-      required_fields: ["fullName", "email", "phone", "password"],
-      optional_fields: ["role (admin/user/manager)"],
-      note: "If role is not provided, default will be 'user'"
-    },
-    { status: 200 }
-  );
+      description: "User registration endpoint with email verification",
+      required_fields: [
+        "fullName (string, min 2 chars)",
+        "email (valid email format)",
+        "phone (10-15 digits)",
+        "password (min 6 characters)",
+      ],
+      optional_fields: [
+        "role (user, admin, manager - defaults to 'user')",
+      ],
+      security_features: [
+        "Email verification required before login",
+        "24-hour verification token expiry",
+        "Password hashing with bcrypt",
+        "Duplicate email/phone prevention",
+        "Input validation and sanitization",
+      ],
+      response_format: {
+        success: "boolean",
+        message: "string",
+        data: "object (user info)",
+        instructions: "object (next steps)",
+      },
+      status: "operational",
+      timestamp: new Date().toISOString(),
+    };
+
+    return NextResponse.json(info, {
+      status: 200,
+      headers: corsHeaders,
+    });
+  } catch (error) {
+    console.error("❌ [REGISTER API] GET endpoint error:", error);
+    
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error retrieving API information",
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      },
+      {
+        status: 500,
+        headers: corsHeaders,
+      }
+    );
+  }
 }

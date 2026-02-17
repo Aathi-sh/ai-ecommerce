@@ -1,38 +1,112 @@
 'use client';
+
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { signIn, useSession } from 'next-auth/react';
 import { appTheme } from "../../src/constants/theme";
-import { useAuth } from '../../context/authContext';
 
 export default function Login() {
   const [formData, setFormData] = useState({
     email: '',
-    password: ''
+    password: '',
+    rememberMe: false
   });
+  
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-  const [errors, setErrors] = useState({ email: '', password: '' });
+  const [errors, setErrors] = useState({
+    email: '',
+    password: ''
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  
   const router = useRouter();
-  const { login, isAuthenticated, user } = useAuth();
+  const searchParams = useSearchParams();
+  const { data: session, status } = useSession();
+  
+  // Check for callback URL and error messages
+  useEffect(() => {
+    const error = searchParams.get('error');
+    const callbackUrl = searchParams.get('callbackUrl');
+    const verified = searchParams.get('verified');
+    const reset = searchParams.get('reset');
+    
+    // Handle verification success
+    if (verified === 'true') {
+      setMessage({ 
+        type: 'success', 
+        text: '✅ Email verified successfully! You can now log in.' 
+      });
+    }
+    
+    // Handle password reset success
+    if (reset === 'success') {
+      setMessage({ 
+        type: 'success', 
+        text: '✅ Password reset successfully! You can now log in with your new password.' 
+      });
+    }
+    
+    // Handle NextAuth errors
+    if (error) {
+      let errorMessage = 'Authentication failed';
+      
+      switch (error) {
+        case 'CredentialsSignin':
+          errorMessage = 'Invalid email or password';
+          break;
+        case 'EmailNotVerified':
+          errorMessage = 'Please verify your email before logging in';
+          break;
+        case 'AccountInactive':
+          errorMessage = 'Your account is inactive. Please contact support';
+          break;
+        case 'SessionExpired':
+          errorMessage = 'Your session has expired. Please log in again.';
+          break;
+        default:
+          errorMessage = `Authentication error: ${error}`;
+      }
+      
+      setMessage({ 
+        type: 'error', 
+        text: `❌ ${errorMessage}` 
+      });
+    }
+    
+    // Store callback URL for redirect after login
+    if (callbackUrl && typeof window !== 'undefined') {
+      sessionStorage.setItem('auth_callback_url', callbackUrl);
+    }
+  }, [searchParams]);
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated && user) {
-      console.log('✅ Already authenticated, redirecting to dashboard...');
-      router.push('/admin/dashboards');
+    if (status === 'loading') return;
+    
+    if (session?.user) {
+      console.log('✅ [Login] User already authenticated, redirecting...');
+      const redirectPath = session.user.role === 'admin' 
+        ? '/admin/dashboards' 
+        : '/dashboards';
+      router.push(redirectPath);
     }
-  }, [isAuthenticated, user, router]);
+  }, [session, status, router]);
 
   const validateForm = () => {
-    const newErrors = { email: '', password: '' };
+    const newErrors = { 
+      email: '', 
+      password: '' 
+    };
     let isValid = true;
 
     // Email validation
-    if (!formData.email.trim()) {
+    const email = formData.email.trim();
+    if (!email) {
       newErrors.email = 'Email is required';
       isValid = false;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       newErrors.email = 'Please enter a valid email address';
       isValid = false;
     }
@@ -51,13 +125,12 @@ export default function Login() {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData({
       ...formData,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     });
     
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -65,7 +138,6 @@ export default function Login() {
       }));
     }
     
-    // Clear success/error messages when user starts typing
     if (message.text) {
       setMessage({ type: '', text: '' });
     }
@@ -74,7 +146,6 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validate form before submission
     if (!validateForm()) {
       return;
     }
@@ -83,151 +154,166 @@ export default function Login() {
     setMessage({ type: '', text: '' });
 
     try {
-      console.log('🔐 Attempting login for:', formData.email);
+      const email = formData.email.trim();
+      const password = formData.password;
       
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
+      console.log('🔐 [Login] Attempting authentication via NextAuth...');
+      
+      // Sign in using NextAuth credentials provider
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false, // We'll handle redirect manually
+        callbackUrl: '/', // Default callback URL
       });
 
-      const data = await res.json();
-      console.log('📋 Login response:', { 
-        status: res.status, 
-        success: data.success,
-        hasToken: !!data.token,
-        hasUser: !!data.user,
-        dataStructure: data 
+      console.log('📋 [Login] NextAuth sign in result:', result);
+
+      if (result?.error) {
+        // Handle specific error cases
+        let errorMessage = 'Login failed. Please check your credentials.';
+        let errorType = 'error';
+        
+        if (result.error.includes('Invalid email or password')) {
+          errorMessage = 'Invalid email or password';
+        } else if (result.error.includes('verify your email')) {
+          errorMessage = 'Please verify your email address before logging in';
+          errorType = 'warning';
+        } else if (result.error.includes('inactive')) {
+          errorMessage = 'Your account is inactive. Please contact support';
+        } else if (result.error.includes('Too many requests')) {
+          errorMessage = 'Too many login attempts. Please try again later.';
+        }
+        
+        setMessage({ 
+          type: errorType, 
+          text: `${errorType === 'warning' ? '⚠️' : '❌'} ${errorMessage}` 
+        });
+        
+        // Clear password field on error
+        setFormData(prev => ({ 
+          ...prev, 
+          password: '' 
+        }));
+        
+        return;
+      }
+
+      // Login successful
+      console.log('✅ [Login] Authentication successful');
+      
+      setMessage({ 
+        type: 'success', 
+        text: '✅ Login successful! Redirecting...' 
+      });
+      
+      // Get the callback URL from sessionStorage or use default
+      const callbackUrl = sessionStorage.getItem('auth_callback_url') || 
+                        (formData.rememberMe ? '/dashboards' : '/');
+      
+      // Clear the stored callback URL
+      sessionStorage.removeItem('auth_callback_url');
+      
+      // Wait a moment for session to update
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Fetch updated session to get user role
+      const sessionRes = await fetch('/api/auth/session');
+      const sessionData = await sessionRes.json();
+      
+      let redirectPath = callbackUrl;
+      
+      if (sessionData?.user?.role === 'admin') {
+        redirectPath = '/admin/dashboards';
+      } else if (sessionData?.user?.role === 'manager') {
+        redirectPath = '/manager/dashboards';
+      } else if (sessionData?.user?.role === 'user') {
+        redirectPath = '/dashboards';
+      }
+      
+      console.log(`🔄 [Login] Redirecting to: ${redirectPath}`);
+      
+      // Use router.push for SPA navigation
+      router.push(redirectPath);
+      
+    } catch (error) {
+      console.error('❌ [Login] Authentication error:', error);
+      
+      let errorMessage = 'Something went wrong. Please try again.';
+      
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        errorMessage = 'Cannot connect to server. Please check your internet connection.';
+      } else if (error.message.includes('NetworkError')) {
+        errorMessage = 'Network error. Please check your connection.';
+      }
+      
+      setMessage({ 
+        type: 'error', 
+        text: `❌ ${errorMessage}` 
+      });
+      
+      // Clear password field on error
+      setFormData(prev => ({ 
+        ...prev, 
+        password: '' 
+      }));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async (role = 'user') => {
+    setLoading(true);
+    setMessage({ type: '', text: '' });
+    
+    // Demo credentials (for development only)
+    const demoCredentials = {
+      user: { email: 'demo@example.com', password: 'Demo@123' },
+      admin: { email: 'admin@example.com', password: 'Admin@123' },
+      manager: { email: 'manager@example.com', password: 'Manager@123' }
+    };
+    
+    try {
+      const credentials = demoCredentials[role];
+      
+      console.log(`🧪 [Login] Attempting demo login as ${role}...`);
+      
+      const result = await signIn('credentials', {
+        email: credentials.email,
+        password: credentials.password,
+        redirect: false,
       });
 
-      if (res.ok && data.success) {
-        console.log('✅ Login successful!');
-        
-        // FIXED: Get token and user from ROOT LEVEL, not nested in data.data
-        const token = data.token; // Direct from data.token
-        const userData = data.user; // Direct from data.user
-        
-        console.log('📊 Extracted data:', {
-          tokenExists: !!token,
-          userDataExists: !!userData,
-          tokenLength: token?.length,
-          userEmail: userData?.email
+      if (result?.error) {
+        setMessage({ 
+          type: 'error', 
+          text: '❌ Demo login failed. Make sure demo users are seeded in database.' 
         });
-        
-        if (!token || !userData) {
-          console.error('❌ Missing token or user data:', { token, userData });
-          throw new Error('No token or user data received from server');
-        }
-        
-        console.log('💾 Storing auth data in localStorage...');
-        
-        // Store in localStorage
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(userData));
-        
-        // Set token expiry (7 days from now, matching JWT expiry)
-        const expiryTime = Date.now() + (7 * 24 * 60 * 60 * 1000);
-        localStorage.setItem('token_expiry', expiryTime.toString());
-        
-        // Also store sessionId if available
-        if (data.sessionId) {
-          localStorage.setItem('sessionId', data.sessionId);
-        }
-        
-        console.log('🔄 Updating auth context...');
-        
-        // Update auth context
-        const loginResult = await login(userData, token, {
-          rememberMe: true,
-          expiresIn: 7 * 24 * 60 * 60 * 1000 // 7 days
-        });
-        
-        if (loginResult.success) {
-          console.log('✅ Auth context updated successfully');
-          setMessage({ 
-            type: 'success', 
-            text: '✅ Login successful! Redirecting...' 
-          });
-          
-          // Force reload to ensure auth state is updated
-          setTimeout(() => {
-            window.location.href = '/admin/dashboards';
-          }, 1000);
-          
-        } else {
-          console.error('❌ Auth context update failed:', loginResult.error);
-          throw new Error(loginResult.error || 'Failed to update auth context');
-        }
-        
       } else {
-        // Handle error response
-        const errorMessage = data.message || 'Login failed';
-        console.error('❌ Login failed:', errorMessage);
+        setMessage({ 
+          type: 'success', 
+          text: `✅ Demo ${role} login successful! Redirecting...` 
+        });
         
-        if (res.status === 401) {
-          if (data.requiresVerification) {
-            setMessage({ 
-              type: 'error', 
-              text: '⚠️ Please verify your email first' 
-            });
-          } else {
-            setMessage({ 
-              type: 'error', 
-              text: '❌ Incorrect email or password' 
-            });
-          }
-        } else if (res.status === 403) {
-          setMessage({ 
-            type: 'error', 
-            text: '⛔ Account is disabled. Please contact support.' 
-          });
-        } else if (res.status === 429) {
-          setMessage({ 
-            type: 'error', 
-            text: '⚠️ Too many login attempts. Please try again later.' 
-          });
-        } else if (res.status === 404) {
-          setMessage({ 
-            type: 'error', 
-            text: '❌ Account not found. Please check your email.' 
-          });
-        } else {
-          setMessage({ 
-            type: 'error', 
-            text: `❌ ${errorMessage}` 
-          });
-        }
-        
-        // Clear password field on error for security
-        setFormData(prev => ({ ...prev, password: '' }));
+        setTimeout(() => {
+          const redirectPath = role === 'admin' ? '/admin/dashboards' : 
+                              role === 'manager' ? '/manager/dashboards' : '/dashboards';
+          router.push(redirectPath);
+        }, 1500);
       }
     } catch (error) {
-      console.error('Login error:', error);
-      
-      // Handle network errors
-      if (error.name === 'TypeError' && (error.message.includes('NetworkError') || error.message.includes('Failed to fetch'))) {
-        setMessage({ 
-          type: 'error', 
-          text: '🌐 Network error. Please check your internet connection.' 
-        });
-      } else {
-        setMessage({ 
-          type: 'error', 
-          text: `❌ ${error.message || 'Something went wrong. Please try again.'}` 
-        });
-      }
-      
-      // Clear password on error
-      setFormData(prev => ({ ...prev, password: '' }));
+      console.error('Demo login error:', error);
+      setMessage({ 
+        type: 'error', 
+        text: '❌ Demo login failed' 
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const inputStyle = (hasError) => ({
-    padding: "12px 16px",
+    padding: "14px 16px",
     borderRadius: "10px",
     border: hasError ? `1.5px solid ${appTheme.colors.error}` : "1.5px solid #ddd",
     fontSize: "16px",
@@ -241,9 +327,28 @@ export default function Login() {
   const errorTextStyle = {
     color: appTheme.colors.error,
     fontSize: "12px",
-    marginTop: "4px",
+    marginTop: "6px",
     textAlign: "left",
     display: "block",
+  };
+
+  const buttonStyle = {
+    backgroundColor: appTheme.colors.primary,
+    color: "#fff",
+    padding: "14px",
+    border: "none",
+    borderRadius: "12px",
+    fontSize: "16px",
+    cursor: loading ? "not-allowed" : "pointer",
+    fontWeight: "600",
+    width: "100%",
+    marginTop: "10px",
+    opacity: loading ? 0.7 : 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    transition: "all 0.2s ease",
   };
 
   return (
@@ -261,29 +366,28 @@ export default function Login() {
       <div
         style={{
           width: "100%",
-          maxWidth: "400px",
+          maxWidth: "450px",
           backgroundColor: appTheme.colors.surface,
           padding: "40px",
           borderRadius: "20px",
           boxShadow: appTheme.shadows.lg,
-          textAlign: "center",
         }}
       >
-        <div style={{ marginBottom: "30px" }}>
+        <div style={{ marginBottom: "30px", textAlign: "center" }}>
           <div style={{
-            width: "48px",
-            height: "48px",
-            backgroundColor: appTheme.colors.primary + "20",
-            borderRadius: "12px",
+            width: "64px",
+            height: "64px",
+            backgroundColor: appTheme.colors.primary + "15",
+            borderRadius: "16px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            margin: "0 auto 16px",
+            margin: "0 auto 20px",
+            border: `2px solid ${appTheme.colors.primary}30`,
           }}>
             <span style={{ 
-              fontSize: "24px", 
+              fontSize: "32px", 
               color: appTheme.colors.primary,
-              fontWeight: "bold"
             }}>
               🔐
             </span>
@@ -291,160 +395,285 @@ export default function Login() {
           <h1
             style={{
               color: appTheme.colors.textPrimary,
-              fontSize: "24px",
+              fontSize: "28px",
               marginBottom: "8px",
-              fontWeight: "600",
+              fontWeight: "700",
             }}
           >
             Welcome Back
           </h1>
           <p style={{
             color: appTheme.colors.textSecondary,
-            fontSize: "14px",
+            fontSize: "15px",
             marginBottom: "0",
+            lineHeight: "1.5",
           }}>
-            Sign in to your admin account
+            Sign in to your Steponext account
           </p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: "grid", gap: "20px" }}>
           <div>
+            <label style={{
+              display: "block",
+              color: appTheme.colors.textSecondary,
+              fontSize: "14px",
+              fontWeight: "500",
+              marginBottom: "8px",
+            }}>
+              Email Address
+            </label>
             <input
               name="email"
               type="email"
               required
-              placeholder="Email address"
+              placeholder="you@example.com"
               value={formData.email}
               onChange={handleChange}
               style={inputStyle(errors.email)}
-              onFocus={(e) => e.target.style.borderColor = appTheme.colors.primary}
-              onBlur={(e) => e.target.style.borderColor = errors.email ? appTheme.colors.error : "#ddd"}
+              disabled={loading}
+              autoComplete="email"
+              autoFocus
             />
-            {errors.email && (
-              <span style={errorTextStyle}>
-                ⚠️ {errors.email}
-              </span>
-            )}
+            {errors.email && <span style={errorTextStyle}>⚠️ {errors.email}</span>}
           </div>
           
           <div>
-            <input
-              name="password"
-              type="password"
-              required
-              placeholder="Password"
-              value={formData.password}
-              onChange={handleChange}
-              style={inputStyle(errors.password)}
-              onFocus={(e) => e.target.style.borderColor = appTheme.colors.primary}
-              onBlur={(e) => e.target.style.borderColor = errors.password ? appTheme.colors.error : "#ddd"}
-            />
-            {errors.password && (
-              <span style={errorTextStyle}>
-                ⚠️ {errors.password}
-              </span>
-            )}
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "8px",
+            }}>
+              <label style={{
+                color: appTheme.colors.textSecondary,
+                fontSize: "14px",
+                fontWeight: "500",
+              }}>
+                Password
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: appTheme.colors.primary,
+                  fontSize: "12px",
+                  cursor: "pointer",
+                  padding: "4px 8px",
+                  borderRadius: "4px",
+                  transition: "background-color 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = appTheme.colors.primary + "10";
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = "transparent";
+                }}
+              >
+                {showPassword ? '👁️ Hide' : '👁️ Show'}
+              </button>
+            </div>
+            <div style={{ position: "relative" }}>
+              <input
+                name="password"
+                type={showPassword ? "text" : "password"}
+                required
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={handleChange}
+                style={inputStyle(errors.password)}
+                disabled={loading}
+                autoComplete="current-password"
+              />
+            </div>
+            {errors.password && <span style={errorTextStyle}>⚠️ {errors.password}</span>}
           </div>
-
-          <div style={{ textAlign: "right", marginTop: "-10px" }}>
+          
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "10px",
+          }}>
+            <label style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              cursor: "pointer",
+              userSelect: "none",
+            }}>
+              <input
+                name="rememberMe"
+                type="checkbox"
+                checked={formData.rememberMe}
+                onChange={handleChange}
+                style={{
+                  width: "18px",
+                  height: "18px",
+                  cursor: "pointer",
+                }}
+                disabled={loading}
+              />
+              <span style={{
+                color: appTheme.colors.textSecondary,
+                fontSize: "14px",
+              }}>
+                Remember me
+              </span>
+            </label>
+            
             <Link 
-              href="/forgotPass" 
+              href="/forgot-password" 
               style={{
                 color: appTheme.colors.primary,
                 textDecoration: "none",
                 fontSize: "14px",
                 fontWeight: "500",
-                transition: "color 0.3s",
+                transition: "all 0.2s ease",
+                padding: "4px 8px",
+                borderRadius: "4px",
               }}
-              onMouseEnter={(e) => e.target.style.color = appTheme.colors.primaryDark}
-              onMouseLeave={(e) => e.target.style.color = appTheme.colors.primary}
+              onMouseEnter={(e) => {
+                e.target.style.textDecoration = "underline";
+                e.target.style.backgroundColor = appTheme.colors.primary + "10";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.textDecoration = "none";
+                e.target.style.backgroundColor = "transparent";
+              }}
             >
-              Forgot your password?
+              Forgot password?
             </Link>
           </div>
 
           {message.text && (
             <div
               style={{
-                padding: "12px 16px",
+                padding: "14px 16px",
                 borderRadius: "10px",
-                backgroundColor: message.type === 'success' 
-                  ? '#f0f9f0' 
-                  : '#fef2f2',
-                color: message.type === 'success' 
-                  ? '#059669' 
-                  : appTheme.colors.error,
+                backgroundColor: message.type === 'success' ? '#f0f9f0' : 
+                               message.type === 'warning' ? '#fff3cd' : '#fef2f2',
+                color: message.type === 'success' ? '#059669' : 
+                      message.type === 'warning' ? '#856404' : appTheme.colors.error,
                 fontSize: "14px",
-                border: `1px solid ${message.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
-                textAlign: "left",
+                border: `1px solid ${message.type === 'success' ? '#bbf7d0' : 
+                        message.type === 'warning' ? '#ffeaa7' : '#fecaca'}`,
                 display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                animation: "fadeIn 0.3s ease-in",
+                alignItems: "flex-start",
+                gap: "10px",
               }}
             >
-              <span style={{ fontSize: "16px" }}>
+              <span style={{ 
+                fontSize: "16px",
+                flexShrink: 0,
+                marginTop: "1px",
+              }}>
                 {message.type === 'success' ? '✅' : 
-                 message.text.includes('⚠️') ? '⚠️' : '❌'}
+                 message.type === 'warning' ? '⚠️' : '❌'}
               </span>
-              {message.text}
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, lineHeight: "1.5" }}>
+                  {message.text}
+                </p>
+              </div>
             </div>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            style={{
-              backgroundColor: appTheme.colors.primary,
-              color: "#fff",
-              padding: "14px",
-              border: "none",
-              borderRadius: "12px",
-              fontSize: "16px",
-              cursor: loading ? "not-allowed" : "pointer",
-              transition: "all 0.3s",
-              fontWeight: "600",
-              marginTop: "10px",
-              opacity: loading ? 0.7 : 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-            }}
-            onMouseOver={(e) => {
+            style={buttonStyle}
+            onMouseEnter={(e) => {
               if (!loading) {
-                e.target.style.backgroundColor = '#4338ca';
-                e.target.style.transform = 'translateY(-1px)';
-                e.target.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.3)';
+                e.target.style.opacity = "0.9";
+                e.target.style.transform = "translateY(-1px)";
               }
             }}
-            onMouseOut={(e) => {
+            onMouseLeave={(e) => {
               if (!loading) {
-                e.target.style.backgroundColor = appTheme.colors.primary;
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = 'none';
+                e.target.style.opacity = "1";
+                e.target.style.transform = "translateY(0)";
               }
             }}
           >
             {loading ? (
               <>
-                <span className="spinner" style={{
-                  width: "16px",
-                  height: "16px",
+                <span style={{
+                  width: "18px",
+                  height: "18px",
                   border: "2px solid rgba(255,255,255,0.3)",
                   borderTopColor: "#fff",
                   borderRadius: "50%",
                   animation: "spin 0.8s linear infinite",
                 }} />
-                Signing in...
+                Signing In...
               </>
-            ) : 'Sign in'}
+            ) : 'Sign In'}
           </button>
 
+          {/* Demo Login Buttons (Development Only) */}
+          {process.env.NODE_ENV === 'development' && (
+            <div style={{
+              marginTop: "10px",
+            }}>
+              <p style={{
+                color: appTheme.colors.textSecondary,
+                fontSize: "12px",
+                textAlign: "center",
+                marginBottom: "10px",
+              }}>
+                🧪 Development Demo:
+              </p>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: "8px",
+              }}>
+                {['user', 'manager', 'admin'].map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => handleDemoLogin(role)}
+                    disabled={loading}
+                    style={{
+                      padding: "10px",
+                      border: `1px solid ${appTheme.colors.border}`,
+                      borderRadius: "8px",
+                      backgroundColor: appTheme.colors.surface,
+                      color: appTheme.colors.textSecondary,
+                      fontSize: "12px",
+                      cursor: loading ? "not-allowed" : "pointer",
+                      transition: "all 0.2s ease",
+                      textTransform: "capitalize",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!loading) {
+                        e.target.style.backgroundColor = appTheme.colors.primary + "10";
+                        e.target.style.borderColor = appTheme.colors.primary;
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!loading) {
+                        e.target.style.backgroundColor = appTheme.colors.surface;
+                        e.target.style.borderColor = appTheme.colors.border;
+                      }
+                    }}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div style={{ 
-            marginTop: "24px", 
-            paddingTop: "24px", 
-            borderTop: `1px solid ${appTheme.colors.border}` 
+            marginTop: "30px", 
+            paddingTop: "25px", 
+            borderTop: `1px solid ${appTheme.colors.border}`,
+            textAlign: "center"
           }}>
             <p style={{
               color: appTheme.colors.textSecondary,
@@ -463,54 +692,78 @@ export default function Login() {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "6px",
-                transition: "all 0.3s",
-                padding: "8px 16px",
+                padding: "10px 20px",
                 borderRadius: "8px",
                 border: `1.5px solid ${appTheme.colors.primary}30`,
+                transition: "all 0.2s ease",
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = `${appTheme.colors.primary}10`;
-                e.target.style.paddingLeft = "20px";
-                e.target.style.paddingRight = "20px";
+                e.target.style.backgroundColor = appTheme.colors.primary + "10";
+                e.target.style.transform = "translateX(2px)";
               }}
               onMouseLeave={(e) => {
                 e.target.style.backgroundColor = "transparent";
-                e.target.style.paddingLeft = "16px";
-                e.target.style.paddingRight = "16px";
+                e.target.style.transform = "translateX(0)";
               }}
             >
-              Create an account →
+              Create Account →
             </Link>
           </div>
         </form>
 
+        <div style={{
+          marginTop: "30px",
+          padding: "16px",
+          backgroundColor: appTheme.colors.background,
+          borderRadius: "10px",
+          border: `1px solid ${appTheme.colors.border}`,
+        }}>
+          <p style={{
+            color: appTheme.colors.textSecondary,
+            fontSize: "12px",
+            lineHeight: "1.5",
+            margin: 0,
+            textAlign: "center",
+          }}>
+            🔒 Your security is our priority. We use industry-standard encryption
+            to protect your data.
+          </p>
+        </div>
+
         <p
           style={{
-            marginTop: "40px",
+            marginTop: "30px",
             color: appTheme.colors.textSecondary,
             fontSize: "12px",
             paddingTop: "20px",
             borderTop: `1px solid ${appTheme.colors.border}`,
+            textAlign: "center",
           }}
         >
           © {new Date().getFullYear()} Steponext. All rights reserved.
         </p>
       </div>
 
-      {/* Add CSS animations */}
       <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-5px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
         
         input:focus {
-          box-shadow: 0 0 0 3px ${appTheme.colors.primary}20;
           border-color: ${appTheme.colors.primary} !important;
+          box-shadow: 0 0 0 3px ${appTheme.colors.primary}20;
+        }
+        
+        input:disabled, button:disabled {
+          background-color: ${appTheme.colors.background};
+          cursor: not-allowed;
+          opacity: 0.6;
+        }
+        
+        @media (max-width: 480px) {
+          .container {
+            padding: 20px;
+          }
         }
       `}</style>
     </div>

@@ -6,8 +6,8 @@ const workingHoursSchema = new mongoose.Schema({
     enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
     required: true
   },
-  startTime: { type: String, required: true }, // "09:00"
-  endTime: { type: String, required: true },   // "18:00"
+  startTime: { type: String, required: true },
+  endTime: { type: String, required: true },
   isAvailable: { type: Boolean, default: true },
   breaks: [{
     startTime: String,
@@ -16,7 +16,7 @@ const workingHoursSchema = new mongoose.Schema({
   }]
 });
 
-const professionalSchema = new mongoose.Schema({
+const bookingmngSchema = new mongoose.Schema({
   // Basic Info
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -50,7 +50,7 @@ const professionalSchema = new mongoose.Schema({
     trim: true
   }],
   experience: {
-    type: Number, // in years
+    type: Number,
     default: 0
   },
   
@@ -140,7 +140,7 @@ const professionalSchema = new mongoose.Schema({
   
   // Settings
   bookingBuffer: {
-    type: Number, // minutes between bookings
+    type: Number,
     default: 15
   },
   maxDailyBookings: {
@@ -158,7 +158,11 @@ const professionalSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  featured: {
+  isVerified: {
+    type: Boolean,
+    default: false
+  },
+  isFeatured: {
     type: Boolean,
     default: false
   },
@@ -172,11 +176,12 @@ const professionalSchema = new mongoose.Schema({
 });
 
 // Indexes
-professionalSchema.index({ userId: 1 });
-professionalSchema.index({ verificationStatus: 1 });
-professionalSchema.index({ category: 1, type: 1 });
-professionalSchema.index({ 'address.city': 1, 'address.state': 1 });
-professionalSchema.index({ rating: -1 });
-professionalSchema.index({ isActive: 1 });
+bookingmngSchema.index({ userId: 1 });
+bookingmngSchema.index({ verificationStatus: 1 });
+bookingmngSchema.index({ category: 1, type: 1 });
+bookingmngSchema.index({ 'address.city': 1, 'address.state': 1 });
+bookingmngSchema.index({ rating: -1 });
+bookingmngSchema.index({ isActive: 1 });
+bookingmngSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model('Professional', professionalSchema);
+module.exports = mongoose.models.Bookingmng || mongoose.model('Bookingmng', bookingmngSchema);

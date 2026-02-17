@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import connectDB from '@/lib/db';
+import { connectDB } from "@/utils/db";
 import Service from '@/models/Service';
-import Professional from '@/models/Professional';
 
 // GET ALL Services with filters
 export async function GET(request) {
@@ -14,8 +13,7 @@ export async function GET(request) {
     const search = searchParams.get('search') || '';
     const category = searchParams.get('category') || '';
     const type = searchParams.get('type') || '';
-    const professionalId = searchParams.get('professionalId') || '';
-    const status = searchParams.get('status') || 'active'; // active, inactive, all
+    const status = searchParams.get('status') || 'all';
     
     const skip = (page - 1) * limit;
     
@@ -31,54 +29,61 @@ export async function GET(request) {
     }
     
     // Category filter
-    if (category && category !== 'all') {
+    if (category && category !== 'all' && category !== '') {
       query.category = category;
     }
     
     // Type filter
-    if (type && type !== 'all') {
+    if (type && type !== 'all' && type !== '') {
       query.type = type;
     }
     
-    // Professional filter
-    if (professionalId) {
-      query.professionalId = professionalId;
-    }
-    
     // Status filter
-    if (status === 'active') {
-      query.isActive = true;
-    } else if (status === 'inactive') {
-      query.isActive = false;
+    if (status && status !== 'all') {
+      if (status === 'active') {
+        query.isActive = true;
+      } else if (status === 'inactive') {
+        query.isActive = false;
+      }
     }
-    // 'all' shows both active and inactive
     
     // Get total count
     const total = await Service.countDocuments(query);
     
-    // Get services with professional details
+    // Get services
     const services = await Service.find(query)
       .skip(skip)
       .limit(limit)
-      .sort({ popularity: -1, createdAt: -1 })
-      .populate('professionalId', 'businessName category phone email')
+      .sort({ createdAt: -1 })
       .lean();
+    
+    // Format the response data
+    const formattedServices = services.map(service => ({
+      ...service,
+      _id: service._id.toString(),
+      createdAt: service.createdAt?.toISOString(),
+      updatedAt: service.updatedAt?.toISOString()
+    }));
     
     return NextResponse.json({
       success: true,
-      data: services,
+      data: formattedServices,
       pagination: {
         page,
         limit,
         total,
         pages: Math.ceil(total / limit)
       }
-    });
+    }, { status: 200 });
     
   } catch (error) {
     console.error('Error fetching services:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { 
+        success: false, 
+        error: 'Failed to fetch services',
+        message: error.message 
+      },
       { status: 500 }
     );
   }
@@ -91,50 +96,84 @@ export async function POST(request) {
     
     const body = await request.json();
     
-    // Check if professional exists
-    const professional = await Professional.findById(body.professionalId);
-    if (!professional) {
+    // Validate required fields
+    if (!body.name || !body.category || !body.basePrice) {
       return NextResponse.json(
-        { success: false, error: 'Professional not found' },
-        { status: 404 }
+        { 
+          success: false, 
+          error: 'Missing required fields',
+          required: ['name', 'category', 'basePrice']
+        },
+        { status: 400 }
       );
     }
     
-    // Set default values
+    // Set default values matching your Service model
     const serviceData = {
-      ...body,
-      isActive: true,
-      totalBookings: 0,
-      popularity: 0,
+      name: body.name,
+      description: body.description || '',
+      category: body.category,
+      type: body.type || 'physical',
+      subcategory: body.subcategory || '',
+      basePrice: body.basePrice,
+      currency: body.currency || 'INR',
+      duration: body.duration || 60,
+      isActive: body.isActive !== undefined ? body.isActive : true,
+      
+      // Optional fields
+      variations: body.variations || [],
+      addons: body.addons || [],
+      bufferTime: body.bufferTime || 0,
+      advanceBooking: body.advanceBooking || 30,
+      
+      // Arrays
+      images: body.images || [],
       tags: body.tags || [],
       clientRequirements: body.clientRequirements || [],
       professionalProvides: body.professionalProvides || [],
-      variations: body.variations || [],
-      addons: body.addons || [],
-      images: body.images || [],
-      currency: body.currency || 'USD'
+      
+      // Restrictions
+      minAge: body.minAge || null,
+      maxAge: body.maxAge || null,
+      genderPreference: body.genderPreference || 'any',
+      
+      // Stats (always start at 0)
+      totalBookings: 0,
+      popularity: 0
     };
     
     // Create service
     const service = new Service(serviceData);
     await service.save();
     
-    // Add service to professional's services array
-    await Professional.findByIdAndUpdate(
-      body.professionalId,
-      { $push: { services: service._id } }
-    );
-    
     return NextResponse.json({
       success: true,
-      data: service,
+      data: {
+        ...service.toObject(),
+        _id: service._id.toString(),
+        createdAt: service.createdAt?.toISOString(),
+        updatedAt: service.updatedAt?.toISOString()
+      },
       message: 'Service created successfully'
     }, { status: 201 });
     
   } catch (error) {
     console.error('Error creating service:', error);
+    
+    // Handle duplicate key error
+    if (error.code === 11000) {
+      return NextResponse.json(
+        { success: false, error: 'Service with this name already exists' },
+        { status: 409 }
+      );
+    }
+    
     return NextResponse.json(
-      { success: false, error: error.message },
+      { 
+        success: false, 
+        error: 'Failed to create service',
+        message: error.message 
+      },
       { status: 500 }
     );
   }
@@ -147,7 +186,7 @@ export async function PATCH(request) {
     
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    const action = searchParams.get('action'); // 'activate', 'deactivate', 'feature', 'update'
+    const action = searchParams.get('action');
     
     if (!id) {
       return NextResponse.json(
@@ -160,29 +199,28 @@ export async function PATCH(request) {
     
     let updateData = {};
     
-    switch (action) {
-      case 'activate':
-        updateData = { isActive: true };
-        break;
-        
-      case 'deactivate':
-        updateData = { isActive: false };
-        break;
-        
-      case 'feature':
-        updateData = { featured: body.featured || true };
-        break;
-        
-      default:
-        // General update
-        updateData = body;
+    // Handle different actions
+    if (action === 'activate') {
+      updateData = { isActive: true };
+    } else if (action === 'deactivate') {
+      updateData = { isActive: false };
+    } else {
+      // General update - remove fields that shouldn't be updated directly
+      const { _id, totalBookings, popularity, createdAt, updatedAt, ...updateFields } = body;
+      updateData = updateFields;
     }
+    
+    // Add updated timestamp
+    updateData.updatedAt = new Date();
     
     const service = await Service.findByIdAndUpdate(
       id,
       updateData,
-      { new: true, runValidators: true }
-    ).populate('professionalId', 'businessName category phone email');
+      { 
+        new: true, 
+        runValidators: true 
+      }
+    );
     
     if (!service) {
       return NextResponse.json(
@@ -193,14 +231,38 @@ export async function PATCH(request) {
     
     return NextResponse.json({
       success: true,
-      data: service,
-      message: action ? `Service ${action}d successfully` : 'Service updated successfully'
-    });
+      data: {
+        ...service.toObject(),
+        _id: service._id.toString(),
+        createdAt: service.createdAt?.toISOString(),
+        updatedAt: service.updatedAt?.toISOString()
+      },
+      message: action 
+        ? `Service ${action}d successfully` 
+        : 'Service updated successfully'
+    }, { status: 200 });
     
   } catch (error) {
     console.error('Error updating service:', error);
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Validation failed',
+          details: error.errors 
+        },
+        { status: 400 }
+      );
+    }
+    
     return NextResponse.json(
-      { success: false, error: error.message },
+      { 
+        success: false, 
+        error: 'Failed to update service',
+        message: error.message 
+      },
       { status: 500 }
     );
   }
@@ -221,8 +283,9 @@ export async function DELETE(request) {
       );
     }
     
-    // Get service first to know the professional
-    const service = await Service.findById(id);
+    // Delete the service
+    const service = await Service.findByIdAndDelete(id);
+    
     if (!service) {
       return NextResponse.json(
         { success: false, error: 'Service not found' },
@@ -230,25 +293,31 @@ export async function DELETE(request) {
       );
     }
     
-    // Remove service from professional's services array
-    await Professional.findByIdAndUpdate(
-      service.professionalId,
-      { $pull: { services: service._id } }
-    );
-    
-    // Delete the service
-    await Service.findByIdAndDelete(id);
-    
     return NextResponse.json({
       success: true,
-      message: 'Service deleted successfully'
-    });
+      message: 'Service deleted successfully',
+      data: { id: id.toString() }
+    }, { status: 200 });
     
   } catch (error) {
     console.error('Error deleting service:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { 
+        success: false, 
+        error: 'Failed to delete service',
+        message: error.message 
+      },
       { status: 500 }
     );
   }
+}
+
+// OPTIONS request for CORS
+export async function OPTIONS() {
+  return NextResponse.json({}, { 
+    status: 200,
+    headers: {
+      'Allow': 'GET, POST, PATCH, DELETE, OPTIONS'
+    }
+  });
 }

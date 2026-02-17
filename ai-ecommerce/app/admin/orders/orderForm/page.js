@@ -24,6 +24,7 @@ const CreateOrderPage = () => {
 
   const fetchProducts = async () => {
     try {
+      setLoading(true);
       const response = await fetch('/api/products');
       const data = await response.json();
       if (data.success) {
@@ -33,6 +34,8 @@ const CreateOrderPage = () => {
       }
     } catch (error) {
       console.error('Error fetching products:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -229,27 +232,29 @@ const CreateOrderPage = () => {
   return (
     <>
       <Head>
-        <title>Create New Order | PosterPro</title>
+        <title>Create New Order | LFMS</title>
         <meta name="description" content="Create a new order" />
       </Head>
 
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Create New Order</h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Create a new customer order manually
-            </p>
-          </div>
+      <div className="create-order-container">
+        {/* Header */}
+        <div className="page-header">
+          <h1 className="page-title">Create New Order</h1>
+          <p className="page-subtitle">
+            Create a new customer order manually
+          </p>
+        </div>
 
-          {/* Form */}
-          <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              {/* Customer Information */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <label htmlFor="customerName" className="block text-sm font-medium text-gray-700 mb-2">
+        {/* Form */}
+        <div className="form-card">
+          <form onSubmit={handleSubmit} className="form-content">
+            {/* Customer Information */}
+            <div className="form-section">
+              <h2 className="form-section-title">Customer Information</h2>
+              
+              <div className="form-grid">
+                <div className="form-group">
+                  <label htmlFor="customerName" className="form-label">
                     Customer Name *
                   </label>
                   <input
@@ -259,18 +264,16 @@ const CreateOrderPage = () => {
                     required
                     value={formData.customerName}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.customerName ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`form-input ${errors.customerName ? 'input-error' : ''}`}
                     placeholder="Enter customer full name"
                   />
                   {errors.customerName && (
-                    <p className="mt-1 text-sm text-red-600">{errors.customerName}</p>
+                    <p className="form-error">{errors.customerName}</p>
                   )}
                 </div>
 
-                <div>
-                  <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="form-group">
+                  <label htmlFor="phoneNumber" className="form-label">
                     Phone Number *
                   </label>
                   <input
@@ -280,18 +283,16 @@ const CreateOrderPage = () => {
                     required
                     value={formData.phoneNumber}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.phoneNumber ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`form-input ${errors.phoneNumber ? 'input-error' : ''}`}
                     placeholder="Enter primary phone number"
                   />
                   {errors.phoneNumber && (
-                    <p className="mt-1 text-sm text-red-600">{errors.phoneNumber}</p>
+                    <p className="form-error">{errors.phoneNumber}</p>
                   )}
                 </div>
 
-                <div>
-                  <label htmlFor="secondaryPhoneNumber" className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="form-group">
+                  <label htmlFor="secondaryPhoneNumber" className="form-label">
                     Secondary Phone (Optional)
                   </label>
                   <input
@@ -300,20 +301,16 @@ const CreateOrderPage = () => {
                     name="secondaryPhoneNumber"
                     value={formData.secondaryPhoneNumber}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.secondaryPhoneNumber ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`form-input ${errors.secondaryPhoneNumber ? 'input-error' : ''}`}
                     placeholder="Enter secondary phone number"
                   />
                   {errors.secondaryPhoneNumber && (
-                    <p className="mt-1 text-sm text-red-600">{errors.secondaryPhoneNumber}</p>
+                    <p className="form-error">{errors.secondaryPhoneNumber}</p>
                   )}
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label htmlFor="pincode" className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="form-group">
+                  <label htmlFor="pincode" className="form-label">
                     Pincode *
                   </label>
                   <input
@@ -324,18 +321,16 @@ const CreateOrderPage = () => {
                     maxLength={6}
                     value={formData.pincode}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.pincode ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`form-input ${errors.pincode ? 'input-error' : ''}`}
                     placeholder="Enter 6-digit pincode"
                   />
                   {errors.pincode && (
-                    <p className="mt-1 text-sm text-red-600">{errors.pincode}</p>
+                    <p className="form-error">{errors.pincode}</p>
                   )}
                 </div>
 
-                <div className="md:col-span-2">
-                  <label htmlFor="shippingAddress" className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="form-group full-width">
+                  <label htmlFor="shippingAddress" className="form-label">
                     Shipping Address *
                   </label>
                   <textarea
@@ -345,173 +340,606 @@ const CreateOrderPage = () => {
                     rows={3}
                     value={formData.shippingAddress}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.shippingAddress ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`form-textarea ${errors.shippingAddress ? 'input-error' : ''}`}
                     placeholder="Enter complete shipping address with door number, street, area, city, state"
                   />
                   {errors.shippingAddress && (
-                    <p className="mt-1 text-sm text-red-600">{errors.shippingAddress}</p>
+                    <p className="form-error">{errors.shippingAddress}</p>
                   )}
                 </div>
               </div>
+            </div>
 
-              {/* Order Items */}
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">Order Items</h3>
-                  <button
-                    type="button"
-                    onClick={addItem}
-                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Add Item
-                  </button>
-                </div>
+            {/* Order Items */}
+            <div className="form-section">
+              <div className="section-header">
+                <h2 className="form-section-title">Order Items</h2>
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="add-button"
+                >
+                  <span className="button-icon">+</span>
+                  Add Item
+                </button>
+              </div>
 
-                <div className="space-y-4">
-                  {formData.items.map((item, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Product *
-                          </label>
-                          <select
-                            value={item.productId}
-                            onChange={(e) => handleItemChange(index, 'productId', e.target.value)}
-                            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                              errors[`item_${index}_product`] ? 'border-red-500' : 'border-gray-300'
-                            }`}
-                            required
-                          >
-                            <option value="">Select a product</option>
-                            {products.map(product => (
-                              <option 
-                                key={product._id} 
-                                value={product._id}
-                                disabled={product.stock === 0}
-                              >
-                                {product.productName} - ₹{product.price} 
-                                {product.stock === 0 ? ' (Out of Stock)' : ` (Stock: ${product.stock})`}
-                              </option>
-                            ))}
-                          </select>
-                          {errors[`item_${index}_product`] && (
-                            <p className="mt-1 text-sm text-red-600">{errors[`item_${index}_product`]}</p>
-                          )}
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Quantity *
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max={item.productId ? getAvailableStock(item.productId) : 999}
-                            value={item.quantity}
-                            onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                              errors[`item_${index}_quantity`] ? 'border-red-500' : 'border-gray-300'
-                            }`}
-                            required
-                          />
-                          {errors[`item_${index}_quantity`] && (
-                            <p className="mt-1 text-sm text-red-600">{errors[`item_${index}_quantity`]}</p>
-                          )}
-                          {item.productId && (
-                            <p className="mt-1 text-xs text-gray-500">
-                              Available: {getAvailableStock(item.productId)} units
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex items-end space-x-2">
-                          <div className="flex-1">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Price
-                            </label>
-                            <div className="px-3 py-2 bg-white rounded-md border border-gray-300 font-medium">
-                              ₹{item.price * item.quantity}
-                            </div>
-                          </div>
-                          
-                          {formData.items.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeItem(index)}
-                              className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-md transition-colors"
-                              title="Remove item"
+              <div className="items-container">
+                {formData.items.map((item, index) => (
+                  <div key={index} className="item-card">
+                    <div className="item-grid">
+                      <div className="item-group product-select">
+                        <label className="form-label">
+                          Product *
+                        </label>
+                        <select
+                          value={item.productId}
+                          onChange={(e) => handleItemChange(index, 'productId', e.target.value)}
+                          className={`form-select ${errors[`item_${index}_product`] ? 'input-error' : ''}`}
+                          required
+                        >
+                          <option value="">Select a product</option>
+                          {products.map(product => (
+                            <option 
+                              key={product._id} 
+                              value={product._id}
+                              disabled={product.stock === 0}
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          )}
+                              {product.productName} - ₹{product.price} 
+                              {product.stock === 0 ? ' (Out of Stock)' : ` (Stock: ${product.stock})`}
+                            </option>
+                          ))}
+                        </select>
+                        {errors[`item_${index}_product`] && (
+                          <p className="form-error">{errors[`item_${index}_product`]}</p>
+                        )}
+                      </div>
+
+                      <div className="item-group quantity-input">
+                        <label className="form-label">
+                          Quantity *
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max={item.productId ? getAvailableStock(item.productId) : 999}
+                          value={item.quantity}
+                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                          className={`form-input ${errors[`item_${index}_quantity`] ? 'input-error' : ''}`}
+                          required
+                        />
+                        {errors[`item_${index}_quantity`] && (
+                          <p className="form-error">{errors[`item_${index}_quantity`]}</p>
+                        )}
+                        {item.productId && (
+                          <p className="stock-info">
+                            Available: {getAvailableStock(item.productId)} units
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="item-group price-display">
+                        <label className="form-label">
+                          Price
+                        </label>
+                        <div className="price-box">
+                          ₹{item.price * item.quantity}
                         </div>
                       </div>
-                      
-                      {item.productName && (
-                        <div className="mt-2 text-sm text-gray-600">
-                          Selected: <strong>{item.productName}</strong> • Unit Price: ₹{item.price}
+
+                      {formData.items.length > 1 && (
+                        <div className="item-group remove-button">
+                          <button
+                            type="button"
+                            onClick={() => removeItem(index)}
+                            className="remove-btn"
+                            title="Remove item"
+                          >
+                            <span className="remove-icon">×</span>
+                          </button>
                         </div>
                       )}
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Order Summary */}
-              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h4 className="text-lg font-medium text-gray-900">Order Total</h4>
-                    <p className="text-sm text-gray-600">Including all items and quantities</p>
+                    
+                    {item.productName && (
+                      <div className="item-info">
+                        Selected: <strong>{item.productName}</strong> • Unit Price: ₹{item.price}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    ₹{calculateTotal()}
-                  </div>
-                </div>
-                <div className="mt-2 text-sm text-gray-600">
-                  {formData.items.reduce((total, item) => total + item.quantity, 0)} items • {formData.items.length} product(s)
-                </div>
+                ))}
               </div>
+            </div>
 
-              {/* Form Actions */}
-              <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => router.back()}
-                  disabled={loading}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Creating Order...
-                    </>
-                  ) : (
-                    'Create Order'
-                  )}
-                </button>
+            {/* Order Summary */}
+            <div className="order-summary">
+              <div className="summary-content">
+                <div>
+                  <h3 className="summary-title">Order Total</h3>
+                  <p className="summary-subtitle">Including all items and quantities</p>
+                </div>
+                <div className="total-amount">
+                  ₹{calculateTotal()}
+                </div>
               </div>
-            </form>
-          </div>
+              <div className="summary-details">
+                {formData.items.reduce((total, item) => total + item.quantity, 0)} items • {formData.items.length} product(s)
+              </div>
+            </div>
+
+            {/* Form Actions */}
+            <div className="form-actions">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                disabled={loading}
+                className="cancel-button"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="submit-button"
+              >
+                {loading ? (
+                  <>
+                    <span className="spinner"></span>
+                    Creating Order...
+                  </>
+                ) : (
+                  'Create Order'
+                )}
+              </button>
+            </div>
+          </form>
         </div>
+
+        <style jsx>{`
+          /* Container Styles */
+          .create-order-container {
+            padding: 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+          }
+
+          /* Page Header */
+          .page-header {
+            margin-bottom: 2rem;
+          }
+
+          .page-title {
+            font-size: clamp(1.5rem, 3vw, 2rem);
+            font-weight: bold;
+            color: #1f2937;
+            margin: 0;
+          }
+
+          .page-subtitle {
+            margin-top: 0.5rem;
+            color: #6b7280;
+            font-size: 0.95rem;
+          }
+
+          /* Form Card */
+          .form-card {
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+          }
+
+          .form-content {
+            padding: 1.5rem;
+          }
+
+          /* Form Sections */
+          .form-section {
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+          }
+
+          .form-section:last-child {
+            border-bottom: none;
+          }
+
+          .form-section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 1.5rem;
+          }
+
+          .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+          }
+
+          /* Form Grid */
+          .form-grid {
+            display: grid;
+            grid-template-columns: repeat(1, 1fr);
+            gap: 1rem;
+          }
+
+          @media (min-width: 640px) {
+            .form-grid {
+              grid-template-columns: repeat(2, 1fr);
+            }
+          }
+
+          @media (min-width: 1024px) {
+            .form-grid {
+              grid-template-columns: repeat(3, 1fr);
+            }
+          }
+
+          .full-width {
+            grid-column: 1 / -1;
+          }
+
+          /* Form Groups */
+          .form-group {
+            margin-bottom: 1rem;
+          }
+
+          .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 0.375rem;
+          }
+
+          /* Form Inputs */
+          .form-input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            transition: all 0.15s ease;
+            background: white;
+          }
+
+          .form-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+          }
+
+          .form-textarea {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            transition: all 0.15s ease;
+            background: white;
+            resize: vertical;
+            min-height: 80px;
+          }
+
+          .form-textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+          }
+
+          .form-select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            transition: all 0.15s ease;
+            background: white;
+            cursor: pointer;
+          }
+
+          .form-select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+          }
+
+          .input-error {
+            border-color: #ef4444;
+          }
+
+          .input-error:focus {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+          }
+
+          /* Error Messages */
+          .form-error {
+            margin-top: 0.25rem;
+            font-size: 0.75rem;
+            color: #ef4444;
+          }
+
+          /* Add Button */
+          .add-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            background: #10b981;
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+          }
+
+          .add-button:hover {
+            background: #059669;
+          }
+
+          .button-icon {
+            font-size: 1rem;
+            font-weight: bold;
+          }
+
+          /* Items Container */
+          .items-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+          }
+
+          .item-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+          }
+
+          .item-grid {
+            display: grid;
+            grid-template-columns: repeat(1, 1fr);
+            gap: 1rem;
+          }
+
+          @media (min-width: 768px) {
+            .item-grid {
+              grid-template-columns: 2fr 1fr 1fr auto;
+              align-items: end;
+            }
+          }
+
+          .item-group {
+            margin-bottom: 0;
+          }
+
+          .product-select {
+            grid-column: 1 / -1;
+          }
+
+          @media (min-width: 768px) {
+            .product-select {
+              grid-column: span 1;
+            }
+          }
+
+          .price-box {
+            padding: 0.5rem 0.75rem;
+            background: white;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            color: #374151;
+          }
+
+          /* Remove Button */
+          .remove-btn {
+            width: 2.25rem;
+            height: 2.25rem;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 0.375rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+            padding: 0;
+          }
+
+          .remove-btn:hover {
+            background: #dc2626;
+          }
+
+          .remove-icon {
+            font-size: 1.25rem;
+            font-weight: bold;
+            line-height: 1;
+          }
+
+          .remove-button {
+            display: flex;
+            align-items: flex-end;
+            height: 100%;
+          }
+
+          .item-info {
+            margin-top: 0.75rem;
+            font-size: 0.875rem;
+            color: #6b7280;
+          }
+
+          .stock-info {
+            margin-top: 0.25rem;
+            font-size: 0.75rem;
+            color: #6b7280;
+          }
+
+          /* Order Summary */
+          .order-summary {
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 1.5rem 0;
+          }
+
+          .summary-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+          }
+
+          .summary-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin: 0;
+          }
+
+          .summary-subtitle {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin: 0.25rem 0 0;
+          }
+
+          .total-amount {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1f2937;
+          }
+
+          .summary-details {
+            font-size: 0.875rem;
+            color: #6b7280;
+          }
+
+          /* Form Actions */
+          .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e5e7eb;
+          }
+
+          .cancel-button {
+            padding: 0.5rem 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            background: white;
+            color: #374151;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          }
+
+          .cancel-button:hover {
+            background: #f9fafb;
+          }
+
+          .cancel-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+
+          .submit-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1.5rem;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+          }
+
+          .submit-button:hover {
+            background: #2563eb;
+          }
+
+          .submit-button:disabled {
+            background: #93c5fd;
+            cursor: not-allowed;
+          }
+
+          /* Spinner */
+          .spinner {
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+          }
+
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+
+          /* Loading State */
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+          }
+
+          .loading {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+          }
+
+          /* Mobile Optimizations */
+          @media (max-width: 768px) {
+            .create-order-container {
+              padding: 1rem;
+            }
+            
+            .form-content {
+              padding: 1rem;
+            }
+            
+            .form-actions {
+              flex-direction: column-reverse;
+            }
+            
+            .form-actions button {
+              width: 100%;
+            }
+            
+            .item-card {
+              padding: 0.75rem;
+            }
+          }
+
+          @media (max-width: 640px) {
+            .form-grid {
+              grid-template-columns: 1fr;
+            }
+            
+            .section-header {
+              flex-direction: column;
+              align-items: stretch;
+              gap: 1rem;
+            }
+            
+            .add-button {
+              align-self: flex-start;
+            }
+          }
+        `}</style>
       </div>
     </>
   );

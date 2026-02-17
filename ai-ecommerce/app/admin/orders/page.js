@@ -12,7 +12,29 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isMobile, setIsMobile] = useState(false);
   const itemsPerPage = 5;
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    
+    let resizeTimeout;
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(checkMobile, 150);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimeout);
+    };
+  }, []);
 
   const fetchOrders = async () => {
     try {
@@ -30,7 +52,7 @@ export default function OrdersPage() {
     fetchOrders();
   }, []);
 
-  // Filter logic - updated to include customerName and secondaryPhoneNumber
+  // Filter logic
   const filteredOrders = useMemo(() => {
     if (!searchTerm) return orders;
     
@@ -86,11 +108,10 @@ export default function OrdersPage() {
     }
   };
 
-  // PDF Download - updated to include customerName and secondaryPhoneNumber
+  // PDF Download
   const downloadPDF = () => {
     const doc = new jsPDF();
     
-    // Add title
     doc.setFontSize(18);
     doc.setTextColor(
       parseInt(appTheme.colors.primary.slice(1, 3), 16),
@@ -103,7 +124,6 @@ export default function OrdersPage() {
     doc.setTextColor(100);
     doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 30);
 
-    // Prepare table data - updated columns
     const tableColumn = ["Order #", "Customer Name", "Primary Phone", "Secondary Phone", "Address", "Total", "Status", "Payment"];
     const tableRows = filteredOrders.map((order) => [
       order.orderNumber || "N/A",
@@ -146,7 +166,7 @@ export default function OrdersPage() {
     doc.save("orders_report.pdf");
   };
 
-  // Excel Download - updated to include customerName and secondaryPhoneNumber
+  // Excel Download
   const downloadExcel = () => {
     const worksheetData = filteredOrders.map(order => ({
       "Order Number": order.orderNumber,
@@ -164,25 +184,24 @@ export default function OrdersPage() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
     
-    // Add column widths
     if (!worksheet['!cols']) {
       worksheet['!cols'] = [
-        { width: 15 }, // Order Number
-        { width: 20 }, // Customer Name
-        { width: 15 }, // Primary Phone
-        { width: 15 }, // Secondary Phone
-        { width: 30 }, // Address
-        { width: 12 }, // Total Price
-        { width: 12 }, // Status
-        { width: 15 }, // Payment Status
-        { width: 12 }  // Items Count
+        { width: 15 },
+        { width: 20 },
+        { width: 15 },
+        { width: 15 },
+        { width: 30 },
+        { width: 12 },
+        { width: 12 },
+        { width: 15 },
+        { width: 12 }
       ];
     }
     
     XLSX.writeFile(workbook, "orders_report.xlsx");
   };
 
-  // Print Table - updated to include customerName and secondaryPhoneNumber
+  // Print Table
   const handlePrint = () => {
     const printContent = document.getElementById("orders-container").innerHTML;
     const printWindow = window.open('', '_blank', 'width=1200,height=800');
@@ -193,84 +212,18 @@ export default function OrdersPage() {
         <head>
           <title>Orders Report</title>
           <style>
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }
-            body { 
-              font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
-              margin: 40px;
-              color: #1a1a1a;
-              background: white;
-            }
-            .print-header {
-              text-align: center;
-              margin-bottom: 30px;
-              padding-bottom: 20px;
-              border-bottom: 3px solid ${appTheme.colors.primary};
-            }
-            .print-header h1 {
-              color: ${appTheme.colors.primary};
-              margin: 0 0 8px 0;
-              font-size: 28px;
-              font-weight: 700;
-            }
-            .print-meta {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              margin-top: 15px;
-              font-size: 14px;
-              color: #666;
-            }
-            .order-card {
-              background: white;
-              border: 2px solid #f0f0f0;
-              border-radius: 12px;
-              padding: 20px;
-              margin-bottom: 20px;
-              break-inside: avoid;
-            }
-            .order-header {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              margin-bottom: 15px;
-              padding-bottom: 10px;
-              border-bottom: 1px solid #e8e8e8;
-            }
-            .order-details {
-              display: grid;
-              gap: 8px;
-              margin-bottom: 15px;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 10px;
-            }
-            th {
-              background: ${appTheme.colors.primary} !important;
-              color: white !important;
-              padding: 12px 8px;
-              text-align: left;
-              font-weight: 600;
-              font-size: 12px;
-            }
-            td {
-              padding: 10px 8px;
-              border-bottom: 1px solid #e8e8e8;
-              font-size: 12px;
-            }
-            .status-select, .action-buttons {
-              display: none;
-            }
-            @media print {
-              body { margin: 15px; }
-              .print-header { margin-bottom: 20px; }
-              .order-card { break-inside: avoid; }
-            }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 40px; color: #1a1a1a; background: white; }
+            .print-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 3px solid ${appTheme.colors.primary}; }
+            .print-header h1 { color: ${appTheme.colors.primary}; margin: 0 0 8px 0; font-size: 28px; font-weight: 700; }
+            .print-meta { display: flex; justify-content: space-between; margin-top: 15px; font-size: 14px; color: #666; }
+            .order-card { background: white; border: 2px solid #f0f0f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; break-inside: avoid; }
+            .order-header { display: flex; justify-content: space-between; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #e8e8e8; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th { background: ${appTheme.colors.primary} !important; color: white !important; padding: 12px 8px; text-align: left; font-weight: 600; font-size: 12px; }
+            td { padding: 10px 8px; border-bottom: 1px solid #e8e8e8; font-size: 12px; }
+            .status-select, .action-buttons { display: none; }
+            @media print { body { margin: 15px; } .order-card { break-inside: avoid; } }
           </style>
         </head>
         <body>
@@ -287,7 +240,6 @@ export default function OrdersPage() {
             ${printContent}
           </div>
           <script>
-            // Remove action buttons and selects for print
             document.querySelectorAll('.status-select, .action-buttons').forEach(el => el.remove());
           </script>
         </body>
@@ -306,8 +258,8 @@ export default function OrdersPage() {
   if (loading) {
     return (
       <div style={{ 
-        padding: "40px", 
-        backgroundColor: appTheme.colors.background,
+        padding: isMobile ? "24px" : "40px",
+        backgroundColor: "transparent",
         minHeight: "100vh",
         display: "flex",
         justifyContent: "center",
@@ -317,8 +269,8 @@ export default function OrdersPage() {
           textAlign: "center",
           color: appTheme.colors.textSecondary
         }}>
-          <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>⏳</div>
-          <p style={{ fontSize: "1.1rem" }}>Loading orders...</p>
+          <div style={{ fontSize: isMobile ? "2.5rem" : "3rem", marginBottom: "1rem" }}>⏳</div>
+          <p style={{ fontSize: isMobile ? "1rem" : "1.1rem" }}>Loading orders...</p>
         </div>
       </div>
     );
@@ -326,98 +278,112 @@ export default function OrdersPage() {
 
   return (
     <div style={{ 
-      padding: "40px", 
-      backgroundColor: appTheme.colors.background,
-      minHeight: "100vh"
+      padding: isMobile ? "16px" : "24px",
+      backgroundColor: "transparent",
+      minHeight: "100vh",
+      width: "100%",
     }}>
-      {/* Header Section */}
+      {/* Header Section - Mobile Optimized */}
       <div style={{
         display: "flex",
+        flexDirection: isMobile ? "column" : "row",
         justifyContent: "space-between",
-        alignItems: "flex-start",
-        marginBottom: "30px",
-        flexWrap: "wrap",
-        gap: "20px",
+        alignItems: isMobile ? "flex-start" : "flex-start",
+        marginBottom: isMobile ? "20px" : "24px",
+        gap: isMobile ? "16px" : "20px",
       }}>
-        <div style={{ flex: 1 }}>
+        <div style={{ width: "100%" }}>
           <div style={{
             display: "flex",
             alignItems: "center",
-            gap: "15px",
-            marginBottom: "8px",
+            gap: isMobile ? "12px" : "15px",
+            marginBottom: "6px",
           }}>
             <div style={{
-              width: "4px",
-              height: "32px",
+              width: isMobile ? "3px" : "4px",
+              height: isMobile ? "24px" : "32px",
               background: `linear-gradient(135deg, ${appTheme.colors.primary}, ${appTheme.colors.secondary})`,
               borderRadius: "2px",
             }}></div>
             <h1 style={{ 
               color: appTheme.colors.textPrimary, 
               fontWeight: "700",
-              fontSize: "2rem",
+              fontSize: isMobile ? "1.5rem" : "1.75rem",
               margin: 0,
               lineHeight: 1.2,
             }}>
-              Orders Management
+              Orders
             </h1>
           </div>
           <p style={{ 
             color: appTheme.colors.textSecondary, 
-            margin: "8px 0 0 19px",
-            fontSize: "1rem",
+            margin: "4px 0 0 15px",
+            fontSize: isMobile ? "0.85rem" : "0.95rem",
             fontWeight: "500",
           }}>
-            {filteredOrders.length} orders found • Page {currentPage} of {totalPages}
+            {filteredOrders.length} orders • Page {currentPage} of {totalPages}
           </p>
         </div>
 
-        {/* Actions */}
+        {/* Action Buttons - Mobile Scrollable Row */}
         <div style={{ 
           display: "flex", 
-          gap: "12px",
-          flexWrap: "wrap"
+          gap: isMobile ? "10px" : "12px",
+          flexWrap: isMobile ? "nowrap" : "wrap",
+          width: isMobile ? "100%" : "auto",
+          overflowX: isMobile ? "auto" : "visible",
+          paddingBottom: isMobile ? "4px" : "0",
+          WebkitOverflowScrolling: "touch",
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
         }}>
           <button
             onClick={downloadPDF}
-            style={glassButtonStyle(appTheme.colors.secondary)}
+            style={glassButtonStyle(appTheme.colors.secondary, isMobile)}
           >
-            📄 PDF
+            <span style={{ fontSize: isMobile ? "1.1rem" : "1rem" }}>📄</span>
+            {!isMobile && "PDF"}
+            {isMobile && "PDF"}
           </button>
           <button
             onClick={downloadExcel}
-            style={glassButtonStyle(appTheme.colors.success)}
+            style={glassButtonStyle(appTheme.colors.success, isMobile)}
           >
-            📊 Excel
+            <span style={{ fontSize: isMobile ? "1.1rem" : "1rem" }}>📊</span>
+            {!isMobile && "Excel"}
+            {isMobile && "Excel"}
           </button>
           <button
             onClick={handlePrint}
-            style={glassButtonStyle(appTheme.colors.warning)}
+            style={glassButtonStyle(appTheme.colors.warning, isMobile)}
           >
-            🖨️ Print
+            <span style={{ fontSize: isMobile ? "1.1rem" : "1rem" }}>🖨️</span>
+            {!isMobile && "Print"}
+            {isMobile && "Print"}
           </button>
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* Search Bar - Mobile Optimized */}
       <div style={{
         position: "relative",
-        marginBottom: "30px",
-        maxWidth: "500px"
+        marginBottom: isMobile ? "20px" : "24px",
+        width: "100%",
       }}>
         <div style={{
           position: "absolute",
-          left: "16px",
+          left: isMobile ? "14px" : "16px",
           top: "50%",
           transform: "translateY(-50%)",
           color: appTheme.colors.textSecondary,
-          fontSize: "16px",
+          fontSize: isMobile ? "14px" : "16px",
+          pointerEvents: "none",
         }}>
           🔍
         </div>
         <input
           type="text"
-          placeholder="Search by order number, customer name, phone numbers, address..."
+          placeholder={isMobile ? "Search orders..." : "Search by order number, customer name, phone numbers, address..."}
           value={searchTerm}
           onChange={(e) => {
             setSearchTerm(e.target.value);
@@ -425,14 +391,14 @@ export default function OrdersPage() {
           }}
           style={{
             width: "100%",
-            padding: "14px 16px 14px 48px",
+            padding: isMobile ? "14px 14px 14px 44px" : "14px 16px 14px 48px",
             border: `1.5px solid ${appTheme.colors.border}60`,
-            borderRadius: "12px",
+            borderRadius: isMobile ? "10px" : "12px",
             outline: "none",
-            fontSize: "1rem",
+            fontSize: isMobile ? "16px" : "0.95rem",
             transition: "all 0.3s ease",
             backgroundColor: `${appTheme.colors.surface}80`,
-            //backdropFilter: "blur(10px)",
+            WebkitAppearance: "none",
           }}
           onFocus={(e) => {
             e.target.style.borderColor = appTheme.colors.primary;
@@ -446,25 +412,28 @@ export default function OrdersPage() {
       </div>
 
       {/* Orders Container */}
-      <div id="orders-container" style={{ display: "grid", gap: "20px" }}>
+      <div id="orders-container" style={{ 
+        display: "grid", 
+        gap: isMobile ? "16px" : "20px",
+      }}>
         {paginatedOrders.length === 0 ? (
           <div style={{
             backgroundColor: appTheme.colors.surface,
-            padding: "60px 40px",
-            borderRadius: "20px",
+            padding: isMobile ? "40px 24px" : "60px 40px",
+            borderRadius: isMobile ? "16px" : "20px",
             textAlign: "center",
-            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
+            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.04)",
             border: `1.5px solid ${appTheme.colors.border}30`
           }}>
             <div style={{ 
-              fontSize: "4rem", 
+              fontSize: isMobile ? "3rem" : "4rem", 
               marginBottom: "1rem",
               opacity: 0.5,
             }}>
               📭
             </div>
             <div style={{ 
-              fontSize: "1.5rem", 
+              fontSize: isMobile ? "1.25rem" : "1.5rem", 
               fontWeight: "600",
               marginBottom: "0.5rem",
               color: appTheme.colors.textPrimary
@@ -473,7 +442,7 @@ export default function OrdersPage() {
             </div>
             {searchTerm && (
               <div style={{ 
-                fontSize: "1rem", 
+                fontSize: isMobile ? "0.9rem" : "1rem", 
                 marginBottom: "1.5rem",
                 opacity: 0.7,
                 color: appTheme.colors.textSecondary
@@ -484,23 +453,29 @@ export default function OrdersPage() {
             <button
               onClick={() => setSearchTerm('')}
               style={{
-                padding: "12px 24px",
+                padding: isMobile ? "12px 20px" : "12px 24px",
                 border: `1.5px solid ${appTheme.colors.primary}30`,
                 background: "transparent",
                 color: appTheme.colors.primary,
                 borderRadius: "10px",
                 cursor: "pointer",
-                fontSize: "1rem",
+                fontSize: isMobile ? "0.95rem" : "1rem",
                 fontWeight: "600",
                 transition: "all 0.3s ease",
+                minHeight: isMobile ? "48px" : "44px",
+                WebkitTapHighlightColor: "transparent",
               }}
               onMouseEnter={(e) => {
-                e.target.style.background = appTheme.colors.primary;
-                e.target.style.color = "white";
+                if (!isMobile) {
+                  e.target.style.background = appTheme.colors.primary;
+                  e.target.style.color = "white";
+                }
               }}
               onMouseLeave={(e) => {
-                e.target.style.background = "transparent";
-                e.target.style.color = appTheme.colors.primary;
+                if (!isMobile) {
+                  e.target.style.background = "transparent";
+                  e.target.style.color = appTheme.colors.primary;
+                }
               }}
             >
               Clear Search
@@ -513,164 +488,249 @@ export default function OrdersPage() {
               order={order}
               onDelete={handleDelete}
               onUpdateField={handleUpdateField}
+              isMobile={isMobile}
             />
           ))
         )}
       </div>
 
-      {/* Pagination */}
+      {/* Pagination - Mobile Optimized */}
       {filteredOrders.length > 0 && (
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginTop: "40px",
-            padding: "25px",
+            flexDirection: isMobile ? "column" : "row",
+            justifyContent: isMobile ? "center" : "space-between",
+            alignItems: isMobile ? "stretch" : "center",
+            marginTop: isMobile ? "24px" : "32px",
+            padding: isMobile ? "20px" : "24px",
             background: appTheme.colors.surface,
-            borderRadius: "16px",
+            borderRadius: isMobile ? "16px" : "16px",
             border: `1.5px solid ${appTheme.colors.border}30`,
-            boxShadow: "0 4px 16px rgba(0, 0, 0, 0.06)",
-            flexWrap: "wrap",
-            gap: "20px",
+            boxShadow: "0 2px 12px rgba(0, 0, 0, 0.04)",
+            gap: isMobile ? "16px" : "20px",
           }}
         >
           <div style={{ 
             color: appTheme.colors.textSecondary,
-            fontSize: "1rem",
+            fontSize: isMobile ? "0.9rem" : "0.95rem",
             fontWeight: "500",
+            textAlign: isMobile ? "center" : "left",
           }}>
             Showing <strong>{((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredOrders.length)}</strong> of <strong>{filteredOrders.length}</strong> orders
           </div>
           
           <div style={{ 
             display: "flex", 
+            flexDirection: isMobile ? "column" : "row",
             alignItems: "center", 
-            gap: "10px",
-            flexWrap: "wrap",
+            justifyContent: isMobile ? "center" : "flex-end",
+            gap: isMobile ? "12px" : "10px",
+            width: isMobile ? "100%" : "auto",
           }}>
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(currentPage - 1)}
-              style={paginationButtonStyle(currentPage === 1)}
-            >
-              ← Previous
-            </button>
-            
             <div style={{ 
               display: "flex", 
-              gap: "6px",
-              margin: "0 12px",
+              gap: isMobile ? "8px" : "6px",
+              justifyContent: "center",
+              order: isMobile ? 2 : 1,
+              width: isMobile ? "100%" : "auto",
             }}>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-                
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    style={{
-                      padding: "10px 16px",
-                      border: "none",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      fontSize: "0.9rem",
-                      fontWeight: "600",
-                      transition: "all 0.3s ease",
-                      background: currentPage === pageNum 
-                        ? appTheme.colors.primary
-                        : "transparent",
-                      color: currentPage === pageNum ? "white" : appTheme.colors.textSecondary,
-                      minWidth: "44px",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (currentPage !== pageNum) {
-                        e.target.style.background = `${appTheme.colors.primary}15`;
-                        e.target.style.color = appTheme.colors.primary;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (currentPage !== pageNum) {
-                        e.target.style.background = "transparent";
-                        e.target.style.color = appTheme.colors.textSecondary;
-                      }
-                    }}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(currentPage - 1)}
+                style={paginationButtonStyle(currentPage === 1, isMobile)}
+              >
+                ←
+                {!isMobile && " Previous"}
+              </button>
+              
+              <div style={{ 
+                display: "flex", 
+                gap: isMobile ? "6px" : "6px",
+                margin: isMobile ? "0 4px" : "0 12px",
+              }}>
+                {Array.from({ length: Math.min(isMobile ? 3 : 5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= (isMobile ? 3 : 5)) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 2) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 1) {
+                    pageNum = totalPages - (isMobile ? 2 : 4) + i;
+                  } else {
+                    pageNum = currentPage - (isMobile ? 1 : 2) + i;
+                  }
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      style={{
+                        padding: isMobile ? "10px 14px" : "10px 16px",
+                        border: "none",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        fontSize: isMobile ? "0.9rem" : "0.9rem",
+                        fontWeight: "600",
+                        transition: "all 0.3s ease",
+                        background: currentPage === pageNum 
+                          ? appTheme.colors.primary
+                          : "transparent",
+                        color: currentPage === pageNum ? "white" : appTheme.colors.textSecondary,
+                        minWidth: isMobile ? "44px" : "44px",
+                        minHeight: isMobile ? "44px" : "40px",
+                        WebkitTapHighlightColor: "transparent",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isMobile && currentPage !== pageNum) {
+                          e.target.style.background = `${appTheme.colors.primary}15`;
+                          e.target.style.color = appTheme.colors.primary;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isMobile && currentPage !== pageNum) {
+                          e.target.style.background = "transparent";
+                          e.target.style.color = appTheme.colors.textSecondary;
+                        }
+                      }}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(currentPage + 1)}
+                style={paginationButtonStyle(currentPage === totalPages, isMobile)}
+              >
+                {!isMobile && "Next "}
+                →
+              </button>
             </div>
-            
-            <button
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(currentPage + 1)}
-              style={paginationButtonStyle(currentPage === totalPages)}
-            >
-              Next →
-            </button>
+
+            {/* Mobile Page Indicator */}
+            {isMobile && (
+              <div style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: "8px",
+                order: 1,
+                marginBottom: "4px",
+              }}>
+                <span style={{
+                  fontSize: "0.85rem",
+                  color: appTheme.colors.textSecondary,
+                  fontWeight: "500",
+                }}>
+                  Page {currentPage} of {totalPages}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}
+
+      {/* Global Mobile Optimizations */}
+      <style jsx global>{`
+        @media screen and (max-width: 768px) {
+          /* Hide scrollbar for action buttons */
+          div::-webkit-scrollbar {
+            display: none;
+          }
+          
+          /* Better touch targets */
+          button, 
+          [role="button"],
+          input[type="button"],
+          input[type="submit"] {
+            min-height: 48px;
+            min-width: 48px;
+          }
+          
+          /* Prevent zoom on input focus */
+          input, select, textarea {
+            font-size: 16px !important;
+          }
+          
+          /* Smooth scrolling */
+          * {
+            -webkit-overflow-scrolling: touch;
+          }
+          
+          /* Remove hover effects on mobile */
+          button:hover {
+            transform: none !important;
+            box-shadow: none !important;
+          }
+          
+          /* Better tap highlight */
+          * {
+            -webkit-tap-highlight-color: transparent;
+          }
+        }
+
+        /* Desktop styles */
+        @media screen and (min-width: 769px) {
+          button:not(:disabled):hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          }
+          
+          button:not(:disabled):active {
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 }
 
-// Glass Button Style
-const glassButtonStyle = (color) => ({
+// Glass Button Style - Mobile Optimized
+const glassButtonStyle = (color, isMobile) => ({
   backgroundColor: `${color}15`,
   border: `1.5px solid ${color}30`,
   color: color,
-  padding: "12px 20px",
-  borderRadius: "10px",
+  padding: isMobile ? "12px 16px" : "12px 20px",
+  borderRadius: isMobile ? "10px" : "10px",
   cursor: "pointer",
-  fontSize: "0.9rem",
+  fontSize: isMobile ? "0.9rem" : "0.9rem",
   fontWeight: "600",
   transition: "all 0.3s ease",
   display: "flex",
   alignItems: "center",
-  gap: "8px",
+  justifyContent: "center",
+  gap: isMobile ? "6px" : "8px",
   backdropFilter: "blur(10px)",
+  whiteSpace: "nowrap",
+  minHeight: isMobile ? "48px" : "44px",
+  minWidth: isMobile ? "80px" : "auto",
+  flex: isMobile ? "0 0 auto" : "none",
+  WebkitTapHighlightColor: "transparent",
 });
 
-const paginationButtonStyle = (disabled) => ({
+// Pagination Button Style - Mobile Optimized
+const paginationButtonStyle = (disabled, isMobile) => ({
   backgroundColor: disabled ? `${appTheme.colors.border}20` : `${appTheme.colors.primary}15`,
   border: `1.5px solid ${disabled ? appTheme.colors.border : appTheme.colors.primary}30`,
   color: disabled ? appTheme.colors.textSecondary : appTheme.colors.primary,
-  padding: "10px 16px",
+  padding: isMobile ? "12px 18px" : "10px 16px",
   borderRadius: "8px",
   cursor: disabled ? "not-allowed" : "pointer",
-  fontSize: "0.9rem",
+  fontSize: isMobile ? "0.95rem" : "0.9rem",
   fontWeight: "600",
   transition: "all 0.3s ease",
   opacity: disabled ? 0.5 : 1,
+  minHeight: isMobile ? "48px" : "40px",
+  minWidth: isMobile ? "80px" : "auto",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "4px",
+  WebkitTapHighlightColor: "transparent",
 });
-
-// Add global styles for hover effects
-if (typeof window !== 'undefined') {
-  const style = document.createElement('style');
-  style.textContent = `
-    button:not(:disabled):hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-    
-    button:not(:disabled):active {
-      transform: translateY(0);
-    }
-  `;
-  document.head.appendChild(style);
-}
-
 
 // "use client";
 

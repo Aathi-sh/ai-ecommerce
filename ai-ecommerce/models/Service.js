@@ -11,11 +11,6 @@ const serviceSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  professionalId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Professional',
-    required: true
-  },
   
   // Category & Type
   category: {
@@ -125,9 +120,8 @@ const serviceSchema = new mongoose.Schema({
 });
 
 // Indexes
-serviceSchema.index({ professionalId: 1, isActive: 1 });
 serviceSchema.index({ category: 1, type: 1 });
 serviceSchema.index({ basePrice: 1 });
 serviceSchema.index({ name: 'text', description: 'text', tags: 'text' });
 
-module.exports = mongoose.model('Service', serviceSchema);
+module.exports = mongoose.models.Service || mongoose.model('Service', serviceSchema);

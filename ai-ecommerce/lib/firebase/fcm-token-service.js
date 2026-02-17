@@ -1,5 +1,4 @@
-
-// lib/firebase/fcm-token-service.js - CORRECTED VERSION (NO SOCKET.IO)
+// lib/firebase/fcm-token-service.js - UPDATED FOR NEXTAUTH
 import { getToken, onMessage, deleteToken } from 'firebase/messaging';
 import { messaging, initializeFirebase } from './firebase-client';
 
@@ -299,39 +298,51 @@ export const getFCMToken = async (options = {}) => {
 };
 
 /**
- * Get user data from localStorage
+ * Validate and prepare user data for FCM
  */
-const getUserData = () => {
-  if (typeof window === 'undefined') return null;
-  
-  try {
-    const userDataStr = localStorage.getItem('user');
-    if (!userDataStr) return null;
-    
-    const userData = JSON.parse(userDataStr);
-    
-    // Ensure we have the required fields
-    if (!userData || !userData.id) {
-      console.warn('User data missing ID:', userData);
-      return null;
+export const prepareUserDataForFCM = (userData) => {
+  // If no user data provided, try to get from localStorage (fallback)
+  if (!userData) {
+    try {
+      if (typeof window !== 'undefined') {
+        const storedUserInfo = localStorage.getItem('user_info');
+        if (storedUserInfo) {
+          userData = JSON.parse(storedUserInfo);
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not get user info from localStorage:', e);
     }
-    
-    return {
-      id: userData.id || userData._id || '',
-      email: userData.email || '',
-      name: userData.name || '',
-      role: userData.role || 'user',
-      ...userData
-    };
-  } catch (error) {
-    console.error('Error parsing user data:', error);
+  }
+
+  // Validate the user data
+  if (!userData || typeof userData !== 'object') {
+    console.warn('⚠️ Invalid or missing user data for FCM');
     return null;
   }
+
+  // Ensure we have the required fields
+  const userId = userData.id || userData._id || userData.userId;
+  if (!userId) {
+    console.warn('⚠️ User data missing ID:', userData);
+    return null;
+  }
+
+  return {
+    id: userId,
+    email: userData.email || '',
+    name: userData.name || userData.fullName || userData.email?.split('@')[0] || '',
+    role: userData.role || 'user',
+    isVerified: userData.isVerified || false,
+    isAdmin: userData.role === 'admin',
+    isManager: userData.role === 'manager',
+    // Include any additional data
+    ...userData
+  };
 };
 
-// ==================== FIXED: SAVE TOKEN WITHOUT WEBSOCKET ====================
 /**
- * Save FCM token to backend - NO WEBSOCKET INTEGRATION
+ * Save FCM token to backend with NextAuth support
  */
 export const saveTokenToBackend = async (token, additionalInfo = {}) => {
   const now = Date.now();
@@ -374,36 +385,47 @@ export const saveTokenToBackend = async (token, additionalInfo = {}) => {
       throw new Error('Invalid FCM token');
     }
 
+    // Get and validate user data
+    const userData = prepareUserDataForFCM(additionalInfo.userData);
+    
+    if (!userData || !userData.id) {
+      console.error('❌ No valid user data provided for FCM token save');
+      throw new Error('User authentication required. Please log in first.');
+    }
+
+    console.log('✅ User found for FCM:', {
+      id: userData.id,
+      email: userData.email,
+      role: userData.role,
+      isAdmin: userData.role === 'admin'
+    });
+
+    // Prepare device info
     const deviceInfo = {
       ...DeviceInfo.getBasicInfo(),
-      ...additionalInfo,
+      ...additionalInfo.deviceInfo,
       os: DeviceInfo.getOS(),
     };
 
     console.log('📤 Attempting to save FCM token to backend...');
-
-    // Get user data from localStorage
-    const userData = getUserData();
-    
-    if (!userData || !userData.id) {
-      console.error('❌ No user data found in localStorage');
-      throw new Error('User authentication required. Please log in first.');
-    }
-
-    console.log('✅ User found:', {
-      id: userData.id,
-      email: userData.email,
-      role: userData.role
-    });
 
     // Prepare request body
     const requestBody = {
       token: token.trim(),
       deviceInfo,
       userId: userData.id,
-      email: userData.email,
+      userEmail: userData.email,
+      userName: userData.name || userData.email?.split('@')[0],
+      userRole: userData.role,
+      userIsVerified: userData.isVerified || false,
+      isAdmin: userData.role === 'admin',
+      authProvider: 'nextauth',
       timestamp: new Date().toISOString(),
+      ...additionalInfo
     };
+
+    // Remove userData from the request body to avoid duplication
+    delete requestBody.userData;
 
     console.log('📦 Sending request to Next.js backend...');
 
@@ -413,6 +435,7 @@ export const saveTokenToBackend = async (token, additionalInfo = {}) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestBody),
+      credentials: 'include' // ✅ Important: Include cookies for NextAuth
     });
 
     const responseText = await response.text();
@@ -510,12 +533,12 @@ export const saveTokenToBackend = async (token, additionalInfo = {}) => {
       
       console.warn('⚠️ Authentication issue - token save postponed');
       
-      // Store token for later retry
+      // Store token for later retry (temporarily in localStorage for this session only)
       if (typeof window !== 'undefined') {
         const pendingTokens = JSON.parse(localStorage.getItem('pending_fcm_tokens') || '[]');
         pendingTokens.push({
           token,
-          deviceInfo: additionalInfo,
+          deviceInfo: additionalInfo.deviceInfo || {},
           timestamp: Date.now(),
         });
         localStorage.setItem('pending_fcm_tokens', JSON.stringify(pendingTokens.slice(-5))); // Keep only last 5
@@ -552,7 +575,7 @@ export const saveTokenToBackend = async (token, additionalInfo = {}) => {
 /**
  * Process pending FCM tokens
  */
-export const processPendingFCMTokens = async () => {
+export const processPendingFCMTokens = async (userData = null) => {
   try {
     if (typeof window === 'undefined') return { success: false, message: 'Not in browser' };
     
@@ -565,8 +588,9 @@ export const processPendingFCMTokens = async () => {
     
     console.log('🔄 Processing pending FCM tokens...');
     
-    const userData = getUserData();
-    if (!userData || !userData.id) {
+    // Check if we have user data (passed from component)
+    const validatedUserData = prepareUserDataForFCM(userData);
+    if (!validatedUserData || !validatedUserData.id) {
       console.log('⏳ User not authenticated, keeping tokens pending');
       return { success: false, message: 'User not authenticated' };
     }
@@ -575,36 +599,38 @@ export const processPendingFCMTokens = async () => {
     let failed = 0;
     let alreadyExists = 0;
     
-    // Process backend pending tokens
-    if (pendingTokensStr) {
-      const pendingTokens = JSON.parse(pendingTokensStr);
-      if (Array.isArray(pendingTokens) && pendingTokens.length > 0) {
-        for (const pending of pendingTokens) {
-          try {
-            const result = await saveTokenToBackend(pending.token, pending.deviceInfo);
-            if (result && (result.success || result.exists)) {
-              if (result.exists) {
-                alreadyExists++;
-              } else {
-                successful++;
-              }
+    // Process pending tokens
+    const pendingTokens = JSON.parse(pendingTokensStr);
+    if (Array.isArray(pendingTokens) && pendingTokens.length > 0) {
+      for (const pending of pendingTokens) {
+        try {
+          const result = await saveTokenToBackend(pending.token, {
+            userData: validatedUserData,
+            deviceInfo: pending.deviceInfo
+          });
+          
+          if (result && (result.success || result.exists)) {
+            if (result.exists) {
+              alreadyExists++;
             } else {
-              failed++;
+              successful++;
             }
-          } catch (error) {
-            failed++;
-            console.error('Failed to save pending token:', error.message);
-          }
-        }
-        
-        // Remove processed tokens
-        if (successful + alreadyExists > 0) {
-          const remainingTokens = pendingTokens.slice(successful + alreadyExists);
-          if (remainingTokens.length > 0) {
-            localStorage.setItem('pending_fcm_tokens', JSON.stringify(remainingTokens));
           } else {
-            localStorage.removeItem('pending_fcm_tokens');
+            failed++;
           }
+        } catch (error) {
+          failed++;
+          console.error('Failed to save pending token:', error.message);
+        }
+      }
+      
+      // Remove processed tokens
+      if (successful + alreadyExists > 0) {
+        const remainingTokens = pendingTokens.slice(successful + alreadyExists);
+        if (remainingTokens.length > 0) {
+          localStorage.setItem('pending_fcm_tokens', JSON.stringify(remainingTokens));
+        } else {
+          localStorage.removeItem('pending_fcm_tokens');
         }
       }
     }
@@ -629,8 +655,9 @@ const SETUP_COOLDOWN_MS = 60000; // 60 seconds between setup attempts
 
 /**
  * Complete admin notification setup - WITH THROTTLING
+ * userData parameter is now required
  */
-export const setupAdminNotifications = async (options = {}) => {
+export const setupAdminNotifications = async (userData, options = {}) => {
   const now = Date.now();
   
   // Throttle setup attempts
@@ -650,7 +677,6 @@ export const setupAdminNotifications = async (options = {}) => {
     showCustomPrompt = null,
     onSetupComplete = null,
     onSetupError = null,
-    userId = null,
   } = options;
 
   try {
@@ -658,6 +684,12 @@ export const setupAdminNotifications = async (options = {}) => {
     
     if (!isNotificationSupported()) {
       throw new Error('Browser does not support notifications');
+    }
+
+    // Validate user data
+    const validatedUserData = prepareUserDataForFCM(userData);
+    if (!validatedUserData || !validatedUserData.id) {
+      throw new Error('User data required for notification setup');
     }
 
     if (requestPermission) {
@@ -675,6 +707,7 @@ export const setupAdminNotifications = async (options = {}) => {
     console.log('✅ FCM token obtained, saving to backend...');
     
     const saveResult = await saveTokenToBackend(token, {
+      userData: validatedUserData,
       userType: 'admin',
       setupTimestamp: new Date().toISOString(),
     });
@@ -690,7 +723,7 @@ export const setupAdminNotifications = async (options = {}) => {
           window.removeEventListener('auth-ready', handleAuthReady);
           
           setTimeout(() => {
-            setupAdminNotifications(options)
+            setupAdminNotifications(validatedUserData, options)
               .then(result => {
                 if (onSetupComplete) onSetupComplete(result);
               })
@@ -758,7 +791,7 @@ export const setupAdminNotifications = async (options = {}) => {
  * Delete token from backend
  */
 export const deleteTokenFromBackend = async (options = {}) => {
-  const { token: specificToken, deviceId, clearAll = false } = options;
+  const { token: specificToken, deviceId, clearAll = false, userData } = options;
 
   try {
     let tokenToDelete = specificToken || cachedFCMToken;
@@ -767,9 +800,10 @@ export const deleteTokenFromBackend = async (options = {}) => {
       throw new Error('No token specified for deletion');
     }
 
-    const userData = getUserData();
-    if (!userData || !userData.id) {
-      throw new Error('User authentication required');
+    // User data must be provided
+    const validatedUserData = prepareUserDataForFCM(userData);
+    if (!validatedUserData || !validatedUserData.id) {
+      throw new Error('User data required for token deletion');
     }
 
     const response = await fetch('/api/auth/fcm-token', {
@@ -781,7 +815,7 @@ export const deleteTokenFromBackend = async (options = {}) => {
         token: clearAll ? null : tokenToDelete,
         deviceId,
         clearAll,
-        userId: userData.id,
+        userId: validatedUserData.id,
       }),
     });
 
@@ -897,7 +931,7 @@ const REFRESH_COOLDOWN_MS = 120000; // 2 minutes between refreshes
 /**
  * Refresh FCM token and update backend - WITH THROTTLING
  */
-export const refreshFCMToken = async () => {
+export const refreshFCMToken = async (userData = null) => {
   const now = Date.now();
   
   // Throttle refresh attempts
@@ -912,7 +946,8 @@ export const refreshFCMToken = async () => {
     const newToken = await getFCMToken({ forceRefresh: true });
     
     if (newToken) {
-      const saveResult = await saveTokenToBackend(newToken);
+      const validatedUserData = prepareUserDataForFCM(userData);
+      const saveResult = await saveTokenToBackend(newToken, { userData: validatedUserData });
       console.log('🔄 FCM token refreshed successfully');
       return { token: newToken, saveResult };
     }
@@ -1032,6 +1067,77 @@ export const checkServiceWorkerStatus = async () => {
  */
 export const registerServiceWorkerManually = async () => {
   return getOrRegisterServiceWorker();
+};
+
+/**
+ * Check if user is admin (for components that need to check before calling FCM)
+ */
+export const isAdminUser = (userData) => {
+  const validatedUserData = prepareUserDataForFCM(userData);
+  return validatedUserData && validatedUserData.role === 'admin';
+};
+
+/**
+ * Initialize FCM with user authentication check
+ */
+export const initializeFCMWithAuth = async (userData) => {
+  try {
+    const validatedUserData = prepareUserDataForFCM(userData);
+    
+    if (!validatedUserData || !validatedUserData.id) {
+      console.warn('⚠️ Cannot initialize FCM - user not authenticated');
+      return {
+        success: false,
+        error: 'User not authenticated',
+        requiresAuth: true
+      };
+    }
+    
+    if (validatedUserData.role !== 'admin') {
+      console.log('⏭️ Skipping FCM initialization - user is not admin');
+      return {
+        success: false,
+        error: 'User is not admin',
+        requiresAdmin: true
+      };
+    }
+    
+    // Check notification support
+    if (!isNotificationSupported()) {
+      return {
+        success: false,
+        error: 'Notifications not supported'
+      };
+    }
+    
+    // Get current permission
+    const permission = getNotificationPermission();
+    
+    if (permission === 'granted') {
+      const token = await getFCMToken();
+      if (token) {
+        const saveResult = await saveTokenToBackend(token, { userData: validatedUserData });
+        return {
+          success: true,
+          token,
+          saveResult,
+          permission
+        };
+      }
+    }
+    
+    return {
+      success: false,
+      permission,
+      requiresPermission: permission !== 'granted'
+    };
+  } catch (error) {
+    console.error('❌ Error initializing FCM:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 };
 
 // Export DeviceInfo class
