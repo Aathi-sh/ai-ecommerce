@@ -1,7 +1,7 @@
 // app/api/config/route.js - Professional Config API Routes
 import { NextResponse } from 'next/server';
-import ConfigModel, { ConfigUtils } from '@/models/Config';
-import { connectToDatabase } from '@/lib/db/mongoose';
+import ConfigModel, { ConfigUtils } from '../../../models/config';
+import { connectDB } from "@/utils/db";
 import mongoose from 'mongoose';
 
 // Helper: Validate ObjectId
@@ -40,7 +40,7 @@ const handleError = (error, message = 'Internal server error') => {
 // GET: Get configuration for current tenant
 export async function GET(request) {
   try {
-    await connectToDatabase();
+    await connectDB();
     
     const { searchParams } = new URL(request.url);
     const tenantId = searchParams.get('tenantId');
@@ -117,7 +117,7 @@ export async function GET(request) {
 // POST: Create or update configuration
 export async function POST(request) {
   try {
-    await connectToDatabase();
+    await connectDB();
     
     const body = await request.json();
     const { tenantId, ...configData } = body;
@@ -199,7 +199,7 @@ export async function POST(request) {
 // PUT: Update specific fields
 export async function PUT(request) {
   try {
-    await connectToDatabase();
+    await connectDB();
     
     const body = await request.json();
     const { tenantId, updates } = body;
@@ -289,7 +289,7 @@ export async function PUT(request) {
 // PATCH: Partial update (specific operations)
 export async function PATCH(request) {
   try {
-    await connectToDatabase();
+    await connectDB();
     
     const body = await request.json();
     const { tenantId, operation, data } = body;
@@ -410,7 +410,7 @@ export async function PATCH(request) {
 // DELETE: Deactivate configuration (soft delete)
 export async function DELETE(request) {
   try {
-    await connectToDatabase();
+    await connectDB();
     
     const { searchParams } = new URL(request.url);
     const tenantId = searchParams.get('tenantId');

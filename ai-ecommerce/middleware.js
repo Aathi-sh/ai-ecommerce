@@ -36,10 +36,32 @@ const publicPaths = [
   '/_next/image',
   '/favicon.ico',
   '/public',
-  '/api/products', // ✅ WhatsApp API route - PUBLIC
+  '/api/company-settings',           // ← ADD THIS
+  '/api/company-settings/(.*)',
+  '/api/config',
+  '/api/config/(.*)',  
+  
   '/api/whatsapp', // ✅ WhatsApp API routes
   '/api/webhook', // ✅ Webhook routes for WhatsApp
   '/api/orders/public', // ✅ Public order creation from WhatsApp
+  // GET endpoints only - for browsing products
+  '/api/products',
+  '/api/products/:path*',  // All products endpoints (GET only)
+  // For customers to create and check orders
+  '/api/orders',
+  '/api/orders?phone=:phone',  // Get orders by phone number
+  '/api/orders?orderNumber=:number',  // Get order by number
+  '/api/orders/:id',  // Get specific order
+   // For payment verification via WhatsApp
+  '/api/payments/verify',  // POST - Create verification
+  '/api/payments/verify?orderNumber=:number',  // GET - Check verification status
+  '/api/payments/verify?customerPhone=:phone',  // GET - Get by phone
+  '/api/payments/verify?status=pending',  // GET - Check pending (public status check)
+  // For WhatsApp webhook and public notifications
+  '/api/notifications',  // For WhatsApp status updates
+  '/api/notifications/webhook',  // WhatsApp webhook
+  '/api/notifications/status/:id',  // Check notification status
+
 ];
 
 // Admin-only paths (require admin authentication)

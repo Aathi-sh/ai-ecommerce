@@ -310,6 +310,8 @@ export default function Sidebar({
   const [logoutError, setLogoutError] = useState(null);
 
   const menuItems = [
+    { label: "Config", icon: <FiBox />, path: "/admin/config" },
+    { label: "Company Profile", icon: <FiBox />, path: "/admin/companyProfile" },
     { label: "QR Code", icon: <AiOutlineQrcode />, path: "/admin/qr" },
     { label: "Dashboard", icon: <FiHome />, path: "/admin/dashboards" },
     { label: "Add New Products", icon: <FiPlusCircle />, path: "/admin/products/productForm" },
@@ -321,8 +323,9 @@ export default function Sidebar({
     { label: "Booking Create", icon: <FiSettings />, path: "/admin/bookingService/bookingmng/create" },
     { label: "Service", icon: <FiTool />, path: "/admin/bookingService/service" },
     { label: "Service Create", icon: <FiPlusCircle />, path: "/admin/bookingService/service/create" },
-     { label: "Bookings ", icon: <FiPlusCircle />, path: "/admin/bookingService/bookings/" },
-      { label: "Create Bookings", icon: <FiPlusCircle />, path: "/admin/bookingService/bookings/create" },
+    { label: "Bookings ", icon: <FiPlusCircle />, path: "/admin/bookingService/bookings/" },
+    { label: "Create Bookings", icon: <FiPlusCircle />, path: "/admin/bookingService/bookings/create" },
+    
     
   ];
 

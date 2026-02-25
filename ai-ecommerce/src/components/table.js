@@ -5,7 +5,27 @@ import { appTheme } from "../constants/theme";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
-import { FaFilePdf, FaFileExcel, FaPrint, FaEdit, FaTrash, FaSearch, FaSortUp, FaSortDown, FaCaretLeft, FaCaretRight, FaAngleDoubleLeft, FaAngleDoubleRight, FaInbox, FaTimesCircle } from 'react-icons/fa';
+import { 
+  FaFilePdf, 
+  FaFileExcel, 
+  FaPrint, 
+  FaEdit, 
+  FaTrash, 
+  FaSearch, 
+  FaSortUp, 
+  FaSortDown, 
+  FaCaretLeft, 
+  FaCaretRight, 
+  FaAngleDoubleLeft, 
+  FaAngleDoubleRight, 
+  FaInbox, 
+  FaTimesCircle,
+  FaToggleOn,
+  FaToggleOff,
+  FaStar,
+  FaFire,
+  FaTag
+} from 'react-icons/fa';
 
 export function DataTable({
   columns,
@@ -24,35 +44,71 @@ export function DataTable({
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
-  // Sort logic
+  // Safe value formatter to prevent undefined errors
+  const safeValue = (value, defaultValue = '') => {
+    if (value === null || value === undefined) return defaultValue;
+    if (typeof value === 'number') return value;
+    return value;
+  };
+
+  // Safe toFixed wrapper
+  const safeToFixed = (value, digits = 2) => {
+    if (value === null || value === undefined) return '0.00';
+    if (typeof value === 'number') return value.toFixed(digits);
+    const num = parseFloat(value);
+    return isNaN(num) ? '0.00' : num.toFixed(digits);
+  };
+
+  // Sort logic with safe comparison
   const sortedData = useMemo(() => {
-    if (!sortConfig.key) return data;
+    if (!sortConfig.key || !data) return data || [];
     
-    return [...data].sort((a, b) => {
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
+    return [...(data || [])].sort((a, b) => {
+      let aValue = a[sortConfig.key];
+      let bValue = b[sortConfig.key];
       
-      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      // Handle undefined values
+      if (aValue === undefined || aValue === null) aValue = '';
+      if (bValue === undefined || bValue === null) bValue = '';
+      
+      // Handle different types
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+      
+      // Default string comparison
+      const aStr = String(aValue).toLowerCase();
+      const bStr = String(bValue).toLowerCase();
+      
+      if (aStr < bStr) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aStr > bStr) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
   }, [data, sortConfig]);
 
-  // Filter logic
+  // Filter logic with safe search
   const filteredData = useMemo(() => {
-    return sortedData.filter((row) =>
-      Object.values(row).some((value) =>
-        String(value).toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    );
+    if (!sortedData || sortedData.length === 0) return [];
+    if (!searchTerm.trim()) return sortedData;
+
+    const term = searchTerm.toLowerCase().trim();
+    
+    return sortedData.filter((row) => {
+      return Object.values(row).some((value) => {
+        if (value === null || value === undefined) return false;
+        return String(value).toLowerCase().includes(term);
+      });
+    });
   }, [sortedData, searchTerm]);
 
   // Pagination logic
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-  const paginatedData = filteredData.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const totalPages = Math.ceil((filteredData?.length || 0) / itemsPerPage);
+  const paginatedData = useMemo(() => {
+    if (!filteredData || filteredData.length === 0) return [];
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredData.slice(start, end);
+  }, [filteredData, currentPage, itemsPerPage]);
 
   // Handle sort
   const handleSort = (key) => {
@@ -62,151 +118,286 @@ export function DataTable({
     });
   };
 
-  // PDF Download
+  // PDF Download with safe data handling
   const downloadPDF = () => {
-    const doc = new jsPDF();
+    if (!filteredData || filteredData.length === 0) return;
+    
+    const doc = new jsPDF('landscape');
     
     doc.setFontSize(18);
-    doc.setTextColor(parseInt(appTheme.colors.primary.slice(1, 3), 16),
-                   parseInt(appTheme.colors.primary.slice(3, 5), 16),
-                   parseInt(appTheme.colors.primary.slice(5, 7), 16));
-    doc.text(title, 14, 22);
+    doc.setTextColor(
+      parseInt(appTheme.colors.primary.slice(1, 3), 16),
+      parseInt(appTheme.colors.primary.slice(3, 5), 16),
+      parseInt(appTheme.colors.primary.slice(5, 7), 16)
+    );
+    doc.text(title, 14, 20);
     
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 30);
+    doc.text(`Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 28);
+    doc.text(`Total Records: ${filteredData.length}`, 14, 35);
 
     const tableColumn = columns.map((col) => col.header);
     const tableRows = filteredData.map((row) =>
       columns.map((col) => {
         const value = row[col.accessor];
+        
+        // Handle custom cell rendering
         if (col.cell && typeof col.cell === 'function') {
-          // Extract text from React element
-          const tempDiv = document.createElement('div');
-          const element = col.cell(value, row);
-          if (typeof element === 'string') {
-            return element;
+          try {
+            const element = col.cell(value, row);
+            // Try to extract text content from React element
+            if (element && element.props) {
+              if (element.props.children) {
+                if (typeof element.props.children === 'string') {
+                  return element.props.children;
+                }
+                if (Array.isArray(element.props.children)) {
+                  return element.props.children
+                    .map(child => child && child.props ? child.props.children : child)
+                    .filter(Boolean)
+                    .join(' ');
+                }
+              }
+            }
+            return String(value || '');
+          } catch (e) {
+            return String(value || '');
           }
-          return String(value || "");
         }
-        return String(value || "");
+        
+        // Handle different value types
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+        if (typeof value === 'number') return value.toFixed(2);
+        if (typeof value === 'object') return JSON.stringify(value);
+        return String(value);
       })
     );
 
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-      startY: 35,
+      startY: 40,
       theme: 'grid',
       styles: {
-        fontSize: 9,
-        cellPadding: 4,
+        fontSize: 8,
+        cellPadding: 3,
         textColor: [51, 51, 51],
         lineColor: [200, 200, 200],
         lineWidth: 0.25,
       },
       headStyles: {
-        fillColor: [parseInt(appTheme.colors.primary.slice(1, 3), 16),
-                   parseInt(appTheme.colors.primary.slice(3, 5), 16),
-                   parseInt(appTheme.colors.primary.slice(5, 7), 16)],
+        fillColor: [
+          parseInt(appTheme.colors.primary.slice(1, 3), 16),
+          parseInt(appTheme.colors.primary.slice(3, 5), 16),
+          parseInt(appTheme.colors.primary.slice(5, 7), 16)
+        ],
         textColor: [255, 255, 255],
         fontStyle: 'bold',
       },
       alternateRowStyles: {
         fillColor: [248, 248, 248]
       },
-      margin: { top: 35 }
+      margin: { top: 40 },
+      didDrawPage: (data) => {
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(
+          `Page ${data.pageNumber} of ${data.pageCount}`,
+          doc.internal.pageSize.width - 30,
+          doc.internal.pageSize.height - 10
+        );
+      }
     });
 
-    doc.save(`${title.replace(/\s+/g, '_')}.pdf`);
+    doc.save(`${title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
-  // Excel Download
+  // Excel Download with safe data handling
   const downloadExcel = () => {
+    if (!filteredData || filteredData.length === 0) return;
+    
     const flattenedData = filteredData.map(row => {
       const flatRow = {};
       columns.forEach(col => {
         const value = row[col.accessor];
-        flatRow[col.header] = value;
+        
+        // Handle custom cell rendering
+        if (col.cell && typeof col.cell === 'function') {
+          try {
+            const element = col.cell(value, row);
+            if (element && element.props) {
+              if (element.props.children) {
+                if (typeof element.props.children === 'string') {
+                  flatRow[col.header] = element.props.children;
+                } else {
+                  flatRow[col.header] = String(value || '');
+                }
+              } else {
+                flatRow[col.header] = String(value || '');
+              }
+            } else {
+              flatRow[col.header] = String(value || '');
+            }
+          } catch (e) {
+            flatRow[col.header] = String(value || '');
+          }
+        } else {
+          // Handle different value types
+          if (value === null || value === undefined) {
+            flatRow[col.header] = '';
+          } else if (typeof value === 'boolean') {
+            flatRow[col.header] = value ? 'Yes' : 'No';
+          } else if (typeof value === 'number') {
+            flatRow[col.header] = value;
+          } else if (typeof value === 'object') {
+            flatRow[col.header] = JSON.stringify(value);
+          } else {
+            flatRow[col.header] = value;
+          }
+        }
       });
       return flatRow;
     });
     
     const worksheet = XLSX.utils.json_to_sheet(flattenedData);
+    
+    // Auto-size columns
+    const maxWidth = 50;
+    const wscols = columns.map(col => ({
+      wch: Math.min(maxWidth, col.header.length + 10)
+    }));
+    worksheet['!cols'] = wscols;
+    
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
     
-    XLSX.writeFile(workbook, `${title.replace(/\s+/g, '_')}.xlsx`);
+    XLSX.writeFile(workbook, `${title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  // Print Table
+  // Print Table with safe data handling
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank', 'width=1200,height=800');
+    if (!filteredData || filteredData.length === 0) return;
+    
+    const printWindow = window.open('', '_blank', 'width=1400,height=900');
+    
+    const renderCellContent = (row, col) => {
+      const value = row[col.accessor];
+      
+      if (col.cell && typeof col.cell === 'function') {
+        try {
+          const element = col.cell(value, row);
+          if (element && element.props) {
+            if (element.props.children) {
+              if (typeof element.props.children === 'string') {
+                return element.props.children;
+              }
+              if (Array.isArray(element.props.children)) {
+                return element.props.children
+                  .map(child => {
+                    if (typeof child === 'string') return child;
+                    if (child && child.props) {
+                      if (child.props.children) return child.props.children;
+                      if (child.props.label) return child.props.label;
+                    }
+                    return '';
+                  })
+                  .filter(Boolean)
+                  .join(' ');
+              }
+            }
+          }
+          return String(value || '');
+        } catch (e) {
+          return String(value || '');
+        }
+      }
+      
+      if (value === null || value === undefined) return '';
+      if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+      if (typeof value === 'number') return safeToFixed(value);
+      if (typeof value === 'object') return JSON.stringify(value);
+      return String(value);
+    };
     
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>${title}</title>
+          <title>${title} - ${new Date().toLocaleDateString()}</title>
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { 
               font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
-              margin: 40px;
-              color: #1a1a1a;
-              background: white;
+              margin: 30px; 
+              color: #1a1a1a; 
+              background: white; 
             }
-            .print-header {
-              text-align: center;
-              margin-bottom: 30px;
-              padding-bottom: 20px;
-              border-bottom: 3px solid ${appTheme.colors.primary};
+            .print-header { 
+              text-align: center; 
+              margin-bottom: 30px; 
+              padding-bottom: 20px; 
+              border-bottom: 3px solid ${appTheme.colors.primary}; 
             }
-            .print-header h1 {
-              color: ${appTheme.colors.primary};
-              margin: 0 0 8px 0;
-              font-size: 28px;
-              font-weight: 700;
+            .print-header h1 { 
+              color: ${appTheme.colors.primary}; 
+              margin: 0 0 8px 0; 
+              font-size: 28px; 
+              font-weight: 700; 
             }
-            .print-meta {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              margin-top: 15px;
-              font-size: 14px;
-              color: #666;
+            .print-meta { 
+              display: flex; 
+              justify-content: space-between; 
+              margin-top: 15px; 
+              font-size: 13px; 
+              color: #666; 
             }
             table { 
               width: 100%; 
               border-collapse: collapse; 
-              margin-top: 15px;
-              font-size: 14px;
+              margin-top: 20px;
+              font-size: 12px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             }
             th { 
               background: ${appTheme.colors.primary};
               color: white !important;
-              padding: 16px 12px;
+              padding: 15px 12px;
               text-align: left;
               font-weight: 600;
-              font-size: 13px;
+              font-size: 12px;
               text-transform: uppercase;
               letter-spacing: 0.5px;
               border: none !important;
             }
             td { 
-              padding: 14px 12px;
+              padding: 12px;
               border-bottom: 1px solid #e8e8e8;
               background: white;
+              vertical-align: middle;
             }
             tr:nth-child(even) td {
               background-color: #fafafa;
             }
+            tr:hover td {
+              background-color: #f5f5f5;
+            }
             .action-buttons {
               display: none;
+            }
+            .badge {
+              display: inline-block;
+              padding: 4px 8px;
+              border-radius: 12px;
+              font-size: 10px;
+              font-weight: 600;
+              text-transform: uppercase;
             }
             @media print {
               body { margin: 15px; }
               .print-header { margin-bottom: 20px; }
+              th { background: ${appTheme.colors.primary} !important; }
             }
           </style>
         </head>
@@ -216,7 +407,7 @@ export function DataTable({
             <p>Comprehensive Data Report</p>
             <div class="print-meta">
               <span>Total Records: ${filteredData.length}</span>
-              <span>Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</span>
+              <span>Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</span>
               <span>Page 1 of 1</span>
             </div>
           </div>
@@ -224,24 +415,21 @@ export function DataTable({
             <thead>
               <tr>
                 ${columns.map(col => `<th>${col.header}</th>`).join('')}
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               ${filteredData.map(row => `
                 <tr>
                   ${columns.map(col => {
-                    const value = row[col.accessor];
-                    let displayValue = value;
-                    if (col.cell && typeof col.cell === 'function') {
-                      const element = col.cell(value, row);
-                      if (typeof element === 'string') {
-                        displayValue = element;
-                      } else if (element && element.props && element.props.children) {
-                        displayValue = element.props.children;
-                      }
-                    }
-                    return `<td>${displayValue || ''}</td>`;
+                    const content = renderCellContent(row, col);
+                    return `<td>${content}</td>`;
                   }).join('')}
+                  <td>
+                    <span class="badge" style="background: ${appTheme.colors.primary}15; color: ${appTheme.colors.primary}">
+                      ${row.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
@@ -255,7 +443,7 @@ export function DataTable({
     
     setTimeout(() => {
       printWindow.print();
-      setTimeout(() => printWindow.close(), 100);
+      setTimeout(() => printWindow.close(), 500);
     }, 500);
   };
 
@@ -274,7 +462,8 @@ export function DataTable({
         color: appTheme.colors.textPrimary,
         border: `1px solid ${appTheme.colors.border}`,
         width: "100%",
-        overflow: "hidden"
+        overflow: "hidden",
+        boxShadow: "0 2px 12px rgba(0,0,0,0.05)"
       }}
     >
       {/* Header Section */}
@@ -304,12 +493,12 @@ export function DataTable({
             fontSize: "0.9rem",
             fontWeight: "500",
           }}>
-            {filteredData.length} records • Page {currentPage} of {totalPages}
+            {filteredData?.length || 0} records • Page {currentPage} of {Math.max(1, totalPages)}
           </p>
         </div>
 
         {/* Actions */}
-        {exportable && (
+        {exportable && filteredData?.length > 0 && (
           <div style={{ 
             display: "flex", 
             gap: "8px",
@@ -331,11 +520,11 @@ export function DataTable({
                 gap: "6px",
                 transition: "all 0.2s ease"
               }}
-              onMouseOver={(e) => {
+              onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = appTheme.colors.secondary;
                 e.currentTarget.style.color = "white";
               }}
-              onMouseOut={(e) => {
+              onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = `${appTheme.colors.secondary}15`;
                 e.currentTarget.style.color = appTheme.colors.secondary;
               }}
@@ -359,11 +548,11 @@ export function DataTable({
                 gap: "6px",
                 transition: "all 0.2s ease"
               }}
-              onMouseOver={(e) => {
+              onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = appTheme.colors.success;
                 e.currentTarget.style.color = "white";
               }}
-              onMouseOut={(e) => {
+              onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = `${appTheme.colors.success}15`;
                 e.currentTarget.style.color = appTheme.colors.success;
               }}
@@ -387,11 +576,11 @@ export function DataTable({
                 gap: "6px",
                 transition: "all 0.2s ease"
               }}
-              onMouseOver={(e) => {
+              onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = appTheme.colors.warning;
                 e.currentTarget.style.color = "white";
               }}
-              onMouseOut={(e) => {
+              onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = `${appTheme.colors.warning}15`;
                 e.currentTarget.style.color = appTheme.colors.warning;
               }}
@@ -512,7 +701,7 @@ export function DataTable({
             </tr>
           </thead>
           <tbody>
-            {paginatedData.length > 0 ? (
+            {paginatedData && paginatedData.length > 0 ? (
               paginatedData.map((row, rowIdx) => (
                 <tr
                   key={rowIdx}
@@ -534,11 +723,11 @@ export function DataTable({
                       fontSize: "0.875rem",
                       verticalAlign: "middle"
                     }}>
-                      {col.cell ? col.cell(row[col.accessor], row) : row[col.accessor]}
+                      {col.cell ? col.cell(safeValue(row[col.accessor]), row) : safeValue(row[col.accessor])}
                     </td>
                   ))}
                   <td style={{ padding: "14px 16px" }}>
-                    <div style={{ display: "flex", gap: "8px" }}>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                       <button
                         onClick={() => onEdit(row)}
                         style={{
@@ -571,9 +760,9 @@ export function DataTable({
                         <button
                           onClick={() => onToggleStatus(row)}
                           style={{
-                            backgroundColor: `${appTheme.colors.warning}15`,
-                            color: appTheme.colors.warning,
-                            border: `1px solid ${appTheme.colors.warning}30`,
+                            backgroundColor: row.isActive ? `${appTheme.colors.warning}15` : `${appTheme.colors.success}15`,
+                            color: row.isActive ? appTheme.colors.warning : appTheme.colors.success,
+                            border: `1px solid ${row.isActive ? appTheme.colors.warning + '30' : appTheme.colors.success + '30'}`,
                             padding: "6px 12px",
                             borderRadius: "6px",
                             cursor: "pointer",
@@ -585,14 +774,15 @@ export function DataTable({
                             transition: "all 0.2s ease"
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = appTheme.colors.warning;
+                            e.currentTarget.style.backgroundColor = row.isActive ? appTheme.colors.warning : appTheme.colors.success;
                             e.currentTarget.style.color = "white";
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = `${appTheme.colors.warning}15`;
-                            e.currentTarget.style.color = appTheme.colors.warning;
+                            e.currentTarget.style.backgroundColor = row.isActive ? `${appTheme.colors.warning}15` : `${appTheme.colors.success}15`;
+                            e.currentTarget.style.color = row.isActive ? appTheme.colors.warning : appTheme.colors.success;
                           }}
                         >
+                          {row.isActive ? <FaToggleOff size={12} /> : <FaToggleOn size={12} />}
                           {row.isActive ? "Deactivate" : "Activate"}
                         </button>
                       )}
@@ -696,7 +886,7 @@ export function DataTable({
       </div>
 
       {/* Pagination */}
-      {pagination && filteredData.length > 0 && (
+      {pagination && filteredData?.length > 0 && (
         <div
           style={{
             display: "flex",
@@ -760,7 +950,7 @@ export function DataTable({
             </button>
             
             <div style={{ margin: "0 8px", fontSize: "0.875rem", color: appTheme.colors.textPrimary, fontWeight: "500" }}>
-              Page {currentPage} of {totalPages}
+              Page {currentPage} of {Math.max(1, totalPages)}
             </div>
             
             <button

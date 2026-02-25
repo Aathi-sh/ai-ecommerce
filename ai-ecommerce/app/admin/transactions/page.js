@@ -1,60 +1,93 @@
-// app/admin/dashboards/payments/page.js - MATCHING CREATE ORDER PAGE STYLE
+// app/admin/transactions/page.js - ENHANCED PROFESSIONAL VERSION
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast, Toaster } from 'react-hot-toast';
 import { useAuth } from '../../../context/AuthContext';
-import Head from 'next/head'; 
+import Head from 'next/head';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
-// Status configuration
+// Status configuration with enhanced styling
 const STATUS_CONFIG = {
   pending: {
     label: 'Pending',
     icon: '⏳',
     color: 'bg-yellow-100 text-yellow-800',
-    badgeColor: 'bg-yellow-500'
+    badgeColor: 'bg-yellow-500',
+    borderColor: 'border-yellow-200',
+    hoverColor: 'hover:bg-yellow-50'
   },
   processing: {
     label: 'Processing',
     icon: '🔄',
     color: 'bg-blue-100 text-blue-800',
-    badgeColor: 'bg-blue-500'
+    badgeColor: 'bg-blue-500',
+    borderColor: 'border-blue-200',
+    hoverColor: 'hover:bg-blue-50'
   },
   verified: {
     label: 'Verified',
     icon: '✅',
     color: 'bg-green-100 text-green-800',
-    badgeColor: 'bg-green-500'
+    badgeColor: 'bg-green-500',
+    borderColor: 'border-green-200',
+    hoverColor: 'hover:bg-green-50'
   },
   rejected: {
     label: 'Rejected',
     icon: '❌',
     color: 'bg-red-100 text-red-800',
-    badgeColor: 'bg-red-500'
+    badgeColor: 'bg-red-500',
+    borderColor: 'border-red-200',
+    hoverColor: 'hover:bg-red-50'
   },
   fraud: {
     label: 'Fraud',
     icon: '🚨',
     color: 'bg-red-100 text-red-800',
-    badgeColor: 'bg-red-700'
+    badgeColor: 'bg-red-700',
+    borderColor: 'border-red-300',
+    hoverColor: 'hover:bg-red-50'
   },
   manual_review: {
     label: 'Manual Review',
     icon: '👁️',
     color: 'bg-purple-100 text-purple-800',
-    badgeColor: 'bg-purple-500'
+    badgeColor: 'bg-purple-500',
+    borderColor: 'border-purple-200',
+    hoverColor: 'hover:bg-purple-50'
+  },
+  requires_additional_proof: {
+    label: 'Needs More Proof',
+    icon: '📎',
+    color: 'bg-orange-100 text-orange-800',
+    badgeColor: 'bg-orange-500',
+    borderColor: 'border-orange-200',
+    hoverColor: 'hover:bg-orange-50'
   }
+};
+
+// Risk level configuration
+const RISK_CONFIG = {
+  low: { label: 'Low Risk', icon: '✓', color: 'text-green-600', bgColor: 'bg-green-50' },
+  medium: { label: 'Medium Risk', icon: '⚠️', color: 'text-yellow-600', bgColor: 'bg-yellow-50' },
+  high: { label: 'High Risk', icon: '🚨', color: 'text-orange-600', bgColor: 'bg-orange-50' },
+  critical: { label: 'Critical Risk', icon: '💀', color: 'text-red-600', bgColor: 'bg-red-50' }
 };
 
 // API endpoint configuration
 const API_ENDPOINTS = {
   verifications: '/api/payments/verify',
+  getVerification: (id) => `/api/payments/verify?id=${id}`,
   updateStatus: (id, action) => `/api/payments/verify?id=${id}&action=${action}`,
-  deleteVerification: (id) => `/api/payments/verify?id=${id}`
+  deleteVerification: (id) => `/api/payments/verify?id=${id}`,
+  generateInvoice: (id) => `/api/payments/verify/${id}/invoice`,
+  sendNotification: (id) => `/api/payments/verify/${id}/notify`
 };
 
 export default function PaymentVerificationDashboard() {
-  // Auth context
+  const router = useRouter();
   const { user, isAdmin } = useAuth();
   
   // State management
@@ -68,6 +101,11 @@ export default function PaymentVerificationDashboard() {
   const [action, setAction] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dateRange, setDateRange] = useState({ from: '', to: '' });
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [showFilters, setShowFilters] = useState(false);
+  const [includeInactive, setIncludeInactive] = useState(false);
   
   // Statistics state
   const [stats, setStats] = useState({
@@ -78,6 +116,9 @@ export default function PaymentVerificationDashboard() {
     rejected: 0,
     fraud: 0,
     manual_review: 0,
+    totalAmount: 0,
+    verifiedAmount: 0,
+    pendingAmount: 0
   });
 
   // ========== DATA FETCHING ==========
@@ -87,7 +128,16 @@ export default function PaymentVerificationDashboard() {
       setLoading(true);
       if (showRefreshToast) setIsRefreshing(true);
       
-      const response = await fetch(API_ENDPOINTS.verifications);
+      // Build query params
+      const params = new URLSearchParams();
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (dateRange.from) params.append('fromDate', dateRange.from);
+      if (dateRange.to) params.append('toDate', dateRange.to);
+      if (includeInactive) params.append('includeInactive', 'true');
+      params.append('sortBy', sortBy);
+      params.append('sortOrder', sortOrder);
+      
+      const response = await fetch(`${API_ENDPOINTS.verifications}?${params.toString()}`);
       
       if (!response.ok) {
         throw new Error(`API Error ${response.status}`);
@@ -99,7 +149,7 @@ export default function PaymentVerificationDashboard() {
         const data = result.data || [];
         setVerifications(data);
         setFilteredVerifications(data);
-        updateStatistics(data);
+        updateStatistics(data, result.stats);
         
         if (showRefreshToast) {
           toast.success('Data refreshed successfully');
@@ -114,20 +164,41 @@ export default function PaymentVerificationDashboard() {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [statusFilter, dateRange.from, dateRange.to, sortBy, sortOrder, includeInactive]);
 
   // Update statistics
-  const updateStatistics = (data) => {
-    const newStats = {
-      total: data.length,
-      pending: data.filter(v => v.status === 'pending').length,
-      processing: data.filter(v => v.status === 'processing').length,
-      verified: data.filter(v => v.status === 'verified').length,
-      rejected: data.filter(v => v.status === 'rejected').length,
-      fraud: data.filter(v => v.status === 'fraud').length,
-      manual_review: data.filter(v => v.status === 'manual_review').length,
-    };
-    setStats(newStats);
+  const updateStatistics = (data, apiStats = null) => {
+    if (apiStats) {
+      setStats({
+        total: apiStats.total || data.length,
+        pending: apiStats.pending || data.filter(v => v.status === 'pending').length,
+        processing: apiStats.processing || data.filter(v => v.status === 'processing').length,
+        verified: apiStats.verified || data.filter(v => v.status === 'verified').length,
+        rejected: apiStats.rejected || data.filter(v => v.status === 'rejected').length,
+        fraud: apiStats.fraud || data.filter(v => v.status === 'fraud').length,
+        manual_review: apiStats.manual_review || data.filter(v => v.status === 'manual_review').length,
+        totalAmount: data.reduce((sum, v) => sum + (v.orderDetails?.totalAmount || 0), 0),
+        verifiedAmount: data.filter(v => v.status === 'verified')
+          .reduce((sum, v) => sum + (v.orderDetails?.totalAmount || 0), 0),
+        pendingAmount: data.filter(v => v.status === 'pending')
+          .reduce((sum, v) => sum + (v.orderDetails?.totalAmount || 0), 0)
+      });
+    } else {
+      setStats({
+        total: data.length,
+        pending: data.filter(v => v.status === 'pending').length,
+        processing: data.filter(v => v.status === 'processing').length,
+        verified: data.filter(v => v.status === 'verified').length,
+        rejected: data.filter(v => v.status === 'rejected').length,
+        fraud: data.filter(v => v.status === 'fraud').length,
+        manual_review: data.filter(v => v.status === 'manual_review').length,
+        totalAmount: data.reduce((sum, v) => sum + (v.orderDetails?.totalAmount || 0), 0),
+        verifiedAmount: data.filter(v => v.status === 'verified')
+          .reduce((sum, v) => sum + (v.orderDetails?.totalAmount || 0), 0),
+        pendingAmount: data.filter(v => v.status === 'pending')
+          .reduce((sum, v) => sum + (v.orderDetails?.totalAmount || 0), 0)
+      });
+    }
   };
 
   // ========== FILTERING ==========
@@ -146,7 +217,9 @@ export default function PaymentVerificationDashboard() {
       filtered = filtered.filter(v => 
         (v.orderNumber && v.orderNumber.toLowerCase().includes(term)) ||
         (v.customerPhone && v.customerPhone.includes(term)) ||
-        (v.orderReference && v.orderReference.toLowerCase().includes(term))
+        (v.orderReference && v.orderReference.toLowerCase().includes(term)) ||
+        (v.detectedPayment?.transactionId && v.detectedPayment.transactionId.toLowerCase().includes(term)) ||
+        (v.customerName && v.customerName.toLowerCase().includes(term))
       );
     }
 
@@ -163,8 +236,15 @@ export default function PaymentVerificationDashboard() {
       if (status === 'fraud') actionType = 'mark-fraud';
 
       const requestBody = {
-        ...(actionType === 'reject' && { reason }),
-        ...(actionType === 'verify' && { verifiedBy: user?.email || 'admin' })
+        ...(actionType === 'reject' && { reason, category: 'amount_mismatch' }),
+        ...(actionType === 'verify' && { 
+          verifiedBy: user?.email || 'admin',
+          method: 'manual'
+        }),
+        ...(actionType === 'mark-fraud' && { 
+          reasons: typeof reason === 'string' ? [reason] : reason,
+          markedBy: user?.email || 'admin'
+        })
       };
 
       const response = await fetch(API_ENDPOINTS.updateStatus(id, actionType), {
@@ -178,7 +258,7 @@ export default function PaymentVerificationDashboard() {
       const result = await response.json();
 
       if (result.success) {
-        toast.success(`Payment ${STATUS_CONFIG[status].label.toLowerCase()} successfully`);
+        toast.success(`Payment ${STATUS_CONFIG[status]?.label || status} successfully`);
         fetchVerifications();
         setIsModalOpen(false);
         setAction('');
@@ -192,20 +272,22 @@ export default function PaymentVerificationDashboard() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this verification?')) {
+  const handleDelete = async (id, permanent = false) => {
+    if (!confirm(permanent 
+      ? 'Are you sure you want to permanently delete this verification? This action cannot be undone.' 
+      : 'Are you sure you want to delete this verification?')) {
       return;
     }
 
     try {
-      const response = await fetch(API_ENDPOINTS.deleteVerification(id), {
+      const response = await fetch(`${API_ENDPOINTS.deleteVerification(id)}${permanent ? '&permanent=true' : ''}`, {
         method: 'DELETE',
       });
 
       const result = await response.json();
 
       if (result.success) {
-        toast.success('Verification deleted successfully');
+        toast.success(permanent ? 'Verification permanently deleted' : 'Verification deleted successfully');
         fetchVerifications();
       } else {
         throw new Error(result.message || 'Delete failed');
@@ -213,6 +295,64 @@ export default function PaymentVerificationDashboard() {
     } catch (error) {
       console.error('Error deleting verification:', error);
       toast.error(error.message || 'Failed to delete verification');
+    }
+  };
+
+  const handleGenerateInvoice = async (verification) => {
+    try {
+      toast.loading('Generating invoice...');
+      
+      const response = await fetch(API_ENDPOINTS.generateInvoice(verification._id), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.dismiss();
+        toast.success('Invoice generated successfully');
+        
+        if (result.data?.invoiceUrl) {
+          window.open(result.data.invoiceUrl, '_blank');
+        }
+        
+        fetchVerifications();
+      } else {
+        throw new Error(result.message || 'Failed to generate invoice');
+      }
+    } catch (error) {
+      toast.dismiss();
+      console.error('Error generating invoice:', error);
+      toast.error(error.message || 'Failed to generate invoice');
+    }
+  };
+
+  const handleSendNotification = async (verification) => {
+    try {
+      toast.loading('Sending notification...');
+      
+      const response = await fetch(API_ENDPOINTS.sendNotification(verification._id), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.dismiss();
+        toast.success('Notification sent successfully');
+      } else {
+        throw new Error(result.message || 'Failed to send notification');
+      }
+    } catch (error) {
+      toast.dismiss();
+      console.error('Error sending notification:', error);
+      toast.error(error.message || 'Failed to send notification');
     }
   };
 
@@ -232,6 +372,19 @@ export default function PaymentVerificationDashboard() {
     document.body.style.overflow = 'unset';
   };
 
+  const handleViewOrder = (orderId) => {
+    router.push(`/admin/orders?id=${orderId}`);
+  };
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setDateRange({ from: '', to: '' });
+    setSortBy('createdAt');
+    setSortOrder('desc');
+    setIncludeInactive(false);
+  };
+
   // ========== FORMATTING UTILITIES ==========
   
   const formatCurrency = (amount) => {
@@ -246,7 +399,7 @@ export default function PaymentVerificationDashboard() {
   const formatDate = (dateString) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
+      return date.toLocaleDateString('en-IN', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -259,12 +412,34 @@ export default function PaymentVerificationDashboard() {
   const formatDateTime = (dateString) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleString('en-US', {
+      return date.toLocaleString('en-IN', {
+        year: 'numeric',
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
+        second: '2-digit',
+        hour12: true
       });
+    } catch (error) {
+      return 'Invalid Date';
+    }
+  };
+
+  const formatTimeAgo = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins} min ago`;
+      if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+      if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+      return formatDate(dateString);
     } catch (error) {
       return 'Invalid Date';
     }
@@ -272,11 +447,18 @@ export default function PaymentVerificationDashboard() {
 
   const getValidationStatus = (verification) => {
     const results = verification.validationResults || {};
+    const expected = results.expectedAmount || verification.orderDetails?.totalAmount || 0;
+    const found = results.foundAmount || verification.detectedPayment?.amount || 0;
+    const amountDiff = Math.abs(expected - found);
     
-    if (results.amountMatch !== undefined) {
-      return results.amountMatch 
-        ? { text: 'Amount Matched', color: 'text-green-600', icon: '✓' }
-        : { text: 'Amount Mismatch', color: 'text-red-600', icon: '✗' };
+    if (amountDiff === 0) {
+      return { text: 'Exact Match', color: 'text-green-600', icon: '✓' };
+    } else if (amountDiff <= 2) {
+      return { text: 'Close Match', color: 'text-green-500', icon: '~' };
+    } else if (amountDiff <= 10) {
+      return { text: 'Near Match', color: 'text-yellow-600', icon: '⚠️' };
+    } else if (amountDiff > 0) {
+      return { text: 'Mismatch', color: 'text-red-600', icon: '✗' };
     }
     
     return { text: 'Not Validated', color: 'text-gray-600', icon: '−' };
@@ -284,16 +466,27 @@ export default function PaymentVerificationDashboard() {
 
   const getFraudRiskLevel = (verification) => {
     const analysis = verification.fraudAnalysis || {};
+    const score = analysis.fraudScore || 0;
     
-    if (analysis.isSuspicious || analysis.markedAsFraud) {
-      return { level: 'High', color: 'text-red-600', icon: '⚠️' };
+    if (analysis.isSuspicious || analysis.markedAsFraud || score >= 75) {
+      return RISK_CONFIG.critical;
     }
-    
-    if (analysis.fraudScore > 0.5) {
-      return { level: 'Medium', color: 'text-yellow-600', icon: '⚠️' };
+    if (score >= 50) {
+      return RISK_CONFIG.high;
     }
+    if (score >= 25) {
+      return RISK_CONFIG.medium;
+    }
+    return RISK_CONFIG.low;
+  };
+
+  const getAmountDifference = (verification) => {
+    const expected = verification.orderDetails?.totalAmount || 0;
+    const detected = verification.detectedPayment?.amount || 0;
+    const diff = Math.abs(expected - detected);
+    const percent = expected > 0 ? (diff / expected) * 100 : 0;
     
-    return { level: 'Low', color: 'text-green-600', icon: '✓' };
+    return { diff, percent };
   };
 
   // ========== COMPONENT INITIALIZATION ==========
@@ -306,14 +499,60 @@ export default function PaymentVerificationDashboard() {
     };
   }, [fetchVerifications]);
 
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchVerifications();
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [fetchVerifications]);
+
   // ========== STATISTICS CARDS ==========
   
   const statCards = [
-    { title: 'Total', value: stats.total, icon: '📊', color: 'bg-blue-500' },
-    { title: 'Pending', value: stats.pending, icon: '⏳', color: 'bg-yellow-500' },
-    { title: 'Processing', value: stats.processing, icon: '🔄', color: 'bg-blue-400' },
-    { title: 'Verified', value: stats.verified, icon: '✅', color: 'bg-green-500' },
-    { title: 'Rejected', value: stats.rejected, icon: '❌', color: 'bg-red-500' }
+    { 
+      title: 'Total', 
+      value: stats.total, 
+      icon: '📊', 
+      color: 'bg-blue-500',
+      subValue: formatCurrency(stats.totalAmount)
+    },
+    { 
+      title: 'Pending', 
+      value: stats.pending, 
+      icon: '⏳', 
+      color: 'bg-yellow-500',
+      subValue: formatCurrency(stats.pendingAmount)
+    },
+    { 
+      title: 'Processing', 
+      value: stats.processing, 
+      icon: '🔄', 
+      color: 'bg-blue-400',
+      subValue: stats.processing > 0 ? formatCurrency(stats.pendingAmount) : '₹0'
+    },
+    { 
+      title: 'Verified', 
+      value: stats.verified, 
+      icon: '✅', 
+      color: 'bg-green-500',
+      subValue: formatCurrency(stats.verifiedAmount)
+    },
+    { 
+      title: 'Rejected', 
+      value: stats.rejected, 
+      icon: '❌', 
+      color: 'bg-red-500',
+      subValue: stats.rejected > 0 ? formatCurrency(stats.pendingAmount) : '₹0'
+    },
+    { 
+      title: 'Fraud', 
+      value: stats.fraud, 
+      icon: '🚨', 
+      color: 'bg-red-700',
+      subValue: stats.fraud > 0 ? formatCurrency(stats.pendingAmount) : '₹0'
+    }
   ];
 
   const statusOptions = [
@@ -325,12 +564,20 @@ export default function PaymentVerificationDashboard() {
     }))
   ];
 
+  const sortOptions = [
+    { value: 'createdAt', label: 'Date Created' },
+    { value: 'updatedAt', label: 'Last Updated' },
+    { value: 'orderDetails.totalAmount', label: 'Amount' },
+    { value: 'status', label: 'Status' }
+  ];
+
   // ========== RENDER ==========
   
   return (
     <>
       <Head>
-        <title>Payment Verification | LFMS</title>
+        <title>Payment Verification | PosterPro Admin</title>
+        <meta name="description" content="Manage and verify customer payments" />
       </Head>
 
       <Toaster 
@@ -343,6 +590,24 @@ export default function PaymentVerificationDashboard() {
             borderRadius: '0.375rem',
             padding: '0.75rem 1rem',
             fontSize: '0.875rem'
+          },
+          success: {
+            icon: '✅',
+            style: {
+              background: '#10b981',
+            }
+          },
+          error: {
+            icon: '❌',
+            style: {
+              background: '#ef4444',
+            }
+          },
+          loading: {
+            icon: '⏳',
+            style: {
+              background: '#3b82f6',
+            }
           }
         }}
       />
@@ -350,13 +615,34 @@ export default function PaymentVerificationDashboard() {
       <div className="payments-container">
         {/* Header */}
         <div className="page-header">
-          <h1 className="page-title">Payment Verification</h1>
-          <p className="page-subtitle">
-            Manage, verify, and monitor payment confirmations from customers
-          </p>
+          <div>
+            <h1 className="page-title">Payment Verification</h1>
+            <p className="page-subtitle">
+              Manage, verify, and monitor payment confirmations from customers
+            </p>
+          </div>
+          
+          {/* Quick Actions */}
+          <div className="header-actions">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="filter-toggle-btn"
+            >
+              <span className="btn-icon">🔍</span>
+              {showFilters ? 'Hide Filters' : 'Show Filters'}
+            </button>
+            <button
+              onClick={() => fetchVerifications(true)}
+              disabled={isRefreshing}
+              className="refresh-btn"
+            >
+              <span className={`btn-icon ${isRefreshing ? 'spinning' : ''}`}>🔄</span>
+              Refresh
+            </button>
+          </div>
         </div>
 
-        {/* Statistics Cards - Matching Create Order Style */}
+        {/* Statistics Cards */}
         <div className="stats-grid">
           {statCards.map((stat, index) => (
             <div key={index} className="stat-card">
@@ -364,6 +650,9 @@ export default function PaymentVerificationDashboard() {
                 <div>
                   <p className="stat-label">{stat.title}</p>
                   <p className="stat-value">{stat.value}</p>
+                  {stat.subValue && (
+                    <p className="stat-subvalue">{stat.subValue}</p>
+                  )}
                 </div>
                 <div className={`stat-icon ${stat.color}`}>
                   <span>{stat.icon}</span>
@@ -379,7 +668,91 @@ export default function PaymentVerificationDashboard() {
           ))}
         </div>
 
-        {/* Filters Section - Matching Create Order Style */}
+        {/* Advanced Filters */}
+        {showFilters && (
+          <div className="filters-panel">
+            <div className="filters-header">
+              <h3 className="filters-title">Advanced Filters</h3>
+              <button onClick={resetFilters} className="reset-filters-btn">
+                Reset All
+              </button>
+            </div>
+            
+            <div className="filters-grid">
+              {/* Date Range */}
+              <div className="filter-group">
+                <label className="filter-label">Date Range</label>
+                <div className="date-range">
+                  <input
+                    type="date"
+                    value={dateRange.from}
+                    onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
+                    className="filter-input"
+                    placeholder="From"
+                  />
+                  <span className="date-separator">to</span>
+                  <input
+                    type="date"
+                    value={dateRange.to}
+                    onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
+                    className="filter-input"
+                    placeholder="To"
+                  />
+                </div>
+              </div>
+
+              {/* Sort By */}
+              <div className="filter-group">
+                <label className="filter-label">Sort By</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="filter-select"
+                >
+                  {sortOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sort Order */}
+              <div className="filter-group">
+                <label className="filter-label">Sort Order</label>
+                <div className="sort-order">
+                  <button
+                    onClick={() => setSortOrder('desc')}
+                    className={`sort-order-btn ${sortOrder === 'desc' ? 'active' : ''}`}
+                  >
+                    Newest First
+                  </button>
+                  <button
+                    onClick={() => setSortOrder('asc')}
+                    className={`sort-order-btn ${sortOrder === 'asc' ? 'active' : ''}`}
+                  >
+                    Oldest First
+                  </button>
+                </div>
+              </div>
+
+              {/* Include Inactive */}
+              <div className="filter-group">
+                <label className="filter-label">Options</label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={includeInactive}
+                    onChange={(e) => setIncludeInactive(e.target.checked)}
+                  />
+                  <span>Include inactive verifications</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Filters Section */}
         <div className="filters-section">
           {/* Search Input */}
           <div className="search-wrapper">
@@ -388,7 +761,7 @@ export default function PaymentVerificationDashboard() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by order number, phone, or ID..."
+              placeholder="Search by order number, phone, transaction ID..."
               className="search-input"
             />
             {searchTerm && (
@@ -430,14 +803,18 @@ export default function PaymentVerificationDashboard() {
               <h3 className="card-title">Payment Verifications</h3>
               <span className="card-badge">{filteredVerifications.length}</span>
             </div>
-            <button
-              onClick={() => fetchVerifications(true)}
-              disabled={isRefreshing}
-              className="refresh-button"
-            >
-              <span className={`refresh-icon ${isRefreshing ? 'spinning' : ''}`}>🔄</span>
-              Refresh
-            </button>
+            
+            {/* Bulk Actions */}
+            {isAdmin && filteredVerifications.length > 0 && (
+              <div className="bulk-actions">
+                <button className="bulk-action-btn">
+                  Bulk Verify
+                </button>
+                <button className="bulk-action-btn">
+                  Export CSV
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Table/Content */}
@@ -452,106 +829,180 @@ export default function PaymentVerificationDashboard() {
                 <div className="empty-icon">📄</div>
                 <h3 className="empty-title">No payment verifications found</h3>
                 <p className="empty-message">
-                  {searchTerm || statusFilter !== 'all'
+                  {searchTerm || statusFilter !== 'all' || dateRange.from || dateRange.to
                     ? 'Try adjusting your search or filter criteria'
                     : 'No payment verifications have been submitted yet'}
                 </p>
-                {(searchTerm || statusFilter !== 'all') && (
+                {(searchTerm || statusFilter !== 'all' || dateRange.from || dateRange.to) && (
                   <button
-                    onClick={() => {
-                      setSearchTerm('');
-                      setStatusFilter('all');
-                    }}
+                    onClick={resetFilters}
                     className="empty-button"
                   >
-                    Clear Filters
+                    Clear All Filters
                   </button>
                 )}
               </div>
             ) : (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Order Details</th>
-                    <th>Customer</th>
-                    <th>Payment</th>
-                    <th>Status</th>
-                    <th>Date</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredVerifications.map((verification) => {
-                    const validation = getValidationStatus(verification);
-                    const fraudRisk = getFraudRiskLevel(verification);
-                    const statusConfig = STATUS_CONFIG[verification.status] || STATUS_CONFIG.pending;
-                    
-                    return (
-                      <tr key={verification._id}>
-                        <td>
-                          <div className="order-details">
-                            <span className="order-number">#{verification.orderNumber}</span>
-                            <span className="order-reference">Ref: {verification.orderReference || 'N/A'}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="customer-details">
-                            <span className="customer-phone">{verification.customerPhone || 'N/A'}</span>
-                            <span className="customer-name">{verification.orderDetails?.customerName || 'Customer'}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="payment-details">
-                            <span className="payment-amount">
-                              {formatCurrency(verification.detectedPayment?.amount || verification.orderDetails?.totalAmount || 0)}
-                            </span>
-                            <span className={`payment-status ${validation.color}`}>
-                              {validation.icon} {validation.text}
-                            </span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="status-wrapper">
-                            <span className={`status-badge ${statusConfig.color}`}>
-                              <span className="status-icon">{statusConfig.icon}</span>
-                              {statusConfig.label}
-                            </span>
-                            {verification.status !== 'verified' && (
-                              <span className={`risk-level ${fraudRisk.color}`}>
-                                {fraudRisk.icon} {fraudRisk.level} Risk
+              <div className="table-responsive">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Order Details</th>
+                      <th>Customer</th>
+                      <th>Payment</th>
+                      <th>Validation</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredVerifications.map((verification) => {
+                      const validation = getValidationStatus(verification);
+                      const fraudRisk = getFraudRiskLevel(verification);
+                      const amountDiff = getAmountDifference(verification);
+                      const statusConfig = STATUS_CONFIG[verification.status] || STATUS_CONFIG.pending;
+                      const timeAgo = formatTimeAgo(verification.createdAt);
+                      
+                      return (
+                        <tr key={verification._id} className={statusConfig.hoverColor}>
+                          <td>
+                            <div className="order-details">
+                              <span className="order-number">#{verification.orderNumber}</span>
+                              <span className="order-reference">
+                                Ref: {verification.orderReference?.slice(-8) || 'N/A'}
                               </span>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <div className="date-wrapper">
-                            <span className="date-main">{formatDate(verification.createdAt)}</span>
-                            <span className="date-time">{formatDateTime(verification.createdAt).split(', ')[1]}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="action-buttons">
-                            <button
-                              onClick={() => handleViewDetails(verification)}
-                              className="action-button view"
-                            >
-                              View
-                            </button>
-                            {isAdmin && verification.status !== 'verified' && (
+                              {amountDiff.diff > 0 && (
+                                <span className={`amount-diff ${validation.color}`}>
+                                  {validation.icon} ₹{amountDiff.diff}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="customer-details">
+                              <span className="customer-phone">{verification.customerPhone || 'N/A'}</span>
+                              <span className="customer-name">
+                                {verification.orderDetails?.customerName || verification.customerName || 'Customer'}
+                              </span>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="payment-details">
+                              <span className="payment-amount">
+                                {formatCurrency(verification.detectedPayment?.amount || verification.orderDetails?.totalAmount || 0)}
+                              </span>
+                              {verification.detectedPayment?.transactionId && (
+                                <span className="transaction-id" title={verification.detectedPayment.transactionId}>
+                                  TXN: {verification.detectedPayment.transactionId.slice(-8)}
+                                </span>
+                              )}
+                              {verification.detectedPayment?.upiId && (
+                                <span className="upi-id" title={verification.detectedPayment.upiId}>
+                                  UPI: {verification.detectedPayment.upiId.split('@')[0]}@...
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="validation-details">
+                              <span className={`validation-badge ${validation.color}`}>
+                                {validation.icon} {validation.text}
+                              </span>
+                              {verification.validationResults?.confidenceScore > 0 && (
+                                <span className="confidence-score">
+                                  Confidence: {verification.validationResults.confidenceScore}%
+                                </span>
+                              )}
+                              <span className={`risk-badge ${fraudRisk.bgColor} ${fraudRisk.color}`}>
+                                {fraudRisk.icon} {fraudRisk.label}
+                              </span>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="status-wrapper">
+                              <span className={`status-badge ${statusConfig.color}`}>
+                                <span className="status-icon">{statusConfig.icon}</span>
+                                {statusConfig.label}
+                              </span>
+                              {verification.verificationAttempts > 1 && (
+                                <span className="attempt-badge" title={`${verification.verificationAttempts} attempts`}>
+                                  Attempt {verification.verificationAttempts}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="date-wrapper">
+                              <span className="date-main" title={formatDateTime(verification.createdAt)}>
+                                {timeAgo}
+                              </span>
+                              {verification.verifiedAt && (
+                                <span className="date-verified" title={formatDateTime(verification.verifiedAt)}>
+                                  ✓ {formatTimeAgo(verification.verifiedAt)}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="action-buttons">
                               <button
-                                onClick={() => handleDelete(verification._id)}
-                                className="action-button delete"
+                                onClick={() => handleViewDetails(verification)}
+                                className="action-button view"
+                                title="View Details"
                               >
-                                Delete
+                                View
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                              {verification.status === 'verified' && !verification.invoiceGenerated && (
+                                <button
+                                  onClick={() => handleGenerateInvoice(verification)}
+                                  className="action-button invoice"
+                                  title="Generate Invoice"
+                                >
+                                  📄
+                                </button>
+                              )}
+                              {verification.orderReference && (
+                                <button
+                                  onClick={() => handleViewOrder(verification.orderReference)}
+                                  className="action-button order"
+                                  title="View Order"
+                                >
+                                  📦
+                                </button>
+                              )}
+                              {isAdmin && (
+                                <>
+                                  {verification.status !== 'verified' && (
+                                    <button
+                                      onClick={() => handleDelete(verification._id, false)}
+                                      className="action-button delete"
+                                      title="Soft Delete"
+                                    >
+                                      🗑️
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => {
+                                      if (confirm('Permanently delete this verification?')) {
+                                        handleDelete(verification._id, true);
+                                      }
+                                    }}
+                                    className="action-button delete-permanent"
+                                    title="Permanent Delete"
+                                  >
+                                    💀
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 
@@ -560,11 +1011,18 @@ export default function PaymentVerificationDashboard() {
             <p className="footer-text">
               Showing {filteredVerifications.length} of {verifications.length} total verifications
             </p>
+            {filteredVerifications.length > 0 && (
+              <p className="footer-total">
+                Total Amount: {formatCurrency(
+                  filteredVerifications.reduce((sum, v) => sum + (v.orderDetails?.totalAmount || 0), 0)
+                )}
+              </p>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Details Modal - Matching Create Order Style */}
+      {/* Details Modal */}
       {isModalOpen && selectedVerification && (
         <div className="modal-overlay" onClick={handleCloseModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -582,7 +1040,7 @@ export default function PaymentVerificationDashboard() {
                   <span className="status-icon">{STATUS_CONFIG[selectedVerification.status]?.icon || '⏳'}</span>
                   {STATUS_CONFIG[selectedVerification.status]?.label || 'Pending'}
                 </span>
-                <span className="modal-id">ID: {selectedVerification._id}</span>
+                <span className="modal-id">ID: {selectedVerification._id.slice(-12)}</span>
               </div>
 
               {/* Order Information Section */}
@@ -591,15 +1049,19 @@ export default function PaymentVerificationDashboard() {
                 <div className="info-grid">
                   <div className="info-item">
                     <label>Order Number</label>
-                    <p>#{selectedVerification.orderNumber}</p>
+                    <p className="info-value">#{selectedVerification.orderNumber}</p>
                   </div>
                   <div className="info-item">
-                    <label>Reference</label>
-                    <p>{selectedVerification.orderReference || 'N/A'}</p>
+                    <label>Reference ID</label>
+                    <p className="info-value">{selectedVerification.orderReference || 'N/A'}</p>
                   </div>
                   <div className="info-item">
                     <label>Created At</label>
-                    <p>{formatDateTime(selectedVerification.createdAt)}</p>
+                    <p className="info-value">{formatDateTime(selectedVerification.createdAt)}</p>
+                  </div>
+                  <div className="info-item">
+                    <label>Last Updated</label>
+                    <p className="info-value">{formatDateTime(selectedVerification.updatedAt)}</p>
                   </div>
                 </div>
               </div>
@@ -610,17 +1072,23 @@ export default function PaymentVerificationDashboard() {
                 <div className="info-grid">
                   <div className="info-item">
                     <label>Phone Number</label>
-                    <p>{selectedVerification.customerPhone || 'N/A'}</p>
+                    <p className="info-value">{selectedVerification.customerPhone || 'N/A'}</p>
                   </div>
                   <div className="info-item">
                     <label>Name</label>
-                    <p>{selectedVerification.orderDetails?.customerName || 'N/A'}</p>
+                    <p className="info-value">{selectedVerification.orderDetails?.customerName || selectedVerification.customerName || 'N/A'}</p>
                   </div>
-                  {selectedVerification.orderDetails?.pincode && (
-                    <div className="info-item">
-                      <label>Pincode</label>
-                      <p>{selectedVerification.orderDetails.pincode}</p>
-                    </div>
+                  {selectedVerification.orderDetails?.shippingAddress && (
+                    <>
+                      <div className="info-item full-width">
+                        <label>Shipping Address</label>
+                        <p className="info-value">
+                          {typeof selectedVerification.orderDetails.shippingAddress === 'object' 
+                            ? `${selectedVerification.orderDetails.shippingAddress.street || ''}, ${selectedVerification.orderDetails.shippingAddress.city || ''}, ${selectedVerification.orderDetails.shippingAddress.state || ''} - ${selectedVerification.orderDetails.shippingAddress.pincode || ''}`
+                            : selectedVerification.orderDetails.shippingAddress}
+                        </p>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -632,15 +1100,26 @@ export default function PaymentVerificationDashboard() {
                   <div className="amount-info">
                     <div className="amount-item">
                       <label>Order Amount</label>
-                      <p className="amount-value">
+                      <p className="amount-value expected">
                         {formatCurrency(selectedVerification.orderDetails?.totalAmount || 0)}
                       </p>
                     </div>
                     {selectedVerification.detectedPayment?.amount && (
                       <div className="amount-item">
                         <label>Detected Amount</label>
-                        <p className={`amount-value ${getValidationStatus(selectedVerification).color}`}>
+                        <p className={`amount-value detected ${getValidationStatus(selectedVerification).color}`}>
                           {formatCurrency(selectedVerification.detectedPayment.amount)}
+                        </p>
+                      </div>
+                    )}
+                    {getAmountDifference(selectedVerification).diff > 0 && (
+                      <div className="amount-item">
+                        <label>Difference</label>
+                        <p className={`amount-value diff ${getValidationStatus(selectedVerification).color}`}>
+                          {formatCurrency(getAmountDifference(selectedVerification).diff)}
+                          <span className="diff-percent">
+                            ({getAmountDifference(selectedVerification).percent.toFixed(1)}%)
+                          </span>
                         </p>
                       </div>
                     )}
@@ -657,6 +1136,20 @@ export default function PaymentVerificationDashboard() {
                     <div className="payment-field">
                       <label>Transaction ID</label>
                       <p className="payment-value">{selectedVerification.detectedPayment.transactionId}</p>
+                    </div>
+                  )}
+
+                  {selectedVerification.detectedPayment?.transactionTime && (
+                    <div className="payment-field">
+                      <label>Transaction Time</label>
+                      <p className="payment-value">{formatDateTime(selectedVerification.detectedPayment.transactionTime)}</p>
+                    </div>
+                  )}
+
+                  {selectedVerification.detectedPayment?.appName && (
+                    <div className="payment-field">
+                      <label>Payment App</label>
+                      <p className="payment-value capitalize">{selectedVerification.detectedPayment.appName}</p>
                     </div>
                   )}
                 </div>
@@ -679,15 +1172,32 @@ export default function PaymentVerificationDashboard() {
                         {selectedVerification.validationResults.upiMatch ? '✓ Match' : '✗ Mismatch'}
                       </span>
                     </div>
-                    {selectedVerification.validationResults.confidenceScore && (
+                    <div className="result-item">
+                      <span className="result-label">Time Valid:</span>
+                      <span className={`result-value ${selectedVerification.validationResults.timeValid ? 'text-green-600' : 'text-red-600'}`}>
+                        {selectedVerification.validationResults.timeValid ? '✓ Recent' : '✗ Too Old'}
+                      </span>
+                    </div>
+                    {selectedVerification.validationResults.confidenceScore > 0 && (
                       <div className="result-item">
                         <span className="result-label">Confidence:</span>
                         <span className="result-value">
-                          {(selectedVerification.validationResults.confidenceScore * 100).toFixed(1)}%
+                          {selectedVerification.validationResults.confidenceScore}%
                         </span>
                       </div>
                     )}
                   </div>
+
+                  {selectedVerification.validationResults.validationErrors?.length > 0 && (
+                    <div className="validation-errors">
+                      <p className="errors-title">Errors:</p>
+                      <ul className="errors-list">
+                        {selectedVerification.validationResults.validationErrors.map((error, idx) => (
+                          <li key={idx}>{error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -695,17 +1205,17 @@ export default function PaymentVerificationDashboard() {
               {selectedVerification.fraudAnalysis && Object.keys(selectedVerification.fraudAnalysis).length > 0 && (
                 <div className="modal-section">
                   <h3 className="modal-section-title">Risk Analysis</h3>
-                  <div className="fraud-info">
+                  <div className={`fraud-info ${getFraudRiskLevel(selectedVerification).bgColor}`}>
                     <div className="fraud-header">
                       <span className="risk-label">Risk Level:</span>
                       <span className={`risk-value ${getFraudRiskLevel(selectedVerification).color}`}>
-                        {getFraudRiskLevel(selectedVerification).icon} {getFraudRiskLevel(selectedVerification).level}
+                        {getFraudRiskLevel(selectedVerification).icon} {getFraudRiskLevel(selectedVerification).label}
                       </span>
-                      {selectedVerification.fraudAnalysis.fraudScore && (
+                      {selectedVerification.fraudAnalysis.fraudScore > 0 && (
                         <>
                           <span className="risk-label">Fraud Score:</span>
                           <span className="risk-value">
-                            {(selectedVerification.fraudAnalysis.fraudScore * 100).toFixed(1)}%
+                            {selectedVerification.fraudAnalysis.fraudScore}%
                           </span>
                         </>
                       )}
@@ -720,33 +1230,124 @@ export default function PaymentVerificationDashboard() {
                         </ul>
                       </div>
                     )}
+                    {selectedVerification.fraudAnalysis.flags?.length > 0 && (
+                      <div className="fraud-flags">
+                        <p className="flags-label">Flags:</p>
+                        <div className="flags-list">
+                          {selectedVerification.fraudAnalysis.flags.map((flag, index) => (
+                            <span key={index} className="flag-badge">{flag}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* OCR Analysis */}
+              {selectedVerification.ocrAnalysis?.extractedText && (
+                <div className="modal-section">
+                  <h3 className="modal-section-title">OCR Analysis</h3>
+                  <div className="ocr-info">
+                    <div className="ocr-stats">
+                      <span className="ocr-stat">Confidence: {selectedVerification.ocrAnalysis.confidenceScore || 0}%</span>
+                      <span className="ocr-stat">Words: {selectedVerification.ocrAnalysis.wordCount || 0}</span>
+                      <span className="ocr-stat">Time: {(selectedVerification.ocrAnalysis.processingTime || 0) / 1000}s</span>
+                    </div>
+                    <div className="ocr-text">
+                      <p className="ocr-label">Extracted Text:</p>
+                      <pre className="ocr-content">
+                        {selectedVerification.ocrAnalysis.extractedText}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Image Analysis */}
+              {selectedVerification.imageAnalysis && (
+                <div className="modal-section">
+                  <h3 className="modal-section-title">Image Analysis</h3>
+                  <div className="image-analysis">
+                    <div className="analysis-item">
+                      <span className="analysis-label">Quality Score:</span>
+                      <span className="analysis-value">{selectedVerification.imageAnalysis.qualityScore || 0}%</span>
+                    </div>
+                    <div className="analysis-item">
+                      <span className="analysis-label">Tampering Detected:</span>
+                      <span className={`analysis-value ${selectedVerification.imageAnalysis.isEdited ? 'text-red-600' : 'text-green-600'}`}>
+                        {selectedVerification.imageAnalysis.isEdited ? 'Yes' : 'No'}
+                      </span>
+                    </div>
+                    {selectedVerification.imageAnalysis.tamperingIndicators?.length > 0 && (
+                      <div className="tampering-indicators">
+                        <p className="indicators-label">Tampering Indicators:</p>
+                        <ul className="indicators-list">
+                          {selectedVerification.imageAnalysis.tamperingIndicators.map((indicator, idx) => (
+                            <li key={idx}>{indicator}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Admin Notes */}
+              {selectedVerification.adminNotes && (
+                <div className="modal-section">
+                  <h3 className="modal-section-title">Admin Notes</h3>
+                  <div className="admin-notes">
+                    <p className="notes-content">{selectedVerification.adminNotes}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Invoice Information */}
+              {selectedVerification.invoiceGenerated && (
+                <div className="modal-section">
+                  <h3 className="modal-section-title">Invoice Information</h3>
+                  <div className="invoice-info">
+                    <div className="invoice-item">
+                      <span className="invoice-label">Invoice Number:</span>
+                      <span className="invoice-value">{selectedVerification.invoiceNumber}</span>
+                    </div>
+                    {selectedVerification.invoiceSentAt && (
+                      <div className="invoice-item">
+                        <span className="invoice-label">Sent At:</span>
+                        <span className="invoice-value">{formatDateTime(selectedVerification.invoiceSentAt)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
 
               {/* Admin Actions */}
-              {isAdmin && selectedVerification.status !== 'verified' && (
+              {isAdmin && (
                 <div className="modal-section">
-                  <h3 className="modal-section-title">Update Status</h3>
+                  <h3 className="modal-section-title">Admin Actions</h3>
                   
                   <div className="action-buttons-group">
                     <button
                       onClick={() => setAction('verified')}
                       className={`action-btn verify ${action === 'verified' ? 'selected' : ''}`}
+                      disabled={selectedVerification.status === 'verified'}
                     >
-                      ✓ Verify
+                      ✓ Verify Payment
                     </button>
                     <button
                       onClick={() => setAction('rejected')}
                       className={`action-btn reject ${action === 'rejected' ? 'selected' : ''}`}
+                      disabled={selectedVerification.status === 'rejected' || selectedVerification.status === 'fraud'}
                     >
-                      ✗ Reject
+                      ✗ Reject Payment
                     </button>
                     <button
                       onClick={() => setAction('fraud')}
                       className={`action-btn fraud ${action === 'fraud' ? 'selected' : ''}`}
+                      disabled={selectedVerification.status === 'fraud'}
                     >
-                      🚨 Mark Fraud
+                      🚨 Mark as Fraud
                     </button>
                   </div>
 
@@ -760,10 +1361,28 @@ export default function PaymentVerificationDashboard() {
                         rows="3"
                         value={rejectionReason}
                         onChange={(e) => setRejectionReason(e.target.value)}
-                        placeholder="Enter rejection reason..."
+                        placeholder="Enter rejection reason (e.g., amount mismatch, invalid UPI, etc.)"
                         className="reason-input"
                         required
                       />
+                    </div>
+                  )}
+
+                  {action === 'fraud' && (
+                    <div className="rejection-reason">
+                      <label htmlFor="fraudReason" className="reason-label">
+                        Fraud Reasons <span className="required">*</span>
+                      </label>
+                      <textarea
+                        id="fraudReason"
+                        rows="3"
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                        placeholder="Enter fraud detection reasons (comma separated)"
+                        className="reason-input"
+                        required
+                      />
+                      <p className="reason-hint">Separate multiple reasons with commas</p>
                     </div>
                   )}
 
@@ -779,22 +1398,75 @@ export default function PaymentVerificationDashboard() {
                         Cancel
                       </button>
                       <button
-                        onClick={() => handleUpdateStatus(
-                          selectedVerification._id,
-                          action,
-                          rejectionReason
-                        )}
-                        disabled={action === 'rejected' && !rejectionReason.trim()}
+                        onClick={() => {
+                          const reasons = action === 'fraud' 
+                            ? rejectionReason.split(',').map(r => r.trim()).filter(r => r)
+                            : rejectionReason;
+                          handleUpdateStatus(
+                            selectedVerification._id,
+                            action,
+                            reasons
+                          );
+                        }}
+                        disabled={(action === 'rejected' || action === 'fraud') && !rejectionReason.trim()}
                         className={`confirm-btn ${
                           action === 'verified' ? 'verify' :
                           action === 'rejected' ? 'reject' :
                           action === 'fraud' ? 'fraud' : ''
                         }`}
                       >
-                        Confirm Update
+                        Confirm {action === 'verified' ? 'Verification' : 
+                                 action === 'rejected' ? 'Rejection' : 
+                                 'Fraud Mark'}
                       </button>
                     </div>
                   )}
+
+                  {/* Additional Admin Actions */}
+                  {selectedVerification.status === 'verified' && !selectedVerification.invoiceGenerated && (
+                    <div className="admin-extra-actions">
+                      <button
+                        onClick={() => handleGenerateInvoice(selectedVerification)}
+                        className="extra-action-btn"
+                      >
+                        📄 Generate Invoice
+                      </button>
+                    </div>
+                  )}
+
+                  {selectedVerification.orderReference && (
+                    <div className="admin-extra-actions">
+                      <button
+                        onClick={() => handleViewOrder(selectedVerification.orderReference)}
+                        className="extra-action-btn"
+                      >
+                        📦 View Full Order
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="admin-extra-actions">
+                    <button
+                      onClick={() => handleSendNotification(selectedVerification)}
+                      className="extra-action-btn"
+                    >
+                      🔔 Send Notification
+                    </button>
+                  </div>
+
+                  <div className="admin-extra-actions">
+                    <button
+                      onClick={() => {
+                        if (confirm('Permanently delete this verification?')) {
+                          handleDelete(selectedVerification._id, true);
+                          handleCloseModal();
+                        }
+                      }}
+                      className="extra-action-btn delete-permanent"
+                    >
+                      💀 Permanent Delete
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -803,7 +1475,7 @@ export default function PaymentVerificationDashboard() {
       )}
 
       <style jsx>{`
-        /* Main Container - Matching Create Order Page */
+        /* Main Container */
         .payments-container {
           padding: 1.5rem;
           max-width: 1400px;
@@ -811,9 +1483,14 @@ export default function PaymentVerificationDashboard() {
           width: 100%;
         }
 
-        /* Page Header - Matching Create Order */
+        /* Page Header */
         .page-header {
           margin-bottom: 2rem;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 1rem;
         }
 
         .page-title {
@@ -829,12 +1506,57 @@ export default function PaymentVerificationDashboard() {
           font-size: 0.95rem;
         }
 
-        /* Statistics Grid - Matching Create Order Grid */
+        .header-actions {
+          display: flex;
+          gap: 0.75rem;
+        }
+
+        .filter-toggle-btn,
+        .refresh-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.625rem 1rem;
+          border: 1px solid #e5e7eb;
+          border-radius: 0.375rem;
+          background: white;
+          color: #374151;
+          font-size: 0.875rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .filter-toggle-btn:hover,
+        .refresh-btn:hover:not(:disabled) {
+          background: #f9fafb;
+          border-color: #d1d5db;
+        }
+
+        .refresh-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .btn-icon {
+          display: inline-block;
+        }
+
+        .spinning {
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        /* Statistics Grid */
         .stats-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
           gap: 1rem;
-          margin-bottom: 2rem;
+          margin-bottom: 1.5rem;
         }
 
         .stat-card {
@@ -843,6 +1565,12 @@ export default function PaymentVerificationDashboard() {
           border-radius: 0.5rem;
           padding: 1rem;
           box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+          transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .stat-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         .stat-header {
@@ -863,6 +1591,13 @@ export default function PaymentVerificationDashboard() {
           font-weight: bold;
           color: #1f2937;
           margin: 0;
+          line-height: 1.2;
+        }
+
+        .stat-subvalue {
+          font-size: 0.75rem;
+          color: #6b7280;
+          margin: 0.25rem 0 0;
         }
 
         .stat-icon {
@@ -881,6 +1616,7 @@ export default function PaymentVerificationDashboard() {
         .stat-icon.bg-blue-400 { background: #60a5fa; }
         .stat-icon.bg-green-500 { background: #22c55e; }
         .stat-icon.bg-red-500 { background: #ef4444; }
+        .stat-icon.bg-red-700 { background: #b91c1c; }
 
         .stat-progress {
           width: 100%;
@@ -901,6 +1637,148 @@ export default function PaymentVerificationDashboard() {
         .stat-progress-bar.bg-blue-400 { background: #60a5fa; }
         .stat-progress-bar.bg-green-500 { background: #22c55e; }
         .stat-progress-bar.bg-red-500 { background: #ef4444; }
+        .stat-progress-bar.bg-red-700 { background: #b91c1c; }
+
+        /* Filters Panel */
+        .filters-panel {
+          background: white;
+          border: 1px solid #e5e7eb;
+          border-radius: 0.5rem;
+          padding: 1rem;
+          margin-bottom: 1rem;
+        }
+
+        .filters-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+        }
+
+        .filters-title {
+          font-size: 1rem;
+          font-weight: 600;
+          color: #374151;
+          margin: 0;
+        }
+
+        .reset-filters-btn {
+          background: none;
+          border: none;
+          color: #3b82f6;
+          font-size: 0.875rem;
+          font-weight: 500;
+          cursor: pointer;
+          padding: 0.25rem 0.5rem;
+        }
+
+        .reset-filters-btn:hover {
+          text-decoration: underline;
+        }
+
+        .filters-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+          gap: 1rem;
+        }
+
+        .filter-group {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .filter-label {
+          font-size: 0.875rem;
+          font-weight: 500;
+          color: #374151;
+        }
+
+        .filter-input {
+          padding: 0.5rem 0.75rem;
+          border: 1px solid #d1d5db;
+          border-radius: 0.375rem;
+          font-size: 0.875rem;
+          transition: all 0.15s ease;
+          background: white;
+        }
+
+        .filter-input:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .filter-select {
+          padding: 0.5rem 0.75rem;
+          border: 1px solid #d1d5db;
+          border-radius: 0.375rem;
+          font-size: 0.875rem;
+          background: white;
+          cursor: pointer;
+        }
+
+        .filter-select:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .checkbox-label {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          cursor: pointer;
+          font-size: 0.875rem;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+          width: 1rem;
+          height: 1rem;
+          cursor: pointer;
+        }
+
+        .date-range {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .date-range .filter-input {
+          flex: 1;
+        }
+
+        .date-separator {
+          color: #6b7280;
+          font-size: 0.875rem;
+        }
+
+        .sort-order {
+          display: flex;
+          gap: 0.5rem;
+        }
+
+        .sort-order-btn {
+          flex: 1;
+          padding: 0.5rem;
+          border: 1px solid #d1d5db;
+          border-radius: 0.375rem;
+          background: white;
+          color: #374151;
+          font-size: 0.875rem;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .sort-order-btn:hover {
+          background: #f9fafb;
+        }
+
+        .sort-order-btn.active {
+          background: #3b82f6;
+          color: white;
+          border-color: #3b82f6;
+        }
 
         /* Filters Section */
         .filters-section {
@@ -918,7 +1796,7 @@ export default function PaymentVerificationDashboard() {
           }
         }
 
-        /* Search Input - Matching Create Order */
+        /* Search Input */
         .search-wrapper {
           position: relative;
           flex: 1;
@@ -1043,7 +1921,7 @@ export default function PaymentVerificationDashboard() {
           font-weight: 500;
         }
 
-        /* Content Card - Matching Create Order Card */
+        /* Content Card */
         .content-card {
           background: white;
           border: 1px solid #e5e7eb;
@@ -1059,6 +1937,8 @@ export default function PaymentVerificationDashboard() {
           justify-content: space-between;
           align-items: center;
           background: #f9fafb;
+          flex-wrap: wrap;
+          gap: 1rem;
         }
 
         .card-title-wrapper {
@@ -1083,42 +1963,26 @@ export default function PaymentVerificationDashboard() {
           font-weight: 500;
         }
 
-        .refresh-button {
-          display: inline-flex;
-          align-items: center;
+        .bulk-actions {
+          display: flex;
           gap: 0.5rem;
-          padding: 0.5rem 1rem;
+        }
+
+        .bulk-action-btn {
+          padding: 0.375rem 0.75rem;
           border: 1px solid #d1d5db;
           border-radius: 0.375rem;
           background: white;
           color: #374151;
-          font-size: 0.875rem;
+          font-size: 0.75rem;
           font-weight: 500;
           cursor: pointer;
           transition: all 0.15s ease;
         }
 
-        .refresh-button:hover:not(:disabled) {
+        .bulk-action-btn:hover {
           background: #f9fafb;
           border-color: #9ca3af;
-        }
-
-        .refresh-button:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .refresh-icon {
-          display: inline-block;
-        }
-
-        .spinning {
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
         }
 
         /* Table Container */
@@ -1126,11 +1990,15 @@ export default function PaymentVerificationDashboard() {
           overflow-x: auto;
         }
 
-        /* Data Table - Matching Create Order Input Styles */
+        .table-responsive {
+          min-width: 100%;
+        }
+
+        /* Data Table */
         .data-table {
           width: 100%;
           border-collapse: collapse;
-          min-width: 800px;
+          min-width: 1200px;
         }
 
         .data-table th {
@@ -1149,6 +2017,7 @@ export default function PaymentVerificationDashboard() {
           color: #1f2937;
           font-size: 0.875rem;
           border-bottom: 1px solid #e5e7eb;
+          transition: background 0.15s ease;
         }
 
         .data-table tr:hover td {
@@ -1170,6 +2039,13 @@ export default function PaymentVerificationDashboard() {
         .order-reference {
           font-size: 0.75rem;
           color: #6b7280;
+        }
+
+        .amount-diff {
+          font-size: 0.7rem;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.125rem;
         }
 
         .customer-details {
@@ -1195,13 +2071,41 @@ export default function PaymentVerificationDashboard() {
 
         .payment-amount {
           font-weight: 600;
+          color: #1f2937;
         }
 
-        .payment-status {
-          font-size: 0.75rem;
+        .transaction-id,
+        .upi-id {
+          font-size: 0.7rem;
+          color: #6b7280;
+          cursor: help;
+        }
+
+        .validation-details {
           display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+        }
+
+        .validation-badge {
+          font-size: 0.75rem;
+          font-weight: 500;
+          display: inline-flex;
           align-items: center;
           gap: 0.25rem;
+        }
+
+        .confidence-score {
+          font-size: 0.7rem;
+          color: #6b7280;
+        }
+
+        .risk-badge {
+          font-size: 0.7rem;
+          font-weight: 500;
+          padding: 0.125rem 0.25rem;
+          border-radius: 0.25rem;
+          display: inline-block;
         }
 
         .status-wrapper {
@@ -1219,6 +2123,7 @@ export default function PaymentVerificationDashboard() {
           font-size: 0.75rem;
           font-weight: 500;
           white-space: nowrap;
+          width: fit-content;
         }
 
         .status-badge.bg-yellow-100 { background: #fef9c3; color: #854d0e; }
@@ -1226,12 +2131,15 @@ export default function PaymentVerificationDashboard() {
         .status-badge.bg-green-100 { background: #dcfce7; color: #166534; }
         .status-badge.bg-red-100 { background: #fee2e2; color: #991b1b; }
         .status-badge.bg-purple-100 { background: #f3e8ff; color: #6b21a8; }
+        .status-badge.bg-orange-100 { background: #ffedd5; color: #9a3412; }
 
-        .risk-level {
-          font-size: 0.7rem;
-          display: flex;
-          align-items: center;
-          gap: 0.25rem;
+        .attempt-badge {
+          font-size: 0.65rem;
+          color: #6b7280;
+          background: #f3f4f6;
+          padding: 0.125rem 0.25rem;
+          border-radius: 0.25rem;
+          width: fit-content;
         }
 
         .date-wrapper {
@@ -1242,16 +2150,18 @@ export default function PaymentVerificationDashboard() {
 
         .date-main {
           font-weight: 500;
+          font-size: 0.75rem;
         }
 
-        .date-time {
-          font-size: 0.75rem;
-          color: #6b7280;
+        .date-verified {
+          font-size: 0.7rem;
+          color: #10b981;
         }
 
         .action-buttons {
           display: flex;
           gap: 0.5rem;
+          flex-wrap: wrap;
         }
 
         .action-button {
@@ -1273,6 +2183,24 @@ export default function PaymentVerificationDashboard() {
           background: #bfdbfe;
         }
 
+        .action-button.invoice {
+          background: #dcfce7;
+          color: #166534;
+        }
+
+        .action-button.invoice:hover {
+          background: #bbf7d0;
+        }
+
+        .action-button.order {
+          background: #f3e8ff;
+          color: #6b21a8;
+        }
+
+        .action-button.order:hover {
+          background: #e9d5ff;
+        }
+
         .action-button.delete {
           background: #fee2e2;
           color: #991b1b;
@@ -1282,17 +2210,38 @@ export default function PaymentVerificationDashboard() {
           background: #fecaca;
         }
 
+        .action-button.delete-permanent {
+          background: #7f1d1d;
+          color: white;
+        }
+
+        .action-button.delete-permanent:hover {
+          background: #991b1b;
+        }
+
         /* Table Footer */
         .table-footer {
           padding: 1rem 1.5rem;
           border-top: 1px solid #e5e7eb;
           background: #f9fafb;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 1rem;
         }
 
         .footer-text {
           margin: 0;
           color: #6b7280;
           font-size: 0.875rem;
+        }
+
+        .footer-total {
+          margin: 0;
+          color: #1f2937;
+          font-size: 0.875rem;
+          font-weight: 600;
         }
 
         /* Loading State */
@@ -1361,7 +2310,7 @@ export default function PaymentVerificationDashboard() {
           background: #2563eb;
         }
 
-        /* Modal Styles - Matching Create Order Modal Style */
+        /* Modal Styles */
         .modal-overlay {
           position: fixed;
           top: 0;
@@ -1380,7 +2329,7 @@ export default function PaymentVerificationDashboard() {
         .modal-content {
           background: white;
           border-radius: 0.75rem;
-          max-width: 600px;
+          max-width: 700px;
           width: 100%;
           max-height: 90vh;
           overflow: hidden;
@@ -1446,15 +2395,17 @@ export default function PaymentVerificationDashboard() {
           justify-content: space-between;
           align-items: center;
           margin-bottom: 1.5rem;
+          flex-wrap: wrap;
+          gap: 0.5rem;
         }
 
         .status-badge-large {
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;
-          padding: 0.375rem 0.75rem;
-          border-radius: 0.375rem;
-          font-size: 0.875rem;
+          padding: 0.5rem 1rem;
+          border-radius: 0.5rem;
+          font-size: 1rem;
           font-weight: 600;
         }
 
@@ -1496,6 +2447,10 @@ export default function PaymentVerificationDashboard() {
           gap: 0.25rem;
         }
 
+        .info-item.full-width {
+          grid-column: 1 / -1;
+        }
+
         .info-item label {
           font-size: 0.75rem;
           color: #6b7280;
@@ -1503,11 +2458,12 @@ export default function PaymentVerificationDashboard() {
           letter-spacing: 0.05em;
         }
 
-        .info-item p {
+        .info-value {
           margin: 0;
           font-size: 0.875rem;
           color: #1f2937;
           font-weight: 500;
+          line-height: 1.5;
         }
 
         .payment-details-grid {
@@ -1522,10 +2478,12 @@ export default function PaymentVerificationDashboard() {
           background: #f9fafb;
           padding: 0.75rem;
           border-radius: 0.375rem;
+          flex-wrap: wrap;
         }
 
         .amount-item {
           flex: 1;
+          min-width: 120px;
         }
 
         .amount-item label {
@@ -1539,6 +2497,16 @@ export default function PaymentVerificationDashboard() {
           font-size: 1.125rem;
           font-weight: bold;
           margin: 0;
+        }
+
+        .amount-value.diff {
+          font-size: 1rem;
+        }
+
+        .diff-percent {
+          font-size: 0.75rem;
+          color: #6b7280;
+          margin-left: 0.25rem;
         }
 
         .payment-field {
@@ -1559,6 +2527,10 @@ export default function PaymentVerificationDashboard() {
           font-size: 0.875rem;
           font-family: monospace;
           word-break: break-all;
+        }
+
+        .capitalize {
+          text-transform: capitalize;
         }
 
         .results-grid {
@@ -1589,11 +2561,34 @@ export default function PaymentVerificationDashboard() {
           font-size: 0.875rem;
         }
 
-        .fraud-info {
-          background: #fef2f2;
-          border: 1px solid #fee2e2;
-          border-radius: 0.375rem;
+        .text-green-600 { color: #16a34a; }
+        .text-red-600 { color: #dc2626; }
+        .text-yellow-600 { color: #ca8a04; }
+
+        .validation-errors {
+          margin-top: 0.75rem;
           padding: 0.75rem;
+          background: #fef2f2;
+          border-radius: 0.375rem;
+        }
+
+        .errors-title {
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: #991b1b;
+          margin: 0 0 0.5rem;
+        }
+
+        .errors-list {
+          margin: 0;
+          padding-left: 1.25rem;
+          color: #b91c1c;
+          font-size: 0.875rem;
+        }
+
+        .fraud-info {
+          padding: 1rem;
+          border-radius: 0.375rem;
         }
 
         .fraud-header {
@@ -1601,12 +2596,12 @@ export default function PaymentVerificationDashboard() {
           flex-wrap: wrap;
           align-items: center;
           gap: 0.5rem;
-          margin-bottom: 0.5rem;
+          margin-bottom: 0.75rem;
         }
 
         .risk-label {
           color: #6b7280;
-          font-size: 0.75rem;
+          font-size: 0.875rem;
         }
 
         .risk-value {
@@ -1614,16 +2609,18 @@ export default function PaymentVerificationDashboard() {
           font-size: 0.875rem;
         }
 
-        .fraud-reasons {
-          margin-top: 0.5rem;
-          padding-top: 0.5rem;
-          border-top: 1px solid #fee2e2;
+        .fraud-reasons,
+        .fraud-flags {
+          margin-top: 0.75rem;
+          padding-top: 0.75rem;
+          border-top: 1px solid #e5e7eb;
         }
 
-        .reasons-label {
+        .reasons-label,
+        .flags-label {
           color: #6b7280;
-          font-size: 0.75rem;
-          margin: 0 0 0.25rem;
+          font-size: 0.875rem;
+          margin: 0 0 0.5rem;
         }
 
         .reasons-list {
@@ -1633,8 +2630,141 @@ export default function PaymentVerificationDashboard() {
           font-size: 0.875rem;
         }
 
-        .reasons-list li {
-          margin-bottom: 0.25rem;
+        .flags-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+
+        .flag-badge {
+          background: #fee2e2;
+          color: #991b1b;
+          padding: 0.25rem 0.5rem;
+          border-radius: 0.25rem;
+          font-size: 0.75rem;
+          font-weight: 500;
+        }
+
+        .ocr-info {
+          background: #f9fafb;
+          padding: 0.75rem;
+          border-radius: 0.375rem;
+        }
+
+        .ocr-stats {
+          display: flex;
+          gap: 1rem;
+          margin-bottom: 0.75rem;
+          flex-wrap: wrap;
+        }
+
+        .ocr-stat {
+          font-size: 0.75rem;
+          color: #6b7280;
+        }
+
+        .ocr-text {
+          margin-top: 0.75rem;
+        }
+
+        .ocr-label {
+          font-size: 0.75rem;
+          color: #6b7280;
+          margin: 0 0 0.25rem;
+        }
+
+        .ocr-content {
+          margin: 0;
+          padding: 0.5rem;
+          background: white;
+          border: 1px solid #e5e7eb;
+          border-radius: 0.375rem;
+          font-size: 0.75rem;
+          max-height: 150px;
+          overflow-y: auto;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+        }
+
+        .image-analysis {
+          background: #f9fafb;
+          padding: 0.75rem;
+          border-radius: 0.375rem;
+        }
+
+        .analysis-item {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 0.5rem;
+        }
+
+        .analysis-label {
+          color: #6b7280;
+          font-size: 0.875rem;
+        }
+
+        .analysis-value {
+          font-weight: 500;
+          font-size: 0.875rem;
+        }
+
+        .tampering-indicators {
+          margin-top: 0.75rem;
+          padding-top: 0.75rem;
+          border-top: 1px solid #e5e7eb;
+        }
+
+        .indicators-label {
+          color: #6b7280;
+          font-size: 0.875rem;
+          margin: 0 0 0.5rem;
+        }
+
+        .indicators-list {
+          margin: 0;
+          padding-left: 1.25rem;
+          color: #dc2626;
+          font-size: 0.875rem;
+        }
+
+        .admin-notes {
+          background: #f9fafb;
+          padding: 0.75rem;
+          border-radius: 0.375rem;
+        }
+
+        .notes-content {
+          margin: 0;
+          color: #4b5563;
+          font-size: 0.875rem;
+          line-height: 1.5;
+        }
+
+        .invoice-info {
+          background: #f0f9ff;
+          padding: 0.75rem;
+          border-radius: 0.375rem;
+        }
+
+        .invoice-item {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 0.5rem;
+        }
+
+        .invoice-item:last-child {
+          margin-bottom: 0;
+        }
+
+        .invoice-label {
+          color: #0369a1;
+          font-size: 0.875rem;
+        }
+
+        .invoice-value {
+          font-weight: 600;
+          color: #0369a1;
+          font-size: 0.875rem;
         }
 
         /* Action Buttons in Modal */
@@ -1642,10 +2772,12 @@ export default function PaymentVerificationDashboard() {
           display: flex;
           gap: 0.5rem;
           margin-bottom: 1rem;
+          flex-wrap: wrap;
         }
 
         .action-btn {
           flex: 1;
+          min-width: 120px;
           padding: 0.625rem;
           border: 1px solid #e5e7eb;
           border-radius: 0.375rem;
@@ -1656,7 +2788,12 @@ export default function PaymentVerificationDashboard() {
           transition: all 0.15s ease;
         }
 
-        .action-btn.verify:hover {
+        .action-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .action-btn.verify:hover:not(:disabled) {
           background: #22c55e;
           color: white;
           border-color: #22c55e;
@@ -1668,7 +2805,7 @@ export default function PaymentVerificationDashboard() {
           border-color: #22c55e;
         }
 
-        .action-btn.reject:hover {
+        .action-btn.reject:hover:not(:disabled) {
           background: #ef4444;
           color: white;
           border-color: #ef4444;
@@ -1680,7 +2817,7 @@ export default function PaymentVerificationDashboard() {
           border-color: #ef4444;
         }
 
-        .action-btn.fraud:hover {
+        .action-btn.fraud:hover:not(:disabled) {
           background: #b91c1c;
           color: white;
           border-color: #b91c1c;
@@ -1723,6 +2860,12 @@ export default function PaymentVerificationDashboard() {
           box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
         }
 
+        .reason-hint {
+          margin-top: 0.25rem;
+          font-size: 0.75rem;
+          color: #6b7280;
+        }
+
         .confirm-actions {
           display: flex;
           justify-content: flex-end;
@@ -1756,6 +2899,11 @@ export default function PaymentVerificationDashboard() {
           transition: all 0.15s ease;
         }
 
+        .confirm-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
         .confirm-btn.verify {
           background: #22c55e;
           color: white;
@@ -1783,9 +2931,38 @@ export default function PaymentVerificationDashboard() {
           background: #991b1b;
         }
 
-        .confirm-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
+        .admin-extra-actions {
+          margin-top: 1rem;
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+
+        .extra-action-btn {
+          padding: 0.5rem 1rem;
+          border: 1px solid #d1d5db;
+          border-radius: 0.375rem;
+          background: white;
+          color: #374151;
+          font-size: 0.875rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .extra-action-btn:hover {
+          background: #f9fafb;
+          border-color: #9ca3af;
+        }
+
+        .extra-action-btn.delete-permanent {
+          background: #7f1d1d;
+          color: white;
+          border-color: #7f1d1d;
+        }
+
+        .extra-action-btn.delete-permanent:hover {
+          background: #991b1b;
         }
 
         /* Mobile Responsive */
@@ -1796,6 +2973,15 @@ export default function PaymentVerificationDashboard() {
 
           .stats-grid {
             grid-template-columns: repeat(2, 1fr);
+          }
+
+          .header-actions {
+            width: 100%;
+          }
+
+          .filter-toggle-btn,
+          .refresh-btn {
+            flex: 1;
           }
 
           .filter-buttons {
@@ -1817,17 +3003,23 @@ export default function PaymentVerificationDashboard() {
 
           .card-header {
             flex-direction: column;
-            gap: 0.75rem;
             align-items: flex-start;
           }
 
-          .refresh-button {
+          .bulk-actions {
             width: 100%;
-            justify-content: center;
+          }
+
+          .bulk-action-btn {
+            flex: 1;
           }
 
           .action-buttons-group {
             flex-direction: column;
+          }
+
+          .action-btn {
+            width: 100%;
           }
 
           .confirm-actions {
@@ -1836,6 +3028,14 @@ export default function PaymentVerificationDashboard() {
 
           .cancel-btn,
           .confirm-btn {
+            width: 100%;
+          }
+
+          .admin-extra-actions {
+            flex-direction: column;
+          }
+
+          .extra-action-btn {
             width: 100%;
           }
         }
@@ -1860,6 +3060,14 @@ export default function PaymentVerificationDashboard() {
           .amount-info {
             flex-direction: column;
             gap: 0.5rem;
+          }
+
+          .date-range {
+            flex-direction: column;
+          }
+
+          .date-range .filter-input {
+            width: 100%;
           }
         }
       `}</style>
