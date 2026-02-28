@@ -8,26 +8,90 @@ import {
     Building2, Mail, Phone, MapPin, CreditCard, Landmark,
     Receipt, HeadphonesIcon, Palette, Save, X, Plus,
     Trash2, Edit2, Check, AlertCircle, Loader2, Globe,
-    Facebook, Instagram, Twitter, Youtube, Upload, Image as ImageIcon
+    Facebook, Instagram, Twitter, Youtube, Upload, Image as ImageIcon,
+    ChevronRight, Settings, Shield, DollarSign, Clock, Link2, Users,
+    Briefcase, FileText, Eye, EyeOff, Star, Heart, Gift, Award,
+    Bell, ShieldCheck, Zap, TrendingUp, Activity, Package, Truck,
+    RotateCcw, HelpCircle, MessageCircle, PhoneCall, MailOpen,
+    MapPinHouse, Building, Store, Globe2, Linkedin, TwitterIcon,
+    FileSignature, Stamp, Palette as PaletteIcon, Brush, Sparkles,
+    CheckCircle, AlertTriangle, Info, XCircle, Menu, Home,
+    Settings2, User, LogOut, ChevronLeft, Search, Filter,
+    MoreVertical, Copy, Download, Printer, Share2, Bookmark,
+    ThumbsUp, ThumbsDown, MessageSquare, Send, Camera, Video,
+    Mic, Paperclip, Smile, Calendar as CalendarIcon, ArrowLeft,
+    ArrowRight, Grid, List, RefreshCw, Filter as FilterIcon,
+    Layout, Layers, Box, Database, Shield as ShieldIcon,
+    Key, Lock, Unlock, Hash, AtSign, Link, Link2 as LinkIcon,
+    Wifi, WifiOff, Battery, BatteryCharging, Cpu, HardDrive,
+    Server, Cloud, CloudOff, Download as DownloadIcon, Upload as UploadIcon,
+    Repeat, Shuffle, Play, Pause, Square, Circle, Triangle,
+    Hexagon, Octagon, Diamond, Gem, Crown, Sparkle
 } from 'lucide-react';
 
 // ==================== CONSTANTS ====================
-const TABS = [
-    { id: 'basic', label: 'Basic Info', icon: Building2 },
-    { id: 'upi', label: 'UPI IDs', icon: CreditCard },
-    { id: 'bank', label: 'Bank Details', icon: Landmark },
-    { id: 'invoice', label: 'Invoice Settings', icon: Receipt },
-    { id: 'support', label: 'Support', icon: HeadphonesIcon },
-    { id: 'branding', label: 'Branding', icon: Palette }
+const SECTIONS = [
+    { 
+        id: 'basic', 
+        title: 'Basic Information', 
+        icon: Building2, 
+        color: '#3b82f6',
+        description: 'Company details and contact information'
+    },
+    { 
+        id: 'upi', 
+        title: 'UPI Payment IDs', 
+        icon: CreditCard, 
+        color: '#8b5cf6',
+        description: 'Manage UPI addresses for payment verification'
+    },
+    { 
+        id: 'bank', 
+        title: 'Bank Account Details', 
+        icon: Landmark, 
+        color: '#ec4899',
+        description: 'Bank information for invoice and payment references'
+    },
+    { 
+        id: 'invoice', 
+        title: 'Invoice Settings', 
+        icon: Receipt, 
+        color: '#f59e0b',
+        description: 'Configure invoice formatting and business policies'
+    },
+    { 
+        id: 'support', 
+        title: 'Customer Support', 
+        icon: HeadphonesIcon, 
+        color: '#10b981',
+        description: 'Configure support channels and availability'
+    },
+    { 
+        id: 'branding', 
+        title: 'Branding & Theme', 
+        icon: Palette, 
+        color: '#6366f1',
+        description: 'Customize your brand identity and visual appearance'
+    }
 ];
 
 const UPI_APPS = [
-    { value: 'gpay', label: 'Google Pay', color: '#4285F4' },
-    { value: 'phonepe', label: 'PhonePe', color: '#5F259F' },
-    { value: 'paytm', label: 'Paytm', color: '#00BAF2' },
-    { value: 'bhim', label: 'BHIM', color: '#DD4B39' },
-    { value: 'other', label: 'Other', color: '#6B7280' }
+    { value: 'gpay', label: 'Google Pay', color: '#4285F4', icon: '💚' },
+    { value: 'phonepe', label: 'PhonePe', color: '#5F259F', icon: '🟣' },
+    { value: 'paytm', label: 'Paytm', color: '#00BAF2', icon: '🔵' },
+    { value: 'bhim', label: 'BHIM', color: '#DD4B39', icon: '🔴' },
+    { value: 'other', label: 'Other', color: '#6B7280', icon: '⚫' }
 ];
+
+const BUSINESS_HOURS_DEFAULT = {
+    monday: '9:00 AM - 8:00 PM',
+    tuesday: '9:00 AM - 8:00 PM',
+    wednesday: '9:00 AM - 8:00 PM',
+    thursday: '9:00 AM - 8:00 PM',
+    friday: '9:00 AM - 8:00 PM',
+    saturday: '9:00 AM - 6:00 PM',
+    sunday: 'Closed'
+};
 
 // ==================== MAIN COMPONENT ====================
 export default function CompanyProfilePage() {
@@ -35,13 +99,13 @@ export default function CompanyProfilePage() {
     const { data: session, status } = useSession();
     
     // State management
+    const [expandedSections, setExpandedSections] = useState(['basic']);
     const [activeTab, setActiveTab] = useState('basic');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState(null);
     const [errors, setErrors] = useState({});
-    const [successMessage, setSuccessMessage] = useState('');
-    const [isMobile, setIsMobile] = useState(false);
+    const [toast, setToast] = useState({ show: false, type: '', message: '' });
     
     // Form state for each section
     const [formData, setFormData] = useState({
@@ -98,23 +162,15 @@ export default function CompanyProfilePage() {
             youtube: '',
             linkedin: ''
         },
-        businessHours: {
-            monday: '9:00 AM - 8:00 PM',
-            tuesday: '9:00 AM - 8:00 PM',
-            wednesday: '9:00 AM - 8:00 PM',
-            thursday: '9:00 AM - 8:00 PM',
-            friday: '9:00 AM - 8:00 PM',
-            saturday: '9:00 AM - 6:00 PM',
-            sunday: 'Closed'
-        },
+        businessHours: { ...BUSINESS_HOURS_DEFAULT },
         logo: null,
         favicon: null,
         signature: null,
         stamp: null,
         theme: {
-            primary: '#2c3e50',
-            secondary: '#34495e',
-            accent: '#27ae60'
+            primary: '#2563eb',
+            secondary: '#4f46e5',
+            accent: '#0d9488'
         }
     });
 
@@ -129,21 +185,20 @@ export default function CompanyProfilePage() {
     const [editingUpiIndex, setEditingUpiIndex] = useState(-1);
     const [showUpiForm, setShowUpiForm] = useState(false);
 
-    // Mobile detection
-    useEffect(() => {
-        const checkMobile = () => {
-            setIsMobile(window.innerWidth < 768);
-        };
-        
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, []);
-
     // Fetch company settings
     useEffect(() => {
         fetchSettings();
     }, []);
+
+    // Toast auto-hide
+    useEffect(() => {
+        if (toast.show) {
+            const timer = setTimeout(() => {
+                setToast({ show: false, type: '', message: '' });
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [toast]);
 
     // ==================== API FUNCTIONS ====================
     
@@ -158,7 +213,7 @@ export default function CompanyProfilePage() {
                 setFormData(prev => ({
                     ...prev,
                     ...data.data,
-                    businessHours: { ...prev.businessHours, ...(data.data.businessHours || {}) },
+                    businessHours: { ...BUSINESS_HOURS_DEFAULT, ...(data.data.businessHours || {}) },
                     support: { ...prev.support, ...(data.data.support || {}) },
                     social: { ...prev.social, ...(data.data.social || {}) },
                     bank: { ...prev.bank, ...(data.data.bank || {}) },
@@ -168,7 +223,7 @@ export default function CompanyProfilePage() {
             }
         } catch (error) {
             console.error('Error fetching settings:', error);
-            alert('Failed to load company settings');
+            showToast('error', 'Failed to load company settings');
         } finally {
             setLoading(false);
         }
@@ -178,7 +233,6 @@ export default function CompanyProfilePage() {
         if (!validateForm()) return;
         
         setSaving(true);
-        setSuccessMessage('');
         setErrors({});
         
         try {
@@ -192,17 +246,20 @@ export default function CompanyProfilePage() {
             
             if (data.success) {
                 setSettings(data.data);
-                setSuccessMessage('Settings saved successfully!');
-                setTimeout(() => setSuccessMessage(''), 3000);
+                showToast('success', 'Settings saved successfully!');
             } else {
-                alert(`Error: ${data.error || 'Failed to save settings'}`);
+                showToast('error', data.error || 'Failed to save settings');
             }
         } catch (error) {
             console.error('Error saving settings:', error);
-            alert('Network error. Please try again.');
+            showToast('error', 'Network error. Please try again.');
         } finally {
             setSaving(false);
         }
+    };
+
+    const showToast = (type, message) => {
+        setToast({ show: true, type, message });
     };
 
     // ==================== VALIDATION ====================
@@ -257,15 +314,15 @@ export default function CompanyProfilePage() {
     
     const validateUpiForm = () => {
         if (!upiForm.id.trim()) {
-            alert('UPI ID is required');
+            showToast('error', 'UPI ID is required');
             return false;
         }
         if (!upiForm.id.includes('@')) {
-            alert('UPI ID must include @ (e.g., name@oksbi)');
+            showToast('error', 'UPI ID must include @ (e.g., name@oksbi)');
             return false;
         }
         if (!upiForm.name.trim()) {
-            alert('Display name is required');
+            showToast('error', 'Display name is required');
             return false;
         }
         
@@ -274,7 +331,7 @@ export default function CompanyProfilePage() {
         );
         
         if (exists) {
-            alert('This UPI ID already exists');
+            showToast('error', 'This UPI ID already exists');
             return false;
         }
         
@@ -296,8 +353,10 @@ export default function CompanyProfilePage() {
             const updated = [...formData.upiIds];
             updated[editingUpiIndex] = newUpi;
             setFormData({ ...formData, upiIds: updated });
+            showToast('success', 'UPI ID updated successfully');
         } else {
             setFormData({ ...formData, upiIds: [...formData.upiIds, newUpi] });
+            showToast('success', 'UPI ID added successfully');
         }
         
         setUpiForm({ id: '', name: '', appType: 'other', isActive: true, description: '' });
@@ -319,16 +378,16 @@ export default function CompanyProfilePage() {
     };
 
     const deleteUpi = (index) => {
-        if (confirm('Are you sure you want to delete this UPI ID?')) {
-            const updated = formData.upiIds.filter((_, i) => i !== index);
-            setFormData({ ...formData, upiIds: updated });
-        }
+        const updated = formData.upiIds.filter((_, i) => i !== index);
+        setFormData({ ...formData, upiIds: updated });
+        showToast('success', 'UPI ID deleted successfully');
     };
 
     const toggleUpiStatus = (index) => {
         const updated = [...formData.upiIds];
         updated[index].isActive = !updated[index].isActive;
         setFormData({ ...formData, upiIds: updated });
+        showToast('success', `UPI ID ${updated[index].isActive ? 'activated' : 'deactivated'}`);
     };
 
     // ==================== HANDLERS ====================
@@ -368,1272 +427,1580 @@ export default function CompanyProfilePage() {
         }));
     };
 
-    // ==================== RENDER ====================
+    const toggleSection = (sectionId) => {
+        setExpandedSections(prev => {
+            if (prev.includes(sectionId)) {
+                return prev.filter(id => id !== sectionId);
+            } else {
+                return [...prev, sectionId];
+            }
+        });
+    };
+
+    const handleTabClick = (tabId) => {
+        setActiveTab(tabId);
+        if (!expandedSections.includes(tabId)) {
+            setExpandedSections(prev => [...prev, tabId]);
+        }
+    };
+
+    const expandAll = () => {
+        setExpandedSections(SECTIONS.map(s => s.id));
+    };
+
+    const collapseAll = () => {
+        setExpandedSections([]);
+    };
+
+    // ==================== RENDER HELPERS ====================
+    
+    const getAppIcon = (appType) => {
+        const app = UPI_APPS.find(a => a.value === appType);
+        return app?.icon || '⚫';
+    };
+
+    const getStatusIcon = (isActive) => {
+        return isActive ? 
+            <CheckCircle size={16} className="status-icon active" /> : 
+            <XCircle size={16} className="status-icon inactive" />;
+    };
+
+    // ==================== LOADING STATE ====================
     
     if (loading) {
         return (
             <div className="loading-container">
-                <div className="spinner"></div>
-                <p>Loading company settings...</p>
+                <div className="loading-grid">
+                    <div className="loading-card"></div>
+                    <div className="loading-card"></div>
+                    <div className="loading-card"></div>
+                </div>
+                <p className="loading-text">Loading company settings...</p>
                 <style jsx>{`
                     .loading-container {
+                        min-height: 100vh;
                         display: flex;
                         flex-direction: column;
                         align-items: center;
                         justify-content: center;
-                        min-height: 400px;
+                        background: #f1f5f9;
+                    }
+                    .loading-grid {
+                        display: grid;
+                        grid-template-columns: repeat(3, 1fr);
                         gap: 16px;
+                        margin-bottom: 24px;
                     }
-                    .spinner {
-                        width: 40px;
-                        height: 40px;
-                        border: 3px solid #e5e7eb;
-                        border-top: 3px solid #3b82f6;
-                        border-radius: 50%;
-                        animation: spin 1s linear infinite;
+                    .loading-card {
+                        width: 80px;
+                        height: 80px;
+                        background: white;
+                        border-radius: 8px;
+                        animation: pulse 1.5s ease-in-out infinite;
                     }
-                    @keyframes spin {
-                        0% { transform: rotate(0deg); }
-                        100% { transform: rotate(360deg); }
+                    .loading-card:nth-child(2) {
+                        animation-delay: 0.2s;
+                    }
+                    .loading-card:nth-child(3) {
+                        animation-delay: 0.4s;
+                    }
+                    @keyframes pulse {
+                        0%, 100% {
+                            opacity: 0.6;
+                            transform: scale(1);
+                        }
+                        50% {
+                            opacity: 1;
+                            transform: scale(1.05);
+                        }
+                    }
+                    .loading-text {
+                        color: #64748b;
+                        font-size: 0.875rem;
+                        font-weight: 500;
                     }
                 `}</style>
             </div>
         );
     }
 
+    // ==================== MAIN RENDER ====================
+    
     return (
         <>
             <Head>
                 <title>Company Profile | LFMS</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <meta name="description" content="Manage your company information and settings" />
             </Head>
 
-            <div className="company-profile-container">
-                {/* Header - Exactly like CreateOrderPage */}
-                <div className="page-header">
-                    <h1 className="page-title">Company Profile</h1>
-                    <p className="page-subtitle">
-                        Manage your company information, payment settings, and branding
-                    </p>
-                </div>
-
-                {/* Success Message */}
-                {successMessage && (
-                    <div className="success-message">
-                        <Check size={20} />
-                        <span>{successMessage}</span>
+            <div className="company-profile">
+                {/* Toast Notification */}
+                {toast.show && (
+                    <div className={`toast-notification ${toast.type}`}>
+                        {toast.type === 'success' ? <CheckCircle size={20} /> : <AlertTriangle size={20} />}
+                        <span>{toast.message}</span>
                     </div>
                 )}
 
-               {/* Tabs - Mobile Dropdown */}
-{isMobile ? (
-    <select
-        className="mobile-tab-select"
-        value={activeTab}
-        onChange={(e) => setActiveTab(e.target.value)}
-    >
-        {TABS.map(tab => (
-            <option key={tab.id} value={tab.id}>
-                {tab.label}  {/* Fixed: removed tab.icon which was causing the error */}
-            </option>
-        ))}
-    </select>
-) : (
-    <div className="tabs-container">
-        {TABS.map(tab => {
-            const Icon = tab.icon;
-            return (
-                <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
-                >
-                    <Icon size={18} />
-                    <span>{tab.label}</span>
-                </button>
-            );
-        })}
-    </div>
-)}
-
-                {/* Form Card - Exactly like CreateOrderPage */}
-                <div className="form-card">
-                    {/* Basic Info Tab */}
-                    {activeTab === 'basic' && (
-                        <div className="form-section">
-                            <h2 className="form-section-title">Basic Company Information</h2>
-                            
-                            <div className="form-grid">
-                                <div className="form-group full-width">
-                                    <label className="form-label">
-                                        Company Name <span className="required">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="companyName"
-                                        value={formData.companyName}
-                                        onChange={handleInputChange}
-                                        className={`form-input ${errors.companyName ? 'input-error' : ''}`}
-                                        placeholder="e.g., PosterPro Store"
-                                    />
-                                    {errors.companyName && (
-                                        <p className="form-error">{errors.companyName}</p>
-                                    )}
-                                </div>
-
-                                <div className="form-group full-width">
-                                    <label className="form-label">Legal Name</label>
-                                    <input
-                                        type="text"
-                                        name="legalName"
-                                        value={formData.legalName}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="e.g., PosterPro Entertainment Private Limited"
-                                    />
-                                </div>
-
-                                <div className="form-group full-width">
-                                    <label className="form-label">Tagline</label>
-                                    <input
-                                        type="text"
-                                        name="tagline"
-                                        value={formData.tagline}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="e.g., Premium Posters & Art Prints"
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        Phone <span className="required">*</span>
-                                    </label>
-                                    <input
-                                        type="tel"
-                                        name="phone"
-                                        value={formData.phone}
-                                        onChange={handleInputChange}
-                                        className={`form-input ${errors.phone ? 'input-error' : ''}`}
-                                        placeholder="+91 98765 43210"
-                                    />
-                                    {errors.phone && (
-                                        <p className="form-error">{errors.phone}</p>
-                                    )}
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        Email <span className="required">*</span>
-                                    </label>
-                                    <input
-                                        type="email"
-                                        name="email"
-                                        value={formData.email}
-                                        onChange={handleInputChange}
-                                        className={`form-input ${errors.email ? 'input-error' : ''}`}
-                                        placeholder="support@posterpro.store"
-                                    />
-                                    {errors.email && (
-                                        <p className="form-error">{errors.email}</p>
-                                    )}
-                                </div>
-
-                                <div className="form-group full-width">
-                                    <label className="form-label">Website</label>
-                                    <input
-                                        type="url"
-                                        name="website"
-                                        value={formData.website}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="www.posterpro.store"
-                                    />
-                                </div>
-
-                                <div className="form-group full-width">
-                                    <label className="form-label">
-                                        Address <span className="required">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="address"
-                                        value={formData.address}
-                                        onChange={handleInputChange}
-                                        className={`form-input ${errors.address ? 'input-error' : ''}`}
-                                        placeholder="123 Business Street, Andheri East"
-                                    />
-                                    {errors.address && (
-                                        <p className="form-error">{errors.address}</p>
-                                    )}
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        City <span className="required">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="city"
-                                        value={formData.city}
-                                        onChange={handleInputChange}
-                                        className={`form-input ${errors.city ? 'input-error' : ''}`}
-                                        placeholder="Mumbai"
-                                    />
-                                    {errors.city && (
-                                        <p className="form-error">{errors.city}</p>
-                                    )}
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">State</label>
-                                    <input
-                                        type="text"
-                                        name="state"
-                                        value={formData.state}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="Maharashtra"
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Pincode</label>
-                                    <input
-                                        type="text"
-                                        name="pincode"
-                                        value={formData.pincode}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="400001"
-                                        maxLength="6"
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Country</label>
-                                    <input
-                                        type="text"
-                                        name="country"
-                                        value={formData.country}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="India"
-                                    />
-                                </div>
-                            </div>
-
-                            <h3 className="subsection-title">Tax & Legal Information</h3>
-
-                            <div className="form-grid">
-                                <div className="form-group">
-                                    <label className="form-label">GSTIN</label>
-                                    <input
-                                        type="text"
-                                        name="gstin"
-                                        value={formData.gstin}
-                                        onChange={handleInputChange}
-                                        className={`form-input ${errors.gstin ? 'input-error' : ''}`}
-                                        placeholder="27ABCDE1234F1Z5"
-                                        maxLength="15"
-                                    />
-                                    {errors.gstin && (
-                                        <p className="form-error">{errors.gstin}</p>
-                                    )}
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">PAN</label>
-                                    <input
-                                        type="text"
-                                        name="pan"
-                                        value={formData.pan}
-                                        onChange={handleInputChange}
-                                        className={`form-input ${errors.pan ? 'input-error' : ''}`}
-                                        placeholder="ABCDE1234F"
-                                        maxLength="10"
-                                        style={{ textTransform: 'uppercase' }}
-                                    />
-                                    {errors.pan && (
-                                        <p className="form-error">{errors.pan}</p>
-                                    )}
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">CIN</label>
-                                    <input
-                                        type="text"
-                                        name="cin"
-                                        value={formData.cin}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="U12345MH2023PTC123456"
-                                    />
-                                </div>
-                            </div>
-
-                            <h3 className="subsection-title">Social Media Links</h3>
-
-                            <div className="form-grid">
-                                <div className="form-group">
-                                    <label className="form-label">Facebook</label>
-                                    <input
-                                        type="url"
-                                        name="social.facebook"
-                                        value={formData.social?.facebook}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="https://facebook.com/posterpro"
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Instagram</label>
-                                    <input
-                                        type="url"
-                                        name="social.instagram"
-                                        value={formData.social?.instagram}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="https://instagram.com/posterpro"
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Twitter</label>
-                                    <input
-                                        type="url"
-                                        name="social.twitter"
-                                        value={formData.social?.twitter}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="https://twitter.com/posterpro"
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">YouTube</label>
-                                    <input
-                                        type="url"
-                                        name="social.youtube"
-                                        value={formData.social?.youtube}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="https://youtube.com/@posterpro"
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">LinkedIn</label>
-                                    <input
-                                        type="url"
-                                        name="social.linkedin"
-                                        value={formData.social?.linkedin}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="https://linkedin.com/company/posterpro"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-navigation">
-                                <button
-                                    type="button"
-                                    onClick={saveSettings}
-                                    disabled={saving}
-                                    className="submit-button"
-                                >
-                                    {saving ? (
-                                        <>
-                                            <span className="spinner"></span>
-                                            Saving...
-                                        </>
-                                    ) : (
-                                        'Save Changes'
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* UPI Tab */}
-                    {activeTab === 'upi' && (
-                        <div className="form-section">
-                            <div className="section-header">
-                                <h2 className="form-section-title">UPI Payment IDs</h2>
-                                <button
-                                    onClick={() => {
-                                        setUpiForm({ id: '', name: '', appType: 'other', isActive: true, description: '' });
-                                        setEditingUpiIndex(-1);
-                                        setShowUpiForm(true);
-                                    }}
-                                    className="add-button"
-                                >
-                                    <span className="button-icon">+</span>
-                                    Add UPI ID
-                                </button>
-                            </div>
-
-                            <p className="section-description">
-                                These UPI IDs will be used for payment verification. Customers must pay to these IDs.
+                {/* Header */}
+                <header className="page-header">
+                    <div className="header-content">
+                        <div className="header-left">
+                            <h1 className="page-title">
+                                <Building2 size={28} className="title-icon" />
+                                Company Profile
+                            </h1>
+                            <p className="page-description">
+                                Manage all your company information in one place
                             </p>
-
-                            {showUpiForm && (
-                                <div className="upi-form-container">
-                                    <h4 className="form-subtitle">
-                                        {editingUpiIndex >= 0 ? 'Edit UPI ID' : 'Add New UPI ID'}
-                                    </h4>
-
-                                    <div className="form-grid">
-                                        <div className="form-group full-width">
-                                            <label className="form-label">UPI ID *</label>
-                                            <input
-                                                type="text"
-                                                value={upiForm.id}
-                                                onChange={(e) => setUpiForm({ ...upiForm, id: e.target.value })}
-                                                className="form-input"
-                                                placeholder="e.g., posterpro@oksbi"
-                                            />
-                                            <small className="input-hint">
-                                                Must include @ (e.g., name@oksbi)
-                                            </small>
-                                        </div>
-
-                                        <div className="form-group">
-                                            <label className="form-label">Display Name *</label>
-                                            <input
-                                                type="text"
-                                                value={upiForm.name}
-                                                onChange={(e) => setUpiForm({ ...upiForm, name: e.target.value })}
-                                                className="form-input"
-                                                placeholder="e.g., Primary UPI"
-                                            />
-                                        </div>
-
-                                        <div className="form-group">
-                                            <label className="form-label">App Type</label>
-                                            <select
-                                                value={upiForm.appType}
-                                                onChange={(e) => setUpiForm({ ...upiForm, appType: e.target.value })}
-                                                className="form-select"
-                                            >
-                                                {UPI_APPS.map(app => (
-                                                    <option key={app.value} value={app.value}>
-                                                        {app.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        <div className="form-group full-width">
-                                            <label className="form-label">Description (Optional)</label>
-                                            <input
-                                                type="text"
-                                                value={upiForm.description}
-                                                onChange={(e) => setUpiForm({ ...upiForm, description: e.target.value })}
-                                                className="form-input"
-                                                placeholder="e.g., For GPay payments only"
-                                            />
-                                        </div>
-
-                                        <div className="form-group checkbox-group">
-                                            <label className="checkbox-label">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={upiForm.isActive}
-                                                    onChange={(e) => setUpiForm({ ...upiForm, isActive: e.target.checked })}
-                                                />
-                                                <span>Active (accept payments on this ID)</span>
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <div className="form-actions">
-                                        <button
-                                            onClick={() => setShowUpiForm(false)}
-                                            className="cancel-button"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={addUpiId}
-                                            className="submit-button"
-                                        >
-                                            {editingUpiIndex >= 0 ? 'Update' : 'Add'} UPI ID
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="items-container">
-                                {formData.upiIds?.length === 0 ? (
-                                    <div className="empty-state">
-                                        <CreditCard size={48} className="empty-icon" />
-                                        <p>No UPI IDs added yet</p>
-                                        <p className="empty-hint">Add your first UPI ID to start accepting payments</p>
-                                    </div>
+                        </div>
+                        <div className="header-actions">
+                            <button
+                                onClick={expandAll}
+                                className="header-action-btn"
+                                title="Expand all sections"
+                            >
+                                <Layers size={18} />
+                            </button>
+                            <button
+                                onClick={collapseAll}
+                                className="header-action-btn"
+                                title="Collapse all sections"
+                            >
+                                <Layout size={18} />
+                            </button>
+                            <button
+                                onClick={saveSettings}
+                                disabled={saving}
+                                className="save-button"
+                            >
+                                {saving ? (
+                                    <>
+                                        <div className="button-spinner"></div>
+                                        <span>Saving...</span>
+                                    </>
                                 ) : (
-                                    formData.upiIds.map((upi, index) => {
-                                        const app = UPI_APPS.find(a => a.value === upi.appType) || UPI_APPS[4];
-                                        
-                                        return (
-                                            <div key={index} className="item-card">
-                                                <div className="item-header">
-                                                    <div className="item-number">
-                                                        <span className={`status-badge ${upi.isActive ? 'active' : 'inactive'}`}>
-                                                            {upi.isActive ? 'Active' : 'Inactive'}
-                                                        </span>
-                                                    </div>
-                                                    <div className="item-actions">
-                                                        <button
-                                                            onClick={() => editUpi(index)}
-                                                            className="icon-button edit"
-                                                        >
-                                                            <Edit2 size={16} />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => deleteUpi(index)}
-                                                            className="icon-button delete"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                <div className="item-details">
-                                                    <div className="upi-main">
-                                                        <span className="upi-id">{upi.id}</span>
-                                                        <span className="upi-name">{upi.name}</span>
-                                                    </div>
-                                                    
-                                                    {upi.description && (
-                                                        <p className="upi-description">{upi.description}</p>
-                                                    )}
-                                                    
-                                                    <div className="item-info">
-                                                        <span 
-                                                            className="app-badge"
-                                                            style={{ backgroundColor: app.color + '20', color: app.color }}
-                                                        >
-                                                            {app.label}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })
+                                    <>
+                                        <Save size={16} />
+                                        <span>Save Changes</span>
+                                    </>
                                 )}
-                            </div>
-
-                            <div className="info-box">
-                                <AlertCircle size={20} />
-                                <div>
-                                    <strong>Important:</strong> Payment verification system will check screenshots against ALL active UPI IDs above.
-                                </div>
-                            </div>
-
-                            <div className="form-navigation">
-                                <button
-                                    type="button"
-                                    onClick={saveSettings}
-                                    disabled={saving}
-                                    className="submit-button"
-                                >
-                                    {saving ? (
-                                        <>
-                                            <span className="spinner"></span>
-                                            Saving...
-                                        </>
-                                    ) : (
-                                        'Save Changes'
-                                    )}
-                                </button>
-                            </div>
+                            </button>
                         </div>
-                    )}
+                    </div>
+                </header>
 
-                    {/* Bank Details Tab */}
-                    {activeTab === 'bank' && (
-                        <div className="form-section">
-                            <h2 className="form-section-title">Bank Account Details</h2>
-                            <p className="section-description">
-                                These bank details will appear on invoices for bank transfer payments.
-                            </p>
-
-                            <div className="form-grid">
-                                <div className="form-group full-width">
-                                    <label className="form-label">Bank Name</label>
-                                    <input
-                                        type="text"
-                                        name="bank.name"
-                                        value={formData.bank?.name}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="e.g., State Bank of India"
-                                    />
+                {/* Desktop Horizontal Tabs */}
+                <div className="desktop-tabs">
+                    {SECTIONS.map(section => {
+                        const Icon = section.icon;
+                        return (
+                            <button
+                                key={section.id}
+                                className={`tab-button ${activeTab === section.id ? 'active' : ''}`}
+                                onClick={() => handleTabClick(section.id)}
+                            >
+                                <div className="tab-icon" style={{ 
+                                    backgroundColor: activeTab === section.id ? `${section.color}20` : 'transparent',
+                                    color: activeTab === section.id ? section.color : '#64748b'
+                                }}>
+                                    <Icon size={20} />
                                 </div>
+                                <span className="tab-title" style={{
+                                    color: activeTab === section.id ? '#0f172a' : '#64748b',
+                                    fontWeight: activeTab === section.id ? '600' : '500'
+                                }}>{section.title}</span>
+                                {activeTab === section.id && (
+                                    <div className="active-indicator" style={{ backgroundColor: section.color }}></div>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
 
-                                <div className="form-group">
-                                    <label className="form-label">Account Number</label>
-                                    <input
-                                        type="text"
-                                        name="bank.account"
-                                        value={formData.bank?.account}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="12345678901"
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">IFSC Code</label>
-                                    <input
-                                        type="text"
-                                        name="bank.ifsc"
-                                        value={formData.bank?.ifsc}
-                                        onChange={handleInputChange}
-                                        className={`form-input ${errors.bankIfsc ? 'input-error' : ''}`}
-                                        placeholder="SBIN0001234"
-                                        maxLength="11"
-                                        style={{ textTransform: 'uppercase' }}
-                                    />
-                                    {errors.bankIfsc && (
-                                        <p className="form-error">{errors.bankIfsc}</p>
-                                    )}
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Branch</label>
-                                    <input
-                                        type="text"
-                                        name="bank.branch"
-                                        value={formData.bank?.branch}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="Andheri East Branch"
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Account Type</label>
-                                    <select
-                                        name="bank.accountType"
-                                        value={formData.bank?.accountType}
-                                        onChange={handleInputChange}
-                                        className="form-select"
+                {/* Main Content */}
+                <main className="main-content">
+                    {/* Sections */}
+                    <div className="sections-container">
+                        {SECTIONS.map(section => {
+                            const Icon = section.icon;
+                            const isExpanded = expandedSections.includes(section.id);
+                            
+                            return (
+                                <div key={section.id} className={`section-card ${activeTab === section.id ? 'active' : ''}`}>
+                                    {/* Section Header */}
+                                    <div 
+                                        className="section-header"
+                                        onClick={() => toggleSection(section.id)}
                                     >
-                                        <option value="Current Account">Current Account</option>
-                                        <option value="Savings Account">Savings Account</option>
-                                        <option value="Business Account">Business Account</option>
-                                    </select>
-                                </div>
-                            </div>
+                                        <div className="section-header-left">
+                                            <div 
+                                                className="section-icon"
+                                                style={{ background: `${section.color}15`, color: section.color }}
+                                            >
+                                                <Icon size={20} />
+                                            </div>
+                                            <div className="section-title">
+                                                <h2>{section.title}</h2>
+                                                <p>{section.description}</p>
+                                            </div>
+                                        </div>
+                                        <div className="section-header-right">
+                                            <ChevronRight 
+                                                size={20} 
+                                                className={`chevron-icon ${isExpanded ? 'expanded' : ''}`}
+                                                style={{
+                                                    transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                                                    transition: 'transform 0.3s ease'
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
 
-                            <div className="info-box">
-                                <AlertCircle size={20} />
-                                <div>
-                                    <strong>Note:</strong> These details are for reference only.
-                                </div>
-                            </div>
+                                    {/* Section Content */}
+                                    {isExpanded && (
+                                        <div className="section-content">
+                                            {/* Basic Info Section */}
+                                            {section.id === 'basic' && (
+                                                <>
+                                                    {/* Company Details */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <Building size={16} />
+                                                            Company Details
+                                                        </h3>
+                                                        <div className="form-grid">
+                                                            <div className="form-field span-2">
+                                                                <label>Company Name <span className="required">*</span></label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="companyName"
+                                                                    value={formData.companyName}
+                                                                    onChange={handleInputChange}
+                                                                    className={errors.companyName ? 'error' : ''}
+                                                                    placeholder="Enter company name"
+                                                                />
+                                                                {errors.companyName && <span className="error-text">{errors.companyName}</span>}
+                                                            </div>
 
-                            <div className="form-navigation">
-                                <button
-                                    type="button"
-                                    onClick={saveSettings}
-                                    disabled={saving}
-                                    className="submit-button"
-                                >
-                                    {saving ? (
-                                        <>
-                                            <span className="spinner"></span>
-                                            Saving...
-                                        </>
-                                    ) : (
-                                        'Save Changes'
+                                                            <div className="form-field span-2">
+                                                                <label>Legal Name</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="legalName"
+                                                                    value={formData.legalName}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="Enter registered legal name"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field span-2">
+                                                                <label>Tagline</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="tagline"
+                                                                    value={formData.tagline}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="Brief company description"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Contact Information */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <Phone size={16} />
+                                                            Contact Information
+                                                        </h3>
+                                                        <div className="form-grid">
+                                                            <div className="form-field">
+                                                                <label>Phone <span className="required">*</span></label>
+                                                                <input
+                                                                    type="tel"
+                                                                    name="phone"
+                                                                    value={formData.phone}
+                                                                    onChange={handleInputChange}
+                                                                    className={errors.phone ? 'error' : ''}
+                                                                    placeholder="+91 98765 43210"
+                                                                />
+                                                                {errors.phone && <span className="error-text">{errors.phone}</span>}
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>Email <span className="required">*</span></label>
+                                                                <input
+                                                                    type="email"
+                                                                    name="email"
+                                                                    value={formData.email}
+                                                                    onChange={handleInputChange}
+                                                                    className={errors.email ? 'error' : ''}
+                                                                    placeholder="company@example.com"
+                                                                />
+                                                                {errors.email && <span className="error-text">{errors.email}</span>}
+                                                            </div>
+
+                                                            <div className="form-field span-2">
+                                                                <label>Website</label>
+                                                                <input
+                                                                    type="url"
+                                                                    name="website"
+                                                                    value={formData.website}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="https://www.example.com"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Address */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <MapPin size={16} />
+                                                            Address
+                                                        </h3>
+                                                        <div className="form-grid">
+                                                            <div className="form-field span-2">
+                                                                <label>Street Address <span className="required">*</span></label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="address"
+                                                                    value={formData.address}
+                                                                    onChange={handleInputChange}
+                                                                    className={errors.address ? 'error' : ''}
+                                                                    placeholder="Street address, building, area"
+                                                                />
+                                                                {errors.address && <span className="error-text">{errors.address}</span>}
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>City <span className="required">*</span></label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="city"
+                                                                    value={formData.city}
+                                                                    onChange={handleInputChange}
+                                                                    className={errors.city ? 'error' : ''}
+                                                                    placeholder="City"
+                                                                />
+                                                                {errors.city && <span className="error-text">{errors.city}</span>}
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>State</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="state"
+                                                                    value={formData.state}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="State"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>Pincode</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="pincode"
+                                                                    value={formData.pincode}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="Pincode"
+                                                                    maxLength="6"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>Country</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="country"
+                                                                    value={formData.country}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="Country"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Tax & Legal */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <FileText size={16} />
+                                                            Tax & Legal Information
+                                                        </h3>
+                                                        <div className="form-grid">
+                                                            <div className="form-field">
+                                                                <label>GSTIN</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="gstin"
+                                                                    value={formData.gstin}
+                                                                    onChange={handleInputChange}
+                                                                    className={errors.gstin ? 'error' : ''}
+                                                                    placeholder="27ABCDE1234F1Z5"
+                                                                    maxLength="15"
+                                                                />
+                                                                {errors.gstin && <span className="error-text">{errors.gstin}</span>}
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>PAN</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="pan"
+                                                                    value={formData.pan}
+                                                                    onChange={handleInputChange}
+                                                                    className={errors.pan ? 'error' : ''}
+                                                                    placeholder="ABCDE1234F"
+                                                                    maxLength="10"
+                                                                />
+                                                                {errors.pan && <span className="error-text">{errors.pan}</span>}
+                                                            </div>
+
+                                                            <div className="form-field span-2">
+                                                                <label>CIN</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="cin"
+                                                                    value={formData.cin}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="U12345MH2023PTC123456"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Social Media */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <Globe2 size={16} />
+                                                            Social Media Links
+                                                        </h3>
+                                                        <div className="social-grid">
+                                                            <div className="form-field">
+                                                                <label>Facebook</label>
+                                                                <input
+                                                                    type="url"
+                                                                    name="social.facebook"
+                                                                    value={formData.social?.facebook}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="https://facebook.com/company"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>Instagram</label>
+                                                                <input
+                                                                    type="url"
+                                                                    name="social.instagram"
+                                                                    value={formData.social?.instagram}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="https://instagram.com/company"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>Twitter</label>
+                                                                <input
+                                                                    type="url"
+                                                                    name="social.twitter"
+                                                                    value={formData.social?.twitter}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="https://twitter.com/company"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>LinkedIn</label>
+                                                                <input
+                                                                    type="url"
+                                                                    name="social.linkedin"
+                                                                    value={formData.social?.linkedin}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="https://linkedin.com/company"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>YouTube</label>
+                                                                <input
+                                                                    type="url"
+                                                                    name="social.youtube"
+                                                                    value={formData.social?.youtube}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="https://youtube.com/@company"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            {/* UPI Section */}
+                                            {section.id === 'upi' && (
+                                                <>
+                                                    {/* Add UPI Button */}
+                                                    {!showUpiForm && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setUpiForm({ id: '', name: '', appType: 'other', isActive: true, description: '' });
+                                                                setEditingUpiIndex(-1);
+                                                                setShowUpiForm(true);
+                                                            }}
+                                                            className="add-button"
+                                                        >
+                                                            <Plus size={18} />
+                                                            <span>Add New UPI ID</span>
+                                                        </button>
+                                                    )}
+
+                                                    {/* UPI Form */}
+                                                    {showUpiForm && (
+                                                        <div className="form-card">
+                                                            <div className="form-card-header">
+                                                                <h4>{editingUpiIndex >= 0 ? 'Edit UPI ID' : 'Add New UPI ID'}</h4>
+                                                                <button
+                                                                    onClick={() => setShowUpiForm(false)}
+                                                                    className="close-btn"
+                                                                >
+                                                                    <X size={18} />
+                                                                </button>
+                                                            </div>
+
+                                                            <div className="form-card-body">
+                                                                <div className="form-field">
+                                                                    <label>UPI ID <span className="required">*</span></label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={upiForm.id}
+                                                                        onChange={(e) => setUpiForm({ ...upiForm, id: e.target.value })}
+                                                                        placeholder="e.g., company@oksbi"
+                                                                    />
+                                                                    <span className="hint">Must include @ (e.g., name@oksbi)</span>
+                                                                </div>
+
+                                                                <div className="form-field">
+                                                                    <label>Display Name <span className="required">*</span></label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={upiForm.name}
+                                                                        onChange={(e) => setUpiForm({ ...upiForm, name: e.target.value })}
+                                                                        placeholder="e.g., Primary UPI"
+                                                                    />
+                                                                </div>
+
+                                                                <div className="form-field">
+                                                                    <label>App Type</label>
+                                                                    <select
+                                                                        value={upiForm.appType}
+                                                                        onChange={(e) => setUpiForm({ ...upiForm, appType: e.target.value })}
+                                                                    >
+                                                                        {UPI_APPS.map(app => (
+                                                                            <option key={app.value} value={app.value}>
+                                                                                {app.icon} {app.label}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+
+                                                                <div className="form-field">
+                                                                    <label>Description (Optional)</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={upiForm.description}
+                                                                        onChange={(e) => setUpiForm({ ...upiForm, description: e.target.value })}
+                                                                        placeholder="e.g., For business payments only"
+                                                                    />
+                                                                </div>
+
+                                                                <div className="toggle-field">
+                                                                    <label className="toggle">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={upiForm.isActive}
+                                                                            onChange={(e) => setUpiForm({ ...upiForm, isActive: e.target.checked })}
+                                                                        />
+                                                                        <span className="toggle-slider"></span>
+                                                                        <span className="toggle-label">
+                                                                            {upiForm.isActive ? 'Active' : 'Inactive'}
+                                                                        </span>
+                                                                    </label>
+                                                                </div>
+
+                                                                <div className="form-actions">
+                                                                    <button
+                                                                        onClick={() => setShowUpiForm(false)}
+                                                                        className="btn-secondary"
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={addUpiId}
+                                                                        className="btn-primary"
+                                                                    >
+                                                                        {editingUpiIndex >= 0 ? 'Update' : 'Add'} UPI ID
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* UPI List */}
+                                                    <div className="items-list">
+                                                        {formData.upiIds?.length === 0 ? (
+                                                            <div className="empty-state">
+                                                                <CreditCard size={48} />
+                                                                <h4>No UPI IDs added</h4>
+                                                                <p>Add your first UPI ID to start accepting payments</p>
+                                                            </div>
+                                                        ) : (
+                                                            formData.upiIds.map((upi, index) => {
+                                                                const app = UPI_APPS.find(a => a.value === upi.appType) || UPI_APPS[4];
+                                                                return (
+                                                                    <div key={index} className="item-card">
+                                                                        <div className="item-status">
+                                                                            {getStatusIcon(upi.isActive)}
+                                                                        </div>
+                                                                        <div className="item-details">
+                                                                            <div className="item-title">
+                                                                                <span className="item-id">{upi.id}</span>
+                                                                                <span className="item-name">{upi.name}</span>
+                                                                            </div>
+                                                                            {upi.description && (
+                                                                                <p className="item-description">{upi.description}</p>
+                                                                            )}
+                                                                            <span 
+                                                                                className="item-badge"
+                                                                                style={{ 
+                                                                                    background: `${app.color}15`,
+                                                                                    color: app.color,
+                                                                                }}
+                                                                            >
+                                                                                {app.icon} {app.label}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="item-actions">
+                                                                            <button
+                                                                                onClick={() => toggleUpiStatus(index)}
+                                                                                className="action-btn"
+                                                                                title={upi.isActive ? 'Deactivate' : 'Activate'}
+                                                                            >
+                                                                                {upi.isActive ? <Eye size={16} /> : <EyeOff size={16} />}
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => editUpi(index)}
+                                                                                className="action-btn"
+                                                                                title="Edit"
+                                                                            >
+                                                                                <Edit2 size={16} />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => deleteUpi(index)}
+                                                                                className="action-btn delete"
+                                                                                title="Delete"
+                                                                            >
+                                                                                <Trash2 size={16} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })
+                                                        )}
+                                                    </div>
+
+                                                    {/* Info Box */}
+                                                    <div className="info-box">
+                                                        <Info size={20} />
+                                                        <p>
+                                                            <strong>Important:</strong> Payment verification system will check screenshots against all active UPI IDs above.
+                                                        </p>
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            {/* Bank Section */}
+                                            {section.id === 'bank' && (
+                                                <>
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <Landmark size={16} />
+                                                            Account Information
+                                                        </h3>
+                                                        <div className="form-grid">
+                                                            <div className="form-field span-2">
+                                                                <label>Bank Name</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="bank.name"
+                                                                    value={formData.bank?.name}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="e.g., State Bank of India"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field span-2">
+                                                                <label>Account Number</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="bank.account"
+                                                                    value={formData.bank?.account}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="Enter account number"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>IFSC Code</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="bank.ifsc"
+                                                                    value={formData.bank?.ifsc}
+                                                                    onChange={handleInputChange}
+                                                                    className={errors.bankIfsc ? 'error' : ''}
+                                                                    placeholder="SBIN0001234"
+                                                                    maxLength="11"
+                                                                    style={{ textTransform: 'uppercase' }}
+                                                                />
+                                                                {errors.bankIfsc && <span className="error-text">{errors.bankIfsc}</span>}
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>Branch</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="bank.branch"
+                                                                    value={formData.bank?.branch}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="Branch name"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>Account Type</label>
+                                                                <select
+                                                                    name="bank.accountType"
+                                                                    value={formData.bank?.accountType}
+                                                                    onChange={handleInputChange}
+                                                                >
+                                                                    <option value="Current Account">Current Account</option>
+                                                                    <option value="Savings Account">Savings Account</option>
+                                                                    <option value="Business Account">Business Account</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="info-box">
+                                                        <ShieldCheck size={20} />
+                                                        <p>
+                                                            <strong>Note:</strong> These details are for reference only and will appear on invoices.
+                                                        </p>
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            {/* Invoice Section */}
+                                            {section.id === 'invoice' && (
+                                                <>
+                                                    {/* Format Settings */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <FileText size={16} />
+                                                            Format Settings
+                                                        </h3>
+                                                        <div className="form-grid">
+                                                            <div className="form-field">
+                                                                <label>Invoice Prefix</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="invoiceSettings.prefix"
+                                                                    value={formData.invoiceSettings?.prefix}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="INV"
+                                                                    maxLength="5"
+                                                                    style={{ textTransform: 'uppercase' }}
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>Separator</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="invoiceSettings.separator"
+                                                                    value={formData.invoiceSettings?.separator}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="-"
+                                                                    maxLength="1"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>Date Format</label>
+                                                                <select
+                                                                    name="invoiceSettings.dateFormat"
+                                                                    value={formData.invoiceSettings?.dateFormat}
+                                                                    onChange={handleInputChange}
+                                                                >
+                                                                    <option value="dd/mm/yyyy">DD/MM/YYYY</option>
+                                                                    <option value="mm/dd/yyyy">MM/DD/YYYY</option>
+                                                                    <option value="yyyy-mm-dd">YYYY-MM-DD</option>
+                                                                </select>
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>Currency Symbol</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="invoiceSettings.currency"
+                                                                    value={formData.invoiceSettings?.currency}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="₹"
+                                                                    maxLength="2"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Tax Settings */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <DollarSign size={16} />
+                                                            Tax Settings
+                                                        </h3>
+                                                        <div className="form-grid">
+                                                            <div className="form-field span-2">
+                                                                <label>Tax System</label>
+                                                                <select
+                                                                    name="invoiceSettings.taxSystem"
+                                                                    value={formData.invoiceSettings?.taxSystem}
+                                                                    onChange={handleInputChange}
+                                                                >
+                                                                    <option value="GST">GST (India)</option>
+                                                                    <option value="VAT">VAT</option>
+                                                                    <option value="None">No Tax</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="toggle-field">
+                                                            <label className="toggle">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    name="invoiceSettings.gstBreakdown"
+                                                                    checked={formData.invoiceSettings?.gstBreakdown}
+                                                                    onChange={handleInputChange}
+                                                                />
+                                                                <span className="toggle-slider"></span>
+                                                                <span className="toggle-label">Show GST breakdown</span>
+                                                            </label>
+                                                        </div>
+
+                                                        <div className="toggle-field">
+                                                            <label className="toggle">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    name="invoiceSettings.showCGSTSGST"
+                                                                    checked={formData.invoiceSettings?.showCGSTSGST}
+                                                                    onChange={handleInputChange}
+                                                                />
+                                                                <span className="toggle-slider"></span>
+                                                                <span className="toggle-label">Show CGST/SGST separately</span>
+                                                            </label>
+                                                        </div>
+
+                                                        <div className="toggle-field">
+                                                            <label className="toggle">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    name="invoiceSettings.roundAmount"
+                                                                    checked={formData.invoiceSettings?.roundAmount}
+                                                                    onChange={handleInputChange}
+                                                                />
+                                                                <span className="toggle-slider"></span>
+                                                                <span className="toggle-label">Round amounts to nearest integer</span>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Terms & Policies */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <FileSignature size={16} />
+                                                            Terms & Policies
+                                                        </h3>
+                                                        <div className="form-grid">
+                                                            <div className="form-field span-2">
+                                                                <label>Payment Terms</label>
+                                                                <textarea
+                                                                    name="invoiceSettings.paymentTerms"
+                                                                    value={formData.invoiceSettings?.paymentTerms}
+                                                                    onChange={handleInputChange}
+                                                                    rows="2"
+                                                                    placeholder="e.g., Due on receipt"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field span-2">
+                                                                <label>Delivery Terms</label>
+                                                                <textarea
+                                                                    name="invoiceSettings.deliveryTerms"
+                                                                    value={formData.invoiceSettings?.deliveryTerms}
+                                                                    onChange={handleInputChange}
+                                                                    rows="2"
+                                                                    placeholder="e.g., 3-5 business days after payment"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field span-2">
+                                                                <label>Warranty Terms</label>
+                                                                <textarea
+                                                                    name="invoiceSettings.warrantyTerms"
+                                                                    value={formData.invoiceSettings?.warrantyTerms}
+                                                                    onChange={handleInputChange}
+                                                                    rows="2"
+                                                                    placeholder="e.g., 7 days replacement for defects"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field span-2">
+                                                                <label>Refund Policy</label>
+                                                                <textarea
+                                                                    name="invoiceSettings.refundPolicy"
+                                                                    value={formData.invoiceSettings?.refundPolicy}
+                                                                    onChange={handleInputChange}
+                                                                    rows="2"
+                                                                    placeholder="e.g., No refunds after order processing"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            {/* Support Section */}
+                                            {section.id === 'support' && (
+                                                <>
+                                                    {/* Contact Channels */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <HeadphonesIcon size={16} />
+                                                            Support Channels
+                                                        </h3>
+                                                        <div className="form-grid">
+                                                            <div className="form-field span-2">
+                                                                <label>Support Email</label>
+                                                                <input
+                                                                    type="email"
+                                                                    name="support.email"
+                                                                    value={formData.support?.email}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="support@company.com"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>Support Phone</label>
+                                                                <input
+                                                                    type="tel"
+                                                                    name="support.phone"
+                                                                    value={formData.support?.phone}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="+91 98765 43210"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field">
+                                                                <label>WhatsApp Number</label>
+                                                                <input
+                                                                    type="tel"
+                                                                    name="support.whatsapp"
+                                                                    value={formData.support?.whatsapp}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="+91 98765 43210"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Availability */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <Clock size={16} />
+                                                            Availability
+                                                        </h3>
+                                                        <div className="form-grid">
+                                                            <div className="form-field span-2">
+                                                                <label>Support Hours</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="support.hours"
+                                                                    value={formData.support?.hours}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="Mon-Sat, 10:00 AM - 7:00 PM"
+                                                                />
+                                                            </div>
+
+                                                            <div className="form-field span-2">
+                                                                <label>Response Time</label>
+                                                                <input
+                                                                    type="text"
+                                                                    name="support.responseTime"
+                                                                    value={formData.support?.responseTime}
+                                                                    onChange={handleInputChange}
+                                                                    placeholder="Within 30 minutes"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Business Hours */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <CalendarIcon size={16} />
+                                                            Business Hours
+                                                        </h3>
+                                                        <div className="hours-list">
+                                                            {Object.entries(formData.businessHours || {}).map(([day, hours]) => (
+                                                                <div key={day} className="hours-item">
+                                                                    <label className="day-label">{day.charAt(0).toUpperCase() + day.slice(1)}</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={hours}
+                                                                        onChange={(e) => handleBusinessHoursChange(day, e.target.value)}
+                                                                        placeholder="9:00 AM - 6:00 PM"
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            {/* Branding Section */}
+                                            {section.id === 'branding' && (
+                                                <>
+                                                    {/* Theme Colors */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <PaletteIcon size={16} />
+                                                            Theme Colors
+                                                        </h3>
+                                                        <div className="colors-grid">
+                                                            <div className="color-field">
+                                                                <label>Primary</label>
+                                                                <div className="color-input">
+                                                                    <input
+                                                                        type="color"
+                                                                        value={formData.theme?.primary || '#2563eb'}
+                                                                        onChange={(e) => handleThemeChange('primary', e.target.value)}
+                                                                    />
+                                                                    <input
+                                                                        type="text"
+                                                                        value={formData.theme?.primary || '#2563eb'}
+                                                                        onChange={(e) => handleThemeChange('primary', e.target.value)}
+                                                                        placeholder="#2563eb"
+                                                                    />
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="color-field">
+                                                                <label>Secondary</label>
+                                                                <div className="color-input">
+                                                                    <input
+                                                                        type="color"
+                                                                        value={formData.theme?.secondary || '#4f46e5'}
+                                                                        onChange={(e) => handleThemeChange('secondary', e.target.value)}
+                                                                    />
+                                                                    <input
+                                                                        type="text"
+                                                                        value={formData.theme?.secondary || '#4f46e5'}
+                                                                        onChange={(e) => handleThemeChange('secondary', e.target.value)}
+                                                                        placeholder="#4f46e5"
+                                                                    />
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="color-field">
+                                                                <label>Accent</label>
+                                                                <div className="color-input">
+                                                                    <input
+                                                                        type="color"
+                                                                        value={formData.theme?.accent || '#0d9488'}
+                                                                        onChange={(e) => handleThemeChange('accent', e.target.value)}
+                                                                    />
+                                                                    <input
+                                                                        type="text"
+                                                                        value={formData.theme?.accent || '#0d9488'}
+                                                                        onChange={(e) => handleThemeChange('accent', e.target.value)}
+                                                                        placeholder="#0d9488"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Color Preview */}
+                                                        <div className="color-preview">
+                                                            <div className="preview-bar">
+                                                                <div className="preview-segment" style={{ backgroundColor: formData.theme?.primary }}>Primary</div>
+                                                                <div className="preview-segment" style={{ backgroundColor: formData.theme?.secondary }}>Secondary</div>
+                                                                <div className="preview-segment" style={{ backgroundColor: formData.theme?.accent }}>Accent</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Brand Assets */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <ImageIcon size={16} />
+                                                            Brand Assets
+                                                        </h3>
+                                                        <div className="assets-grid">
+                                                            <div className="asset-card">
+                                                                <div className="asset-preview">
+                                                                    {formData.logo ? (
+                                                                        <img src={formData.logo} alt="Logo" />
+                                                                    ) : (
+                                                                        <Building2 size={32} />
+                                                                    )}
+                                                                </div>
+                                                                <label className="asset-upload">
+                                                                    <Upload size={14} />
+                                                                    <span>Upload Logo</span>
+                                                                    <input type="file" accept="image/*" />
+                                                                </label>
+                                                            </div>
+
+                                                            <div className="asset-card">
+                                                                <div className="asset-preview">
+                                                                    {formData.favicon ? (
+                                                                        <img src={formData.favicon} alt="Favicon" />
+                                                                    ) : (
+                                                                        <Star size={32} />
+                                                                    )}
+                                                                </div>
+                                                                <label className="asset-upload">
+                                                                    <Upload size={14} />
+                                                                    <span>Upload Favicon</span>
+                                                                    <input type="file" accept="image/*" />
+                                                                </label>
+                                                            </div>
+
+                                                            <div className="asset-card">
+                                                                <div className="asset-preview">
+                                                                    {formData.signature ? (
+                                                                        <img src={formData.signature} alt="Signature" />
+                                                                    ) : (
+                                                                        <FileSignature size={32} />
+                                                                    )}
+                                                                </div>
+                                                                <label className="asset-upload">
+                                                                    <Upload size={14} />
+                                                                    <span>Upload Signature</span>
+                                                                    <input type="file" accept="image/*" />
+                                                                </label>
+                                                            </div>
+
+                                                            <div className="asset-card">
+                                                                <div className="asset-preview">
+                                                                    {formData.stamp ? (
+                                                                        <img src={formData.stamp} alt="Stamp" />
+                                                                    ) : (
+                                                                        <Stamp size={32} />
+                                                                    )}
+                                                                </div>
+                                                                <label className="asset-upload">
+                                                                    <Upload size={14} />
+                                                                    <span>Upload Stamp</span>
+                                                                    <input type="file" accept="image/*" />
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
                                     )}
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Invoice Settings Tab */}
-                    {activeTab === 'invoice' && (
-                        <div className="form-section">
-                            <h2 className="form-section-title">Invoice Configuration</h2>
-
-                            <div className="form-grid">
-                                <div className="form-group">
-                                    <label className="form-label">Invoice Prefix</label>
-                                    <input
-                                        type="text"
-                                        name="invoiceSettings.prefix"
-                                        value={formData.invoiceSettings?.prefix}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="INV"
-                                        maxLength="5"
-                                        style={{ textTransform: 'uppercase' }}
-                                    />
                                 </div>
+                            );
+                        })}
+                    </div>
+                </main>
 
-                                <div className="form-group">
-                                    <label className="form-label">Separator</label>
-                                    <input
-                                        type="text"
-                                        name="invoiceSettings.separator"
-                                        value={formData.invoiceSettings?.separator}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="-"
-                                        maxLength="1"
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Date Format</label>
-                                    <select
-                                        name="invoiceSettings.dateFormat"
-                                        value={formData.invoiceSettings?.dateFormat}
-                                        onChange={handleInputChange}
-                                        className="form-select"
-                                    >
-                                        <option value="dd/mm/yyyy">DD/MM/YYYY</option>
-                                        <option value="mm/dd/yyyy">MM/DD/YYYY</option>
-                                        <option value="yyyy-mm-dd">YYYY-MM-DD</option>
-                                    </select>
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Currency Symbol</label>
-                                    <input
-                                        type="text"
-                                        name="invoiceSettings.currency"
-                                        value={formData.invoiceSettings?.currency}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="₹"
-                                        maxLength="2"
-                                    />
-                                </div>
-
-                                <div className="form-group full-width">
-                                    <label className="form-label">Tax System</label>
-                                    <select
-                                        name="invoiceSettings.taxSystem"
-                                        value={formData.invoiceSettings?.taxSystem}
-                                        onChange={handleInputChange}
-                                        className="form-select"
-                                    >
-                                        <option value="GST">GST (India)</option>
-                                        <option value="VAT">VAT</option>
-                                        <option value="None">No Tax</option>
-                                    </select>
-                                </div>
-
-                                <div className="form-group checkbox-group">
-                                    <label className="checkbox-label">
-                                        <input
-                                            type="checkbox"
-                                            name="invoiceSettings.gstBreakdown"
-                                            checked={formData.invoiceSettings?.gstBreakdown}
-                                            onChange={handleInputChange}
-                                        />
-                                        <span>Show GST breakdown</span>
-                                    </label>
-                                </div>
-
-                                <div className="form-group checkbox-group">
-                                    <label className="checkbox-label">
-                                        <input
-                                            type="checkbox"
-                                            name="invoiceSettings.showCGSTSGST"
-                                            checked={formData.invoiceSettings?.showCGSTSGST}
-                                            onChange={handleInputChange}
-                                        />
-                                        <span>Show CGST/SGST separately</span>
-                                    </label>
-                                </div>
-
-                                <div className="form-group checkbox-group">
-                                    <label className="checkbox-label">
-                                        <input
-                                            type="checkbox"
-                                            name="invoiceSettings.roundAmount"
-                                            checked={formData.invoiceSettings?.roundAmount}
-                                            onChange={handleInputChange}
-                                        />
-                                        <span>Round amounts to nearest integer</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <h3 className="subsection-title">Terms & Policies</h3>
-
-                            <div className="form-grid">
-                                <div className="form-group full-width">
-                                    <label className="form-label">Payment Terms</label>
-                                    <textarea
-                                        name="invoiceSettings.paymentTerms"
-                                        value={formData.invoiceSettings?.paymentTerms}
-                                        onChange={handleInputChange}
-                                        className="form-textarea"
-                                        rows="2"
-                                    />
-                                </div>
-
-                                <div className="form-group full-width">
-                                    <label className="form-label">Delivery Terms</label>
-                                    <textarea
-                                        name="invoiceSettings.deliveryTerms"
-                                        value={formData.invoiceSettings?.deliveryTerms}
-                                        onChange={handleInputChange}
-                                        className="form-textarea"
-                                        rows="2"
-                                    />
-                                </div>
-
-                                <div className="form-group full-width">
-                                    <label className="form-label">Warranty Terms</label>
-                                    <textarea
-                                        name="invoiceSettings.warrantyTerms"
-                                        value={formData.invoiceSettings?.warrantyTerms}
-                                        onChange={handleInputChange}
-                                        className="form-textarea"
-                                        rows="2"
-                                    />
-                                </div>
-
-                                <div className="form-group full-width">
-                                    <label className="form-label">Refund Policy</label>
-                                    <textarea
-                                        name="invoiceSettings.refundPolicy"
-                                        value={formData.invoiceSettings?.refundPolicy}
-                                        onChange={handleInputChange}
-                                        className="form-textarea"
-                                        rows="2"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-navigation">
-                                <button
-                                    type="button"
-                                    onClick={saveSettings}
-                                    disabled={saving}
-                                    className="submit-button"
-                                >
-                                    {saving ? (
-                                        <>
-                                            <span className="spinner"></span>
-                                            Saving...
-                                        </>
-                                    ) : (
-                                        'Save Changes'
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Support Tab */}
-                    {activeTab === 'support' && (
-                        <div className="form-section">
-                            <h2 className="form-section-title">Customer Support Settings</h2>
-
-                            <div className="form-grid">
-                                <div className="form-group">
-                                    <label className="form-label">Support Email</label>
-                                    <input
-                                        type="email"
-                                        name="support.email"
-                                        value={formData.support?.email}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="care@posterpro.store"
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Support Phone</label>
-                                    <input
-                                        type="tel"
-                                        name="support.phone"
-                                        value={formData.support?.phone}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="+91 98765 43210"
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">WhatsApp Number</label>
-                                    <input
-                                        type="tel"
-                                        name="support.whatsapp"
-                                        value={formData.support?.whatsapp}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="+91 98765 43210"
-                                    />
-                                </div>
-
-                                <div className="form-group full-width">
-                                    <label className="form-label">Support Hours</label>
-                                    <input
-                                        type="text"
-                                        name="support.hours"
-                                        value={formData.support?.hours}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="Mon-Sat, 10:00 AM - 7:00 PM"
-                                    />
-                                </div>
-
-                                <div className="form-group full-width">
-                                    <label className="form-label">Response Time</label>
-                                    <input
-                                        type="text"
-                                        name="support.responseTime"
-                                        value={formData.support?.responseTime}
-                                        onChange={handleInputChange}
-                                        className="form-input"
-                                        placeholder="Within 30 minutes"
-                                    />
-                                </div>
-                            </div>
-
-                            <h3 className="subsection-title">Business Hours</h3>
-
-                            <div className="form-grid">
-                                {Object.entries(formData.businessHours || {}).map(([day, hours]) => (
-                                    <div key={day} className="form-group">
-                                        <label className="form-label" style={{ textTransform: 'capitalize' }}>
-                                            {day}
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={hours}
-                                            onChange={(e) => handleBusinessHoursChange(day, e.target.value)}
-                                            className="form-input"
-                                            placeholder="9:00 AM - 6:00 PM"
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="form-navigation">
-                                <button
-                                    type="button"
-                                    onClick={saveSettings}
-                                    disabled={saving}
-                                    className="submit-button"
-                                >
-                                    {saving ? (
-                                        <>
-                                            <span className="spinner"></span>
-                                            Saving...
-                                        </>
-                                    ) : (
-                                        'Save Changes'
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Branding Tab */}
-                    {activeTab === 'branding' && (
-                        <div className="form-section">
-                            <h2 className="form-section-title">Branding & Theme</h2>
-
-                            <div className="form-grid">
-                                <div className="form-group">
-                                    <label className="form-label">Primary Color</label>
-                                    <div className="color-input-group">
-                                        <input
-                                            type="color"
-                                            value={formData.theme?.primary || '#2c3e50'}
-                                            onChange={(e) => handleThemeChange('primary', e.target.value)}
-                                            className="color-picker"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={formData.theme?.primary || '#2c3e50'}
-                                            onChange={(e) => handleThemeChange('primary', e.target.value)}
-                                            className="form-input"
-                                            style={{ width: '120px' }}
-                                            placeholder="#2c3e50"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Secondary Color</label>
-                                    <div className="color-input-group">
-                                        <input
-                                            type="color"
-                                            value={formData.theme?.secondary || '#34495e'}
-                                            onChange={(e) => handleThemeChange('secondary', e.target.value)}
-                                            className="color-picker"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={formData.theme?.secondary || '#34495e'}
-                                            onChange={(e) => handleThemeChange('secondary', e.target.value)}
-                                            className="form-input"
-                                            style={{ width: '120px' }}
-                                            placeholder="#34495e"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Accent Color</label>
-                                    <div className="color-input-group">
-                                        <input
-                                            type="color"
-                                            value={formData.theme?.accent || '#27ae60'}
-                                            onChange={(e) => handleThemeChange('accent', e.target.value)}
-                                            className="color-picker"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={formData.theme?.accent || '#27ae60'}
-                                            onChange={(e) => handleThemeChange('accent', e.target.value)}
-                                            className="form-input"
-                                            style={{ width: '120px' }}
-                                            placeholder="#27ae60"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <h3 className="subsection-title">Logo & Images</h3>
-
-                            <div className="image-upload-grid">
-                                <div className="image-upload-card">
-                                    <div className="image-preview">
-                                        {formData.logo ? (
-                                            <img src={formData.logo} alt="Logo" />
-                                        ) : (
-                                            <ImageIcon size={48} />
-                                        )}
-                                    </div>
-                                    <label className="upload-button">
-                                        <Upload size={16} />
-                                        <span>Upload Logo</span>
-                                        <input type="file" className="file-input" accept="image/*" />
-                                    </label>
-                                </div>
-
-                                <div className="image-upload-card">
-                                    <div className="image-preview">
-                                        {formData.favicon ? (
-                                            <img src={formData.favicon} alt="Favicon" />
-                                        ) : (
-                                            <ImageIcon size={48} />
-                                        )}
-                                    </div>
-                                    <label className="upload-button">
-                                        <Upload size={16} />
-                                        <span>Upload Favicon</span>
-                                        <input type="file" className="file-input" accept="image/*" />
-                                    </label>
-                                </div>
-
-                                <div className="image-upload-card">
-                                    <div className="image-preview">
-                                        {formData.signature ? (
-                                            <img src={formData.signature} alt="Signature" />
-                                        ) : (
-                                            <ImageIcon size={48} />
-                                        )}
-                                    </div>
-                                    <label className="upload-button">
-                                        <Upload size={16} />
-                                        <span>Upload Signature</span>
-                                        <input type="file" className="file-input" accept="image/*" />
-                                    </label>
-                                </div>
-
-                                <div className="image-upload-card">
-                                    <div className="image-preview">
-                                        {formData.stamp ? (
-                                            <img src={formData.stamp} alt="Stamp" />
-                                        ) : (
-                                            <ImageIcon size={48} />
-                                        )}
-                                    </div>
-                                    <label className="upload-button">
-                                        <Upload size={16} />
-                                        <span>Upload Stamp</span>
-                                        <input type="file" className="file-input" accept="image/*" />
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div className="form-navigation">
-                                <button
-                                    type="button"
-                                    onClick={saveSettings}
-                                    disabled={saving}
-                                    className="submit-button"
-                                >
-                                    {saving ? (
-                                        <>
-                                            <span className="spinner"></span>
-                                            Saving...
-                                        </>
-                                    ) : (
-                                        'Save Changes'
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    )}
+                {/* Mobile Save Button */}
+                <div className="mobile-save">
+                    <button
+                        onClick={saveSettings}
+                        disabled={saving}
+                        className="mobile-save-btn"
+                    >
+                        {saving ? (
+                            <div className="button-spinner"></div>
+                        ) : (
+                            <>
+                                <Save size={18} />
+                                <span>Save Changes</span>
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
 
             <style jsx>{`
-                /* ==================== CONTAINER STYLES ==================== */
-                .company-profile-container {
-                    padding: 1.5rem;
+                /* ==================== GLOBAL STYLES ==================== */
+                .company-profile {
+                    min-height: 100vh;
+                    background: linear-gradient(135deg, #f6f9fc 0%, #f1f5f9 100%);
+                }
+
+                /* ==================== TOAST NOTIFICATION ==================== */
+                .toast-notification {
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    z-index: 1100;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 12px 20px;
+                    background: white;
+                    border-radius: 8px;
+                    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+                    animation: slideInRight 0.3s ease;
+                    font-size: 0.875rem;
+                    max-width: 400px;
+                }
+
+                .toast-notification.success {
+                    border-left: 4px solid #10b981;
+                }
+
+                .toast-notification.error {
+                    border-left: 4px solid #ef4444;
+                }
+
+                .toast-notification.success svg {
+                    color: #10b981;
+                }
+
+                .toast-notification.error svg {
+                    color: #ef4444;
+                }
+
+                @keyframes slideInRight {
+                    from {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+
+                /* ==================== HEADER ==================== */
+                .page-header {
+                    background: white;
+                    border-bottom: 1px solid #e2e8f0;
+                    padding: 20px 24px;
+                    position: sticky;
+                    top: 0;
+                    z-index: 100;
+                    backdrop-filter: blur(10px);
+                    background: rgba(255, 255, 255, 0.95);
+                }
+
+                .header-content {
                     max-width: 1200px;
                     margin: 0 auto;
-                    width: 100%;
-                }
-
-                /* ==================== PAGE HEADER ==================== */
-                .page-header {
-                    margin-bottom: 2rem;
-                }
-
-                .page-title {
-                    font-size: clamp(1.5rem, 3vw, 2rem);
-                    font-weight: bold;
-                    color: #1f2937;
-                    margin: 0;
-                }
-
-                .page-subtitle {
-                    margin-top: 0.5rem;
-                    color: #6b7280;
-                    font-size: 0.95rem;
-                }
-
-                /* ==================== SUCCESS MESSAGE ==================== */
-                .success-message {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    background: #d1fae5;
-                    color: #065f46;
-                    padding: 12px 16px;
-                    border-radius: 8px;
-                    margin-bottom: 20px;
-                    font-size: 0.95rem;
-                    font-weight: 500;
-                }
-
-                /* ==================== TABS ==================== */
-                .tabs-container {
-                    display: flex;
-                    gap: 4px;
-                    margin-bottom: 2rem;
-                    padding: 0.5rem;
-                    background: white;
-                    border-radius: 0.5rem;
-                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-                    overflow-x: auto;
-                }
-
-                .tab-button {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 10px 16px;
-                    border: none;
-                    border-radius: 6px;
-                    background: transparent;
-                    color: #6b7280;
-                    font-size: 0.9rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                    white-space: nowrap;
-                }
-
-                .tab-button:hover {
-                    background: #f3f4f6;
-                    color: #1f2937;
-                }
-
-                .tab-button.active {
-                    background: #eef2ff;
-                    color: #4f46e5;
-                }
-
-                /* Mobile Tab Select */
-                .mobile-tab-select {
-                    width: 100%;
-                    padding: 12px 16px;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 8px;
-                    font-size: 1rem;
-                    margin-bottom: 1rem;
-                    background: white;
-                }
-
-                /* ==================== FORM CARD ==================== */
-                .form-card {
-                    background: white;
-                    border-radius: 0.75rem;
-                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-                    overflow: hidden;
-                }
-
-                .form-section {
-                    padding: 1.5rem;
-                }
-
-                .form-section-title {
-                    font-size: 1.25rem;
-                    font-weight: 600;
-                    color: #374151;
-                    margin-bottom: 1.5rem;
-                }
-
-                .subsection-title {
-                    font-size: 1rem;
-                    font-weight: 600;
-                    color: #4b5563;
-                    margin: 2rem 0 1rem 0;
-                    padding-bottom: 0.5rem;
-                    border-bottom: 1px solid #e5e7eb;
-                }
-
-                .section-header {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    margin-bottom: 1rem;
-                    flex-wrap: wrap;
-                    gap: 1rem;
                 }
 
-                .section-description {
+                .header-left {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                }
+
+                .page-title {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    font-size: 1.5rem;
+                    font-weight: 600;
+                    color: #0f172a;
+                    margin: 0;
+                }
+
+                .title-icon {
+                    color: #3b82f6;
+                }
+
+                .page-description {
+                    color: #64748b;
                     font-size: 0.875rem;
-                    color: #6b7280;
-                    margin-bottom: 1.5rem;
-                    line-height: 1.5;
+                    margin: 0;
                 }
 
-                /* ==================== FORM GRID ==================== */
+                .header-actions {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+
+                .header-action-btn {
+                    width: 40px;
+                    height: 40px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    color: #64748b;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                }
+
+                .header-action-btn:hover {
+                    background: #f1f5f9;
+                    color: #3b82f6;
+                    border-color: #3b82f6;
+                }
+
+                .save-button {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 10px 20px;
+                    background: #3b82f6;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+                }
+
+                .save-button:hover {
+                    background: #2563eb;
+                    transform: translateY(-1px);
+                    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+                }
+
+                .save-button:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                    transform: none;
+                }
+
+                .button-spinner {
+                    width: 16px;
+                    height: 16px;
+                    border: 2px solid rgba(255, 255, 255, 0.3);
+                    border-top-color: white;
+                    border-radius: 50%;
+                    animation: spin 0.8s linear infinite;
+                }
+
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+
+                /* ==================== DESKTOP TABS ==================== */
+               /* ==================== DESKTOP TABS ==================== */
+.desktop-tabs {
+    max-width: 1200px;
+    margin: 0 auto 24px auto;
+    padding: 0 24px;
+    display: none;
+    background: white;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+@media (min-width: 1024px) {
+    .desktop-tabs {
+        display: flex;
+        padding: 0 24px;
+        margin: 0 auto 24px auto;
+    }
+}
+
+.tab-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 12px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    font-size: 0.875rem;
+    position: relative;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.tab-button:hover {
+    background: #f8fafc;
+}
+
+.tab-button.active {
+    background: #f8fafc;
+    border-bottom: 2px solid;
+}
+
+.tab-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.tab-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.active-indicator {
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+}
+
+                /* ==================== MAIN CONTENT ==================== */
+                .main-content {
+                    max-width: 1200px;
+                    margin: 24px auto;
+                    padding: 0 24px 100px 24px;
+                }
+
+                /* ==================== SECTIONS CONTAINER ==================== */
+                .sections-container {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 16px;
+                }
+
+                .section-card {
+                    background: white;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+                    overflow: hidden;
+                }
+
+                @media (min-width: 1024px) {
+                    .section-card:not(.active) {
+                        display: none;
+                    }
+                }
+
+                .section-header {
+                    padding: 20px 24px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                }
+
+                .section-header:hover {
+                    background: #f8fafc;
+                }
+
+                .section-header-left {
+                    display: flex;
+                    align-items: center;
+                    gap: 16px;
+                }
+
+                .section-icon {
+                    width: 44px;
+                    height: 44px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 8px;
+                }
+
+                .section-title h2 {
+                    font-size: 1rem;
+                    font-weight: 600;
+                    color: #0f172a;
+                    margin: 0 0 4px 0;
+                }
+
+                .section-title p {
+                    font-size: 0.75rem;
+                    color: #64748b;
+                    margin: 0;
+                }
+
+                .chevron-icon {
+                    color: #94a3b8;
+                    transition: transform 0.3s ease;
+                }
+
+                .section-content {
+                    padding: 0 24px 24px 24px;
+                    border-top: 1px solid #e2e8f0;
+                    animation: slideDown 0.3s ease;
+                }
+
+                @keyframes slideDown {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-10px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+
+                /* ==================== FORM BLOCKS ==================== */
+                .form-block {
+                    margin-bottom: 28px;
+                }
+
+                .form-block:last-child {
+                    margin-bottom: 0;
+                }
+
+                .form-block h3 {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: 0.875rem;
+                    font-weight: 600;
+                    color: #334155;
+                    margin: 0 0 16px 0;
+                    padding-bottom: 8px;
+                    border-bottom: 1px dashed #e2e8f0;
+                }
+
+                .form-block h3 svg {
+                    color: #3b82f6;
+                }
+
                 .form-grid {
                     display: grid;
                     grid-template-columns: repeat(1, 1fr);
-                    gap: 1rem;
-                    margin-bottom: 1rem;
+                    gap: 16px;
                 }
 
                 @media (min-width: 640px) {
@@ -1648,316 +2015,334 @@ export default function CompanyProfilePage() {
                     }
                 }
 
-                .full-width {
+                .span-2 {
                     grid-column: 1 / -1;
                 }
 
-                /* ==================== FORM GROUPS ==================== */
-                .form-group {
-                    margin-bottom: 1rem;
+                .form-field {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
                 }
 
-                .form-label {
-                    display: block;
-                    font-size: 0.875rem;
+                .form-field label {
+                    font-size: 0.75rem;
                     font-weight: 500;
-                    color: #374151;
-                    margin-bottom: 0.375rem;
+                    color: #475569;
+                    text-transform: uppercase;
+                    letter-spacing: 0.3px;
                 }
 
-                .required {
-                    color: #ef4444;
-                    margin-left: 4px;
-                }
-
-                /* ==================== FORM INPUTS ==================== */
-                .form-input,
-                .form-select,
-                .form-textarea {
-                    width: 100%;
-                    padding: 0.5rem 0.75rem;
-                    border: 1px solid #d1d5db;
-                    border-radius: 0.375rem;
-                    font-size: 0.875rem;
-                    transition: all 0.15s ease;
+                .form-field input,
+                .form-field select,
+                .form-field textarea {
+                    padding: 10px 14px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    font-size: 0.938rem;
+                    transition: all 0.2s ease;
                     background: white;
                 }
 
-                .form-input:focus,
-                .form-select:focus,
-                .form-textarea:focus {
+                .form-field input:focus,
+                .form-field select:focus,
+                .form-field textarea:focus {
                     outline: none;
                     border-color: #3b82f6;
                     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
                 }
 
-                .form-textarea {
-                    resize: vertical;
-                    min-height: 80px;
-                }
-
-                .input-error {
+                .form-field input.error {
                     border-color: #ef4444;
                 }
 
-                .input-error:focus {
-                    border-color: #ef4444;
-                    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-                }
-
-                .form-error {
-                    margin-top: 0.25rem;
-                    font-size: 0.75rem;
+                .error-text {
+                    font-size: 0.688rem;
                     color: #ef4444;
                 }
 
-                .input-hint {
-                    font-size: 0.7rem;
-                    color: #9ca3af;
-                    margin-top: 4px;
-                    display: block;
+                .required {
+                    color: #ef4444;
                 }
 
-                /* ==================== CHECKBOX ==================== */
-                .checkbox-group {
-                    display: flex;
-                    align-items: center;
+                .hint {
+                    font-size: 0.688rem;
+                    color: #94a3b8;
                 }
 
-                .checkbox-label {
+                /* ==================== SOCIAL GRID ==================== */
+                .social-grid {
+                    display: grid;
+                    grid-template-columns: repeat(1, 1fr);
+                    gap: 16px;
+                }
+
+                @media (min-width: 640px) {
+                    .social-grid {
+                        grid-template-columns: repeat(2, 1fr);
+                    }
+                }
+
+                /* ==================== TOGGLE ==================== */
+                .toggle-field {
+                    margin: 12px 0;
+                }
+
+                .toggle {
                     display: flex;
                     align-items: center;
-                    gap: 0.5rem;
+                    gap: 12px;
                     cursor: pointer;
+                }
+
+                .toggle input {
+                    display: none;
+                }
+
+                .toggle-slider {
+                    position: relative;
+                    width: 44px;
+                    height: 24px;
+                    background: #cbd5e1;
+                    border-radius: 12px;
+                    transition: all 0.2s ease;
+                }
+
+                .toggle-slider::before {
+                    content: '';
+                    position: absolute;
+                    top: 2px;
+                    left: 2px;
+                    width: 20px;
+                    height: 20px;
+                    background: white;
+                    border-radius: 50%;
+                    transition: all 0.2s ease;
+                }
+
+                .toggle input:checked + .toggle-slider {
+                    background: #3b82f6;
+                }
+
+                .toggle input:checked + .toggle-slider::before {
+                    left: 22px;
+                }
+
+                .toggle-label {
                     font-size: 0.875rem;
-                    color: #374151;
+                    color: #334155;
                 }
 
-                .checkbox-label input[type="checkbox"] {
-                    width: 1rem;
-                    height: 1rem;
-                    cursor: pointer;
-                }
-
-                /* ==================== BUTTONS ==================== */
+                /* ==================== UPI SECTION ==================== */
                 .add-button {
-                    display: inline-flex;
+                    display: flex;
                     align-items: center;
-                    gap: 0.375rem;
-                    background: #10b981;
-                    color: white;
-                    padding: 0.5rem 1rem;
-                    border: none;
-                    border-radius: 0.375rem;
-                    font-size: 0.875rem;
+                    justify-content: center;
+                    gap: 8px;
+                    width: 100%;
+                    padding: 14px;
+                    background: #f8fafc;
+                    border: 2px dashed #3b82f6;
+                    border-radius: 8px;
+                    color: #3b82f6;
+                    font-size: 0.938rem;
                     font-weight: 500;
                     cursor: pointer;
-                    transition: background-color 0.15s ease;
+                    transition: all 0.2s ease;
+                    margin-bottom: 20px;
                 }
 
                 .add-button:hover {
-                    background: #059669;
+                    background: #eef2ff;
+                    border-style: solid;
                 }
 
-                .button-icon {
-                    font-size: 1rem;
-                    font-weight: bold;
+                .form-card {
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    margin-bottom: 20px;
+                    overflow: hidden;
                 }
 
-                .submit-button {
-                    display: inline-flex;
+                .form-card-header {
+                    display: flex;
+                    justify-content: space-between;
                     align-items: center;
-                    gap: 0.5rem;
-                    padding: 0.5rem 1.5rem;
-                    background: #3b82f6;
-                    color: white;
-                    border: none;
-                    border-radius: 0.375rem;
-                    font-size: 0.875rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: background-color 0.15s ease;
+                    padding: 16px 20px;
+                    background: #f8fafc;
+                    border-bottom: 1px solid #e2e8f0;
                 }
 
-                .submit-button:hover {
-                    background: #2563eb;
+                .form-card-header h4 {
+                    font-size: 0.938rem;
+                    font-weight: 600;
+                    color: #0f172a;
+                    margin: 0;
                 }
 
-                .submit-button:disabled {
-                    background: #93c5fd;
-                    cursor: not-allowed;
-                }
-
-                .cancel-button {
-                    padding: 0.5rem 1rem;
-                    border: 1px solid #d1d5db;
-                    border-radius: 0.375rem;
-                    background: white;
-                    color: #374151;
-                    font-size: 0.875rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: all 0.15s ease;
-                }
-
-                .cancel-button:hover {
-                    background: #f9fafb;
-                }
-
-                .icon-button {
-                    width: 2rem;
-                    height: 2rem;
-                    border-radius: 0.375rem;
-                    border: 1px solid #e5e7eb;
-                    background: white;
-                    color: #6b7280;
-                    display: inline-flex;
+                .close-btn {
+                    width: 32px;
+                    height: 32px;
+                    display: flex;
                     align-items: center;
                     justify-content: center;
+                    background: white;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    color: #64748b;
                     cursor: pointer;
-                    transition: all 0.15s ease;
                 }
 
-                .icon-button:hover {
-                    background: #f3f4f6;
-                    border-color: #9ca3af;
+                .form-card-body {
+                    padding: 20px;
                 }
 
-                .icon-button.edit:hover {
-                    background: #eef2ff;
-                    color: #4f46e5;
-                    border-color: #4f46e5;
-                }
-
-                .icon-button.delete:hover {
-                    background: #fee2e2;
-                    color: #dc2626;
-                    border-color: #dc2626;
-                }
-
-                /* ==================== FORM ACTIONS ==================== */
                 .form-actions {
                     display: flex;
-                    justify-content: flex-end;
                     gap: 12px;
                     margin-top: 20px;
                 }
 
-                .form-navigation {
-                    display: flex;
-                    justify-content: flex-end;
-                    gap: 1rem;
-                    padding-top: 1.5rem;
-                    border-top: 1px solid #e5e7eb;
-                    margin-top: 1.5rem;
+                .btn-primary,
+                .btn-secondary {
+                    flex: 1;
+                    padding: 12px;
+                    border-radius: 8px;
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    cursor: pointer;
                 }
 
-                /* ==================== UPI SECTION ==================== */
-                .upi-form-container {
-                    background: #f9fafb;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 0.5rem;
-                    padding: 1.5rem;
-                    margin-bottom: 1.5rem;
+                .btn-primary {
+                    background: #3b82f6;
+                    color: white;
+                    border: none;
                 }
 
-                .form-subtitle {
-                    font-size: 1rem;
-                    font-weight: 600;
-                    color: #1f2937;
-                    margin: 0 0 1rem 0;
+                .btn-secondary {
+                    background: white;
+                    border: 1px solid #e2e8f0;
+                    color: #334155;
                 }
 
-                .items-container {
+                /* ==================== ITEMS LIST ==================== */
+                .items-list {
                     display: flex;
                     flex-direction: column;
-                    gap: 1rem;
-                    margin-bottom: 1.5rem;
+                    gap: 12px;
+                    margin-bottom: 20px;
                 }
 
                 .item-card {
-                    background: #f9fafb;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 0.5rem;
-                    padding: 1rem;
-                }
-
-                .item-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 0.75rem;
-                }
-
-                .item-number {
                     display: flex;
                     align-items: center;
-                    gap: 8px;
+                    gap: 16px;
+                    padding: 16px;
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
                 }
 
-                .item-actions {
+                .item-status {
+                    width: 28px;
+                    height: 28px;
                     display: flex;
-                    gap: 0.5rem;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                .status-icon.active {
+                    color: #10b981;
+                }
+
+                .status-icon.inactive {
+                    color: #94a3b8;
                 }
 
                 .item-details {
                     flex: 1;
                 }
 
-                .status-badge {
-                    padding: 0.25rem 0.75rem;
-                    border-radius: 1rem;
-                    font-size: 0.75rem;
-                    font-weight: 600;
-                }
-
-                .status-badge.active {
-                    background: #d1fae5;
-                    color: #065f46;
-                }
-
-                .status-badge.inactive {
-                    background: #fee2e2;
-                    color: #991b1b;
-                }
-
-                .upi-main {
+                .item-title {
                     display: flex;
                     align-items: center;
-                    gap: 0.75rem;
+                    gap: 8px;
+                    margin-bottom: 4px;
                     flex-wrap: wrap;
-                    margin-bottom: 0.25rem;
                 }
 
-                .upi-id {
-                    font-weight: 700;
-                    font-size: 1rem;
-                    color: #1f2937;
+                .item-id {
+                    font-weight: 600;
+                    font-size: 0.938rem;
+                    color: #0f172a;
                     font-family: monospace;
                 }
 
-                .upi-name {
-                    font-size: 0.875rem;
-                    color: #6b7280;
+                .item-name {
+                    font-size: 0.75rem;
+                    color: #64748b;
                 }
 
-                .upi-description {
-                    font-size: 0.813rem;
-                    color: #6b7280;
-                    margin: 0.25rem 0;
-                }
-
-                .item-info {
-                    display: flex;
-                    gap: 0.75rem;
-                    margin-top: 0.5rem;
-                }
-
-                .app-badge {
-                    padding: 0.25rem 0.5rem;
-                    border-radius: 0.25rem;
+                .item-description {
                     font-size: 0.688rem;
+                    color: #64748b;
+                    margin: 0 0 8px 0;
+                }
+
+                .item-badge {
+                    display: inline-block;
+                    padding: 4px 10px;
+                    border-radius: 20px;
+                    font-size: 0.625rem;
                     font-weight: 600;
+                }
+
+                .item-actions {
+                    display: flex;
+                    gap: 6px;
+                }
+
+                .action-btn {
+                    width: 34px;
+                    height: 34px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: white;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    color: #64748b;
+                    cursor: pointer;
+                }
+
+                .action-btn.delete {
+                    color: #ef4444;
+                }
+
+                /* ==================== EMPTY STATE ==================== */
+                .empty-state {
+                    text-align: center;
+                    padding: 48px 24px;
+                    background: #f8fafc;
+                    border-radius: 8px;
+                }
+
+                .empty-state svg {
+                    color: #94a3b8;
+                    margin-bottom: 16px;
+                }
+
+                .empty-state h4 {
+                    font-size: 0.938rem;
+                    font-weight: 600;
+                    color: #0f172a;
+                    margin: 0 0 4px 0;
+                }
+
+                .empty-state p {
+                    font-size: 0.813rem;
+                    color: #64748b;
+                    margin: 0;
                 }
 
                 /* ==================== INFO BOX ==================== */
@@ -1965,112 +2350,146 @@ export default function CompanyProfilePage() {
                     display: flex;
                     align-items: center;
                     gap: 12px;
-                    padding: 1rem;
-                    background: #eff6ff;
-                    border: 1px solid #dbeafe;
-                    border-radius: 0.5rem;
+                    padding: 16px;
+                    background: #eef2ff;
+                    border: 1px solid #c7d2fe;
+                    border-radius: 8px;
+                }
+
+                .info-box svg {
+                    flex-shrink: 0;
+                    color: #3b82f6;
+                }
+
+                .info-box p {
                     color: #1e40af;
-                    font-size: 0.875rem;
-                    line-height: 1.5;
-                    margin-top: 1.5rem;
+                    font-size: 0.813rem;
+                    margin: 0;
                 }
 
-                /* ==================== EMPTY STATE ==================== */
-                .empty-state {
-                    text-align: center;
-                    padding: 3rem;
-                    background: #f9fafb;
-                    border-radius: 0.5rem;
-                    border: 2px dashed #e5e7eb;
+                /* ==================== COLORS ==================== */
+                .colors-grid {
+                    display: grid;
+                    grid-template-columns: repeat(1, 1fr);
+                    gap: 16px;
+                    margin-bottom: 20px;
                 }
 
-                .empty-icon {
-                    color: #9ca3af;
-                    margin-bottom: 1rem;
+                @media (min-width: 640px) {
+                    .colors-grid {
+                        grid-template-columns: repeat(3, 1fr);
+                    }
                 }
 
-                .empty-state p {
-                    color: #374151;
+                .color-field label {
+                    display: block;
+                    font-size: 0.688rem;
                     font-weight: 500;
-                    margin: 0 0 0.25rem 0;
+                    color: #475569;
+                    margin-bottom: 6px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.3px;
                 }
 
-                .empty-hint {
-                    color: #9ca3af;
-                    font-size: 0.875rem;
-                }
-
-                /* ==================== COLOR INPUT ==================== */
-                .color-input-group {
+                .color-input {
                     display: flex;
-                    gap: 0.5rem;
-                    align-items: center;
+                    gap: 8px;
                 }
 
-                .color-picker {
-                    width: 38px;
-                    height: 38px;
+                .color-input input[type="color"] {
+                    width: 42px;
+                    height: 42px;
                     padding: 2px;
-                    border: 1px solid #d1d5db;
-                    border-radius: 0.375rem;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
                     cursor: pointer;
                 }
 
-                /* ==================== IMAGE UPLOAD ==================== */
-                .image-upload-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                    gap: 1rem;
-                    margin-top: 1rem;
+                .color-input input[type="text"] {
+                    flex: 1;
+                    padding: 10px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    font-size: 0.813rem;
+                    font-family: monospace;
                 }
 
-                .image-upload-card {
-                    position: relative;
-                    background: #f9fafb;
-                    border: 2px dashed #d1d5db;
-                    border-radius: 0.5rem;
-                    padding: 1rem;
-                    text-align: center;
+                .color-preview {
+                    margin-top: 16px;
                 }
 
-                .image-preview {
-                    width: 100%;
-                    height: 100px;
+                .preview-bar {
+                    display: flex;
+                    height: 40px;
+                    border-radius: 8px;
+                    overflow: hidden;
+                }
+
+                .preview-segment {
+                    flex: 1;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    margin-bottom: 0.75rem;
+                    color: white;
+                    font-size: 0.625rem;
+                    font-weight: 600;
+                    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
                 }
 
-                .image-preview img {
+                /* ==================== ASSETS ==================== */
+                .assets-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 16px;
+                }
+
+                @media (min-width: 640px) {
+                    .assets-grid {
+                        grid-template-columns: repeat(4, 1fr);
+                    }
+                }
+
+                .asset-card {
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    padding: 20px;
+                    text-align: center;
+                }
+
+                .asset-preview {
+                    height: 80px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-bottom: 12px;
+                }
+
+                .asset-preview img {
                     max-width: 100%;
                     max-height: 100%;
                     object-fit: contain;
                 }
 
-                .image-preview svg {
-                    color: #9ca3af;
+                .asset-preview svg {
+                    color: #94a3b8;
                 }
 
-                .upload-button {
+                .asset-upload {
                     display: inline-flex;
                     align-items: center;
-                    gap: 0.5rem;
-                    padding: 0.5rem 1rem;
+                    gap: 6px;
+                    padding: 8px 12px;
                     background: white;
-                    border: 1px solid #d1d5db;
-                    border-radius: 0.375rem;
-                    font-size: 0.813rem;
-                    color: #374151;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 30px;
+                    font-size: 0.688rem;
+                    color: #475569;
                     cursor: pointer;
                     position: relative;
                 }
 
-                .upload-button:hover {
-                    background: #f3f4f6;
-                }
-
-                .file-input {
+                .asset-upload input {
                     position: absolute;
                     top: 0;
                     left: 0;
@@ -2080,94 +2499,206 @@ export default function CompanyProfilePage() {
                     cursor: pointer;
                 }
 
-                /* ==================== SPINNER ==================== */
-                .spinner {
-                    width: 1rem;
-                    height: 1rem;
-                    border: 2px solid rgba(255, 255, 255, 0.3);
-                    border-radius: 50%;
-                    border-top-color: white;
-                    animation: spin 1s linear infinite;
-                    display: inline-block;
+                /* ==================== HOURS ==================== */
+                .hours-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
                 }
 
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
+                .hours-item {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
                 }
 
-                /* ==================== MOBILE OPTIMIZATIONS ==================== */
+                @media (min-width: 640px) {
+                    .hours-item {
+                        flex-direction: row;
+                        align-items: center;
+                        gap: 16px;
+                    }
+                }
+
+                .day-label {
+                    font-size: 0.75rem;
+                    font-weight: 500;
+                    color: #475569;
+                    text-transform: capitalize;
+                    min-width: 100px;
+                }
+
+                .hours-item input {
+                    flex: 1;
+                    padding: 10px 12px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    font-size: 0.875rem;
+                }
+
+                /* ==================== MOBILE SAVE ==================== */
+                .mobile-save {
+                    display: none;
+                    position: fixed;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    padding: 16px;
+                    background: linear-gradient(to top, #f1f5f9, transparent);
+                    z-index: 100;
+                }
+
+                .mobile-save-btn {
+                    width: 100%;
+                    padding: 16px;
+                    background: #3b82f6;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 1rem;
+                    font-weight: 600;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+                }
+
+                /* ==================== RESPONSIVE ==================== */
+                @media (max-width: 1024px) {
+                    .stats-grid {
+                        display: none;
+                    }
+                }
+
                 @media (max-width: 768px) {
-                    .company-profile-container {
-                        padding: 1rem;
+                    .page-header {
+                        padding: 16px;
                     }
-                    
-                    .form-section {
-                        padding: 1rem;
-                    }
-                    
-                    .form-navigation {
+
+                    .header-content {
                         flex-direction: column;
+                        gap: 16px;
+                        align-items: flex-start;
                     }
-                    
-                    .form-navigation button {
+
+                    .page-title {
+                        font-size: 1.25rem;
+                    }
+
+                    .page-description {
+                        font-size: 0.813rem;
+                    }
+
+                    .header-actions {
                         width: 100%;
+                        justify-content: flex-end;
                     }
-                    
+
+                    .save-button {
+                        display: none;
+                    }
+
+                    .mobile-save {
+                        display: block;
+                    }
+
+                    .desktop-tabs {
+                        display: none;
+                    }
+
+                    .section-header {
+                        padding: 16px;
+                    }
+
+                    .section-header-left {
+                        gap: 12px;
+                    }
+
+                    .section-icon {
+                        width: 36px;
+                        height: 36px;
+                    }
+
+                    .section-icon svg {
+                        width: 18px;
+                        height: 18px;
+                    }
+
+                    .section-title h2 {
+                        font-size: 0.938rem;
+                    }
+
+                    .section-title p {
+                        font-size: 0.688rem;
+                    }
+
+                    .section-content {
+                        padding: 0 16px 16px 16px;
+                    }
+
+                    .form-block h3 {
+                        font-size: 0.813rem;
+                    }
+
+                    .item-card {
+                        flex-wrap: wrap;
+                    }
+
+                    .item-actions {
+                        width: 100%;
+                        justify-content: flex-end;
+                    }
+
                     .form-actions {
                         flex-direction: column;
                     }
-                    
-                    .form-actions button {
-                        width: 100%;
-                    }
-                    
-                    .item-card {
-                        padding: 0.75rem;
-                    }
-                    
-                    .item-info {
-                        flex-wrap: wrap;
-                    }
-                    
-                    .image-upload-grid {
+
+                    .assets-grid {
                         grid-template-columns: 1fr;
                     }
                 }
 
-                @media (max-width: 640px) {
-                    .form-grid {
-                        grid-template-columns: 1fr;
+                @media (max-width: 480px) {
+                    .main-content {
+                        padding: 16px 16px 90px 16px;
                     }
-                    
-                    .section-header {
-                        flex-direction: column;
-                        align-items: stretch;
+
+                    .stats-grid {
+                        display: none;
                     }
-                    
-                    .add-button {
-                        width: 100%;
-                        justify-content: center;
+
+                    .stat-card {
+                        padding: 12px;
                     }
-                    
-                    .upi-main {
-                        flex-direction: column;
-                        align-items: flex-start;
-                        gap: 4px;
+
+                    .stat-icon {
+                        width: 40px;
+                        height: 40px;
                     }
-                    
-                    .color-input-group {
-                        flex-direction: column;
-                        align-items: stretch;
+
+                    .stat-icon svg {
+                        width: 18px;
+                        height: 18px;
                     }
-                    
-                    .color-picker {
-                        width: 100%;
-                        height: 48px;
+
+                    .stat-value {
+                        font-size: 0.875rem;
                     }
-                    
-                    .color-input-group .form-input {
-                        width: 100% !important;
+
+                    .form-field input,
+                    .form-field select,
+                    .form-field textarea {
+                        padding: 8px 12px;
+                        font-size: 0.875rem;
+                    }
+
+                    .hours-item {
+                        gap: 8px;
+                    }
+
+                    .hours-item input {
+                        padding: 8px 10px;
                     }
                 }
             `}</style>

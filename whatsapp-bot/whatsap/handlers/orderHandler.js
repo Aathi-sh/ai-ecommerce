@@ -1504,7 +1504,7 @@
 // }
 
 
-
+// https://jbfq57km-3000.inc1.devtunnels.ms/
 // Above code is using for withou payment verofication and invoice send correct whole code
 
 import pkg from 'whatsapp-web.js';

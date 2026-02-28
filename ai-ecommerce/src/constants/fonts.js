@@ -1,4 +1,4 @@
-//fonts
+//src/constants/fonts.js
 
 export const appFonts = {
   primary: "'Emerald', sans-serif",
