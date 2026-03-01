@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WhatsApp Commerce Platform – Investor Pitch</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+      color: #333;
+      padding: 20px;
+    }
+
+    .page {
+      max-width: 1200px;
+      margin: auto;
+      background: #fff;
+      padding: 50px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+    }
+
+    h1 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 2.8em;
+      color: #075E54;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .tagline {
+      font-size: 1.3em;
+      color: #128C7E;
+      font-weight: 500;
+    }
+
+    .header {
+      text-align: center;
+      padding-bottom: 25px;
+      border-bottom: 3px solid #25D366;
+    }
+
+    .section {
+      margin: 45px 0;
+    }
+
+    h2 {
+      font-size: 1.9em;
+      color: #075E54;
+      border-left: 6px solid #25D366;
+      padding-left: 15px;
+      margin-bottom: 20px;
+    }
+
+    h3 {
+      color: #128C7E;
+      margin-bottom: 10px;
+    }
+
+    p {
+      font-size: 1.05em;
+      margin-bottom: 12px;
+      line-height: 1.7;
+    }
+
+    .highlight-box {
+      background: linear-gradient(135deg, #25D366, #128C7E);
+      color: #fff;
+      padding: 30px;
+      border-radius: 16px;
+      margin: 40px 0;
+      box-shadow: 0 15px 35px rgba(37,211,102,0.35);
+    }
+
+    .grid-2, .grid-3 {
+      display: grid;
+      gap: 25px;
+    }
+
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+
+    .card {
+      background: #f9f9f9;
+      padding: 22px;
+      border-radius: 12px;
+      border-top: 4px solid #25D366;
+    }
+
+    .pricing {
+      text-align: center;
+      border: 2px solid #ddd;
+      border-radius: 15px;
+      padding: 25px;
+    }
+
+    .pricing.popular {
+      border-color: #25D366;
+      box-shadow: 0 15px 35px rgba(37,211,102,0.25);
+      transform: scale(1.05);
+    }
+
+    .price {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 2.4em;
+      color: #075E54;
+      margin: 15px 0;
+    }
+
+    .stats {
+      display: flex;
+      justify-content: space-around;
+      text-align: center;
+      margin-top: 30px;
+    }
+
+    .stat-number {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 2.6em;
+      color: #25D366;
+      font-weight: 800;
+    }
+
+    .cta {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+      padding: 40px;
+      border-radius: 20px;
+      text-align: center;
+      margin-top: 60px;
+    }
+
+    .cta button {
+      margin-top: 20px;
+      padding: 15px 45px;
+      border-radius: 50px;
+      border: none;
+      background: #25D366;
+      color: #fff;
+      font-size: 1.2em;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 40px;
+      font-size: 0.9em;
+      color: #666;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      margin: 30px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 25px 0;
+    }
+
+    th {
+      background: #075E54;
+      color: white;
+      padding: 15px;
+      text-align: left;
+    }
+
+    td {
+      padding: 15px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    tr:hover {
+      background: #f5f5f5;
+    }
+
+    .feature-badge {
+      display: inline-block;
+      background: #25D366;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.85em;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+
+    .roadmap-phase {
+      background: #E8F5E9;
+      padding: 20px;
+      border-radius: 12px;
+      margin: 15px 0;
+      border-left: 5px solid #4CAF50;
+    }
+
+    @media print {
+      body { background: white; }
+      .page { box-shadow: none; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+
+    <!-- HEADER -->
+    <div class="header">
+      <h1>WhatsApp Commerce Platform</h1>
+      <p class="tagline">Turning WhatsApp Chats into Scalable Business Revenue</p>
+      <p style="margin-top:12px;color:#555;">
+        A WhatsApp-first commerce & operations platform for modern businesses
+      </p>
+    </div>
+
+    <!-- OPPORTUNITY -->
+    <div class="highlight-box">
+      <h2>🚀 The $1.8 Billion Opportunity</h2>
+      <p>
+        India has <strong>500+ million WhatsApp users</strong> but businesses are still managing 
+        commerce manually through chats. The WhatsApp commerce market is projected to reach 
+        <strong>₹15,000+ Cr ($1.8B)</strong> by 2026.
+      </p>
+      <p>
+        We're capturing this market with an affordable, complete solution that converts 
+        WhatsApp conversations into structured, trackable sales funnels.
+      </p>
+    </div>
+
+    <!-- PROBLEM -->
+    <div class="section">
+      <h2>📉 The Problem & Competition</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Manual Operations = Lost Revenue</h3>
+          <p>
+            Businesses manage orders, payments, inventory via chats & spreadsheets — 
+            resulting in 30-40% missed revenue due to human error and unorganized workflows.
+          </p>
+        </div>
+        <div class="card">
+          <h3>Existing Solutions Are Too Expensive</h3>
+          <p>
+            WhatsApp Business API costs ₹0.42 per message + high setup fees. 
+            Competitor platforms charge ₹25,000-₹50,000/year — unaffordable for 90% of SMBs.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPETITOR COMPARISON -->
+    <div class="section">
+      <h2>💸 Competitive Landscape & Pricing Advantage</h2>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Platform</th>
+              <th>Monthly Cost</th>
+              <th>Setup Fee</th>
+              <th>Message Cost</th>
+              <th>E-commerce Features</th>
+              <th>Target Market</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>WhatsApp Business API</strong></td>
+              <td>₹12,600+</td>
+              <td>₹15,000+</td>
+              <td>₹0.42/message</td>
+              <td>Basic only</td>
+              <td>Enterprise only</td>
+            </tr>
+            <tr>
+              <td><strong>Competitor Platforms</strong></td>
+              <td>₹2,000 - ₹4,000</td>
+              <td>₹5,000 - ₹10,000</td>
+              <td>Limited/Extra</td>
+              <td>Partial</td>
+              <td>Mid-market</td>
+            </tr>
+            <tr style="background-color:#E8F5E9;">
+              <td><strong>Our Platform</strong></td>
+              <td><strong>₹500 - ₹1,000</strong></td>
+              <td><strong>₹0</strong></td>
+              <td><strong>Unlimited</strong></td>
+              <td><strong>Complete Suite</strong></td>
+              <td><strong>SMBs & Enterprises</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="text-align: center; font-weight: 600; color: #075E54;">
+        We offer 80-90% cost savings compared to WhatsApp Business API solutions
+      </p>
+    </div>
+
+    <!-- SOLUTION -->
+    <div class="section">
+      <h2>💡 Our Complete Solution</h2>
+      <p>
+        A unified platform that gives businesses everything they need to sell on WhatsApp:
+      </p>
+
+      <div class="grid-3">
+        <div class="card">
+          <h3>📱 WhatsApp Automation</h3>
+          <p>• QR Code Store Access<br>• Auto-reply System<br>• Order Processing<br>• Customer Support Bots</p>
+        </div>
+        <div class="card">
+          <h3>🛍️ E-commerce Management</h3>
+          <p>• Product Catalog<br>• Order Management<br>• Inventory Tracking<br>• Payment Reconciliation</p>
+        </div>
+        <div class="card">
+          <h3>📊 Business Intelligence</h3>
+          <p>• Revenue Dashboard<br>• Sales Analytics<br>• Customer Insights<br>• Performance Reports</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- FUTURE SCOPE -->
+    <div class="section">
+      <h2>🔮 Future Roadmap & Expansion</h2>
+      
+      <div class="roadmap-phase">
+        <h3>Phase 1: WhatsApp Commerce Platform (Current)</h3>
+        <p>
+          <span class="feature-badge">✓ Dashboard Analytics</span>
+          <span class="feature-badge">✓ QR Code Store</span>
+          <span class="feature-badge">✓ Order Management</span>
+          <span class="feature-badge">✓ Payment Tracking</span>
+          <span class="feature-badge">✓ Services & Bookings</span>
+        </p>
+      </div>
+      
+      <div class="roadmap-phase">
+        <h3>Phase 2: E-commerce Web Store (Next 6 Months)</h3>
+        <p>
+          • <strong>Dedicated Web Store</strong> for each business with custom subdomain (yourstore.ourplatform.com)<br>
+          • <strong>SEO Optimized</strong> product pages for organic traffic<br>
+          • <strong>Multi-channel sync</strong> between WhatsApp and web store<br>
+          • <strong>Separate hosting option</strong> for enterprises (white-label solution)<br>
+          • <strong>Mobile App</strong> for business owners to manage on-the-go
+        </p>
+      </div>
+      
+      <div class="roadmap-phase">
+        <h3>Phase 3: Ecosystem Expansion (Next 12-18 Months)</h3>
+        <p>
+          • <strong>Marketplace Integration</strong> (Amazon, Flipkart, Meesho sync)<br>
+          • <strong>Logistics API</strong> integration (Shiprocket, Delhivery)<br>
+          • <strong>Accounting Software</strong> sync (Tally, QuickBooks)<br>
+          • <strong>WhatsApp Payments</strong> integration when available<br>
+          • <strong>Multi-language</strong> support for regional businesses
+        </p>
+      </div>
+      
+      <div class="roadmap-phase">
+        <h3>Phase 4: Enterprise & White-label Solutions</h3>
+        <p>
+          • <strong>Separate hosting/VPS</strong> option with dedicated infrastructure<br>
+          • <strong>Custom domain</strong> support (yourbusiness.com)<br>
+          • <strong>API Access</strong> for custom integrations<br>
+          • <strong>Bulk WhatsApp messaging</strong> with approval workflows<br>
+          • <strong>AI-powered</strong> customer insights and recommendations
+        </p>
+      </div>
+    </div>
+
+    <!-- PRICING -->
+    <div class="section">
+      <h2>💰 Revenue Model & Pricing Tiers</h2>
+      <div class="grid-3">
+        <div class="pricing">
+          <h3>Starter</h3>
+          <div class="price">₹6,000 / year</div>
+          <p>Basic WhatsApp commerce<br>500 products<br>1,000 orders/month<br>Email support</p>
+        </div>
+        <div class="pricing popular">
+          <h3>Growth</h3>
+          <div class="price">₹12,000 / year</div>
+          <p>Advanced analytics<br>5,000 products<br>Booking system<br>Priority support<br>QR Code store</p>
+        </div>
+        <div class="pricing">
+          <h3>Enterprise</h3>
+          <div class="price">₹36,000+</div>
+          <p>Unlimited products<br>Web store option<br>Separate hosting<br>Dedicated support<br>Custom features</p>
+        </div>
+      </div>
+      <p style="text-align: center; margin-top: 20px; font-style: italic;">
+        Plus: <strong>White-label solutions</strong> starting at ₹2,50,000/year for separate hosting & customization
+      </p>
+    </div>
+
+    <!-- MARKET POTENTIAL -->
+    <div class="section">
+      <h2>📈 Market Potential & Traction</h2>
+      <p>
+        Target: 50M+ SMBs in India | 1% market capture = 500,000 customers
+      </p>
+
+      <div class="stats">
+        <div>
+          <div class="stat-number">500+</div>
+          <p>Customers (Year 1)</p>
+        </div>
+        <div>
+          <div class="stat-number">₹45L+</div>
+          <p>Annual Revenue (Year 1)</p>
+        </div>
+        <div>
+          <div class="stat-number">75%</div>
+          <p>Gross Margin</p>
+        </div>
+        <div>
+          <div class="stat-number">3-5x</div>
+          <p>Valuation Multiple</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- FUNDING -->
+    <div class="section">
+      <h2>💼 Investment Opportunity</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Seed Funding: ₹1.5 Lakhs</h3>
+          <p>
+            <strong>Immediate Execution:</strong><br>
+            • Marketing & customer acquisition<br>
+            • Infrastructure scaling<br>
+            • Technical support team<br>
+            • Legal & compliance setup<br>
+            <br>
+            <strong>Runway:</strong> 8-10 months to profitability
+          </p>
+        </div>
+        <div class="card">
+          <h3>What We Offer Investors</h3>
+          <p>
+            • <strong>Equity stake</strong> (percentage open for discussion)<br>
+            • <strong>Strategic advisory role</strong><br>
+            • <strong>Revenue sharing options</strong> available<br>
+            • <strong>Board seat</strong> for significant investors<br>
+            • <strong>Performance-based bonuses</strong>
+          </p>
+          <p style="margin-top: 15px; font-style: italic;">
+            We value strategic partners who can contribute beyond capital
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- BUSINESS STRATEGIST PARTNERSHIP -->
+    <div class="highlight-box" style="background:linear-gradient(135deg,#667eea,#764ba2);">
+      <h2>👨‍💼 Business Strategist Partnership</h2>
+      <p>
+        <strong>We welcome investors who want to actively contribute as Business Strategists.</strong>
+      </p>
+      <div style="margin: 20px 0;">
+        <p>✓ <strong>Strategic Guidance:</strong> Pricing, positioning, scaling strategy</p>
+        <p>✓ <strong>Network Access:</strong> Enterprise client introductions</p>
+        <p>✓ <strong>Partnership Development:</strong> Integrations with payment gateways, logistics</p>
+        <p>✓ <strong>Operational Excellence:</strong> Process optimization, team building</p>
+      </div>
+      <p style="font-style: italic;">
+        This can be structured as: Equity + Advisory Role | Revenue Sharing | Performance-linked Compensation
+      </p>
+    </div>
+
+    <!-- EXIT STRATEGY -->
+    <div class="section">
+      <h2>🎯 Exit Potential & Valuation Growth</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Acquisition Targets</h3>
+          <p>
+            • Indian e-commerce players (Meesho, Udaan)<br>
+            • CRM companies (Freshworks, Zoho)<br>
+            • Payment gateways (Razorpay, Paytm)<br>
+            • Global WhatsApp automation platforms
+          </p>
+        </div>
+        <div class="card">
+          <h3>Valuation Projection</h3>
+          <p>
+            <strong>Current:</strong> ₹50L - ₹1Cr ($60K - $120K)<br>
+            <strong>Year 2:</strong> ₹5-8 Cr ($600K - $960K)<br>
+            <strong>Year 3:</strong> ₹15-25 Cr ($1.8M - $3M)<br>
+            <strong>Exit Multiple:</strong> 5-7x ARR
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- WHY NOW -->
+    <div class="section">
+      <h2>⏰ Why Invest Now?</h2>
+      <div class="grid-3">
+        <div class="card">
+          <h3>First-Mover Advantage</h3>
+          <p>Limited competition in affordable WhatsApp commerce automation</p>
+        </div>
+        <div class="card">
+          <h3>Complete Product</h3>
+          <p>Platform fully developed and ready for scaling</p>
+        </div>
+        <div class="card">
+          <h3>Massive TAM</h3>
+          <p>50M+ SMBs need this solution immediately</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta">
+      <h2>Let's Capture the WhatsApp Commerce Revolution</h2>
+      <p>
+        With just ₹1.5 Lakhs investment, we can validate the market, achieve profitability in 8 months, 
+        and build a ₹25+ Cr business within 3 years.
+      </p>
+      <p style="margin-top: 15px; font-style: italic;">
+        Low investment, high potential, proven market need
+      </p>
+      <button onclick="window.print()">Download PDF Pitch</button>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <p>Confidential Investor Pitch • WhatsApp Commerce Platform • 2026</p>
+      <p style="margin-top: 10px; font-size: 0.8em;">
+        This document contains proprietary information. Disclosure requires written permission.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>

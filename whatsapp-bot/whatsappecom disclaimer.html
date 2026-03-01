@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WhatsApp Integration – Technical Disclaimer</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #f4f6f9;
+      padding: 40px;
+      color: #333;
+    }
+
+    .page {
+      max-width: 900px;
+      margin: auto;
+      background: #fff;
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.12);
+    }
+
+    h1 {
+      font-family: 'Montserrat', sans-serif;
+      color: #075E54;
+      margin-bottom: 20px;
+    }
+
+    h2 {
+      color: #128C7E;
+      margin-top: 35px;
+      margin-bottom: 15px;
+    }
+
+    p {
+      line-height: 1.7;
+      font-size: 1.05em;
+      margin-bottom: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      padding: 14px;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #075E54;
+      color: #fff;
+    }
+
+    .note {
+      background: #E8F5E9;
+      padding: 20px;
+      border-left: 5px solid #4CAF50;
+      border-radius: 8px;
+      margin-top: 30px;
+    }
+
+    .warning {
+      background: #FFF3E0;
+      padding: 20px;
+      border-left: 5px solid #FF9800;
+      border-radius: 8px;
+      margin-top: 30px;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 40px;
+      font-size: 0.9em;
+      color: #666;
+    }
+
+    @media print {
+      body { background: white; }
+      .page { box-shadow: none; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="page">
+
+  <h1>WhatsApp Integration – Technical Disclaimer</h1>
+
+  <p>
+    Our platform integrates with WhatsApp to enable customer conversations,
+    order management, and service bookings for small and medium businesses.
+  </p>
+
+  <p>
+    This document outlines the differences between WhatsApp Web–based integration
+    and the official WhatsApp Business API, along with our current and future strategy.
+  </p>
+
+  <h2>Current Integration Approach</h2>
+  <p>
+    In the initial phase, our platform operates using WhatsApp Web–based integration,
+    designed specifically for handling inbound customer conversations such as
+    product inquiries, order confirmations, and service bookings.
+  </p>
+
+  <h2>WhatsApp Web vs WhatsApp Business API</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Aspect</th>
+        <th>WhatsApp Web Integration</th>
+        <th>WhatsApp Business API</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Best Suited For</td>
+        <td>Small & medium businesses</td>
+        <td>Large enterprises</td>
+      </tr>
+      <tr>
+        <td>Setup Cost</td>
+        <td>Low / Minimal</td>
+        <td>High (setup + provider fees)</td>
+      </tr>
+      <tr>
+        <td>Message Cost</td>
+        <td>No per-message cost</td>
+        <td>Per-message pricing</td>
+      </tr>
+      <tr>
+        <td>Conversation Type</td>
+        <td>Inbound, transactional conversations</td>
+        <td>Inbound + outbound (templates)</td>
+      </tr>
+      <tr>
+        <td>Automation Level</td>
+        <td>Limited & contextual</td>
+        <td>Fully compliant automation</td>
+      </tr>
+      <tr>
+        <td>Compliance</td>
+        <td>Unofficial (WhatsApp Web usage)</td>
+        <td>Official & WhatsApp-approved</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="warning">
+    <p>
+      WhatsApp does not officially support automation through WhatsApp Web.
+      While this approach is commonly used by small businesses,
+      there is a potential risk of number restrictions if misused.
+    </p>
+  </div>
+
+  <h2>Risk Mitigation Strategy</h2>
+  <p>
+    To minimize operational risk, our platform follows strict usage guidelines:
+  </p>
+  <ul>
+    <li>Focus on inbound customer-initiated conversations only</li>
+    <li>No bulk or promotional message broadcasting</li>
+    <li>Human-like response timing and controlled automation</li>
+    <li>Designed for real business workflows (orders & bookings)</li>
+  </ul>
+
+  <div class="note">
+    <p>
+      This usage pattern closely aligns with normal WhatsApp Web business behavior,
+      significantly reducing the likelihood of account restrictions.
+    </p>
+  </div>
+
+  <h2>Future Transition Strategy</h2>
+  <p>
+    As the platform scales and enterprise clients onboard,
+    we plan to offer official WhatsApp Business API integration
+    as an optional upgrade.
+  </p>
+
+  <p>
+    This phased approach allows us to serve SMBs cost-effectively today,
+    while remaining compliant and scalable for enterprise use cases.
+  </p>
+
+  <h2>Conclusion</h2>
+  <p>
+    Our current integration strategy balances affordability, usability,
+    and operational safety for small businesses,
+    while maintaining a clear roadmap toward official API adoption
+    as the business grows.
+  </p>
+
+  <div class="footer">
+    <p>Confidential Technical Disclosure • For Investor Review Only</p>
+  </div>
+
+</div>
+</body>
+</html>
