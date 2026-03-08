@@ -319,6 +319,7 @@ export default function Sidebar({
     { label: "Orders", icon: <FiShoppingCart />, path: "/admin/orders" },
     { label: "Create your own orders", icon: <FiShoppingBag />, path: "/admin/orders/orderForm" },
     { label: "Transactions", icon: <BsReceipt />, path: "/admin/transactions" },
+    { label: "Categories", icon: <BsReceipt />, path: "/admin/masters" },
     { label: "Booking Manager", icon: <FiCalendar />, path: "/admin/bookingService/bookingmng" },
     { label: "Booking Create", icon: <FiSettings />, path: "/admin/bookingService/bookingmng/create" },
     { label: "Service", icon: <FiTool />, path: "/admin/bookingService/service" },

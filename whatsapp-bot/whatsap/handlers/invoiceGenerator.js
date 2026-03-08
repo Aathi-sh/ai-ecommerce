@@ -1017,7 +1017,7 @@ class InvoiceGenerator {
       .lineWidth(2)
       .strokeColor(this.colors.primary)
       .stroke();
-  }
+  } //https://jbfq57km-3000.inc1.devtunnels.ms/
 
   addInvoiceTitle(doc, order, paymentVerification) {
     const invoiceNumber = paymentVerification?.invoiceNumber || 

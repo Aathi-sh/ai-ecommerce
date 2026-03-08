@@ -43,6 +43,25 @@ const formatCustomId = (id) => {
   return String(id).padStart(5, '0');
 };
 
+// Get category display name from populated object
+const getCategoryName = (category) => {
+  if (!category) return 'Uncategorized';
+  if (typeof category === 'string') return category;
+  return category.name || 'Uncategorized';
+};
+
+// Get subcategory display name from populated object
+const getSubCategoryName = (subCategory) => {
+  if (!subCategory) return null;
+  if (typeof subCategory === 'string') return subCategory;
+  return subCategory.name || null;
+};
+
+// ✅ Helper to validate ObjectId (added for safety)
+const isValidObjectId = (id) => {
+  return /^[0-9a-fA-F]{24}$/.test(id);
+};
+
 // Mobile Card Component with enhanced product data
 const MobileProductCard = ({ product, onEdit, onDelete, onToggleStatus, appTheme }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -56,6 +75,11 @@ const MobileProductCard = ({ product, onEdit, onDelete, onToggleStatus, appTheme
   const margin = safeNumber(product.margin);
   const averageRating = safeNumber(product.averageRating);
   const customId = product.customId;
+
+  // Get category names
+  const categoryName = getCategoryName(product.category);
+  const subCategoryName = getSubCategoryName(product.subCategory);
+  const fullCategory = subCategoryName ? `${categoryName} → ${subCategoryName}` : categoryName;
 
   // Calculate discount percentage
   const discountPercentage = useMemo(() => {
@@ -195,7 +219,7 @@ const MobileProductCard = ({ product, onEdit, onDelete, onToggleStatus, appTheme
               fontWeight: "500",
               border: `1px solid ${appTheme.colors.primary}20`
             }}>
-              {product.category || "Uncategorized"}
+              {fullCategory}
             </span>
             
             {product.brand && (
@@ -708,10 +732,16 @@ export default function ProductTablePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedSubCategory, setSelectedSubCategory] = useState("all");
   const [selectedBrand, setSelectedBrand] = useState("all");
   const [priceRange, setPriceRange] = useState({ min: "", max: "" });
   const [showFilters, setShowFilters] = useState(false);
-  const [customIdFilter, setCustomIdFilter] = useState(""); // New filter for custom ID
+  const [customIdFilter, setCustomIdFilter] = useState("");
+  
+  // State for categories
+  const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
 
   // Detect mobile on mount and resize
   useEffect(() => {
@@ -724,6 +754,48 @@ export default function ProductTablePage() {
     
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Fetch categories on mount
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+  useEffect(() => {
+  console.log('Selected category ID:', selectedCategory);
+  console.log('URL params:', window.location.search);
+}, [selectedCategory]);
+
+// Also check what categories are loaded
+useEffect(() => {
+  console.log('Categories loaded:', categories);
+}, [categories]);
+
+  // Update subcategories when category changes
+  useEffect(() => {
+    if (selectedCategory && selectedCategory !== 'all') {
+      const cat = categories.find(c => c._id === selectedCategory);
+      setSubCategories(cat?.subcategories || []);
+      setSelectedSubCategory('all');
+    } else {
+      setSubCategories([]);
+      setSelectedSubCategory('all');
+    }
+  }, [selectedCategory, categories]);
+
+  // Fetch all categories
+  const fetchCategories = async () => {
+    setLoadingCategories(true);
+    try {
+      const res = await fetch('/api/masters?type=categories&format=tree');
+      const data = await res.json();
+      if (data.success) {
+        setCategories(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
 
   // Fetch all products
   const fetchProducts = async () => {
@@ -763,12 +835,7 @@ export default function ProductTablePage() {
     fetchProducts();
   }, []);
 
-  // Get unique categories and brands for filters
-  const categories = useMemo(() => {
-    const cats = [...new Set(products.map(p => p.category).filter(Boolean))];
-    return ["all", ...cats];
-  }, [products]);
-
+  // Get unique brands for filters
   const brands = useMemo(() => {
     const br = [...new Set(products.map(p => p.brand).filter(Boolean))];
     return ["all", ...br];
@@ -806,9 +873,20 @@ export default function ProductTablePage() {
         break;
     }
 
-    // Apply category filter
+    // Apply category filter using ID
     if (selectedCategory !== "all") {
-      filtered = filtered.filter(product => product.category === selectedCategory);
+      filtered = filtered.filter(product => 
+        product.category?._id === selectedCategory || 
+        product.category === selectedCategory
+      );
+    }
+
+    // Apply subcategory filter using ID
+    if (selectedSubCategory !== "all") {
+      filtered = filtered.filter(product => 
+        product.subCategory?._id === selectedSubCategory || 
+        product.subCategory === selectedSubCategory
+      );
     }
 
     // Apply brand filter
@@ -843,20 +921,26 @@ export default function ProductTablePage() {
     // Apply search
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
-      filtered = filtered.filter(product => 
-        product.productName?.toLowerCase().includes(term) ||
-        product.sku?.toLowerCase().includes(term) ||
-        product.hsnCode?.toLowerCase().includes(term) ||
-        product.category?.toLowerCase().includes(term) ||
-        product.brand?.toLowerCase().includes(term) ||
-        product.description?.toLowerCase().includes(term) ||
-        product.formattedId?.includes(term) ||
-        String(product.customId).includes(term)
-      );
+      filtered = filtered.filter(product => {
+        const categoryName = getCategoryName(product.category).toLowerCase();
+        const subCategoryName = getSubCategoryName(product.subCategory)?.toLowerCase() || '';
+        
+        return (
+          product.productName?.toLowerCase().includes(term) ||
+          product.sku?.toLowerCase().includes(term) ||
+          product.hsnCode?.toLowerCase().includes(term) ||
+          categoryName.includes(term) ||
+          subCategoryName.includes(term) ||
+          product.brand?.toLowerCase().includes(term) ||
+          product.description?.toLowerCase().includes(term) ||
+          product.formattedId?.includes(term) ||
+          String(product.customId).includes(term)
+        );
+      });
     }
 
     setFilteredProducts(filtered);
-  }, [activeFilter, searchTerm, products, selectedCategory, selectedBrand, priceRange, customIdFilter]);
+  }, [activeFilter, searchTerm, products, selectedCategory, selectedSubCategory, selectedBrand, priceRange, customIdFilter]);
 
   // Edit handler - using MongoDB _id for navigation
   const handleEdit = (product) => {
@@ -946,7 +1030,6 @@ export default function ProductTablePage() {
         if (ratings.length === 0) return 0;
         return ratings.reduce((sum, p) => sum + safeNumber(p.averageRating), 0) / ratings.length;
       })(),
-      // Add custom ID range
       minCustomId: products.length > 0 ? Math.min(...products.map(p => p.customId).filter(Boolean)) : 100,
       maxCustomId: products.length > 0 ? Math.max(...products.map(p => p.customId).filter(Boolean)) : 100
     };
@@ -957,13 +1040,14 @@ export default function ProductTablePage() {
   const resetFilters = () => {
     setActiveFilter("all");
     setSelectedCategory("all");
+    setSelectedSubCategory("all");
     setSelectedBrand("all");
     setPriceRange({ min: "", max: "" });
     setCustomIdFilter("");
     setSearchTerm("");
   };
 
-  // Columns for desktop table with enhanced data
+  // Columns for desktop table with proper category display
   const columns = [
     { 
       header: "ID", 
@@ -1067,21 +1151,27 @@ export default function ProductTablePage() {
     { 
       header: "Category", 
       accessor: "category",
-      cell: (value) => (
-        <span style={{
-          backgroundColor: appTheme.colors.primary + "15",
-          color: appTheme.colors.primary,
-          padding: "4px 10px",
-          borderRadius: "12px",
-          fontSize: "0.75rem",
-          fontWeight: "500",
-          border: `1px solid ${appTheme.colors.primary}20`,
-          display: "inline-block",
-          whiteSpace: "nowrap",
-        }}>
-          {value || "Uncategorized"}
-        </span>
-      )
+      cell: (value, row) => {
+        const categoryName = getCategoryName(row.category);
+        const subCategoryName = getSubCategoryName(row.subCategory);
+        const displayText = subCategoryName ? `${categoryName} → ${subCategoryName}` : categoryName;
+        
+        return (
+          <span style={{
+            backgroundColor: appTheme.colors.primary + "15",
+            color: appTheme.colors.primary,
+            padding: "4px 10px",
+            borderRadius: "12px",
+            fontSize: "0.75rem",
+            fontWeight: "500",
+            border: `1px solid ${appTheme.colors.primary}20`,
+            display: "inline-block",
+            whiteSpace: "nowrap",
+          }}>
+            {displayText}
+          </span>
+        );
+      }
     },
     { 
       header: "Pricing", 
@@ -1438,9 +1528,10 @@ export default function ProductTablePage() {
 
           <div style={{
             display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "repeat(5, 1fr)",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(6, 1fr)",
             gap: "12px"
           }}>
+            {/* Category Filter with Hierarchy */}
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
@@ -1454,13 +1545,46 @@ export default function ProductTablePage() {
                 cursor: "pointer",
                 minHeight: "44px"
               }}
+              disabled={loadingCategories}
             >
               <option value="all">All Categories</option>
-              {categories.filter(c => c !== "all").map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
+              {categories.map(cat => (
+                <optgroup key={cat._id} label={cat.name}>
+                  <option value={cat._id}>{cat.name}</option>
+                  {cat.subcategories?.map(sub => (
+                    <option key={sub._id} value={sub._id}>
+                      &nbsp;&nbsp;↳ {sub.name}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
 
+            {/* SubCategory Filter */}
+            <select
+              value={selectedSubCategory}
+              onChange={(e) => setSelectedSubCategory(e.target.value)}
+              style={{
+                padding: "10px",
+                border: `1px solid ${appTheme.colors.border}`,
+                borderRadius: "8px",
+                fontSize: "0.85rem",
+                backgroundColor: appTheme.colors.background,
+                color: appTheme.colors.textPrimary,
+                cursor: "pointer",
+                minHeight: "44px"
+              }}
+              disabled={!selectedCategory || selectedCategory === 'all' || subCategories.length === 0}
+            >
+              <option value="all">All SubCategories</option>
+              {subCategories.map(sub => (
+                <option key={sub._id} value={sub._id}>
+                  {sub.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Brand Filter */}
             <select
               value={selectedBrand}
               onChange={(e) => setSelectedBrand(e.target.value)}
@@ -1481,6 +1605,7 @@ export default function ProductTablePage() {
               ))}
             </select>
 
+            {/* Price Range */}
             <div style={{ display: "flex", gap: "8px" }}>
               <input
                 type="number"
@@ -1827,7 +1952,7 @@ export default function ProductTablePage() {
               marginBottom: "8px",
               color: appTheme.colors.textPrimary
             }}>
-              {searchTerm || activeFilter !== "all" || selectedCategory !== "all" || selectedBrand !== "all" || priceRange.min || priceRange.max || customIdFilter
+              {searchTerm || activeFilter !== "all" || selectedCategory !== "all" || selectedSubCategory !== "all" || selectedBrand !== "all" || priceRange.min || priceRange.max || customIdFilter
                 ? "No products match your filters"
                 : "No products available"}
             </div>
@@ -1838,7 +1963,7 @@ export default function ProductTablePage() {
               lineHeight: 1.5,
               color: appTheme.colors.textSecondary
             }}>
-              {searchTerm || activeFilter !== "all" || selectedCategory !== "all" || selectedBrand !== "all" || priceRange.min || priceRange.max || customIdFilter
+              {searchTerm || activeFilter !== "all" || selectedCategory !== "all" || selectedSubCategory !== "all" || selectedBrand !== "all" || priceRange.min || priceRange.max || customIdFilter
                 ? "Try adjusting your filters or search term"
                 : "Get started by adding your first product"}
             </div>

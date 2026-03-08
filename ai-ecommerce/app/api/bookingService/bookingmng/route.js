@@ -1,7 +1,7 @@
+// app/api/bookingService/bookingmng/route.js
 import { NextResponse } from 'next/server';
 import { connectDB } from "@/utils/db";
 import Bookingmng from '@/models/Bookingmng';
-import User from '@/models/user';
 
 // GET ALL Professionals with filters
 export async function GET(request) {
@@ -9,7 +9,6 @@ export async function GET(request) {
     await connectDB();
     
     const { searchParams } = new URL(request.url);
-    const role = searchParams.get('role');
     const page = parseInt(searchParams.get('page')) || 1;
     const limit = parseInt(searchParams.get('limit')) || 20;
     const search = searchParams.get('search') || '';
@@ -17,50 +16,69 @@ export async function GET(request) {
     const category = searchParams.get('category') || 'all';
     const type = searchParams.get('type') || 'all';
     const verification = searchParams.get('verification') || 'all';
+    const whatsappBusinessId = searchParams.get('whatsappBusinessId'); // For WhatsApp bot lookup
     
     const skip = (page - 1) * limit;
     
     let query = {};
-
-    // If role=user, fetch users for dropdown
-    if (role === 'user') {
-      const users = await User.find({ 
-        $or: [
-          { role: 'user' },
-          { role: { $exists: false } }
-        ]
-      })
-      .select('_id name email phone avatar')
-      .limit(limit)
-      .lean();
+    
+    // ===== WHATSAPP BOT LOOKUP =====
+    // When a customer messages a WhatsApp number, we need to find which business owns it
+    if (whatsappBusinessId) {
+      console.log('🔍 WhatsApp Bot looking for business with number:', whatsappBusinessId);
       
-      const total = await User.countDocuments({ 
+      // Clean the WhatsApp number (remove @lid, @c.us, etc and get digits)
+      const cleanNumber = whatsappBusinessId.split('@')[0].replace(/\D/g, '');
+      
+      // Search by whatsappBusinessId field (exact match or partial)
+      query = {
         $or: [
-          { role: 'user' },
-          { role: { $exists: false } }
-        ]
-      });
-
-      const formattedUsers = users.map(user => ({
-        ...user,
-        _id: user._id.toString(),
-        createdAt: user.createdAt?.toISOString(),
-        updatedAt: user.updatedAt?.toISOString()
-      }));
-
+          { whatsappBusinessId: whatsappBusinessId },           // Exact match with @lid
+          { whatsappBusinessId: cleanNumber },                  // Exact match with digits only
+          { whatsappBusinessId: { $regex: cleanNumber } },      // Contains the number
+          { phone: cleanNumber }                                 // Also check phone field
+        ],
+        isActive: true  // Only active businesses
+      };
+      
+      console.log('🔎 Search query:', JSON.stringify(query, null, 2));
+      
+      // Find the business (should be one)
+      const business = await Bookingmng.findOne(query).lean();
+      
+      if (!business) {
+        console.log('❌ No business found with WhatsApp number:', whatsappBusinessId);
+        return NextResponse.json({
+          success: true,
+          data: [],
+          message: 'No business found with this WhatsApp number'
+        }, { status: 200 });
+      }
+      
+      console.log('✅ Business found:', business.businessName);
+      
+      // Format the response
+      const formattedBusiness = {
+        ...business,
+        _id: business._id.toString(),
+        createdAt: business.createdAt?.toISOString(),
+        updatedAt: business.updatedAt?.toISOString()
+      };
+      
       return NextResponse.json({
         success: true,
-        data: formattedUsers,
+        data: [formattedBusiness],
         pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit)
+          page: 1,
+          limit: 1,
+          total: 1,
+          pages: 1
         }
       }, { status: 200 });
     }
     
-    // Search filter
+    // ===== ADMIN PANEL FILTERS =====
+    // Regular search filter (for admin panel)
     if (search) {
       query.$or = [
         { businessName: { $regex: search, $options: 'i' } },
@@ -95,25 +113,20 @@ export async function GET(request) {
       query.type = type;
     }
     
-    // Get total count
+    // Get total count for pagination
     const total = await Bookingmng.countDocuments(query);
     
-    // Get professionals with user details
+    // Get professionals
     const professionals = await Bookingmng.find(query)
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 })
-      .populate('userId', 'name email phone avatar')
       .lean();
     
     // Format the response data
     const formattedProfessionals = professionals.map(prof => ({
       ...prof,
       _id: prof._id.toString(),
-      userId: prof.userId ? {
-        ...prof.userId,
-        _id: prof.userId._id.toString()
-      } : null,
       createdAt: prof.createdAt?.toISOString(),
       updatedAt: prof.updatedAt?.toISOString()
     }));
@@ -150,43 +163,25 @@ export async function POST(request) {
     const body = await request.json();
     
     // Validate required fields
-    if (!body.userId || !body.businessName || !body.category || !body.email || !body.phone) {
+    if (!body.businessName || !body.category || !body.email || !body.phone) {
       return NextResponse.json(
         { 
           success: false, 
           error: 'Missing required fields',
-          required: ['userId', 'businessName', 'category', 'email', 'phone']
+          required: ['businessName', 'category', 'email', 'phone']
         },
         { status: 400 }
       );
     }
-    
-    // Check if user exists
-    const userExists = await User.findById(body.userId);
-    if (!userExists) {
-      return NextResponse.json(
-        { success: false, error: 'User not found' },
-        { status: 404 }
-      );
-    }
-    
-    // Check if professional already exists for this user
+
+    // Check if professional already exists with this email
     const existingProfessional = await Bookingmng.findOne({ 
-      userId: body.userId 
+      email: body.email 
     });
     
     if (existingProfessional) {
       return NextResponse.json(
-        { success: false, error: 'Professional profile already exists for this user' },
-        { status: 409 }
-      );
-    }
-    
-    // Check for duplicate email
-    const emailExists = await Bookingmng.findOne({ email: body.email });
-    if (emailExists) {
-      return NextResponse.json(
-        { success: false, error: 'Email already registered' },
+        { success: false, error: 'Professional with this email already exists' },
         { status: 409 }
       );
     }
@@ -194,13 +189,13 @@ export async function POST(request) {
     // Set default working hours if not provided
     if (!body.workingHours || body.workingHours.length === 0) {
       body.workingHours = [
-        { day: 'monday', startTime: '09:00', endTime: '18:00', isAvailable: true },
-        { day: 'tuesday', startTime: '09:00', endTime: '18:00', isAvailable: true },
-        { day: 'wednesday', startTime: '09:00', endTime: '18:00', isAvailable: true },
-        { day: 'thursday', startTime: '09:00', endTime: '18:00', isAvailable: true },
-        { day: 'friday', startTime: '09:00', endTime: '18:00', isAvailable: true },
-        { day: 'saturday', startTime: '10:00', endTime: '16:00', isAvailable: false },
-        { day: 'sunday', startTime: '10:00', endTime: '16:00', isAvailable: false }
+        { day: 'monday', startTime: '09:00', endTime: '18:00', isAvailable: true, breaks: [] },
+        { day: 'tuesday', startTime: '09:00', endTime: '18:00', isAvailable: true, breaks: [] },
+        { day: 'wednesday', startTime: '09:00', endTime: '18:00', isAvailable: true, breaks: [] },
+        { day: 'thursday', startTime: '09:00', endTime: '18:00', isAvailable: true, breaks: [] },
+        { day: 'friday', startTime: '09:00', endTime: '18:00', isAvailable: true, breaks: [] },
+        { day: 'saturday', startTime: '10:00', endTime: '16:00', isAvailable: false, breaks: [] },
+        { day: 'sunday', startTime: '10:00', endTime: '16:00', isAvailable: false, breaks: [] }
       ];
     }
     
@@ -216,7 +211,6 @@ export async function POST(request) {
     
     // Create professional
     const professional = new Bookingmng({
-      userId: body.userId,
       businessName: body.businessName,
       tagline: body.tagline || '',
       type: body.type || 'individual',
@@ -236,7 +230,7 @@ export async function POST(request) {
       // Working Hours
       workingHours: body.workingHours,
       
-      // WhatsApp
+      // WhatsApp - THIS IS THE IMPORTANT FIELD FOR BOT LOOKUP
       whatsappBusinessId: body.whatsappBusinessId || '',
       autoReplyEnabled: body.autoReplyEnabled || false,
       autoReplyMessage: body.autoReplyMessage || 'Hello! Thank you for your message. Our team will get back to you soon.',
@@ -275,31 +269,17 @@ export async function POST(request) {
     
     await professional.save();
     
-    // Update user role to professional
-    await User.findByIdAndUpdate(
-      body.userId, 
-      { 
-        role: 'professional',
-        professionalId: professional._id 
-      },
-      { new: true }
-    );
-    
-    // Populate user data for response
-    await professional.populate('userId', 'name email phone avatar');
+    // Prepare response data
+    const responseData = {
+      ...professional.toObject(),
+      _id: professional._id.toString(),
+      createdAt: professional.createdAt.toISOString(),
+      updatedAt: professional.updatedAt.toISOString()
+    };
     
     return NextResponse.json({
       success: true,
-      data: {
-        ...professional.toObject(),
-        _id: professional._id.toString(),
-        userId: professional.userId ? {
-          ...professional.userId.toObject(),
-          _id: professional.userId._id.toString()
-        } : null,
-        createdAt: professional.createdAt.toISOString(),
-        updatedAt: professional.updatedAt.toISOString()
-      },
+      data: responseData,
       message: 'Professional created successfully'
     }, { status: 201 });
     
@@ -416,7 +396,7 @@ export async function PATCH(request) {
         
       default:
         // General update - remove sensitive fields
-        const { _id, userId, createdAt, ...updateFields } = body;
+        const { _id, createdAt, ...updateFields } = body;
         updateData = { ...updateData, ...updateFields };
         actionMessage = 'updated';
     }
@@ -425,7 +405,7 @@ export async function PATCH(request) {
       id,
       updateData,
       { new: true, runValidators: true }
-    ).populate('userId', 'name email phone avatar');
+    ).lean();
     
     if (!professional) {
       return NextResponse.json(
@@ -437,12 +417,8 @@ export async function PATCH(request) {
     return NextResponse.json({
       success: true,
       data: {
-        ...professional.toObject(),
+        ...professional,
         _id: professional._id.toString(),
-        userId: professional.userId ? {
-          ...professional.userId.toObject(),
-          _id: professional.userId._id.toString()
-        } : null,
         createdAt: professional.createdAt?.toISOString(),
         updatedAt: professional.updatedAt?.toISOString()
       },
@@ -477,6 +453,7 @@ export async function DELETE(request) {
     
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const permanent = searchParams.get('permanent') === 'true';
     
     if (!id) {
       return NextResponse.json(
@@ -485,40 +462,48 @@ export async function DELETE(request) {
       );
     }
     
-    // Soft delete - mark as inactive
-    const professional = await Bookingmng.findByIdAndUpdate(
-      id,
-      { 
-        isActive: false,
-        verificationStatus: 'suspended',
-        updatedAt: new Date()
-      },
-      { new: true }
-    );
-    
-    if (!professional) {
-      return NextResponse.json(
-        { success: false, error: 'Professional not found' },
-        { status: 404 }
-      );
-    }
-    
-    // Remove professional role from user
-    if (professional.userId) {
-      await User.findByIdAndUpdate(
-        professional.userId,
+    if (permanent) {
+      // Permanent delete (use with caution)
+      const professional = await Bookingmng.findByIdAndDelete(id);
+      
+      if (!professional) {
+        return NextResponse.json(
+          { success: false, error: 'Professional not found' },
+          { status: 404 }
+        );
+      }
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Professional permanently deleted',
+        data: { id: id.toString() }
+      }, { status: 200 });
+      
+    } else {
+      // Soft delete - mark as inactive
+      const professional = await Bookingmng.findByIdAndUpdate(
+        id,
         { 
-          role: 'user',
-          professionalId: null 
-        }
+          isActive: false,
+          verificationStatus: 'suspended',
+          updatedAt: new Date()
+        },
+        { new: true }
       );
+      
+      if (!professional) {
+        return NextResponse.json(
+          { success: false, error: 'Professional not found' },
+          { status: 404 }
+        );
+      }
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Professional deactivated successfully',
+        data: { id: id.toString() }
+      }, { status: 200 });
     }
-    
-    return NextResponse.json({
-      success: true,
-      message: 'Professional deactivated successfully',
-      data: { id: id.toString() }
-    }, { status: 200 });
     
   } catch (error) {
     console.error('Error deleting professional:', error);
@@ -533,13 +518,60 @@ export async function DELETE(request) {
   }
 }
 
+// GET Single Professional by ID
+export async function PUT(request) {
+  try {
+    await connectDB();
+    
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'Professional ID is required' },
+        { status: 400 }
+      );
+    }
+    
+    const professional = await Bookingmng.findById(id).lean();
+    
+    if (!professional) {
+      return NextResponse.json(
+        { success: false, error: 'Professional not found' },
+        { status: 404 }
+      );
+    }
+    
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...professional,
+        _id: professional._id.toString(),
+        createdAt: professional.createdAt?.toISOString(),
+        updatedAt: professional.updatedAt?.toISOString()
+      }
+    }, { status: 200 });
+    
+  } catch (error) {
+    console.error('Error fetching professional:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Failed to fetch professional',
+        message: error.message 
+      },
+      { status: 500 }
+    );
+  }
+}
+
 // OPTIONS request for CORS
 export async function OPTIONS() {
   return NextResponse.json({}, { 
     status: 200,
     headers: {
-      'Allow': 'GET, POST, PATCH, DELETE, OPTIONS',
-      'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+      'Allow': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization'
     }
   });

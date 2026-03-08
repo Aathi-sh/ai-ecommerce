@@ -1796,8 +1796,6 @@
 //   );
 // }
 
-
-
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -1929,14 +1927,14 @@ export default function CreateBookingmngPage() {
     
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [users, setUsers] = useState([]);
+    // const [users, setUsers] = useState([]); // REMOVED - User selection no longer needed
     const [expandedSections, setExpandedSections] = useState(['basic']);
     const [activeTab, setActiveTab] = useState('basic');
     const [toast, setToast] = useState({ show: false, type: '', message: '' });
     const [isMobile, setIsMobile] = useState(false);
     
     const [formData, setFormData] = useState({
-        userId: '',
+        // userId: '', // REMOVED - User selection removed
         businessName: '',
         tagline: '',
         type: 'individual',
@@ -2032,31 +2030,14 @@ export default function CreateBookingmngPage() {
         }
     }, [toast]);
 
-    // Fetch users for dropdown
-    useEffect(() => {
-        fetchUsers();
-    }, []);
+    // REMOVED: fetchUsers function - No longer needed
+    // const fetchUsers = async () => { ... }
+
+    // REMOVED: useEffect for fetching users
+    // useEffect(() => { fetchUsers(); }, []);
 
     const showToast = (type, message) => {
         setToast({ show: true, type, message });
-    };
-
-    const fetchUsers = async () => {
-        try {
-            setLoading(true);
-            const res = await fetch('/api/bookingService/bookingmng?role=user&limit=50');
-            const data = await res.json();
-            if (data.success) {
-                setUsers(data.data || []);
-            } else {
-                showToast('error', 'Failed to fetch users');
-            }
-        } catch (error) {
-            console.error('Error fetching users:', error);
-            showToast('error', 'Error fetching users');
-        } finally {
-            setLoading(false);
-        }
     };
 
     // Toggle section expansion
@@ -2105,6 +2086,7 @@ export default function CreateBookingmngPage() {
             }));
         }
         
+        // Clear error for this field if it exists
         if (errors[name]) {
             setErrors(prev => ({
                 ...prev,
@@ -2185,9 +2167,10 @@ export default function CreateBookingmngPage() {
     const validateForm = () => {
         const newErrors = {};
 
-        if (!formData.userId) {
-            newErrors.userId = 'Please select a user';
-        }
+        // REMOVED: userId validation
+        // if (!formData.userId) {
+        //     newErrors.userId = 'Please select a user';
+        // }
 
         if (!formData.businessName.trim()) {
             newErrors.businessName = 'Business name is required';
@@ -2198,7 +2181,7 @@ export default function CreateBookingmngPage() {
         } else {
             const digits = formData.phone.replace(/\D/g, '');
             if (digits.length < 10) {
-                newErrors.phone = 'Enter a valid phone number';
+                newErrors.phone = 'Enter a valid phone number (10 digits)';
             }
         }
 
@@ -2232,7 +2215,7 @@ export default function CreateBookingmngPage() {
 
         try {
             // Filter out empty service areas
-            const filteredServiceAreas = formData.serviceAreas.filter(area => area.trim() !== '');
+            const filteredServiceAreas = formData.serviceAreas.filter(area => area && area.trim() !== '');
             
             const payload = {
                 ...formData,
@@ -2259,6 +2242,12 @@ export default function CreateBookingmngPage() {
 
             if (data.success) {
                 showToast('success', 'Professional created successfully!');
+                // If there's a temporary password for new user, show it
+                if (data.tempPassword) {
+                    setTimeout(() => {
+                        alert(`New user created!\nEmail: ${formData.email}\nTemporary Password: ${data.tempPassword}\n\nPlease share this with the professional.`);
+                    }, 500);
+                }
                 setTimeout(() => router.push('/admin/bookingService/bookingmng'), 1500);
             } else {
                 showToast('error', `Error: ${data.error || 'Failed to create professional'}`);
@@ -2477,24 +2466,13 @@ export default function CreateBookingmngPage() {
                                                             Professional Details
                                                         </h3>
                                                         <div className="form-grid">
-                                                            <div className="form-field span-2">
+                                                            {/* REMOVED: User Selection Dropdown */}
+                                                            {/* <div className="form-field span-2">
                                                                 <label>Select User <span className="required">*</span></label>
-                                                                <select
-                                                                    name="userId"
-                                                                    id="userId"
-                                                                    value={formData.userId}
-                                                                    onChange={handleChange}
-                                                                    className={errors.userId ? 'error' : ''}
-                                                                >
-                                                                    <option value="">Choose a user</option>
-                                                                    {users.map(user => (
-                                                                        <option key={user._id} value={user._id}>
-                                                                            {user.name} - {user.email}
-                                                                        </option>
-                                                                    ))}
+                                                                <select ...>
+                                                                    ...
                                                                 </select>
-                                                                {errors.userId && <span className="error-text">{errors.userId}</span>}
-                                                            </div>
+                                                            </div> */}
 
                                                             <div className="form-field span-2">
                                                                 <label>Business Name <span className="required">*</span></label>

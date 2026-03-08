@@ -18,12 +18,7 @@ const workingHoursSchema = new mongoose.Schema({
 
 const bookingmngSchema = new mongoose.Schema({
   // Basic Info
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    unique: true
-  },
+ 
   businessName: {
     type: String,
     required: true,
@@ -176,7 +171,7 @@ const bookingmngSchema = new mongoose.Schema({
 });
 
 // Indexes
-bookingmngSchema.index({ userId: 1 });
+
 bookingmngSchema.index({ verificationStatus: 1 });
 bookingmngSchema.index({ category: 1, type: 1 });
 bookingmngSchema.index({ 'address.city': 1, 'address.state': 1 });

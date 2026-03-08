@@ -1910,9 +1910,8 @@
 
 
 
-
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Head from 'next/head';
@@ -2023,6 +2022,9 @@ const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 420,
 export default function CreateServicePage() {
     const router = useRouter();
     
+    // Refs for focus management
+    const inputRefs = useRef({});
+    
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [expandedSections, setExpandedSections] = useState(['basic']);
@@ -2030,7 +2032,13 @@ export default function CreateServicePage() {
     const [toast, setToast] = useState({ show: false, type: '', message: '' });
     const [isMobile, setIsMobile] = useState(false);
     
+    // NEW: State for professionals dropdown
+    const [professionals, setProfessionals] = useState([]);
+    const [loadingProfessionals, setLoadingProfessionals] = useState(true);
+    
     const [formData, setFormData] = useState({
+        // NEW: professionalId field
+        professionalId: '',
         name: '',
         description: '',
         category: 'beauty',
@@ -2061,6 +2069,27 @@ export default function CreateServicePage() {
     const [variationInput, setVariationInput] = useState({ name: '', price: 0, duration: 0 });
     const [addonInput, setAddonInput] = useState({ name: '', price: 0, description: '' });
     const [errors, setErrors] = useState({});
+
+    // Fetch professionals on mount
+    useEffect(() => {
+        fetchProfessionals();
+    }, []);
+
+    const fetchProfessionals = async () => {
+        try {
+            setLoadingProfessionals(true);
+            const res = await fetch('/api/bookingService/bookingmng?isActive=true');
+            const data = await res.json();
+            if (data.success) {
+                setProfessionals(data.data || []);
+            }
+        } catch (error) {
+            console.error('Error fetching professionals:', error);
+            showToast('error', 'Failed to load professionals');
+        } finally {
+            setLoadingProfessionals(false);
+        }
+    };
 
     // Mobile detection
     useEffect(() => {
@@ -2136,6 +2165,23 @@ export default function CreateServicePage() {
                 ...prev,
                 [name]: ''
             }));
+        }
+    };
+
+    // Handle Enter key navigation
+    const handleKeyDown = (e, fieldName, nextFieldName) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (nextFieldName && inputRefs.current[nextFieldName]) {
+                inputRefs.current[nextFieldName].focus();
+            }
+        }
+    };
+
+    // Register ref for input
+    const setInputRef = (name, element) => {
+        if (element) {
+            inputRefs.current[name] = element;
         }
     };
 
@@ -2230,6 +2276,11 @@ export default function CreateServicePage() {
     const validateForm = () => {
         const newErrors = {};
 
+        // NEW: Validate professionalId
+        if (!formData.professionalId) {
+            newErrors.professionalId = 'Please select a professional/business';
+        }
+
         if (!formData.name.trim()) {
             newErrors.name = 'Service name is required';
         }
@@ -2252,17 +2303,38 @@ export default function CreateServicePage() {
         return Object.keys(newErrors).length === 0;
     };
 
-    // Handle form submission
+    // Handle form submission with scroll to error
     const handleSubmit = async (e) => {
         e.preventDefault();
         
         if (!validateForm()) {
             showToast('error', 'Please fix the errors before submitting');
+            
+            // Get the first error field
             const firstError = Object.keys(errors)[0];
+            
+            // Scroll to the error
             if (firstError) {
-                const element = document.getElementById(firstError);
-                if (element) {
-                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Check if the field is in the current section, if not expand that section
+                const errorSection = getFieldSection(firstError);
+                if (errorSection && !expandedSections.includes(errorSection)) {
+                    setExpandedSections(prev => [...prev, errorSection]);
+                    setActiveTab(errorSection);
+                    
+                    // Small delay to allow section to expand before scrolling
+                    setTimeout(() => {
+                        const element = document.getElementById(firstError);
+                        if (element) {
+                            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            element.focus();
+                        }
+                    }, 300);
+                } else {
+                    const element = document.getElementById(firstError);
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        element.focus();
+                    }
                 }
             }
             return;
@@ -2304,13 +2376,39 @@ export default function CreateServicePage() {
         }
     };
 
+    // Helper to find which section a field belongs to
+    const getFieldSection = (fieldName) => {
+        const fieldToSection = {
+            professionalId: 'basic',
+            name: 'basic',
+            description: 'basic',
+            category: 'basic',
+            type: 'basic',
+            subcategory: 'basic',
+            tags: 'basic',
+            basePrice: 'pricing',
+            currency: 'pricing',
+            duration: 'pricing',
+            bufferTime: 'pricing',
+            variations: 'variations',
+            addons: 'addons',
+            clientRequirements: 'requirements',
+            professionalProvides: 'requirements',
+            advanceBooking: 'restrictions',
+            minAge: 'restrictions',
+            maxAge: 'restrictions',
+            genderPreference: 'restrictions'
+        };
+        return fieldToSection[fieldName] || 'basic';
+    };
+
     // Get currency symbol
     const getCurrencySymbol = () => {
         const currency = CURRENCIES.find(c => c.value === formData.currency);
         return currency?.symbol || '₹';
     };
 
-    if (loading) {
+    if (loading || loadingProfessionals) {
         return (
             <div className="loading-container">
                 <div className="loading-grid">
@@ -2513,6 +2611,35 @@ export default function CreateServicePage() {
                                                 <>
                                                     <div className="form-block">
                                                         <h3>
+                                                            <Building2 size={16} />
+                                                            Professional Selection
+                                                        </h3>
+                                                        <div className="form-grid">
+                                                            <div className="form-field span-2">
+                                                                <label>Select Professional/Business <span className="required">*</span></label>
+                                                                <select
+                                                                    name="professionalId"
+                                                                    id="professionalId"
+                                                                    value={formData.professionalId}
+                                                                    onChange={handleChange}
+                                                                    className={errors.professionalId ? 'error' : ''}
+                                                                    ref={(el) => setInputRef('professionalId', el)}
+                                                                    onKeyDown={(e) => handleKeyDown(e, 'professionalId', 'name')}
+                                                                >
+                                                                    <option value="">Choose a professional</option>
+                                                                    {professionals.map(pro => (
+                                                                        <option key={pro._id} value={pro._id}>
+                                                                            {pro.businessName} - {pro.category}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                                {errors.professionalId && <span className="error-text">{errors.professionalId}</span>}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="form-block">
+                                                        <h3>
                                                             <Tag size={16} />
                                                             Basic Details
                                                         </h3>
@@ -2527,6 +2654,8 @@ export default function CreateServicePage() {
                                                                     onChange={handleChange}
                                                                     className={errors.name ? 'error' : ''}
                                                                     placeholder="e.g., Professional Haircut"
+                                                                    ref={(el) => setInputRef('name', el)}
+                                                                    onKeyDown={(e) => handleKeyDown(e, 'name', 'description')}
                                                                 />
                                                                 {errors.name && <span className="error-text">{errors.name}</span>}
                                                             </div>
@@ -2541,6 +2670,7 @@ export default function CreateServicePage() {
                                                                     rows="4"
                                                                     className={errors.description ? 'error' : ''}
                                                                     placeholder="Describe the service in detail..."
+                                                                    ref={(el) => setInputRef('description', el)}
                                                                 />
                                                                 {errors.description && <span className="error-text">{errors.description}</span>}
                                                                 <span className="hint">Minimum 50 characters recommended</span>
@@ -2588,6 +2718,8 @@ export default function CreateServicePage() {
                                                                     value={formData.subcategory}
                                                                     onChange={handleChange}
                                                                     placeholder="e.g., Hair Styling"
+                                                                    ref={(el) => setInputRef('subcategory', el)}
+                                                                    onKeyDown={(e) => handleKeyDown(e, 'subcategory')}
                                                                 />
                                                             </div>
 
@@ -2683,6 +2815,8 @@ export default function CreateServicePage() {
                                                                         min="0"
                                                                         step="0.01"
                                                                         className={errors.basePrice ? 'error' : ''}
+                                                                        ref={(el) => setInputRef('basePrice', el)}
+                                                                        onKeyDown={(e) => handleKeyDown(e, 'basePrice', 'duration')}
                                                                     />
                                                                 </div>
                                                                 {errors.basePrice && <span className="error-text">{errors.basePrice}</span>}
@@ -2698,6 +2832,7 @@ export default function CreateServicePage() {
                                                                     value={formData.currency}
                                                                     onChange={handleChange}
                                                                     className="currency-select"
+                                                                    ref={(el) => setInputRef('currency', el)}
                                                                 >
                                                                     {CURRENCIES.map(curr => (
                                                                         <option key={curr.value} value={curr.value}>{curr.label}</option>
@@ -2716,6 +2851,7 @@ export default function CreateServicePage() {
                                                                     value={formData.duration}
                                                                     onChange={handleChange}
                                                                     className={errors.duration ? 'error' : ''}
+                                                                    ref={(el) => setInputRef('duration', el)}
                                                                 >
                                                                     {DURATION_OPTIONS.map(mins => (
                                                                         <option key={mins} value={mins}>
@@ -2741,6 +2877,7 @@ export default function CreateServicePage() {
                                                                         onChange={handleChange}
                                                                         min="0"
                                                                         step="5"
+                                                                        ref={(el) => setInputRef('bufferTime', el)}
                                                                     />
                                                                     <span>min</span>
                                                                 </div>
@@ -2765,6 +2902,7 @@ export default function CreateServicePage() {
                                                                     value={variationInput.name}
                                                                     onChange={(e) => setVariationInput(prev => ({ ...prev, name: e.target.value }))}
                                                                     placeholder="Variation name"
+                                                                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddVariation())}
                                                                 />
                                                                 <input
                                                                     type="number"
@@ -2847,6 +2985,7 @@ export default function CreateServicePage() {
                                                                     value={addonInput.name}
                                                                     onChange={(e) => setAddonInput(prev => ({ ...prev, name: e.target.value }))}
                                                                     placeholder="Add-on name"
+                                                                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddAddon())}
                                                                 />
                                                                 <input
                                                                     type="number"
@@ -2930,6 +3069,7 @@ export default function CreateServicePage() {
                                                                         value={req}
                                                                         onChange={(e) => handleArrayChange('clientRequirements', index, e.target.value)}
                                                                         placeholder="What client needs to bring"
+                                                                        onKeyPress={(e) => e.key === 'Enter' && e.preventDefault()}
                                                                     />
                                                                     {formData.clientRequirements.length > 1 && (
                                                                         <button 
@@ -2966,6 +3106,7 @@ export default function CreateServicePage() {
                                                                         value={prov}
                                                                         onChange={(e) => handleArrayChange('professionalProvides', index, e.target.value)}
                                                                         placeholder="What professional provides"
+                                                                        onKeyPress={(e) => e.key === 'Enter' && e.preventDefault()}
                                                                     />
                                                                     {formData.professionalProvides.length > 1 && (
                                                                         <button 
@@ -3013,6 +3154,7 @@ export default function CreateServicePage() {
                                                                         onChange={handleChange}
                                                                         min="1"
                                                                         max="365"
+                                                                        ref={(el) => setInputRef('advanceBooking', el)}
                                                                     />
                                                                     <span>days</span>
                                                                 </div>
@@ -3032,6 +3174,7 @@ export default function CreateServicePage() {
                                                                         placeholder="Min"
                                                                         min="0"
                                                                         max="100"
+                                                                        ref={(el) => setInputRef('minAge', el)}
                                                                     />
                                                                     <span>to</span>
                                                                     <input
@@ -3042,6 +3185,7 @@ export default function CreateServicePage() {
                                                                         placeholder="Max"
                                                                         min="0"
                                                                         max="100"
+                                                                        ref={(el) => setInputRef('maxAge', el)}
                                                                     />
                                                                 </div>
                                                             </div>

@@ -1048,8 +1048,20 @@ function findSimilarProducts(products, searchTerm) {
     products.forEach(product => {
         const productName = product.productName?.toLowerCase() || '';
         const productWords = productName.split(/\s+/);
-        const category = (product.category || '').toLowerCase();
+        
+        // ✅ PROFESSIONAL FIX: Handle category whether it's string, object, or null
+        let categoryText = '';
+        if (product.category) {
+            if (typeof product.category === 'string') {
+                categoryText = product.category.toLowerCase();
+            } else if (typeof product.category === 'object') {
+                // Try to get name from category object, fallback to string representation
+                categoryText = (product.category.name || product.category._id || '').toString().toLowerCase();
+            }
+        }
+        
         const description = (product.description || '').toLowerCase();
+        const shortDescription = (product.shortDescription || '').toLowerCase();
         const sku = (product.sku || '').toLowerCase();
         const hsnCode = (product.hsnCode || '').toLowerCase();
         const brand = (product.brand || '').toLowerCase();
@@ -1060,23 +1072,25 @@ function findSimilarProducts(products, searchTerm) {
         let score = 0;
         let matchedWords = [];
         
+        // ===== HIGH PRIORITY MATCHES (1000-1500 points) =====
+        
         // Check if search term matches custom ID (exact)
-        if (customId === searchTerm) {
+        if (customId && customId === searchTerm) {
             score += 1500;
             matchedWords.push('Custom ID Exact Match');
         }
         // Check if search term matches formatted ID (00123)
-        else if (formattedId === searchTerm) {
+        else if (formattedId && formattedId === searchTerm) {
             score += 1400;
             matchedWords.push('Formatted ID Exact Match');
         }
         // Check if search term contains custom ID
-        else if (customId.includes(searchTerm)) {
+        else if (customId && customId.includes(searchTerm)) {
             score += 700;
             matchedWords.push('Custom ID Partial Match');
         }
         // Check if search term contains formatted ID
-        else if (formattedId.includes(searchTerm)) {
+        else if (formattedId && formattedId.includes(searchTerm)) {
             score += 600;
             matchedWords.push('Formatted ID Partial Match');
         }
@@ -1091,17 +1105,17 @@ function findSimilarProducts(products, searchTerm) {
             matchedWords.push('MongoDB ID Partial Match');
         }
         // Check SKU match
-        else if (sku.includes(searchTerm.toLowerCase())) {
+        else if (sku && sku.includes(searchTerm.toLowerCase())) {
             score += 400;
             matchedWords.push('SKU Match');
         }
         // Check HSN match
-        else if (hsnCode.includes(searchTerm.toLowerCase())) {
+        else if (hsnCode && hsnCode.includes(searchTerm.toLowerCase())) {
             score += 300;
             matchedWords.push('HSN Code Match');
         }
         // Check brand match
-        else if (brand.includes(searchTerm.toLowerCase())) {
+        else if (brand && brand.includes(searchTerm.toLowerCase())) {
             score += 200;
             matchedWords.push('Brand Match');
         }
@@ -1111,7 +1125,7 @@ function findSimilarProducts(products, searchTerm) {
             matchedWords.push(searchTerm);
         }
         
-        // Regular word-based search
+        // ===== WORD-BASED SEARCH (10-50 points) =====
         searchWords.forEach(searchWord => {
             // Exact word match in product name
             if (productWords.some(word => word === searchWord)) {
@@ -1139,32 +1153,76 @@ function findSimilarProducts(products, searchTerm) {
                 });
             }
             
-            // Search in other fields
-            if (category.includes(searchWord)) score += 25;
-            if (description.includes(searchWord)) score += 10;
-            if (brand.includes(searchWord)) score += 15;
-            if (sku.includes(searchWord)) score += 20;
-            if (hsnCode.includes(searchWord)) score += 15;
+            // ===== SEARCH IN OTHER FIELDS (5-25 points) =====
+            
+            // Category search (now safe with null check)
+            if (categoryText && categoryText.includes(searchWord)) {
+                score += 25;
+                if (!matchedWords.includes(searchWord)) matchedWords.push(searchWord);
+            }
+            
+            // Description search
+            if (description.includes(searchWord)) {
+                score += 10;
+                if (!matchedWords.includes(searchWord)) matchedWords.push(searchWord);
+            }
+            
+            // Short description search
+            if (shortDescription.includes(searchWord)) {
+                score += 8;
+                if (!matchedWords.includes(searchWord)) matchedWords.push(searchWord);
+            }
+            
+            // Brand search (additional check beyond the earlier brand match)
+            if (brand && brand.includes(searchWord) && !matchedWords.includes('Brand Match')) {
+                score += 15;
+                if (!matchedWords.includes(searchWord)) matchedWords.push(searchWord);
+            }
+            
+            // SKU search (additional check)
+            if (sku && sku.includes(searchWord) && !matchedWords.includes('SKU Match')) {
+                score += 20;
+                if (!matchedWords.includes(searchWord)) matchedWords.push(searchWord);
+            }
+            
+            // HSN search (additional check)
+            if (hsnCode && hsnCode.includes(searchWord) && !matchedWords.includes('HSN Code Match')) {
+                score += 15;
+                if (!matchedWords.includes(searchWord)) matchedWords.push(searchWord);
+            }
         });
         
+        // ===== BONUS POINTS FOR MULTIPLE MATCHES =====
+        if (matchedWords.length > 1) {
+            // Bonus for having multiple matching words
+            score += matchedWords.length * 5;
+        }
+        
+        // ===== INCLUDE PRODUCT IF IT HAS ANY MATCH =====
         if (score > 0) {
             results.push({
                 product,
                 score,
                 matchedWords: [...new Set(matchedWords)],
-                isExactMatch: customId === searchTerm || 
-                             formattedId === searchTerm ||
+                isExactMatch: (customId && customId === searchTerm) || 
+                             (formattedId && formattedId === searchTerm) ||
                              productId === searchTerm.toLowerCase() || 
                              productName.includes(searchTerm.toLowerCase()) ||
-                             sku.includes(searchTerm.toLowerCase())
+                             (sku && sku.includes(searchTerm.toLowerCase()))
             });
         }
     });
     
+    // ===== SORT RESULTS BY SCORE (HIGHEST FIRST) =====
     return results
         .sort((a, b) => {
+            // First by score (descending)
             if (b.score !== a.score) return b.score - a.score;
-            return a.product.productName.localeCompare(b.product.productName);
+            
+            // Then by product name (alphabetical)
+            const nameA = a.product.productName || '';
+            const nameB = b.product.productName || '';
+            return nameA.localeCompare(nameB);
         })
         .map(item => item.product);
 }
@@ -1176,39 +1234,82 @@ function getSearchSuggestions(products, searchTerm) {
     const allWords = new Set();
     
     products.forEach(product => {
+        // Product name words
         const nameWords = (product.productName || '').toLowerCase().split(/\s+/);
-        const categoryWords = (product.category || '').toLowerCase().split(/\s+/);
+        
+        // ✅ PROFESSIONAL FIX: Handle category whether it's string, object, or null
+        let categoryText = '';
+        if (product.category) {
+            if (typeof product.category === 'string') {
+                categoryText = product.category.toLowerCase();
+            } else if (typeof product.category === 'object') {
+                // Extract name from category object, fallback to empty string
+                categoryText = (product.category.name || '').toLowerCase();
+            }
+        }
+        const categoryWords = categoryText.split(/\s+/);
+        
+        // Brand words
         const brandWords = (product.brand || '').toLowerCase().split(/\s+/);
+        
+        // ✅ ADDED: Description words for better suggestions
+        const descriptionWords = (product.description || '').toLowerCase().split(/\s+/);
+        
+        // Custom ID handling
         const customId = product.customId ? String(product.customId) : '';
         const formattedId = product.customId ? formatCustomId(product.customId) : '';
         
-        if (customId) allWords.add(customId);
-        if (formattedId) allWords.add(formattedId);
+        // Add IDs to suggestions
+        if (customId && customId.length > 0) allWords.add(customId);
+        if (formattedId && formattedId.length > 0) allWords.add(formattedId);
         
+        // Add product name words (minimum 3 characters)
         nameWords.forEach(word => {
-            if (word.length > 2) allWords.add(word);
+            if (word && word.length > 2) allWords.add(word);
         });
         
+        // Add category words (minimum 3 characters)
         categoryWords.forEach(word => {
-            if (word.length > 2) allWords.add(word);
+            if (word && word.length > 2) allWords.add(word);
         });
 
+        // Add brand words (minimum 3 characters)
         brandWords.forEach(word => {
-            if (word.length > 2) allWords.add(word);
+            if (word && word.length > 2) allWords.add(word);
+        });
+        
+        // ✅ ADDED: Add description words for better suggestions
+        descriptionWords.forEach(word => {
+            if (word && word.length > 3) allWords.add(word); // Longer threshold for descriptions
         });
     });
     
-    const suggestions = Array.from(allWords)
-        .map(word => ({
-            word,
-            similarity: 1 - (levenshteinDistance(searchTerm, word) / Math.max(searchTerm.length, word.length))
-        }))
-        .filter(item => item.similarity > 0.5)
+    // Convert Set to Array and filter out empty/invalid words
+    const validWords = Array.from(allWords).filter(word => word && word.length > 0);
+    
+    // If no valid words found, return default suggestions
+    if (validWords.length === 0) {
+        return `• Check spelling\n• Try shorter words\n• Browse all products with *Products*`;
+    }
+    
+    // Calculate similarity and get best matches
+    const suggestions = validWords
+        .map(word => {
+            // Avoid division by zero
+            const maxLength = Math.max(searchTerm.length, word.length);
+            const similarity = maxLength > 0 
+                ? 1 - (levenshteinDistance(searchTerm, word) / maxLength)
+                : 0;
+            
+            return { word, similarity };
+        })
+        .filter(item => item.similarity > 0.4) // Slightly lower threshold for more suggestions
         .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, 5)
+        .slice(0, 6) // Show 6 suggestions instead of 5
         .map(item => `• "${item.word}"`)
         .join('\n');
     
+    // Return suggestions or default message
     return suggestions || `• Check spelling\n• Try shorter words\n• Browse all products with *Products*`;
 }
 
@@ -1418,14 +1519,12 @@ async function sendProductWithImage(message, client, product, title = '') {
         console.log(`🖼️ Images detected: ${imageCount}`);
 
         // Create enhanced product description with all new fields
-        let productText = 
-            `${title ? title + '\n\n' : ''}` +
-            `🆔 *MongoDB ID:* \`${(product._id || product.id).slice(-8)}\`\n`;
-        
-        // Show custom ID if available
-        if (customIdDisplay) {
-            productText += `🔢 *Product Code:* \`${customIdDisplay}\`\n`;
-        }
+        let productText = `${title ? title + '\n\n' : ''}`;
+
+          // Show custom ID if available (without backticks to make it clickable)
+           if (customIdDisplay) {
+               productText += `🔢 *Product Code:* ${customIdDisplay}\n`;  // ← REMOVED BACKTICKS
+          }
         
         productText += `*${product.productName}*\n\n` +
             `💰 *Price:* ₹${safeToFixed(price)}`;
@@ -1608,42 +1707,104 @@ export async function handleProducts(message, client) {
 /**
  * Enhanced direct product search with smart matching
  */
+// Add this at the top of your file with other state management
+const processingSearches = new Map(); // Track ongoing searches per user
+const searchCooldown = 2000; // 2 seconds cooldown between searches
+
 export async function handleDirectProductSearch(message, client, productName) {
+    const from = message.from;
+    const now = Date.now();
+    
+    // ===== PREVENT DUPLICATE PROCESSING =====
+    // Check if already processing a search for this user
+    if (processingSearches.has(from)) {
+        const lastSearchTime = processingSearches.get(from);
+        if (now - lastSearchTime < searchCooldown) {
+            console.log(`⏳ Search cooldown for ${from}, ignoring duplicate (${now - lastSearchTime}ms)`);
+            return true;
+        } else {
+            // Remove stale entry
+            processingSearches.delete(from);
+        }
+    }
+    
+    // Mark as processing
+    processingSearches.set(from, now);
+    
     try {
         console.log(`🔍 Smart product search: "${productName}"`);
         
         const cleanProductName = productName.replace(/\s+/g, ' ').trim().toLowerCase();
         
         if (cleanProductName.length < 2) {
+            processingSearches.delete(from);
             return false;
         }
 
+        // ===== CHECK FOR PRODUCT ID MATCHES =====
         // Check if it's a MongoDB ObjectId (24 characters hex)
         if (/^[0-9a-fA-F]{24}$/.test(cleanProductName)) {
             console.log(`🔍 Detected MongoDB ID format, attempting direct lookup`);
             const idResult = await handleDirectProductIdSearch(message, client, cleanProductName);
-            if (idResult) return true;
+            if (idResult) {
+                processingSearches.delete(from);
+                return true;
+            }
         }
         
-        // Check if it's a custom ID (numeric)
+        // Check if it's a custom ID (numeric 3-5 digits)
         if (/^\d{3,5}$/.test(cleanProductName)) {
-            console.log(`🔍 Detected custom ID format, attempting search by custom ID`);
-            // Note: You might want to add a specific API method for custom ID search
+            console.log(`🔍 Detected custom ID format: ${cleanProductName}`);
+            // Try to find by custom ID directly
+            const allProducts = await apiService.getProducts();
+            const productByCustomId = allProducts.find(p => 
+                p.customId && String(p.customId) === cleanProductName
+            );
+            
+            if (productByCustomId) {
+                console.log(`✅ Found product by custom ID: ${productByCustomId.productName}`);
+                await sendProductWithImage(message, client, productByCustomId, `🔍 Found product by ID ${cleanProductName}:`);
+                await message.reply(
+                    `💡 *Product found by ID!*\n\n` +
+                    `🛒 *To order:* Type *Order* and I'll guide you!`
+                );
+                processingSearches.delete(from);
+                return true;
+            }
         }
 
-        // Get all products for smart search
+        // ===== GET ALL PRODUCTS FOR SMART SEARCH =====
         let allProducts = await apiService.getProducts();
         
         console.log(`🔍 Search debug - Total products: ${allProducts?.length || 0}`);
         
         if (!allProducts || allProducts.length === 0) {
             console.log('❌ No products available for search');
+            processingSearches.delete(from);
             return false;
         }
 
-        // Use smart search to find similar products
+        // ===== REMOVE DUPLICATES FROM PRODUCT LIST =====
+        // Ensure we don't have duplicate products in the list
+        const uniqueProducts = [];
+        const seenProductIds = new Set();
+        
+        allProducts.forEach(product => {
+            const productId = product._id || product.id;
+            if (!seenProductIds.has(productId)) {
+                seenProductIds.add(productId);
+                uniqueProducts.push(product);
+            }
+        });
+        
+        if (uniqueProducts.length !== allProducts.length) {
+            console.log(`📊 Removed ${allProducts.length - uniqueProducts.length} duplicate products from search`);
+            allProducts = uniqueProducts;
+        }
+
+        // ===== FIND SIMILAR PRODUCTS =====
         const similarProducts = findSimilarProducts(allProducts, cleanProductName);
-        console.log(`🔍 Search results: ${similarProducts.length} products found`);
+        console.log(`🔍 Search results: ${similarProducts.length} unique products found`);
 
         if (similarProducts.length === 0) {
             const suggestions = getSearchSuggestions(allProducts, cleanProductName);
@@ -1655,11 +1816,70 @@ export async function handleDirectProductSearch(message, client, productName) {
                 `Type *Products* to see everything available\n\n` +
                 `🛒 *Ready to order?* Type *Order*`
             );
+            processingSearches.delete(from);
             return true;
         }
 
-        if (similarProducts.length === 1) {
-            const product = similarProducts[0];
+        // ===== GET OR CREATE USER SESSION =====
+        let session = productSessions.get(from) || {
+            currentPage: 0,
+            totalPages: 1,
+            searchTerm: cleanProductName,
+            lastActivity: now,
+            sentProductIds: new Set()
+        };
+
+        // ===== FILTER OUT ALREADY SENT PRODUCTS =====
+        const unsentProducts = [];
+        const alreadySent = [];
+        
+        similarProducts.forEach(product => {
+            const productId = product._id || product.id;
+            if (session.sentProductIds && session.sentProductIds.has(productId)) {
+                alreadySent.push(product.productName);
+            } else {
+                unsentProducts.push(product);
+            }
+        });
+
+        if (alreadySent.length > 0) {
+            console.log(`⏭️ Skipping ${alreadySent.length} already sent products`);
+        }
+
+        // ===== HANDLE CASE WHERE ALL PRODUCTS WERE ALREADY SENT =====
+        if (unsentProducts.length === 0) {
+            // Reset the sent products after 5 minutes or if user searches again
+            const sessionAge = now - (session.lastActivity || 0);
+            if (sessionAge > 5 * 60 * 1000) { // 5 minutes
+                console.log(`🔄 Session expired, resetting sent products for ${from}`);
+                session.sentProductIds = new Set();
+                unsentProducts.push(...similarProducts);
+            } else {
+                await message.reply(
+                    `✅ You've already seen all matching products for "*${productName}*"\n\n` +
+                    `Try a different search term or type *Products* to browse all.`
+                );
+                processingSearches.delete(from);
+                return true;
+            }
+        }
+
+        // ===== UPDATE SESSION WITH NEWLY SENT PRODUCTS =====
+        unsentProducts.forEach(product => {
+            const productId = product._id || product.id;
+            if (!session.sentProductIds) {
+                session.sentProductIds = new Set();
+            }
+            session.sentProductIds.add(productId);
+        });
+        
+        session.lastActivity = now;
+        session.searchTerm = cleanProductName;
+        productSessions.set(from, session);
+
+        // ===== HANDLE SINGLE PRODUCT RESULT =====
+        if (unsentProducts.length === 1) {
+            const product = unsentProducts[0];
             await sendProductWithImage(message, client, product, `🔍 Found product for "${productName}":`);
             
             await message.reply(
@@ -1670,24 +1890,46 @@ export async function handleDirectProductSearch(message, client, productName) {
                 `• Type *Products* to see all products\n` +
                 `• Search for other product names`
             );
+            processingSearches.delete(from);
             return true;
-        } else {
-            const exactMatch = similarProducts.find(p => 
+        } 
+        
+        // ===== HANDLE MULTIPLE PRODUCT RESULTS =====
+        else {
+            const exactMatch = unsentProducts.find(p => 
                 p.productName.toLowerCase().includes(cleanProductName) ||
                 (p.customId && String(p.customId) === cleanProductName) ||
                 (p.customId && formatCustomId(p.customId) === cleanProductName)
             );
             
-            let title = `🔍 Found ${similarProducts.length} products matching "*${productName}*"`;
+            let title = `🔍 Found ${unsentProducts.length} products matching "*${productName}*"`;
             if (exactMatch) {
                 title += `\n⭐ *Exact match available*`;
             }
             
-            return await showProductsPage(message, client, 0, cleanProductName, title, similarProducts);
+            // Update session with current page info
+            session.currentPage = 0;
+            session.totalPages = Math.ceil(unsentProducts.length / 6); // Assuming 6 per page
+            productSessions.set(from, session);
+            
+            const result = await showProductsPage(message, client, 0, cleanProductName, title, unsentProducts);
+            processingSearches.delete(from);
+            return result;
         }
 
     } catch (error) {
         console.error('❌ Smart search error:', error);
+        processingSearches.delete(from);
+        
+        // Send user-friendly error message
+        await message.reply(
+            `❌ *Search Error*\n\n` +
+            `Something went wrong while searching. Please try again.\n\n` +
+            `💡 *Try:*\n` +
+            `• Type *Products* to browse all\n` +
+            `• Use fewer words\n` +
+            `• Check spelling`
+        );
         return false;
     }
 }

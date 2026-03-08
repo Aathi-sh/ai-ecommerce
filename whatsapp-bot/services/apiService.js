@@ -1880,25 +1880,74 @@ const formattedOrderData = {
 
     // ========== PRODUCT APIS (UPDATED FOR ENHANCED SCHEMA) ==========
 
-    async getProducts() {
-        try {
-            const response = await this.client.get('/api/products?isActive=true');
-            const products = this.ensureArray(response.data);
+async getProducts() {
+    try {
+        const response = await this.client.get('/api/products?isActive=true');
+        const products = this.ensureArray(response.data);
+        
+        // Format products with computed fields and ensure category consistency
+        return products.map(product => {
+            // ✅ SAFELY extract category information
+            let categoryName = '';
+            let categoryId = null;
             
-            // Format products with computed fields
-            return products.map(product => ({
+            if (product.category) {
+                if (typeof product.category === 'string') {
+                    categoryName = product.category;
+                    categoryId = product.category;
+                } else if (typeof product.category === 'object') {
+                    categoryName = product.category.name || '';
+                    categoryId = product.category._id || null;
+                }
+            }
+            
+            // ✅ SAFELY extract subCategory information
+            let subCategoryName = '';
+            let subCategoryId = null;
+            
+            if (product.subCategory) {
+                if (typeof product.subCategory === 'string') {
+                    subCategoryName = product.subCategory;
+                    subCategoryId = product.subCategory;
+                } else if (typeof product.subCategory === 'object') {
+                    subCategoryName = product.subCategory.name || '';
+                    subCategoryId = product.subCategory._id || null;
+                }
+            }
+            
+            return {
                 ...product,
+                // ✅ Computed fields
                 displayPrice: this.safeNumber(product.discountPrice) || this.safeNumber(product.price),
                 inStock: this.safeNumber(product.stock) > 0,
                 discountPercentage: this.safeNumber(product.mrp) > this.safeNumber(product.discountPrice) 
                     ? Math.round(((this.safeNumber(product.mrp) - this.safeNumber(product.discountPrice)) / this.safeNumber(product.mrp)) * 100)
-                    : 0
-            }));
-        } catch (error) {
-            this.handleApiError('Get Products', error);
-            return [];
-        }
+                    : 0,
+                
+                // ✅ Category in multiple formats for maximum compatibility
+                category: product.category, // Keep original
+                categoryName: categoryName, // String version for search
+                categoryId: categoryId,     // ID version for reference
+                
+                // ✅ SubCategory in multiple formats
+                subCategory: product.subCategory, // Keep original
+                subCategoryName: subCategoryName, // String version
+                subCategoryId: subCategoryId,     // ID version
+                
+                // ✅ Ensure all string fields are actually strings
+                productName: String(product.productName || ''),
+                description: String(product.description || ''),
+                shortDescription: String(product.shortDescription || ''),
+                sku: String(product.sku || ''),
+                hsnCode: String(product.hsnCode || ''),
+                brand: String(product.brand || '')
+            };
+        });
+    } catch (error) {
+        this.handleApiError('Get Products', error);
+        return [];
     }
+}
 
     async getProductById(productId) {
         try {

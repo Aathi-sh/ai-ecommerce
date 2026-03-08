@@ -12,6 +12,14 @@ const serviceSchema = new mongoose.Schema({
     trim: true
   },
   
+  // 🔗 LINK TO BUSINESS/PROFESSIONAL - ADD THIS FIELD
+  professionalId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Bookingmng',  // References the business/professional
+    required: true,      // Every service MUST belong to a business
+    index: true          // Index for faster queries
+  },
+  
   // Category & Type
   category: {
     type: String,
@@ -41,7 +49,7 @@ const serviceSchema = new mongoose.Schema({
   },
   currency: {
     type: String,
-    default: 'USD',
+    default: 'INR',  // Changed to INR for your use case
     enum: ['USD', 'EUR', 'GBP', 'INR', 'AED']
   },
   
@@ -110,18 +118,18 @@ const serviceSchema = new mongoose.Schema({
   
   // Metadata
   tags: [String],
-  notes: String,
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
+  notes: String
 }, {
-  timestamps: true
+  timestamps: true  // This automatically adds createdAt and updatedAt
 });
 
-// Indexes
+// Indexes - Added professionalId index
+serviceSchema.index({ professionalId: 1 });  // Add this for faster lookups by business
 serviceSchema.index({ category: 1, type: 1 });
 serviceSchema.index({ basePrice: 1 });
 serviceSchema.index({ name: 'text', description: 'text', tags: 'text' });
+
+// Compound index for common queries
+serviceSchema.index({ professionalId: 1, isActive: 1 });  // Find active services for a business
 
 module.exports = mongoose.models.Service || mongoose.model('Service', serviceSchema);

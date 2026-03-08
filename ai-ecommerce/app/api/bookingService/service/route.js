@@ -14,10 +14,16 @@ export async function GET(request) {
     const category = searchParams.get('category') || '';
     const type = searchParams.get('type') || '';
     const status = searchParams.get('status') || 'all';
+    const professionalId = searchParams.get('professionalId'); // NEW: Filter by professional
     
     const skip = (page - 1) * limit;
     
     let query = {};
+    
+    // NEW: Filter by professionalId
+    if (professionalId) {
+      query.professionalId = professionalId;
+    }
     
     // Search filter
     if (search) {
@@ -61,6 +67,7 @@ export async function GET(request) {
     const formattedServices = services.map(service => ({
       ...service,
       _id: service._id.toString(),
+      professionalId: service.professionalId?.toString(), // Convert to string if exists
       createdAt: service.createdAt?.toISOString(),
       updatedAt: service.updatedAt?.toISOString()
     }));
@@ -96,13 +103,25 @@ export async function POST(request) {
     
     const body = await request.json();
     
-    // Validate required fields
-    if (!body.name || !body.category || !body.basePrice) {
+    // Validate required fields - ADDED professionalId
+    if (!body.name || !body.category || !body.basePrice || !body.professionalId) {
       return NextResponse.json(
         { 
           success: false, 
           error: 'Missing required fields',
-          required: ['name', 'category', 'basePrice']
+          required: ['name', 'category', 'basePrice', 'professionalId']
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Check if duration is provided (should be required based on schema)
+    if (!body.duration) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Duration is required',
+          required: ['duration']
         },
         { status: 400 }
       );
@@ -112,12 +131,13 @@ export async function POST(request) {
     const serviceData = {
       name: body.name,
       description: body.description || '',
+      professionalId: body.professionalId, // ADDED: Link to business
       category: body.category,
       type: body.type || 'physical',
       subcategory: body.subcategory || '',
       basePrice: body.basePrice,
       currency: body.currency || 'INR',
-      duration: body.duration || 60,
+      duration: body.duration, // Required field
       isActive: body.isActive !== undefined ? body.isActive : true,
       
       // Optional fields
@@ -151,6 +171,7 @@ export async function POST(request) {
       data: {
         ...service.toObject(),
         _id: service._id.toString(),
+        professionalId: service.professionalId?.toString(),
         createdAt: service.createdAt?.toISOString(),
         updatedAt: service.updatedAt?.toISOString()
       },
@@ -165,6 +186,22 @@ export async function POST(request) {
       return NextResponse.json(
         { success: false, error: 'Service with this name already exists' },
         { status: 409 }
+      );
+    }
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = {};
+      for (let field in error.errors) {
+        errors[field] = error.errors[field].message;
+      }
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Validation failed',
+          details: errors
+        },
+        { status: 400 }
       );
     }
     
@@ -234,6 +271,7 @@ export async function PATCH(request) {
       data: {
         ...service.toObject(),
         _id: service._id.toString(),
+        professionalId: service.professionalId?.toString(),
         createdAt: service.createdAt?.toISOString(),
         updatedAt: service.updatedAt?.toISOString()
       },
@@ -247,11 +285,15 @@ export async function PATCH(request) {
     
     // Handle validation errors
     if (error.name === 'ValidationError') {
+      const errors = {};
+      for (let field in error.errors) {
+        errors[field] = error.errors[field].message;
+      }
       return NextResponse.json(
         { 
           success: false, 
           error: 'Validation failed',
-          details: error.errors 
+          details: errors
         },
         { status: 400 }
       );
@@ -312,12 +354,62 @@ export async function DELETE(request) {
   }
 }
 
+// GET Single Service by ID
+export async function PUT(request) {
+  try {
+    await connectDB();
+    
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'Service ID is required' },
+        { status: 400 }
+      );
+    }
+    
+    const service = await Service.findById(id).lean();
+    
+    if (!service) {
+      return NextResponse.json(
+        { success: false, error: 'Service not found' },
+        { status: 404 }
+      );
+    }
+    
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...service,
+        _id: service._id.toString(),
+        professionalId: service.professionalId?.toString(),
+        createdAt: service.createdAt?.toISOString(),
+        updatedAt: service.updatedAt?.toISOString()
+      }
+    }, { status: 200 });
+    
+  } catch (error) {
+    console.error('Error fetching service:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Failed to fetch service',
+        message: error.message 
+      },
+      { status: 500 }
+    );
+  }
+}
+
 // OPTIONS request for CORS
 export async function OPTIONS() {
   return NextResponse.json({}, { 
     status: 200,
     headers: {
-      'Allow': 'GET, POST, PATCH, DELETE, OPTIONS'
+      'Allow': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
     }
   });
 }

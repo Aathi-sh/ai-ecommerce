@@ -1,5 +1,7 @@
 
-// // src/components/appbar.js (PROFESSIONAL VERSION - UPDATED)
+
+
+
 // "use client";
 
 // import React, { useState, useEffect } from "react";
@@ -14,7 +16,9 @@
 //   onRefresh,
 //   connectionStatus,
 //   onEnableNotifications,
-//   user
+//   user,
+//   isMobile = false,
+//   sidebarCollapsed = false
 // }) {
 //   const router = useRouter();
 //   const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
@@ -51,7 +55,6 @@
 //       });
 
 //       if (response.ok) {
-//         // Update local state
 //         setRecentNotifications(prev => 
 //           prev.map(n => n.id === notificationId ? { ...n, status: 'read' } : n)
 //         );
@@ -136,6 +139,13 @@
 //     return () => clearInterval(interval);
 //   }, []);
 
+//   // Handle toggle sidebar
+//   const handleToggleSidebar = () => {
+//     if (onToggleSidebar) {
+//       onToggleSidebar();
+//     }
+//   };
+
 //   return (
 //     <motion.div
 //       initial={{ y: -20, opacity: 0 }}
@@ -148,7 +158,7 @@
 //         display: "flex",
 //         alignItems: "center",
 //         justifyContent: "space-between",
-//         padding: "0 25px",
+//         padding: isMobile ? "0 15px" : "0 25px",
 //         boxShadow: appTheme.shadows.lg,
 //         borderBottom: `1px solid ${appTheme.colors.border}`,
 //         zIndex: 1100,
@@ -156,53 +166,83 @@
 //       }}
 //     >
 //       {/* --------------------------- LEFT SECTION --------------------------- */}
-//       <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+//       <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "10px" : "15px" }}>
 //         <motion.div
 //           whileHover={{ scale: 1.1 }}
 //           whileTap={{ scale: 0.9 }}
-//           onClick={onToggleSidebar}
+//           onClick={handleToggleSidebar}
+//           className="menu-toggle"
 //           style={{
 //             backgroundColor: appTheme.colors.background,
 //             borderRadius: "10px",
 //             padding: "6px",
 //             cursor: "pointer",
 //             boxShadow: appTheme.shadows.sm,
+//             display: "flex",
+//             alignItems: "center",
+//             justifyContent: "center",
+//             width: isMobile ? "36px" : "40px",
+//             height: isMobile ? "36px" : "40px",
 //           }}
+//           title={isMobile ? (sidebarCollapsed ? "Open menu" : "Close menu") : "Toggle sidebar"}
 //         >
-//           <Menu size={22} color={appTheme.colors.primary} />
+//           <Menu size={isMobile ? 20 : 22} color={appTheme.colors.primary} />
 //         </motion.div>
 
 //         <div
 //           style={{
 //             fontWeight: "600",
 //             color: appTheme.colors.primary,
-//             fontSize: "1.3rem",
+//             fontSize: isMobile ? "1.1rem" : "1.3rem",
 //             letterSpacing: "0.5px",
 //             userSelect: "none",
+//             display: "flex",
+//             alignItems: "center",
+//             gap: "8px",
 //           }}
 //         >
-//           🛍️ {title}
+//           <span>🛍️</span>
+//           <span>{title}</span>
+//           {isMobile && (
+//             <span style={{
+//               fontSize: "0.7rem",
+//               backgroundColor: sidebarCollapsed ? "#10b981" : "#f59e0b",
+//               color: "white",
+//               padding: "2px 6px",
+//               borderRadius: "4px",
+//               marginLeft: "6px",
+//               fontWeight: "500"
+//             }}>
+//               {sidebarCollapsed ? "Collapsed" : "Expanded"}
+//             </span>
+//           )}
 //         </div>
 //       </div>
 
 //       {/* --------------------------- RIGHT SECTION --------------------------- */}
-//       <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+//       <div style={{ 
+//         display: "flex", 
+//         alignItems: "center", 
+//         gap: isMobile ? "12px" : "20px" 
+//       }}>
 //         {/* Refresh Button */}
-//         <motion.div
-//           whileHover={{ rotate: 90, scale: 1.1 }}
-//           whileTap={{ scale: 0.9 }}
-//           onClick={onRefresh}
-//           style={{
-//             backgroundColor: appTheme.colors.background,
-//             borderRadius: "10px",
-//             padding: "6px",
-//             cursor: "pointer",
-//             boxShadow: appTheme.shadows.sm,
-//           }}
-//           title="Refresh Page"
-//         >
-//           <RefreshCw size={20} color={appTheme.colors.primary} />
-//         </motion.div>
+//         {!isMobile && (
+//           <motion.div
+//             whileHover={{ rotate: 90, scale: 1.1 }}
+//             whileTap={{ scale: 0.9 }}
+//             onClick={onRefresh}
+//             style={{
+//               backgroundColor: appTheme.colors.background,
+//               borderRadius: "10px",
+//               padding: "6px",
+//               cursor: "pointer",
+//               boxShadow: appTheme.shadows.sm,
+//             }}
+//             title="Refresh Page"
+//           >
+//             <RefreshCw size={20} color={appTheme.colors.primary} />
+//           </motion.div>
+//         )}
 
 //         {/* Notifications Button with Dropdown */}
 //         <div style={{ position: "relative" }}>
@@ -223,15 +263,15 @@
 //               display: "flex",
 //               alignItems: "center",
 //               justifyContent: "center",
-//               width: "40px",
-//               height: "40px",
+//               width: isMobile ? "36px" : "40px",
+//               height: isMobile ? "36px" : "40px",
 //             }}
 //             title={`${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}`}
 //           >
 //             {unreadCount > 0 ? (
-//               <BellRing size={20} color={appTheme.colors.primary} />
+//               <BellRing size={isMobile ? 18 : 20} color={appTheme.colors.primary} />
 //             ) : (
-//               <Bell size={20} color={appTheme.colors.primary} />
+//               <Bell size={isMobile ? 18 : 20} color={appTheme.colors.primary} />
 //             )}
             
 //             {/* Notification Count Badge */}
@@ -277,7 +317,7 @@
 //                   backgroundColor: "#ffffff",
 //                   borderRadius: "12px",
 //                   boxShadow: "0 10px 40px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)",
-//                   width: "380px",
+//                   width: isMobile ? "320px" : "380px",
 //                   maxHeight: "500px",
 //                   overflow: "hidden",
 //                   zIndex: 9999,
@@ -336,7 +376,10 @@
 //                       </button>
 //                     )}
 //                     <button
-//                       onClick={() => router.push("/admin/notification")}
+//                       onClick={() => {
+//                         setShowNotificationDropdown(false);
+//                         router.push("/admin/notification");
+//                       }}
 //                       style={{
 //                         background: "transparent",
 //                         border: "none",
@@ -393,7 +436,7 @@
 //                         }
 //                         onClick={() => {
 //                           markAsRead(notification.id);
-//                           // You can add navigation to order or notification details here
+//                           setShowNotificationDropdown(false);
 //                         }}
 //                       >
 //                         <div style={{ display: "flex", gap: "12px" }}>
@@ -494,7 +537,10 @@
 //                     textAlign: "center",
 //                   }}>
 //                     <button
-//                       onClick={() => router.push("/admin/notification")}
+//                       onClick={() => {
+//                         setShowNotificationDropdown(false);
+//                         router.push("/admin/notification");
+//                       }}
 //                       style={{
 //                         width: "100%",
 //                         padding: "8px 16px",
@@ -534,43 +580,48 @@
 //           )}
 //         </div>
 
-//         {/* User Profile */}
-//         <motion.div
-//           whileHover={{ scale: 1.05 }}
-//           whileTap={{ scale: 0.95 }}
-//           onClick={() => router.push("/admin/profile")}
-//           style={{
-//             display: "flex",
-//             alignItems: "center",
-//             gap: "8px",
-//             backgroundColor: appTheme.colors.background,
-//             padding: "6px 10px",
-//             borderRadius: "10px",
-//             cursor: "pointer",
-//             boxShadow: appTheme.shadows.sm,
-//           }}
-//           title="User Profile"
-//         >
-//           <User size={20} color={appTheme.colors.primary} />
-//           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-//             <span style={{ 
-//               fontSize: "0.85rem", 
-//               fontWeight: "600",
-//               color: appTheme.colors.textPrimary,
-//               lineHeight: "1.1"
-//             }}>
-//               {user?.name || 'Admin'}
-//             </span>
-//             <span style={{ 
-//               fontSize: "0.7rem", 
-//               color: appTheme.colors.textSecondary,
-//               lineHeight: "1.1"
-//             }}>
-//               {user?.role || 'Administrator'}
-//             </span>
-//           </div>
-//           <ChevronDown size={16} color={appTheme.colors.textSecondary} />
-//         </motion.div>
+//         {/* User Profile - Show on mobile only if there's space */}
+//         {(!isMobile || window.innerWidth > 400) && (
+//           <motion.div
+//             whileHover={{ scale: 1.05 }}
+//             whileTap={{ scale: 0.95 }}
+//             onClick={() => router.push("/admin/profile")}
+//             style={{
+//               display: "flex",
+//               alignItems: "center",
+//               gap: "8px",
+//               backgroundColor: appTheme.colors.background,
+//               padding: isMobile ? "4px 8px" : "6px 10px",
+//               borderRadius: "10px",
+//               cursor: "pointer",
+//               boxShadow: appTheme.shadows.sm,
+//               minWidth: isMobile ? "auto" : "140px",
+//             }}
+//             title="User Profile"
+//           >
+//             <User size={isMobile ? 18 : 20} color={appTheme.colors.primary} />
+//             {!isMobile && (
+//               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+//                 <span style={{ 
+//                   fontSize: "0.85rem", 
+//                   fontWeight: "600",
+//                   color: appTheme.colors.textPrimary,
+//                   lineHeight: "1.1"
+//                 }}>
+//                   {user?.name || 'Admin'}
+//                 </span>
+//                 <span style={{ 
+//                   fontSize: "0.7rem", 
+//                   color: appTheme.colors.textSecondary,
+//                   lineHeight: "1.1"
+//                 }}>
+//                   {user?.role || 'Administrator'}
+//                 </span>
+//               </div>
+//             )}
+//             {!isMobile && <ChevronDown size={16} color={appTheme.colors.textSecondary} />}
+//           </motion.div>
+//         )}
 //       </div>
 
 //       {/* Animation styles */}
@@ -579,15 +630,10 @@
 //           0% { transform: rotate(0deg); }
 //           100% { transform: rotate(360deg); }
 //         }
-//         @keyframes pulse {
-//           0%, 100% { opacity: 1; }
-//           50% { opacity: 0.5; }
-//         }
 //       `}</style>
 //     </motion.div>
 //   );
 // }
-
 
 
 
@@ -599,6 +645,7 @@ import { appTheme } from "../constants/theme";
 import { Bell, BellRing, User, RefreshCw, Menu, Clock, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react"; // ✅ Import useSession
 
 export default function AppBar({
   title = "Admin Panel",
@@ -606,15 +653,28 @@ export default function AppBar({
   onRefresh,
   connectionStatus,
   onEnableNotifications,
-  user,
+  user: propUser, // Rename prop to avoid confusion
   isMobile = false,
   sidebarCollapsed = false
 }) {
   const router = useRouter();
+  const { data: session } = useSession(); // ✅ Get session data
+  
+  // Use session user if available, otherwise fallback to prop user
+  const user = session?.user || propUser;
+  
   const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
   const [recentNotifications, setRecentNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 0);
+
+  // Track window width for responsive behavior
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Fetch recent notifications
   const fetchRecentNotifications = async () => {
@@ -736,6 +796,28 @@ export default function AppBar({
     }
   };
 
+  // Get user display name
+  const getUserName = () => {
+    if (user?.name) return user.name;
+    if (user?.fullName) return user.fullName;
+    if (user?.email) return user.email.split('@')[0];
+    return 'Admin';
+  };
+
+  // Get user role
+  const getUserRole = () => {
+    if (user?.role) {
+      // Format role nicely
+      return user.role.charAt(0).toUpperCase() + user.role.slice(1);
+    }
+    return 'Administrator';
+  };
+
+  // Check if we should show user profile on mobile
+  const shouldShowUserOnMobile = () => {
+    return windowWidth > 400; // Show on screens larger than 400px
+  };
+
   return (
     <motion.div
       initial={{ y: -20, opacity: 0 }}
@@ -793,19 +875,7 @@ export default function AppBar({
         >
           <span>🛍️</span>
           <span>{title}</span>
-          {isMobile && (
-            <span style={{
-              fontSize: "0.7rem",
-              backgroundColor: sidebarCollapsed ? "#10b981" : "#f59e0b",
-              color: "white",
-              padding: "2px 6px",
-              borderRadius: "4px",
-              marginLeft: "6px",
-              fontWeight: "500"
-            }}>
-              {sidebarCollapsed ? "Collapsed" : "Expanded"}
-            </span>
-          )}
+          {/* REMOVED the "Expanded/Collapsed" text that was showing on mobile */}
         </div>
       </div>
 
@@ -1170,8 +1240,8 @@ export default function AppBar({
           )}
         </div>
 
-        {/* User Profile - Show on mobile only if there's space */}
-        {(!isMobile || window.innerWidth > 400) && (
+        {/* User Profile - Show on desktop always, on mobile only if width > 400px */}
+        {(!isMobile || shouldShowUserOnMobile()) && (
           <motion.div
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -1198,18 +1268,42 @@ export default function AppBar({
                   color: appTheme.colors.textPrimary,
                   lineHeight: "1.1"
                 }}>
-                  {user?.name || 'Admin'}
+                  {getUserName()} {/* ✅ Shows updated name */}
                 </span>
                 <span style={{ 
                   fontSize: "0.7rem", 
                   color: appTheme.colors.textSecondary,
                   lineHeight: "1.1"
                 }}>
-                  {user?.role || 'Administrator'}
+                  {getUserRole()}
                 </span>
               </div>
             )}
             {!isMobile && <ChevronDown size={16} color={appTheme.colors.textSecondary} />}
+          </motion.div>
+        )}
+
+        {/* Mobile-only user icon if screen is very small */}
+        {isMobile && !shouldShowUserOnMobile() && (
+          <motion.div
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => router.push("/admin/profile")}
+            style={{
+              backgroundColor: appTheme.colors.background,
+              borderRadius: "10px",
+              padding: "6px",
+              cursor: "pointer",
+              boxShadow: appTheme.shadows.sm,
+              width: "36px",
+              height: "36px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            title="User Profile"
+          >
+            <User size={18} color={appTheme.colors.primary} />
           </motion.div>
         )}
       </div>

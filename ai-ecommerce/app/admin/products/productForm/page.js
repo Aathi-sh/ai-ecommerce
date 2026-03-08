@@ -2386,14 +2386,7 @@
 //   WebkitTapHighlightColor: "transparent"
 // });
 
-
-
-
-
-
-
 // app/admin/products/productForm/page.js
-
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -2423,7 +2416,8 @@ import {
     MapPinHouse, Building, Store, Globe2, Facebook,
     Instagram, Twitter, Youtube, Linkedin, TwitterIcon,
     Linkedin as LinkedinIcon, ShieldCheck, ShieldAlert,
-    Activity, TrendingUp, Users, Briefcase, Calendar as CalendarIcon
+    Activity, TrendingUp, Users, Briefcase, Calendar as CalendarIcon,
+    ChevronDown
 } from 'lucide-react';
 
 // ==================== CONSTANTS ====================
@@ -2472,6 +2466,11 @@ const SECTIONS = [
     }
 ];
 
+// ✅ Helper to validate ObjectId
+const isValidObjectId = (id) => {
+    return /^[0-9a-fA-F]{24}$/.test(id);
+};
+
 export default function ProductForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -2490,6 +2489,11 @@ export default function ProductForm() {
     // State for custom ID display
     const [customId, setCustomId] = useState(null);
     const [formattedId, setFormattedId] = useState(null);
+
+    // State for categories
+    const [categories, setCategories] = useState([]);
+    const [subCategories, setSubCategories] = useState([]);
+    const [loadingCategories, setLoadingCategories] = useState(false);
 
     const [formData, setFormData] = useState({
         productName: "",
@@ -2574,6 +2578,20 @@ export default function ProductForm() {
         }
     }, [toast]);
 
+    // Fetch categories on mount
+    useEffect(() => {
+        fetchCategories();
+    }, []);
+
+    // Fetch subcategories when category changes
+    useEffect(() => {
+        if (formData.category && isValidObjectId(formData.category)) {
+            fetchSubCategories(formData.category);
+        } else {
+            setSubCategories([]);
+        }
+    }, [formData.category]);
+
     // Fetch product data if editing
     useEffect(() => {
         if (productId) {
@@ -2610,6 +2628,40 @@ export default function ProductForm() {
         return String(id).padStart(5, '0');
     };
 
+    // Fetch all categories
+    const fetchCategories = async () => {
+        setLoadingCategories(true);
+        try {
+            const res = await fetch('/api/masters?type=categories&format=flat');
+            const data = await res.json();
+            if (data.success) {
+                // Filter only main categories (level === 0) for main dropdown
+                const mainCategories = data.data.filter(c => c.level === 0);
+                setCategories(mainCategories);
+            }
+        } catch (error) {
+            console.error('Failed to fetch categories:', error);
+            showToast('error', 'Failed to load categories');
+        } finally {
+            setLoadingCategories(false);
+        }
+    };
+
+    // Fetch subcategories for selected category
+    const fetchSubCategories = async (categoryId) => {
+        if (!categoryId || !isValidObjectId(categoryId)) return;
+        
+        try {
+            const res = await fetch(`/api/masters?type=categories&parentId=${categoryId}`);
+            const data = await res.json();
+            if (data.success) {
+                setSubCategories(data.data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch subcategories:', error);
+        }
+    };
+
     const fetchProduct = async () => {
         try {
             setLoading(true);
@@ -2625,13 +2677,17 @@ export default function ProductForm() {
                     setFormattedId(formatCustomId(product.customId));
                 }
 
+                // Handle category and subCategory (they come as populated objects)
+                const categoryId = product.category?._id || product.category || "";
+                const subCategoryId = product.subCategory?._id || product.subCategory || "";
+
                 setFormData({
                     productName: product.productName || "",
                     slug: product.slug || "",
                     sku: product.sku || "",
                     hsnCode: product.hsnCode || "",
-                    category: product.category || "",
-                    subCategory: product.subCategory || "",
+                    category: categoryId,
+                    subCategory: subCategoryId,
                     brand: product.brand || "",
                     mrp: product.mrp?.toString() || "",
                     discountPrice: product.discountPrice?.toString() || "",
@@ -2703,8 +2759,10 @@ export default function ProductForm() {
             newErrors.hsnCode = "HSN code is required";
         }
 
-        if (!formData.category.trim()) {
+        if (!formData.category) {
             newErrors.category = "Category is required";
+        } else if (!isValidObjectId(formData.category)) {
+            newErrors.category = "Invalid category selected";
         }
 
         // MRP validation
@@ -2995,14 +3053,14 @@ export default function ProductForm() {
                 margin = ((parseFloat(formData.discountPrice) - parseFloat(formData.costPrice)) / parseFloat(formData.costPrice)) * 100;
             }
 
-            // Prepare product data
+            // Prepare product data with category IDs
             const productData = {
                 productName: formData.productName.trim(),
                 slug: formData.slug || generateSlug(formData.productName),
                 sku: formData.sku.toUpperCase(),
                 hsnCode: formData.hsnCode,
-                category: formData.category.trim(),
-                subCategory: formData.subCategory.trim() || undefined,
+                category: formData.category, // This is now an ObjectId
+                subCategory: formData.subCategory || undefined, // This is now an ObjectId
                 brand: formData.brand.trim() || undefined,
                 mrp: parseFloat(formData.mrp),
                 discountPrice: parseFloat(formData.discountPrice),
@@ -3399,29 +3457,46 @@ export default function ProductForm() {
                                                                 {errors.hsnCode && <span className="error-text">{errors.hsnCode}</span>}
                                                             </div>
 
+                                                            {/* Category Dropdown */}
                                                             <div className="form-field">
                                                                 <label>Category <span className="required">*</span></label>
-                                                                <input
-                                                                    type="text"
+                                                                <select
                                                                     name="category"
                                                                     value={formData.category}
                                                                     onChange={handleInputChange}
                                                                     className={errors.category ? 'error' : ''}
-                                                                    placeholder="e.g., Posters, Stickers, Art"
-                                                                />
+                                                                    disabled={loadingCategories}
+                                                                >
+                                                                    <option value="">Select Category</option>
+                                                                    {categories.map(cat => (
+                                                                        <option key={cat._id} value={cat._id}>
+                                                                            {cat.name}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
                                                                 {errors.category && <span className="error-text">{errors.category}</span>}
+                                                                {loadingCategories && <span className="hint">Loading categories...</span>}
                                                             </div>
 
+                                                            {/* SubCategory Dropdown */}
                                                             <div className="form-field">
                                                                 <label>Sub Category</label>
-                                                                <input
-                                                                    type="text"
+                                                                <select
                                                                     name="subCategory"
                                                                     value={formData.subCategory}
                                                                     onChange={handleInputChange}
-                                                                    className="input"
-                                                                    placeholder="e.g., Wall Posters, Vinyl Stickers"
-                                                                />
+                                                                    disabled={!formData.category || !isValidObjectId(formData.category) || subCategories.length === 0}
+                                                                >
+                                                                    <option value="">Select Sub Category (Optional)</option>
+                                                                    {subCategories.map(sub => (
+                                                                        <option key={sub._id} value={sub._id}>
+                                                                            {sub.name}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                                {!formData.category && (
+                                                                    <span className="hint">Select a category first</span>
+                                                                )}
                                                             </div>
 
                                                             <div className="form-field">

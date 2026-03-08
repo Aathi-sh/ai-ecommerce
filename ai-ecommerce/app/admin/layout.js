@@ -2044,7 +2044,7 @@ export default function AdminLayout({ children }) {
           </div>
         )}
 
-        {/* Development indicators */}
+        {/* Development indicators
         {showDevIndicators && (
           <div className="dev-indicators">
             <span>🔗: {connectionStatus.socketio.connected ? '✅' : '❌'}</span>
@@ -2055,7 +2055,19 @@ export default function AdminLayout({ children }) {
             <span>💚: {isActive ? '✅' : '❌'}</span>
             <span>📱: {isMobile ? 'Mobile' : isTablet ? 'Tablet' : 'Desktop'}</span>
           </div>
-        )}
+        )} */}
+        {/* Development Indicators - ONLY shown in development environment */}
+{process.env.NODE_ENV === 'development' && (
+  <div className="dev-indicators">
+    <span>🔗: {connectionStatus.socketio.connected ? '✅' : '❌'}</span>
+    <span>📱: {connectionStatus.fcm.ready ? '✅' : '❌'}</span>
+    <span>👤: {user ? '✅' : '❌'}</span>
+    <span>🔐: {isAuthenticated ? '✅' : '❌'}</span>
+    <span>⭐: {hasRole('admin') ? '✅' : '❌'}</span>
+    <span>💚: {isActive ? '✅' : '❌'}</span>
+    <span>📱: {isMobile ? 'Mobile' : isTablet ? 'Tablet' : 'Desktop'}</span>
+  </div>
+)}
 
         {/* Global Styles */}
         <style jsx global>{`

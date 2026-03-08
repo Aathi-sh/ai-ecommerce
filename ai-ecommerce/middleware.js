@@ -62,6 +62,31 @@ const publicPaths = [
   '/api/notifications/webhook',  // WhatsApp webhook
   '/api/notifications/status/:id',  // Check notification status
 
+  '/api/bookings',
+  '/api/bookings/:path*',
+  
+  // Service Management  
+  '/api/services',
+  '/api/services/:path*',
+  
+  // Professional/Bookingmng Management
+  '/api/bookingmng',
+  '/api/bookingmng/:path*',
+  '/api/masters/:path*',
+  '/api/services',
+  '/api/bookingService/service',  // Add this
+  '/api/bookingService/bookingmng',
+
+  '/api/auth/:path*',
+  '/api/bookingService/service',
+  '/api/bookingService/bookingmng',
+  '/api/bookingService/bookings',           // ← ADD THIS
+  '/api/bookingService/bookings/:path*',    // ← ADD THIS
+  '/api/public/:path*',
+  '/api/notifications',
+  '/api/whatsapp/:path*',
+  '/whatsapp-webhook'
+
 ];
 
 // Admin-only paths (require admin authentication)
@@ -96,6 +121,18 @@ const whatsappPaths = [
   '/api/analytics/products',
   '/api/auth/fcm-token',
   '/api/notifications', 
+  
+
+  '/api/whatsapp/booking',
+  '/api/whatsapp/booking/:path*',
+  '/api/whatsapp/availability',
+  '/api/whatsapp/availability/:path*',
+  '/api/whatsapp/book',
+  '/api/whatsapp/book/:path*',
+  '/api/whatsapp/cancel',
+  '/api/whatsapp/cancel/:path*',
+  '/api/whatsapp/mybookings',
+  '/api/whatsapp/mybookings/:path*'
 ];
 
 // ✅ Authentication routes that should bypass status checks

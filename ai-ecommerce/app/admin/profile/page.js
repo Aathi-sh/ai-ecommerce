@@ -1,1221 +1,1018 @@
+// app/settings/page.jsx
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { User, Mail, Phone, Shield, Settings, RefreshCw, History, AlertTriangle, ChevronDown, ChevronUp, X } from "lucide-react";
-import { appTheme } from "../../../src/constants/theme";
+import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import {
+  User,
+  Mail,
+  Key,
+  LogOut,
+  Save,
+  X,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  CheckCircle,
+  RefreshCw,
+  Lock
+} from "lucide-react";
 
-export default function AdminProfilePage() {
-  // Dummy admin data (keeping your original dummy data)
-  const adminData = {
-    name: "Admin User",
-    email: "admin@steponnext.com",
-    phone: "+91 98765 43210",
-    role: "Super Admin",
-  };
-
-  // State for ID reset functionality
+export default function SettingsPage() {
+  const { data: session, update: updateSession } = useSession();
+  const router = useRouter();
+  
+  // UI States
   const [loading, setLoading] = useState(false);
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [startFrom, setStartFrom] = useState(100);
-  const [resetReason, setResetReason] = useState("");
-  const [forceReset, setForceReset] = useState(false);
-  const [counterData, setCounterData] = useState(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [prefix, setPrefix] = useState("PRD");
-  const [padding, setPadding] = useState(5);
-  const [description, setDescription] = useState("Product ID counter");
-  const [settingsLoading, setSettingsLoading] = useState(false);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [resetHistory, setResetHistory] = useState([]);
-  const [keepHistory, setKeepHistory] = useState(10);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  
+  // Password visibility toggles
+  const [showPassword, setShowPassword] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  });
 
-  // Fetch counter data on mount
+  // Form States
+  const [nameForm, setNameForm] = useState({
+    name: ""
+  });
+
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
+
+  const [forgotPasswordForm, setForgotPasswordForm] = useState({
+    email: ""
+  });
+
+  // Password strength
+  const [passwordStrength, setPasswordStrength] = useState({
+    score: 0,
+    hasMinLength: false,
+    hasUpperCase: false,
+    hasLowerCase: false,
+    hasNumber: false
+  });
+
+  // Load user data
   useEffect(() => {
-    fetchCounterData();
-    fetchResetHistory();
-  }, []);
-
-  const fetchCounterData = async () => {
-    try {
-      const res = await fetch('/api/reset-product-ids');
-      const data = await res.json();
-      if (data.success) {
-        setCounterData(data.data);
-        setStartFrom(data.data.counter.nextValue);
-        setPrefix(data.data.counter.prefix || "PRD");
-        setPadding(data.data.counter.padding || 5);
-        setDescription(data.data.counter.description || "Product ID counter");
-      }
-    } catch (error) {
-      console.error('Error fetching counter data:', error);
+    if (session?.user) {
+      setNameForm({
+        name: session.user.name || session.user.fullName || ""
+      });
+      setForgotPasswordForm({
+        email: session.user.email || ""
+      });
     }
+  }, [session]);
+
+  // Check password strength
+  const checkPasswordStrength = (password) => {
+    const strength = {
+      score: 0,
+      hasMinLength: password.length >= 8,
+      hasUpperCase: /[A-Z]/.test(password),
+      hasLowerCase: /[a-z]/.test(password),
+      hasNumber: /[0-9]/.test(password)
+    };
+
+    let score = 0;
+    if (strength.hasMinLength) score++;
+    if (strength.hasUpperCase) score++;
+    if (strength.hasLowerCase) score++;
+    if (strength.hasNumber) score++;
+
+    strength.score = score;
+    setPasswordStrength(strength);
   };
 
-  const fetchResetHistory = async () => {
-    setHistoryLoading(true);
-    try {
-      const res = await fetch('/api/reset-product-ids');
-      const data = await res.json();
-      if (data.success) {
-        setResetHistory(data.data.resetHistory || []);
-      }
-    } catch (error) {
-      console.error('Error fetching history:', error);
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
+  useEffect(() => {
+    checkPasswordStrength(passwordForm.newPassword);
+  }, [passwordForm.newPassword]);
 
-  const handleReset = async () => {
-    if (!resetReason.trim()) {
-      alert('Please provide a reason for reset');
-      return;
-    }
-
+  // ========== HANDLE NAME CHANGE ==========
+  const handleNameChange = async (e) => {
+    e.preventDefault();
     setLoading(true);
+    setError("");
+    setSuccess("");
+
     try {
-      const res = await fetch('/api/reset-product-ids', {
-        method: 'POST',
+      const res = await fetch('/api/auth/update-name', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          startFrom,
-          reason: resetReason,
-          force: forceReset
-        }),
+        body: JSON.stringify({ name: nameForm.name })
       });
 
       const data = await res.json();
 
-      if (data.success) {
-        alert(`✅ Product IDs reset successfully!\nNew ID will start from: ${startFrom}`);
-        setShowResetModal(false);
-        setResetReason("");
-        setForceReset(false);
-        fetchCounterData();
-        fetchResetHistory();
-      } else {
-        if (data.status === 409) {
-          if (confirm(`${data.error}\n\nDo you want to force reset anyway?`)) {
-            setForceReset(true);
-            handleReset();
-          }
-        } else {
-          alert(`❌ Reset failed: ${data.message || data.error}`);
-        }
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to update name');
       }
-    } catch (error) {
-      alert('❌ Reset failed');
+
+      // Update session
+      await updateSession({
+        ...session,
+        user: {
+          ...session.user,
+          name: nameForm.name,
+          fullName: nameForm.name
+        }
+      });
+
+      setSuccess('Name updated successfully!');
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      setError(err.message);
+      setTimeout(() => setError(""), 5000);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpdateSettings = async () => {
-    setSettingsLoading(true);
+  // ========== HANDLE PASSWORD CHANGE ==========
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    // Validation
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setError("New passwords don't match");
+      setLoading(false);
+      return;
+    }
+
+    if (passwordStrength.score < 3) {
+      setError("Password must be at least 8 characters with uppercase, lowercase, and numbers");
+      setLoading(false);
+      return;
+    }
+
     try {
-      const res = await fetch('/api/reset-product-ids', {
-        method: 'PATCH',
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prefix, padding, description }),
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword
+        })
       });
 
       const data = await res.json();
 
-      if (data.success) {
-        alert('✅ Settings updated successfully');
-        setShowAdvanced(false);
-        fetchCounterData();
-      } else {
-        alert(`❌ Update failed: ${data.message}`);
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to change password');
       }
-    } catch (error) {
-      alert('❌ Update failed');
+
+      setSuccess('Password changed successfully!');
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      });
+      
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      setError(err.message);
+      setTimeout(() => setError(""), 5000);
     } finally {
-      setSettingsLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleClearHistory = async () => {
-    if (!confirm(`Are you sure you want to clear reset history? Only last ${keepHistory} entries will be kept.`)) return;
+  // ========== HANDLE FORGOT PASSWORD ==========
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    setSuccess("");
 
     try {
-      const res = await fetch(`/api/reset-product-ids?keep=${keepHistory}`, {
-        method: 'DELETE',
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotPasswordForm.email })
       });
 
       const data = await res.json();
 
-      if (data.success) {
-        alert(`✅ History cleared. Kept last ${keepHistory} entries.`);
-        fetchResetHistory();
-      } else {
-        alert(`❌ Failed to clear history: ${data.message}`);
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to send reset email');
       }
-    } catch (error) {
-      alert('❌ Failed to clear history');
+
+      setSuccess('Password reset link sent to your email!');
+      setShowForgotPassword(false);
+      setTimeout(() => setSuccess(""), 5000);
+    } catch (err) {
+      setError(err.message);
+      setTimeout(() => setError(""), 5000);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  // ========== HANDLE LOGOUT ==========
+  const handleLogout = async () => {
+    setLoading(true);
+    try {
+      // Call logout API
+      await fetch('/api/auth/logout', { method: 'POST' });
+      
+      // Sign out from NextAuth
+      await signOut({ 
+        redirect: false,
+        callbackUrl: '/login'
+      });
+      
+      // Redirect to login
+      router.push('/login?loggedOut=true');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Force redirect even if API fails
+      router.push('/login');
+    } finally {
+      setLoading(false);
+      setShowLogoutConfirm(false);
+    }
   };
 
-  const formatId = (id) => {
-    if (!id && id !== 0) return 'N/A';
-    return String(id).padStart(padding, '0');
+  // Get password strength color
+  const getStrengthColor = () => {
+    switch (passwordStrength.score) {
+      case 0: return '#ef4444';
+      case 1: return '#f97316';
+      case 2: return '#f59e0b';
+      case 3: return '#10b981';
+      case 4: return '#059669';
+      default: return '#ef4444';
+    }
   };
 
-  // Responsive styles based on screen size
-  const [isMobile, setIsMobile] = useState(false);
-  
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const getStrengthText = () => {
+    switch (passwordStrength.score) {
+      case 0: return 'Very Weak';
+      case 1: return 'Weak';
+      case 2: return 'Fair';
+      case 3: return 'Good';
+      case 4: return 'Strong';
+      default: return 'Too Weak';
+    }
+  };
 
   return (
-    <div style={containerStyle}>
-      {/* Header with Mobile Menu Toggle */}
-      <div style={headerStyle}>
-        <h1 style={titleStyle}>Admin Profile</h1>
-        {isMobile && (
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            style={mobileMenuButtonStyle}
-          >
-            {mobileMenuOpen ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+    <div style={styles.container}>
+      {/* Success Toast */}
+      {success && (
+        <div style={styles.toast.success}>
+          <CheckCircle size={20} />
+          <span>{success}</span>
+          <button onClick={() => setSuccess("")} style={styles.toast.close}>
+            <X size={16} />
           </button>
-        )}
+        </div>
+      )}
+
+      {/* Error Toast */}
+      {error && (
+        <div style={styles.toast.error}>
+          <AlertCircle size={20} />
+          <span>{error}</span>
+          <button onClick={() => setError("")} style={styles.toast.close}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      <div style={styles.header}>
+        <h1 style={styles.title}>Account Settings</h1>
       </div>
 
-      {/* Main Content Grid */}
-      <div style={gridStyle}>
-        {/* Left Column - Profile Info */}
-        <div style={leftColumnStyle(isMobile)}>
-          {/* Profile Card */}
-          <div style={cardStyle}>
-            {/* Profile Header */}
-            <div style={profileHeaderStyle(isMobile)}>
-              <div style={avatarStyle}>
-                {adminData.name.charAt(0)}
-              </div>
-              <div>
-                <h2 style={profileNameStyle}>{adminData.name}</h2>
-                <p style={profileRoleStyle}>{adminData.role}</p>
-              </div>
-            </div>
-
-            {/* Details Section */}
-            <div style={detailsContainerStyle}>
-              <div style={rowStyle}>
-                <User size={isMobile ? 18 : 20} color={appTheme.colors.primary} />
-                <p style={rowTextStyle}>{adminData.name}</p>
-              </div>
-
-              <div style={rowStyle}>
-                <Mail size={isMobile ? 18 : 20} color={appTheme.colors.primary} />
-                <p style={rowTextStyle}>{adminData.email}</p>
-              </div>
-
-              <div style={rowStyle}>
-                <Phone size={isMobile ? 18 : 20} color={appTheme.colors.primary} />
-                <p style={rowTextStyle}>{adminData.phone}</p>
-              </div>
-
-              <div style={rowStyle}>
-                <Shield size={isMobile ? 18 : 20} color={appTheme.colors.primary} />
-                <p style={rowTextStyle}>{adminData.role}</p>
-              </div>
-            </div>
+      <div style={styles.grid}>
+        {/* LEFT COLUMN - Name Change */}
+        <div style={styles.card}>
+          <div style={styles.cardHeader}>
+            <User size={20} color="#3b82f6" />
+            <h2 style={styles.cardTitle}>Change Name</h2>
           </div>
+
+          <form onSubmit={handleNameChange} style={styles.form}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Full Name</label>
+              <input
+                type="text"
+                value={nameForm.name}
+                onChange={(e) => setNameForm({ name: e.target.value })}
+                style={styles.input}
+                placeholder="Enter your full name"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || !nameForm.name}
+              style={{
+                ...styles.button,
+                ...styles.buttonPrimary,
+                ...(loading || !nameForm.name ? styles.buttonDisabled : {})
+              }}
+            >
+              {loading ? (
+                <>
+                  <RefreshCw size={16} className="spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  Update Name
+                </>
+              )}
+            </button>
+          </form>
         </div>
 
-        {/* Right Column - Product ID Management (only visible when menu open on mobile) */}
-        {(!isMobile || mobileMenuOpen) && (
-          <div style={rightColumnStyle(isMobile)}>
-            <div style={cardStyle}>
-              <div style={sectionHeaderStyle}>
-                <Settings size={20} color={appTheme.colors.primary} />
-                <h3 style={sectionTitleStyle}>Product ID Management</h3>
+        {/* RIGHT COLUMN - Password Change */}
+        <div style={styles.card}>
+          <div style={styles.cardHeader}>
+            <Key size={20} color="#3b82f6" />
+            <h2 style={styles.cardTitle}>Change Password</h2>
+          </div>
+
+          <form onSubmit={handlePasswordChange} style={styles.form}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Current Password</label>
+              <div style={styles.passwordInput}>
+                <input
+                  type={showPassword.current ? "text" : "password"}
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  style={styles.input}
+                  placeholder="Enter current password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword({ ...showPassword, current: !showPassword.current })}
+                  style={styles.passwordToggle}
+                >
+                  {showPassword.current ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>New Password</label>
+              <div style={styles.passwordInput}>
+                <input
+                  type={showPassword.new ? "text" : "password"}
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  style={styles.input}
+                  placeholder="Enter new password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword({ ...showPassword, new: !showPassword.new })}
+                  style={styles.passwordToggle}
+                >
+                  {showPassword.new ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
 
-              {/* Current Status */}
-              {counterData ? (
-                <div style={statusContainerStyle}>
-                  <div style={statusGridStyle(isMobile)}>
-                    <div style={statusItemStyle}>
-                      <p style={statusLabelStyle}>Current ID</p>
-                      <p style={statusValueStyle}>{counterData.counter.formattedCurrent}</p>
-                      <p style={statusSubValueStyle}>Value: {counterData.counter.currentValue}</p>
-                    </div>
-                    <div style={statusItemStyle}>
-                      <p style={statusLabelStyle}>Next ID</p>
-                      <p style={statusValueStyle}>{counterData.counter.formattedNext}</p>
-                      <p style={statusSubValueStyle}>Value: {counterData.counter.nextValue}</p>
-                    </div>
+              {/* Password Strength Meter */}
+              {passwordForm.newPassword && (
+                <div style={styles.strengthContainer}>
+                  <div style={styles.strengthBar}>
+                    {[1, 2, 3, 4].map((level) => (
+                      <div
+                        key={level}
+                        style={{
+                          ...styles.strengthSegment,
+                          backgroundColor: level <= passwordStrength.score
+                            ? getStrengthColor()
+                            : '#e5e7eb'
+                        }}
+                      />
+                    ))}
                   </div>
-
-                  {/* Stats */}
-                  <div style={statsContainerStyle}>
-                    <div style={statRowStyle}>
-                      <span style={statLabelStyle}>Total Products:</span>
-                      <span style={statValueStyle}>{counterData.products.total}</span>
-                    </div>
-                    <div style={statRowStyle}>
-                      <span style={statLabelStyle}>With Custom IDs:</span>
-                      <span style={statValueStyle}>{counterData.products.withCustomId}</span>
-                    </div>
-                    {counterData.products.minCustomId && (
-                      <div style={statRowStyle}>
-                        <span style={statLabelStyle}>ID Range:</span>
-                        <span style={statValueStyle}>
-                          {counterData.products.minFormatted} - {counterData.products.maxFormatted}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Warnings */}
-                  {counterData.warnings && counterData.warnings.length > 0 && (
-                    <div style={warningContainerStyle}>
-                      <AlertTriangle size={16} color="#f59e0b" />
-                      <p style={warningTextStyle}>{counterData.warnings[0]}</p>
-                    </div>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div style={actionButtonsStyle(isMobile)}>
-                    <button
-                      onClick={() => setShowResetModal(true)}
-                      style={primaryButtonStyle}
-                    >
-                      <RefreshCw size={16} />
-                      <span>Reset IDs</span>
-                    </button>
-                    <button
-                      onClick={() => setShowHistoryModal(true)}
-                      style={secondaryButtonStyle}
-                    >
-                      <History size={16} />
-                      <span>View History</span>
-                    </button>
-                  </div>
-
-                  {/* Advanced Settings Toggle */}
-                  <button
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                    style={advancedToggleStyle}
-                  >
-                    <Settings size={14} />
-                    <span>{showAdvanced ? 'Hide' : 'Show'} Advanced Settings</span>
-                  </button>
-
-                  {/* Advanced Settings Panel */}
-                  {showAdvanced && (
-                    <div style={advancedPanelStyle}>
-                      <h4 style={advancedTitleStyle}>Counter Settings</h4>
-                      
-                      <div style={settingsFormStyle}>
-                        <div style={inputGroupStyle}>
-                          <label style={inputLabelStyle}>Prefix</label>
-                          <input
-                            type="text"
-                            value={prefix}
-                            onChange={(e) => setPrefix(e.target.value.toUpperCase())}
-                            style={inputStyle}
-                            maxLength={5}
-                            placeholder="PRD"
-                          />
-                          <small style={inputHintStyle}>2-5 letters only</small>
-                        </div>
-
-                        <div style={inputGroupStyle}>
-                          <label style={inputLabelStyle}>Padding (digits)</label>
-                          <input
-                            type="number"
-                            value={padding}
-                            onChange={(e) => setPadding(parseInt(e.target.value))}
-                            style={inputStyle}
-                            min="3"
-                            max="10"
-                          />
-                          <small style={inputHintStyle}>3-10 digits (e.g., 5 = 00123)</small>
-                        </div>
-
-                        <div style={inputGroupStyle}>
-                          <label style={inputLabelStyle}>Description</label>
-                          <input
-                            type="text"
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            style={inputStyle}
-                            placeholder="Counter description"
-                          />
-                        </div>
-
-                        <div style={settingsButtonsStyle}>
-                          <button
-                            onClick={() => setShowAdvanced(false)}
-                            style={cancelButtonStyle}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={handleUpdateSettings}
-                            disabled={settingsLoading}
-                            style={saveButtonStyle}
-                          >
-                            {settingsLoading ? 'Saving...' : 'Save Settings'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div style={loadingContainerStyle}>
-                  <p style={loadingTextStyle}>Loading counter data...</p>
+                  <span style={{ ...styles.strengthText, color: getStrengthColor() }}>
+                    {getStrengthText()}
+                  </span>
                 </div>
               )}
+
+              <ul style={styles.requirements}>
+                <li style={{ color: passwordStrength.hasMinLength ? '#10b981' : '#6b7280' }}>
+                  ✓ At least 8 characters
+                </li>
+                <li style={{ color: passwordStrength.hasUpperCase ? '#10b981' : '#6b7280' }}>
+                  ✓ One uppercase letter
+                </li>
+                <li style={{ color: passwordStrength.hasLowerCase ? '#10b981' : '#6b7280' }}>
+                  ✓ One lowercase letter
+                </li>
+                <li style={{ color: passwordStrength.hasNumber ? '#10b981' : '#6b7280' }}>
+                  ✓ One number
+                </li>
+              </ul>
             </div>
-          </div>
-        )}
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Confirm New Password</label>
+              <div style={styles.passwordInput}>
+                <input
+                  type={showPassword.confirm ? "text" : "password"}
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  style={{
+                    ...styles.input,
+                    borderColor: passwordForm.confirmPassword && 
+                      passwordForm.newPassword !== passwordForm.confirmPassword
+                      ? '#ef4444'
+                      : passwordForm.confirmPassword && 
+                        passwordForm.newPassword === passwordForm.confirmPassword
+                        ? '#10b981'
+                        : '#e5e7eb'
+                  }}
+                  placeholder="Confirm new password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword({ ...showPassword, confirm: !showPassword.confirm })}
+                  style={styles.passwordToggle}
+                >
+                  {showPassword.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {passwordForm.confirmPassword && passwordForm.newPassword !== passwordForm.confirmPassword && (
+                <small style={styles.errorText}>Passwords don't match</small>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || 
+                !passwordForm.currentPassword || 
+                !passwordForm.newPassword || 
+                !passwordForm.confirmPassword ||
+                passwordForm.newPassword !== passwordForm.confirmPassword ||
+                passwordStrength.score < 3}
+              style={{
+                ...styles.button,
+                ...styles.buttonPrimary,
+                ...(loading || 
+                  !passwordForm.currentPassword || 
+                  !passwordForm.newPassword || 
+                  !passwordForm.confirmPassword ||
+                  passwordForm.newPassword !== passwordForm.confirmPassword ||
+                  passwordStrength.score < 3 ? styles.buttonDisabled : {})
+              }}
+            >
+              {loading ? (
+                <>
+                  <RefreshCw size={16} className="spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <Lock size={16} />
+                  Change Password
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Forgot Password Link */}
+          <button
+            onClick={() => setShowForgotPassword(true)}
+            style={styles.forgotPasswordLink}
+          >
+            Forgot your password?
+          </button>
+        </div>
       </div>
 
-      {/* Reset Modal */}
-      {showResetModal && (
-        <div style={modalOverlayStyle} onClick={() => setShowResetModal(false)}>
-          <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
-            <div style={modalHeaderStyle}>
-              <h3 style={modalTitleStyle}>Reset Product IDs</h3>
-              <button onClick={() => setShowResetModal(false)} style={modalCloseStyle}>
+      {/* ACCOUNT ACTIONS CARD */}
+      <div style={styles.actionsCard}>
+        <h2 style={styles.actionsTitle}>Account Actions</h2>
+
+        <div style={styles.actionsGrid}>
+          {/* Logout Button */}
+          <button
+            onClick={() => setShowLogoutConfirm(true)}
+            style={styles.logoutButton}
+          >
+            <LogOut size={18} />
+            <span>Logout</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ========== MODALS ========== */}
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div style={styles.modalOverlay} onClick={() => setShowLogoutConfirm(false)}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <LogOut size={24} color="#ef4444" />
+              <h3 style={styles.modalTitle}>Confirm Logout</h3>
+              <button onClick={() => setShowLogoutConfirm(false)} style={styles.modalClose}>
                 <X size={20} />
               </button>
             </div>
-
-            <div style={modalBodyStyle}>
-              <p style={modalTextStyle}>
-                Current counter is at <strong>{counterData?.counter.formattedCurrent}</strong>.
-                Next product will get ID <strong>{counterData?.counter.formattedNext}</strong>.
-              </p>
-
-              <div style={modalFormStyle}>
-                <div style={inputGroupStyle}>
-                  <label style={inputLabelStyle}>Start From *</label>
-                  <input
-                    type="number"
-                    value={startFrom}
-                    onChange={(e) => setStartFrom(parseInt(e.target.value))}
-                    style={inputStyle}
-                    min="1"
-                  />
-                  <small style={inputHintStyle}>
-                    Next product will get ID: {formatId(startFrom)}
-                  </small>
-                </div>
-
-                <div style={inputGroupStyle}>
-                  <label style={inputLabelStyle}>Reason for Reset *</label>
-                  <textarea
-                    value={resetReason}
-                    onChange={(e) => setResetReason(e.target.value)}
-                    style={textareaStyle}
-                    placeholder="e.g., New financial year, Database cleanup, etc."
-                    rows="3"
-                  />
-                </div>
-
-                <div style={checkboxGroupStyle}>
-                  <input
-                    type="checkbox"
-                    id="forceReset"
-                    checked={forceReset}
-                    onChange={(e) => setForceReset(e.target.checked)}
-                    style={checkboxStyle}
-                  />
-                  <label htmlFor="forceReset" style={checkboxLabelStyle}>
-                    Force reset (override existing products)
-                  </label>
-                </div>
-
-                {forceReset && (
-                  <div style={warningBoxStyle}>
-                    <AlertTriangle size={16} color="#f59e0b" />
-                    <p style={warningBoxTextStyle}>
-                      Warning: This may cause ID conflicts with existing products.
-                    </p>
-                  </div>
-                )}
-              </div>
+            <div style={styles.modalBody}>
+              <p>Are you sure you want to log out?</p>
             </div>
-
-            <div style={modalFooterStyle}>
+            <div style={styles.modalFooter}>
               <button
-                onClick={() => setShowResetModal(false)}
-                style={modalCancelButtonStyle}
+                onClick={() => setShowLogoutConfirm(false)}
+                style={styles.modalCancel}
               >
                 Cancel
               </button>
               <button
-                onClick={handleReset}
-                disabled={loading || !resetReason.trim()}
-                style={modalConfirmButtonStyle}
+                onClick={handleLogout}
+                disabled={loading}
+                style={{
+                  ...styles.modalConfirm,
+                  ...(loading ? styles.buttonDisabled : {})
+                }}
               >
-                {loading ? 'Resetting...' : 'Reset IDs'}
+                {loading ? 'Logging out...' : 'Logout'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* History Modal */}
-      {showHistoryModal && (
-        <div style={modalOverlayStyle} onClick={() => setShowHistoryModal(false)}>
-          <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
-            <div style={modalHeaderStyle}>
-              <h3 style={modalTitleStyle}>Reset History</h3>
-              <button onClick={() => setShowHistoryModal(false)} style={modalCloseStyle}>
+      {/* Forgot Password Modal */}
+      {showForgotPassword && (
+        <div style={styles.modalOverlay} onClick={() => setShowForgotPassword(false)}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <Key size={24} color="#3b82f6" />
+              <h3 style={styles.modalTitle}>Reset Password</h3>
+              <button onClick={() => setShowForgotPassword(false)} style={styles.modalClose}>
                 <X size={20} />
               </button>
             </div>
-
-            <div style={modalBodyStyle}>
-              {historyLoading ? (
-                <p style={loadingTextStyle}>Loading history...</p>
-              ) : resetHistory.length === 0 ? (
-                <p style={emptyTextStyle}>No reset history found</p>
-              ) : (
-                <div style={historyListStyle}>
-                  {resetHistory.map((entry, index) => (
-                    <div key={index} style={historyItemStyle}>
-                      <div style={historyItemHeaderStyle}>
-                        <span style={historyItemBadgeStyle}>
-                          {entry.oldValue} → {entry.newValue}
-                        </span>
-                        <span style={historyItemDateStyle}>
-                          {formatDate(entry.resetAt)}
-                        </span>
-                      </div>
-                      <p style={historyItemReasonStyle}>
-                        <strong>Reason:</strong> {entry.reason}
-                      </p>
-                      <p style={historyItemUserStyle}>
-                        <strong>By:</strong> {entry.resetBy}
-                      </p>
-                      {entry.ipAddress && (
-                        <p style={historyItemMetaStyle}>
-                          IP: {entry.ipAddress}
-                        </p>
-                      )}
-                    </div>
-                  ))}
+            <form onSubmit={handleForgotPassword}>
+              <div style={styles.modalBody}>
+                <p style={styles.modalText}>
+                  Enter your email address and we'll send you a link to reset your password.
+                </p>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Email Address</label>
+                  <input
+                    type="email"
+                    value={forgotPasswordForm.email}
+                    onChange={(e) => setForgotPasswordForm({ email: e.target.value })}
+                    style={styles.input}
+                    placeholder="your@email.com"
+                    required
+                  />
                 </div>
-              )}
-
-              {resetHistory.length > 0 && (
-                <div style={historyFooterStyle}>
-                  <div style={historyControlStyle}>
-                    <label style={historyLabelStyle}>Keep last:</label>
-                    <select
-                      value={keepHistory}
-                      onChange={(e) => setKeepHistory(parseInt(e.target.value))}
-                      style={historySelectStyle}
-                    >
-                      <option value="5">5 entries</option>
-                      <option value="10">10 entries</option>
-                      <option value="20">20 entries</option>
-                      <option value="50">50 entries</option>
-                    </select>
-                  </div>
-                  <button
-                    onClick={handleClearHistory}
-                    style={historyClearButtonStyle}
-                  >
-                    Clear Old History
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div style={modalFooterStyle}>
-              <button
-                onClick={() => setShowHistoryModal(false)}
-                style={modalCloseFooterButtonStyle}
-              >
-                Close
-              </button>
-            </div>
+              </div>
+              <div style={styles.modalFooter}>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(false)}
+                  style={styles.modalCancel}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading || !forgotPasswordForm.email}
+                  style={{
+                    ...styles.modalSend,
+                    ...(loading || !forgotPasswordForm.email ? styles.buttonDisabled : {})
+                  }}
+                >
+                  {loading ? 'Sending...' : 'Send Reset Link'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
+
+      {/* Animation Styles */}
+      <style jsx>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .spin {
+          animation: spin 1s linear infinite;
+        }
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
 }
 
 // ========== STYLES ==========
-
-const containerStyle = {
-  maxWidth: '1200px',
-  margin: '0 auto',
-  padding: '24px',
-  fontFamily: appTheme.fonts.primary,
-  backgroundColor: appTheme.colors.background,
-  minHeight: '100vh',
-};
-
-const headerStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: '24px',
-};
-
-const titleStyle = {
-  fontSize: '28px',
-  fontWeight: '600',
-  color: appTheme.colors.textPrimary,
-  margin: 0,
-};
-
-const mobileMenuButtonStyle = {
-  background: 'none',
-  border: 'none',
-  color: appTheme.colors.primary,
-  cursor: 'pointer',
-  padding: '8px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  minHeight: '44px',
-  minWidth: '44px',
-};
-
-const gridStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-  gap: '24px',
-};
-
-const leftColumnStyle = (isMobile) => ({
-  gridColumn: isMobile ? '1 / -1' : 'span 1',
-});
-
-const rightColumnStyle = (isMobile) => ({
-  gridColumn: isMobile ? '1 / -1' : 'span 1',
-  marginTop: isMobile ? '0' : '0',
-});
-
-const cardStyle = {
-  background: appTheme.colors.surface,
-  padding: '25px',
-  borderRadius: '12px',
-  boxShadow: appTheme.shadows.md,
-  border: `1px solid ${appTheme.colors.border}`,
-  height: 'fit-content',
-};
-
-const profileHeaderStyle = (isMobile) => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: isMobile ? '16px' : '20px',
-  marginBottom: '20px',
-});
-
-const avatarStyle = {
-  width: '80px',
-  height: '80px',
-  borderRadius: '50%',
-  background: appTheme.colors.primary,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: '#fff',
-  fontSize: '32px',
-  fontWeight: '600',
-  flexShrink: 0,
-};
-
-const profileNameStyle = {
-  fontSize: '22px',
-  fontWeight: '600',
-  margin: '0 0 4px 0',
-  color: appTheme.colors.textPrimary,
-};
-
-const profileRoleStyle = {
-  color: appTheme.colors.textSecondary,
-  margin: 0,
-  fontSize: '14px',
-};
-
-const detailsContainerStyle = {
-  marginTop: '20px',
-  borderTop: `1px solid ${appTheme.colors.border}`,
-  paddingTop: '20px',
-};
-
-const rowStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '12px',
-  marginBottom: '15px',
-  fontSize: '16px',
-};
-
-const rowTextStyle = {
-  margin: 0,
-  color: appTheme.colors.textPrimary,
-  wordBreak: 'break-word',
-};
-
-const sectionHeaderStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  marginBottom: '20px',
-};
-
-const sectionTitleStyle = {
-  fontSize: '18px',
-  fontWeight: '600',
-  color: appTheme.colors.textPrimary,
-  margin: 0,
-};
-
-const statusContainerStyle = {
-  marginBottom: '20px',
-};
-
-const statusGridStyle = (isMobile) => ({
-  display: 'grid',
-  gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
-  gap: '16px',
-  marginBottom: '20px',
-});
-
-const statusItemStyle = {
-  background: appTheme.colors.background,
-  padding: '16px',
-  borderRadius: '8px',
-  border: `1px solid ${appTheme.colors.border}`,
-  textAlign: 'center',
-};
-
-const statusLabelStyle = {
-  fontSize: '12px',
-  color: appTheme.colors.textSecondary,
-  margin: '0 0 4px 0',
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-};
-
-const statusValueStyle = {
-  fontSize: '24px',
-  fontWeight: '700',
-  color: appTheme.colors.primary,
-  margin: '0 0 2px 0',
-  fontFamily: 'monospace',
-};
-
-const statusSubValueStyle = {
-  fontSize: '12px',
-  color: appTheme.colors.textSecondary,
-  margin: 0,
-};
-
-const statsContainerStyle = {
-  background: appTheme.colors.background,
-  padding: '16px',
-  borderRadius: '8px',
-  marginBottom: '20px',
-};
-
-const statRowStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  marginBottom: '8px',
-  fontSize: '14px',
-};
-
-const statLabelStyle = {
-  color: appTheme.colors.textSecondary,
-};
-
-const statValueStyle = {
-  fontWeight: '600',
-  color: appTheme.colors.textPrimary,
-};
-
-const warningContainerStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  background: '#fef3c7',
-  padding: '12px',
-  borderRadius: '6px',
-  marginBottom: '20px',
-  border: '1px solid #fde68a',
-};
-
-const warningTextStyle = {
-  margin: 0,
-  fontSize: '13px',
-  color: '#92400e',
-  flex: 1,
-};
-
-const actionButtonsStyle = (isMobile) => ({
-  display: 'flex',
-  gap: '12px',
-  marginBottom: '16px',
-  flexDirection: isMobile ? 'column' : 'row',
-});
-
-const primaryButtonStyle = {
-  flex: 1,
-  background: appTheme.colors.primary,
-  color: '#fff',
-  border: 'none',
-  borderRadius: '8px',
-  padding: '12px 16px',
-  fontSize: '14px',
-  fontWeight: '600',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '8px',
-  transition: 'all 0.2s ease',
-  minHeight: '44px',
-  ':hover': {
-    opacity: 0.9,
+const styles = {
+  container: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '24px',
+    minHeight: '100vh',
+    backgroundColor: '#f9fafb',
+    position: 'relative',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
-};
 
-const secondaryButtonStyle = {
-  flex: 1,
-  background: 'transparent',
-  color: appTheme.colors.primary,
-  border: `1px solid ${appTheme.colors.primary}`,
-  borderRadius: '8px',
-  padding: '12px 16px',
-  fontSize: '14px',
-  fontWeight: '600',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '8px',
-  transition: 'all 0.2s ease',
-  minHeight: '44px',
-  ':hover': {
-    background: `${appTheme.colors.primary}10`,
+  // Toast
+  toast: {
+    success: {
+      position: 'fixed',
+      top: '20px',
+      right: '20px',
+      backgroundColor: '#10b981',
+      color: 'white',
+      padding: '12px 20px',
+      borderRadius: '8px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+      zIndex: 1000,
+      animation: 'slideIn 0.3s ease',
+      maxWidth: '400px',
+      width: 'calc(100% - 40px)',
+    },
+    error: {
+      position: 'fixed',
+      top: '20px',
+      right: '20px',
+      backgroundColor: '#ef4444',
+      color: 'white',
+      padding: '12px 20px',
+      borderRadius: '8px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)',
+      zIndex: 1000,
+      animation: 'slideIn 0.3s ease',
+      maxWidth: '400px',
+      width: 'calc(100% - 40px)',
+    },
+    close: {
+      background: 'none',
+      border: 'none',
+      color: 'white',
+      cursor: 'pointer',
+      marginLeft: 'auto',
+      padding: '4px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      opacity: 0.8,
+      ':hover': {
+        opacity: 1,
+      },
+    },
   },
-};
 
-const advancedToggleStyle = {
-  background: 'none',
-  border: 'none',
-  color: appTheme.colors.textSecondary,
-  fontSize: '13px',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '4px',
-  padding: '8px',
-  width: '100%',
-  justifyContent: 'center',
-};
-
-const advancedPanelStyle = {
-  marginTop: '16px',
-  padding: '16px',
-  background: appTheme.colors.background,
-  borderRadius: '8px',
-  border: `1px solid ${appTheme.colors.border}`,
-};
-
-const advancedTitleStyle = {
-  fontSize: '15px',
-  fontWeight: '600',
-  color: appTheme.colors.textPrimary,
-  margin: '0 0 16px 0',
-};
-
-const settingsFormStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '16px',
-};
-
-const inputGroupStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '4px',
-};
-
-const inputLabelStyle = {
-  fontSize: '13px',
-  fontWeight: '500',
-  color: appTheme.colors.textPrimary,
-};
-
-const inputStyle = {
-  padding: '10px 12px',
-  border: `1px solid ${appTheme.colors.border}`,
-  borderRadius: '6px',
-  fontSize: '14px',
-  background: appTheme.colors.surface,
-  color: appTheme.colors.textPrimary,
-  outline: 'none',
-  transition: 'border-color 0.2s ease',
-  width: '100%',
-  ':focus': {
-    borderColor: appTheme.colors.primary,
+  // Header
+  header: {
+    marginBottom: '32px',
   },
-};
+  title: {
+    fontSize: '28px',
+    fontWeight: '600',
+    color: '#111827',
+    margin: 0,
+  },
 
-const inputHintStyle = {
-  fontSize: '11px',
-  color: appTheme.colors.textSecondary,
-};
+  // Grid
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+    gap: '24px',
+    marginBottom: '24px',
+  },
 
-const settingsButtonsStyle = {
-  display: 'flex',
-  gap: '12px',
-  marginTop: '8px',
-};
+  // Cards
+  card: {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '24px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+  },
+  cardHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginBottom: '20px',
+  },
+  cardTitle: {
+    fontSize: '18px',
+    fontWeight: '600',
+    color: '#111827',
+    margin: 0,
+  },
 
-const cancelButtonStyle = {
-  flex: 1,
-  padding: '10px',
-  border: `1px solid ${appTheme.colors.border}`,
-  borderRadius: '6px',
-  background: 'transparent',
-  color: appTheme.colors.textPrimary,
-  fontSize: '13px',
-  fontWeight: '500',
-  cursor: 'pointer',
-  minHeight: '40px',
-};
+  // Actions Card
+  actionsCard: {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '24px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    marginTop: '24px',
+  },
+  actionsTitle: {
+    fontSize: '18px',
+    fontWeight: '600',
+    color: '#111827',
+    margin: '0 0 20px 0',
+  },
+  actionsGrid: {
+    display: 'flex',
+    gap: '12px',
+    flexWrap: 'wrap',
+  },
 
-const saveButtonStyle = {
-  flex: 2,
-  padding: '10px',
-  border: 'none',
-  borderRadius: '6px',
-  background: appTheme.colors.primary,
-  color: '#fff',
-  fontSize: '13px',
-  fontWeight: '500',
-  cursor: 'pointer',
-  minHeight: '40px',
-  ':disabled': {
-    opacity: 0.6,
+  // Form
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
+  },
+  formGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+  },
+  label: {
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#374151',
+  },
+  input: {
+    padding: '10px 12px',
+    border: '1px solid #e5e7eb',
+    borderRadius: '8px',
+    fontSize: '14px',
+    color: '#111827',
+    outline: 'none',
+    width: '100%',
+    transition: 'border-color 0.2s ease',
+    ':focus': {
+      borderColor: '#3b82f6',
+    },
+  },
+  errorText: {
+    fontSize: '12px',
+    color: '#ef4444',
+    marginTop: '4px',
+  },
+
+  // Password Input
+  passwordInput: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  passwordToggle: {
+    position: 'absolute',
+    right: '12px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: '#6b7280',
+    padding: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Password Strength
+  strengthContainer: {
+    marginTop: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  strengthBar: {
+    display: 'flex',
+    gap: '4px',
+    flex: 1,
+  },
+  strengthSegment: {
+    height: '4px',
+    flex: 1,
+    borderRadius: '2px',
+    transition: 'background-color 0.2s ease',
+  },
+  strengthText: {
+    fontSize: '12px',
+    fontWeight: '500',
+    minWidth: '70px',
+  },
+  requirements: {
+    listStyle: 'none',
+    padding: '12px',
+    margin: '8px 0 0 0',
+    backgroundColor: '#f9fafb',
+    borderRadius: '8px',
+    fontSize: '12px',
+    li: {
+      marginBottom: '4px',
+    },
+  },
+
+  // Buttons
+  button: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '12px 20px',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    border: 'none',
+    transition: 'all 0.2s ease',
+    minHeight: '44px',
+  },
+  buttonPrimary: {
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    ':hover': {
+      backgroundColor: '#2563eb',
+    },
+  },
+  buttonDisabled: {
+    opacity: 0.5,
     cursor: 'not-allowed',
+    ':hover': {
+      backgroundColor: '#3b82f6',
+    },
   },
-};
 
-const loadingContainerStyle = {
-  padding: '40px',
-  textAlign: 'center',
-};
-
-const loadingTextStyle = {
-  color: appTheme.colors.textSecondary,
-  fontSize: '14px',
-};
-
-// Modal Styles
-const modalOverlayStyle = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  background: 'rgba(0, 0, 0, 0.5)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '16px',
-  zIndex: 1000,
-};
-
-const modalContentStyle = {
-  background: appTheme.colors.surface,
-  borderRadius: '12px',
-  maxWidth: '500px',
-  width: '100%',
-  maxHeight: '90vh',
-  overflow: 'hidden',
-  boxShadow: appTheme.shadows.lg,
-};
-
-const modalHeaderStyle = {
-  padding: '16px 20px',
-  borderBottom: `1px solid ${appTheme.colors.border}`,
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-};
-
-const modalTitleStyle = {
-  fontSize: '18px',
-  fontWeight: '600',
-  color: appTheme.colors.textPrimary,
-  margin: 0,
-};
-
-const modalCloseStyle = {
-  background: 'none',
-  border: 'none',
-  color: appTheme.colors.textSecondary,
-  cursor: 'pointer',
-  padding: '4px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: '4px',
-  minHeight: '32px',
-  minWidth: '32px',
-  ':hover': {
-    background: appTheme.colors.background,
+  // Logout Button
+  logoutButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 20px',
+    backgroundColor: '#fef2f2',
+    color: '#ef4444',
+    border: '1px solid #fee2e2',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    ':hover': {
+      backgroundColor: '#fee2e2',
+    },
   },
-};
 
-const modalBodyStyle = {
-  padding: '20px',
-  overflowY: 'auto',
-  maxHeight: 'calc(90vh - 130px)',
-};
-
-const modalTextStyle = {
-  fontSize: '14px',
-  color: appTheme.colors.textSecondary,
-  marginBottom: '20px',
-  lineHeight: 1.5,
-};
-
-const modalFormStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '16px',
-};
-
-const textareaStyle = {
-  ...inputStyle,
-  resize: 'vertical',
-  minHeight: '80px',
-  fontFamily: 'inherit',
-};
-
-const checkboxGroupStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  marginTop: '4px',
-};
-
-const checkboxStyle = {
-  width: '16px',
-  height: '16px',
-  cursor: 'pointer',
-};
-
-const checkboxLabelStyle = {
-  fontSize: '14px',
-  color: appTheme.colors.textPrimary,
-  cursor: 'pointer',
-};
-
-const warningBoxStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  background: '#fef3c7',
-  padding: '10px',
-  borderRadius: '6px',
-  border: '1px solid #fde68a',
-};
-
-const warningBoxTextStyle = {
-  margin: 0,
-  fontSize: '12px',
-  color: '#92400e',
-  flex: 1,
-};
-
-const modalFooterStyle = {
-  padding: '16px 20px',
-  borderTop: `1px solid ${appTheme.colors.border}`,
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: '12px',
-};
-
-const modalCancelButtonStyle = {
-  padding: '10px 16px',
-  border: `1px solid ${appTheme.colors.border}`,
-  borderRadius: '6px',
-  background: 'transparent',
-  color: appTheme.colors.textPrimary,
-  fontSize: '14px',
-  fontWeight: '500',
-  cursor: 'pointer',
-  minHeight: '40px',
-};
-
-const modalConfirmButtonStyle = {
-  padding: '10px 20px',
-  border: 'none',
-  borderRadius: '6px',
-  background: appTheme.colors.primary,
-  color: '#fff',
-  fontSize: '14px',
-  fontWeight: '500',
-  cursor: 'pointer',
-  minHeight: '40px',
-  ':disabled': {
-    opacity: 0.6,
-    cursor: 'not-allowed',
+  // Forgot Password Link
+  forgotPasswordLink: {
+    background: 'none',
+    border: 'none',
+    color: '#3b82f6',
+    fontSize: '14px',
+    cursor: 'pointer',
+    marginTop: '16px',
+    textDecoration: 'underline',
+    padding: '8px',
+    ':hover': {
+      color: '#2563eb',
+    },
   },
-};
 
-const modalCloseFooterButtonStyle = {
-  padding: '10px 24px',
-  border: 'none',
-  borderRadius: '6px',
-  background: appTheme.colors.primary,
-  color: '#fff',
-  fontSize: '14px',
-  fontWeight: '500',
-  cursor: 'pointer',
-  minHeight: '40px',
-};
+  // Modal
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '16px',
+    zIndex: 1000,
+  },
+  modal: {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    maxWidth: '400px',
+    width: '100%',
+    boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+  },
+  modalHeader: {
+    padding: '20px',
+    borderBottom: '1px solid #e5e7eb',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  modalTitle: {
+    fontSize: '18px',
+    fontWeight: '600',
+    color: '#111827',
+    margin: 0,
+    flex: 1,
+  },
+  modalClose: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: '#6b7280',
+    padding: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBody: {
+    padding: '20px',
+  },
+  modalText: {
+    fontSize: '14px',
+    color: '#4b5563',
+    marginBottom: '16px',
+    lineHeight: 1.5,
+  },
+  modalFooter: {
+    padding: '20px',
+    borderTop: '1px solid #e5e7eb',
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '12px',
+  },
+  modalCancel: {
+    padding: '10px 16px',
+    backgroundColor: 'white',
+    color: '#374151',
+    border: '1px solid #e5e7eb',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+  },
+  modalConfirm: {
+    padding: '10px 16px',
+    backgroundColor: '#ef4444',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+  },
+  modalSend: {
+    padding: '10px 16px',
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+  },
 
-// History Modal Styles
-const historyListStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '12px',
-  maxHeight: '400px',
-  overflowY: 'auto',
-};
-
-const historyItemStyle = {
-  padding: '16px',
-  background: appTheme.colors.background,
-  borderRadius: '8px',
-  border: `1px solid ${appTheme.colors.border}`,
-};
-
-const historyItemHeaderStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: '8px',
-  flexWrap: 'wrap',
-  gap: '8px',
-};
-
-const historyItemBadgeStyle = {
-  background: appTheme.colors.primary + '15',
-  color: appTheme.colors.primary,
-  padding: '4px 8px',
-  borderRadius: '4px',
-  fontSize: '12px',
-  fontWeight: '600',
-  fontFamily: 'monospace',
-};
-
-const historyItemDateStyle = {
-  fontSize: '11px',
-  color: appTheme.colors.textSecondary,
-};
-
-const historyItemReasonStyle = {
-  fontSize: '13px',
-  color: appTheme.colors.textPrimary,
-  margin: '0 0 4px 0',
-  lineHeight: 1.4,
-};
-
-const historyItemUserStyle = {
-  fontSize: '12px',
-  color: appTheme.colors.textSecondary,
-  margin: '0 0 2px 0',
-};
-
-const historyItemMetaStyle = {
-  fontSize: '10px',
-  color: appTheme.colors.textSecondary,
-  margin: 0,
-  opacity: 0.7,
-};
-
-const emptyTextStyle = {
-  textAlign: 'center',
-  color: appTheme.colors.textSecondary,
-  padding: '40px 0',
-};
-
-const historyFooterStyle = {
-  marginTop: '20px',
-  paddingTop: '16px',
-  borderTop: `1px solid ${appTheme.colors.border}`,
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  flexWrap: 'wrap',
-  gap: '12px',
-};
-
-const historyControlStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-};
-
-const historyLabelStyle = {
-  fontSize: '13px',
-  color: appTheme.colors.textPrimary,
-};
-
-const historySelectStyle = {
-  padding: '6px 10px',
-  border: `1px solid ${appTheme.colors.border}`,
-  borderRadius: '6px',
-  fontSize: '13px',
-  background: appTheme.colors.surface,
-  color: appTheme.colors.textPrimary,
-  cursor: 'pointer',
-};
-
-const historyClearButtonStyle = {
-  padding: '8px 12px',
-  border: 'none',
-  borderRadius: '6px',
-  background: '#fee2e2',
-  color: '#dc2626',
-  fontSize: '12px',
-  fontWeight: '500',
-  cursor: 'pointer',
-  minHeight: '36px',
-  ':hover': {
-    background: '#fecaca',
+  // Mobile Responsive
+  '@media (max-width: 640px)': {
+    grid: {
+      gridTemplateColumns: '1fr',
+    },
+    container: {
+      padding: '16px',
+    },
+    title: {
+      fontSize: '24px',
+    },
   },
 };
