@@ -675,7 +675,7 @@ class CompanyConfig {
                 // ✅ CRITICAL: Cache the REAL data from API
                 this.cache = settings;
                 this.lastFetch = Date.now();
-                this.setupAutoRefresh();
+              //  this.setupAutoRefresh();
                 
                 console.log(`✅ [CompanyConfig] Settings updated in cache`);
                 console.log(`   Company: ${settings.companyName}`);
@@ -705,16 +705,16 @@ class CompanyConfig {
     /**
      * Setup auto-refresh timer
      */
-    setupAutoRefresh() {
-        if (this.refreshTimer) {
-            clearTimeout(this.refreshTimer);
-        }
+    // setupAutoRefresh() {
+    //     if (this.refreshTimer) {
+    //         clearTimeout(this.refreshTimer);
+    //     }
         
-        this.refreshTimer = setTimeout(async () => {
-            console.log('🔄 [CompanyConfig] Auto-refreshing settings...');
-            await this.getSettings();
-        }, CACHE_TTL);
-    }
+    //     this.refreshTimer = setTimeout(async () => {
+    //         console.log('🔄 [CompanyConfig] Auto-refreshing settings...');
+    //         await this.getSettings();
+    //     }, CACHE_TTL);
+    // }
 
     /**
      * ✅ ADDED: Get current order flow mode

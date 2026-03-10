@@ -717,7 +717,7 @@ class NotificationWebSocketServer {
     constructor() {
         this.wss = null;
         this.server = null;
-        this.port = process.env.NOTIFICATION_WS_PORT || 3001;
+        this.port = process.env.NOTIFICATION_WS_PORT || 3000;
         this.nextjsApiUrl = process.env.NEXTJS_API_URL || 'http://localhost:3000';
         
         // Client management

@@ -6,7 +6,7 @@ const OrderSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      index: true, // Added index for faster queries
+       // Added index for faster queries
     },
     createdBy: { type: String, ref: 'User', required: false },
     updatedBy: { type: String, ref: 'User', required: false },

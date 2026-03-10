@@ -7,7 +7,21 @@ import {
   Search, Filter, Plus, Eye, Edit, CheckCircle, XCircle,
   Phone, Mail, MapPin, Star, Calendar, Users, Shield,
   Trash2, Clock, TrendingUp, Building, UserPlus, ChevronLeft, ChevronRight,
-  Download, MoreVertical
+  Download, MoreVertical, AlertCircle, RefreshCw, Award, Briefcase,
+  Globe, Map, Check, AlertTriangle, Info, Home, Settings,
+  FileText, DollarSign, Percent, Hash, AtSign, Link2,
+  Wifi, WifiOff, Battery, BatteryCharging, Cpu, HardDrive,
+  Server, Cloud, CloudOff, Repeat, Shuffle, Play, Pause,
+  Square, Circle, Triangle, Hexagon, Octagon, Diamond,
+  Gem, Crown, Sparkle, Layers, Layout, Grid, List,
+  Menu, X, ArrowLeft, ArrowRight, ChevronDown, ChevronUp,
+  Maximize, Minimize, ZoomIn, ZoomOut, Move, Target,
+  Flag, Bookmark, Heart, ThumbsUp, ThumbsDown, MessageSquare,
+  Send, Paperclip, Smile, Camera, Video, Image,
+  File, Folder, Database, HardDrive as HardDriveIcon,
+  Printer, Share2, Copy, Scissors, Clipboard, Edit3,
+  Sliders, ToggleLeft, ToggleRight, Volume2, VolumeX,
+  Mic, MicOff, Bell, BellOff, AlertOctagon, AlertTriangle as AlertTriangleIcon
 } from 'lucide-react';
 
 export default function BookingmngPage() {
@@ -33,6 +47,7 @@ export default function BookingmngPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
 
   // Categories
   const categories = [
@@ -102,6 +117,17 @@ export default function BookingmngPage() {
   // Handle filter changes
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      status: 'all',
+      category: 'all',
+      type: 'all'
+    });
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
@@ -202,13 +228,14 @@ export default function BookingmngPage() {
     <>
       <Head>
         <title>Professionals Management | LFMS</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=yes" />
       </Head>
 
       <div className="professionals-container">
         {/* Header */}
         <div className="page-header">
           <div className="header-content">
-            <div>
+            <div className="header-title-section">
               <h1 className="page-title">Professionals Management</h1>
               <p className="page-subtitle">Manage service professionals and their profiles</p>
             </div>
@@ -219,14 +246,14 @@ export default function BookingmngPage() {
                 title="Export Data"
               >
                 <Download size={20} />
-                <span className="hidden sm:inline">Export</span>
+                <span className="export-text">Export</span>
               </button>
               <Link
                 href="/admin/bookingService/bookingmng/create"
                 className="add-button"
               >
                 <Plus size={20} />
-                <span>Add Professional</span>
+                <span className="add-text">Add Professional</span>
               </Link>
             </div>
           </div>
@@ -235,7 +262,11 @@ export default function BookingmngPage() {
         {/* Error Message */}
         {error && (
           <div className="error-alert">
+            <AlertCircle size={20} />
             <p>{error}</p>
+            <button onClick={fetchProfessionals} className="retry-icon">
+              <RefreshCw size={16} />
+            </button>
           </div>
         )}
 
@@ -301,93 +332,150 @@ export default function BookingmngPage() {
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="filters-container">
-          <div className="filters-header">
-            <div className="filters-title">
-              <Filter className="text-gray-500" size={20} />
-              <h2 className="filters-title-text">Filters</h2>
-            </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="mobile-filters-toggle"
-            >
-              <Filter size={20} />
-              <span>{showFilters ? 'Hide' : 'Show'} Filters</span>
-            </button>
-          </div>
-
-          <div className={`filters-grid ${showFilters ? 'show' : ''}`}>
-            {/* Search */}
-            <div className="filter-group">
-              <label className="filter-label">
-                Search Professionals
-              </label>
-              <div className="search-container">
-                <Search className="search-icon" size={18} />
-                <input
-                  type="text"
-                  value={filters.search}
-                  onChange={(e) => handleFilterChange('search', e.target.value)}
-                  placeholder="Search by name, email, phone..."
-                  className="search-input"
-                />
+        {/* Filters and View Toggle */}
+        <div className="filters-wrapper">
+          <div className="filters-container">
+            <div className="filters-header">
+              <div className="filters-title">
+                <Filter className="text-gray-500" size={20} />
+                <h2 className="filters-title-text">Filters</h2>
+                {(filters.search || filters.status !== 'all' || filters.category !== 'all' || filters.type !== 'all') && (
+                  <button
+                    onClick={clearFilters}
+                    className="clear-filters-btn"
+                    title="Clear all filters"
+                  >
+                    <X size={16} />
+                    <span className="clear-text">Clear</span>
+                  </button>
+                )}
+              </div>
+              <div className="filters-right">
+                <div className="view-toggle desktop-only">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                    title="Grid View"
+                  >
+                    <Grid size={18} />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`view-btn ${viewMode === 'list' ? 'active' : ''}`}
+                    title="List View"
+                  >
+                    <List size={18} />
+                  </button>
+                </div>
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="mobile-filters-toggle"
+                >
+                  <Filter size={18} />
+                  <span>{showFilters ? 'Hide' : 'Show'} Filters</span>
+                  <ChevronDown size={16} className={`chevron ${showFilters ? 'up' : ''}`} />
+                </button>
               </div>
             </div>
 
-            {/* Status Filter */}
-            <div className="filter-group">
-              <label className="filter-label">
-                Verification Status
-              </label>
-              <select
-                value={filters.status}
-                onChange={(e) => handleFilterChange('status', e.target.value)}
-                className="filter-select"
-              >
-                {statuses.map(status => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <div className={`filters-grid ${showFilters ? 'show' : ''}`}>
+              {/* Search */}
+              <div className="filter-group">
+                <label className="filter-label">
+                  Search Professionals
+                </label>
+                <div className="search-container">
+                  <Search className="search-icon" size={18} />
+                  <input
+                    type="text"
+                    value={filters.search}
+                    onChange={(e) => handleFilterChange('search', e.target.value)}
+                    placeholder="Search by name, email, phone..."
+                    className="search-input"
+                  />
+                  {filters.search && (
+                    <button
+                      onClick={() => handleFilterChange('search', '')}
+                      className="clear-search"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
 
-            {/* Category Filter */}
-            <div className="filter-group">
-              <label className="filter-label">
-                Category
-              </label>
-              <select
-                value={filters.category}
-                onChange={(e) => handleFilterChange('category', e.target.value)}
-                className="filter-select"
-              >
-                {categories.map(cat => (
-                  <option key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+              {/* Status Filter */}
+              <div className="filter-group">
+                <label className="filter-label">
+                  Verification Status
+                </label>
+                <select
+                  value={filters.status}
+                  onChange={(e) => handleFilterChange('status', e.target.value)}
+                  className="filter-select"
+                >
+                  {statuses.map(status => (
+                    <option key={status.value} value={status.value}>
+                      {status.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            {/* Type Filter */}
-            <div className="filter-group">
-              <label className="filter-label">
-                Professional Type
-              </label>
-              <select
-                value={filters.type}
-                onChange={(e) => handleFilterChange('type', e.target.value)}
-                className="filter-select"
-              >
-                {types.map(type => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
+              {/* Category Filter */}
+              <div className="filter-group">
+                <label className="filter-label">
+                  Category
+                </label>
+                <select
+                  value={filters.category}
+                  onChange={(e) => handleFilterChange('category', e.target.value)}
+                  className="filter-select"
+                >
+                  {categories.map(cat => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Type Filter */}
+              <div className="filter-group">
+                <label className="filter-label">
+                  Professional Type
+                </label>
+                <select
+                  value={filters.type}
+                  onChange={(e) => handleFilterChange('type', e.target.value)}
+                  className="filter-select"
+                >
+                  {types.map(type => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
+          </div>
+
+          {/* Mobile View Toggle */}
+          <div className="mobile-view-toggle">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`mobile-view-btn ${viewMode === 'grid' ? 'active' : ''}`}
+            >
+              <Grid size={18} />
+              <span>Grid</span>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`mobile-view-btn ${viewMode === 'list' ? 'active' : ''}`}
+            >
+              <List size={18} />
+              <span>List</span>
+            </button>
           </div>
         </div>
 
@@ -400,19 +488,20 @@ export default function BookingmngPage() {
             </div>
           ) : error ? (
             <div className="error-state">
-              <Users className="error-icon" />
+              <AlertCircle className="error-icon" size={48} />
               <h3 className="error-title">Unable to load professionals</h3>
               <p className="error-message">{error}</p>
               <button
                 onClick={fetchProfessionals}
                 className="retry-button"
               >
+                <RefreshCw size={16} />
                 Retry
               </button>
             </div>
           ) : professionals.length === 0 ? (
             <div className="empty-state">
-              <Users className="empty-icon" />
+              <Users className="empty-icon" size={48} />
               <h3 className="empty-title">No professionals found</h3>
               <p className="empty-message">
                 {filters.search || filters.status !== 'all' || filters.category !== 'all' || filters.type !== 'all' 
@@ -429,326 +518,336 @@ export default function BookingmngPage() {
             </div>
           ) : (
             <>
-              {/* Desktop Table View */}
-              <div className="desktop-table-container">
-                <table className="professionals-table">
-                  <thead>
-                    <tr>
-                      <th>Professional</th>
-                      <th>Contact</th>
-                      <th>Category & Type</th>
-                      <th>Stats</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {professionals.map((professional) => (
-                      <tr key={professional._id}>
-                        {/* Professional Info */}
-                        <td>
-                          <div className="professional-info">
-                            <div className="professional-avatar">
-                              <Building className="text-blue-600" size={24} />
-                            </div>
-                            <div className="professional-details">
-                              <div className="professional-name">
-                                <span>{professional.businessName || 'Unnamed Business'}</span>
-                                {professional.isFeatured && (
-                                  <span className="featured-badge">Featured</span>
-                                )}
-                              </div>
-                              <p className="professional-tagline">
-                                {professional.tagline || 'No tagline provided'}
-                              </p>
-                              <div className="professional-meta">
-                                <div className="rating">
-                                  <Star size={14} className="text-yellow-500 fill-current" />
-                                  <span>{professional.rating?.average?.toFixed(1) || '0.0'}</span>
-                                  <span className="reviews">({professional.rating?.totalReviews || 0})</span>
-                                </div>
-                                <div className="joined-date">
-                                  <Calendar size={14} />
-                                  <span>Joined {formatDate(professional.createdAt)}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Contact */}
-                        <td>
-                          <div className="contact-info">
-                            <div className="contact-item">
-                              <Phone size={16} />
-                              <span>{professional.phone || 'N/A'}</span>
-                            </div>
-                            <div className="contact-item">
-                              <Mail size={16} />
-                              <span>{professional.email || 'N/A'}</span>
-                            </div>
-                            {professional.address?.city && (
-                              <div className="contact-item">
-                                <MapPin size={16} />
-                                <span>{professional.address.city}, {professional.address.state || ''}</span>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Category & Type */}
-                        <td>
-                          <div className="category-type">
-                            <span className="category-badge">
-                              {professional.category || 'Uncategorized'}
-                            </span>
-                            <div className="type-info">
-                              {getTypeIcon(professional.type)}
-                              <span className="type-text">
-                                {professional.type || 'individual'}
-                              </span>
-                            </div>
-                            <div className="experience">
-                              Experience: {professional.experience || 0} year{professional.experience !== 1 ? 's' : ''}
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Stats */}
-                        <td>
-                          <div className="stats-list">
-                            <div className="stat-item">
-                              <span>Total Bookings:</span>
-                              <span className="stat-value">{professional.totalBookings || 0}</span>
-                            </div>
-                            <div className="stat-item">
-                              <span>Completed:</span>
-                              <span className="stat-value green">{professional.completedBookings || 0}</span>
-                            </div>
-                            <div className="stat-item">
-                              <span>Services:</span>
-                              <span className="stat-value blue">{professional.services?.length || 0}</span>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Status */}
-                        <td>
-                          <div className="status-info">
-                            <div className="status-badge">
-                              {getStatusBadge(professional.verificationStatus)}
-                            </div>
-                            <div className="active-status">
-                              <div className={`status-dot ${professional.isActive ? 'active' : 'inactive'}`} />
-                              <span className={`status-text ${professional.isActive ? 'active' : 'inactive'}`}>
-                                {professional.isActive ? 'Active' : 'Inactive'}
-                              </span>
-                            </div>
-                            {professional.whatsappVerified && (
-                              <div className="whatsapp-verified">
-                                <Shield size={12} />
-                                <span>WhatsApp Verified</span>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Actions */}
-                        <td>
-                          <div className="actions-container">
-                            <Link
-                              href={`/admin/bookingService/bookingmng/${professional._id}`}
-                              className="action-button view"
-                              title="View Details"
-                            >
-                              <Eye size={18} />
-                            </Link>
-                            
-                            <Link
-                              href={`/admin/bookingService/bookingmng/${professional._id}/edit`}
-                              className="action-button edit"
-                              title="Edit"
-                            >
-                              <Edit size={18} />
-                            </Link>
-                            
-                            {professional.verificationStatus === 'pending' && (
-                              <button
-                                onClick={() => handleAction(professional._id, 'verify')}
-                                className="action-button verify"
-                                title="Verify Professional"
-                                disabled={actionLoading}
-                              >
-                                <CheckCircle size={18} />
-                              </button>
-                            )}
-                            
-                            {professional.verificationStatus === 'verified' && professional.isActive && (
-                              <button
-                                onClick={() => handleAction(professional._id, 'suspend', { reason: 'Admin action' })}
-                                className="action-button suspend"
-                                title="Suspend Professional"
-                                disabled={actionLoading}
-                              >
-                                <XCircle size={18} />
-                              </button>
-                            )}
-                            
-                            <button
-                              onClick={() => {
-                                setProfessionalToDelete(professional._id);
-                                setShowDeleteModal(true);
-                              }}
-                              className="action-button delete"
-                              title="Delete Professional"
-                              disabled={actionLoading}
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </div>
-                        </td>
+              {/* Desktop Table View (List Mode) */}
+              {viewMode === 'list' && (
+                <div className="desktop-table-container">
+                  <table className="professionals-table">
+                    <thead>
+                      <tr>
+                        <th>Professional</th>
+                        <th>Contact</th>
+                        <th>Category & Type</th>
+                        <th>Stats</th>
+                        <th>Status</th>
+                        <th>Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {professionals.map((professional) => (
+                        <tr key={professional._id}>
+                          {/* Professional Info */}
+                          <td>
+                            <div className="professional-info">
+                              <div className="professional-avatar">
+                                <Building className="text-blue-600" size={24} />
+                              </div>
+                              <div className="professional-details">
+                                <div className="professional-name">
+                                  <span>{professional.businessName || 'Unnamed Business'}</span>
+                                  {professional.isFeatured && (
+                                    <span className="featured-badge">
+                                      <Award size={12} />
+                                      Featured
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="professional-tagline">
+                                  {professional.tagline || 'No tagline provided'}
+                                </p>
+                                <div className="professional-meta">
+                                  <div className="rating">
+                                    <Star size={14} className="text-yellow-500 fill-current" />
+                                    <span>{professional.rating?.average?.toFixed(1) || '0.0'}</span>
+                                    <span className="reviews">({professional.rating?.totalReviews || 0})</span>
+                                  </div>
+                                  <div className="joined-date">
+                                    <Calendar size={14} />
+                                    <span>Joined {formatDate(professional.createdAt)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
 
-              {/* Mobile Card View */}
-              <div className="mobile-cards-container">
-                {professionals.map((professional) => (
-                  <div key={professional._id} className="professional-card">
-                    <div className="card-header">
-                      <div className="professional-avatar mobile">
-                        <Building className="text-blue-600" size={20} />
-                      </div>
-                      <div className="professional-name-mobile">
-                        <span>{professional.businessName || 'Unnamed Business'}</span>
-                        <div className="mobile-badges">
-                          {professional.isFeatured && (
-                            <span className="featured-badge">Featured</span>
-                          )}
-                          {getStatusBadge(professional.verificationStatus)}
+                          {/* Contact */}
+                          <td>
+                            <div className="contact-info">
+                              <div className="contact-item">
+                                <Phone size={16} />
+                                <span>{professional.phone || 'N/A'}</span>
+                              </div>
+                              <div className="contact-item">
+                                <Mail size={16} />
+                                <span>{professional.email || 'N/A'}</span>
+                              </div>
+                              {professional.address?.city && (
+                                <div className="contact-item">
+                                  <MapPin size={16} />
+                                  <span>{professional.address.city}, {professional.address.state || ''}</span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Category & Type */}
+                          <td>
+                            <div className="category-type">
+                              <span className="category-badge">
+                                {professional.category || 'Uncategorized'}
+                              </span>
+                              <div className="type-info">
+                                {getTypeIcon(professional.type)}
+                                <span className="type-text">
+                                  {professional.type || 'individual'}
+                                </span>
+                              </div>
+                              <div className="experience">
+                                <Briefcase size={12} />
+                                <span>Experience: {professional.experience || 0} year{professional.experience !== 1 ? 's' : ''}</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Stats */}
+                          <td>
+                            <div className="stats-list">
+                              <div className="stat-item">
+                                <span>Total Bookings:</span>
+                                <span className="stat-value">{professional.totalBookings || 0}</span>
+                              </div>
+                              <div className="stat-item">
+                                <span>Completed:</span>
+                                <span className="stat-value green">{professional.completedBookings || 0}</span>
+                              </div>
+                              <div className="stat-item">
+                                <span>Services:</span>
+                                <span className="stat-value blue">{professional.services?.length || 0}</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Status */}
+                          <td>
+                            <div className="status-info">
+                              <div className="status-badge-wrapper">
+                                {getStatusBadge(professional.verificationStatus)}
+                              </div>
+                              <div className="active-status">
+                                <div className={`status-dot ${professional.isActive ? 'active' : 'inactive'}`} />
+                                <span className={`status-text ${professional.isActive ? 'active' : 'inactive'}`}>
+                                  {professional.isActive ? 'Active' : 'Inactive'}
+                                </span>
+                              </div>
+                              {professional.whatsappVerified && (
+                                <div className="whatsapp-verified">
+                                  <Shield size={12} />
+                                  <span>WhatsApp Verified</span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Actions */}
+                          <td>
+                            <div className="actions-container">
+                              <Link
+                                href={`/admin/bookingService/bookingmng/${professional._id}`}
+                                className="action-button view"
+                                title="View Details"
+                              >
+                                <Eye size={18} />
+                              </Link>
+                              
+                              <Link
+                                href={`/admin/bookingService/bookingmng/${professional._id}/edit`}
+                                className="action-button edit"
+                                title="Edit"
+                              >
+                                <Edit size={18} />
+                              </Link>
+                              
+                              {professional.verificationStatus === 'pending' && (
+                                <button
+                                  onClick={() => handleAction(professional._id, 'verify')}
+                                  className="action-button verify"
+                                  title="Verify Professional"
+                                  disabled={actionLoading}
+                                >
+                                  <CheckCircle size={18} />
+                                </button>
+                              )}
+                              
+                              {professional.verificationStatus === 'verified' && professional.isActive && (
+                                <button
+                                  onClick={() => handleAction(professional._id, 'suspend', { reason: 'Admin action' })}
+                                  className="action-button suspend"
+                                  title="Suspend Professional"
+                                  disabled={actionLoading}
+                                >
+                                  <XCircle size={18} />
+                                </button>
+                              )}
+                              
+                              <button
+                                onClick={() => {
+                                  setProfessionalToDelete(professional._id);
+                                  setShowDeleteModal(true);
+                                }}
+                                className="action-button delete"
+                                title="Delete Professional"
+                                disabled={actionLoading}
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Grid View Cards (Mobile & Desktop) */}
+              {viewMode === 'grid' && (
+                <div className="grid-view-container">
+                  {professionals.map((professional) => (
+                    <div key={professional._id} className="grid-card">
+                      <div className="grid-card-header">
+                        <div className="grid-card-avatar">
+                          <Building className="text-blue-600" size={24} />
+                        </div>
+                        <div className="grid-card-title">
+                          <h3 className="grid-card-name">{professional.businessName || 'Unnamed Business'}</h3>
+                          <div className="grid-card-badges">
+                            {professional.isFeatured && (
+                              <span className="featured-badge">
+                                <Award size={10} />
+                                Featured
+                              </span>
+                            )}
+                            {getStatusBadge(professional.verificationStatus)}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="card-body">
-                      <div className="card-row">
-                        <div className="card-label">Contact</div>
-                        <div className="card-value">
-                          <div className="contact-item mobile">
+                      <div className="grid-card-body">
+                        <p className="grid-card-tagline">
+                          {professional.tagline || 'No tagline provided'}
+                        </p>
+
+                        <div className="grid-card-contact">
+                          <div className="grid-contact-item">
                             <Phone size={14} />
                             <span>{professional.phone || 'N/A'}</span>
                           </div>
-                          {professional.email && (
-                            <div className="contact-item mobile">
-                              <Mail size={14} />
-                              <span>{professional.email}</span>
+                          <div className="grid-contact-item">
+                            <Mail size={14} />
+                            <span>{professional.email || 'N/A'}</span>
+                          </div>
+                          {professional.address?.city && (
+                            <div className="grid-contact-item">
+                              <MapPin size={14} />
+                              <span>{professional.address.city}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid-card-details">
+                          <div className="grid-detail-item">
+                            <span className="detail-label">Category</span>
+                            <span className="detail-value">{professional.category || 'Uncategorized'}</span>
+                          </div>
+                          <div className="grid-detail-item">
+                            <span className="detail-label">Type</span>
+                            <span className="detail-value type-value">
+                              {getTypeIcon(professional.type)}
+                              <span>{professional.type || 'individual'}</span>
+                            </span>
+                          </div>
+                          <div className="grid-detail-item">
+                            <span className="detail-label">Experience</span>
+                            <span className="detail-value">{professional.experience || 0} years</span>
+                          </div>
+                        </div>
+
+                        <div className="grid-card-stats">
+                          <div className="grid-stat">
+                            <span className="stat-num">{professional.totalBookings || 0}</span>
+                            <span className="stat-label">Bookings</span>
+                          </div>
+                          <div className="grid-stat">
+                            <span className="stat-num">
+                              <Star size={12} className="text-yellow-500 fill-current" />
+                              {professional.rating?.average?.toFixed(1) || '0.0'}
+                            </span>
+                            <span className="stat-label">Rating</span>
+                          </div>
+                          <div className="grid-stat">
+                            <span className="stat-num">{professional.services?.length || 0}</span>
+                            <span className="stat-label">Services</span>
+                          </div>
+                        </div>
+
+                        <div className="grid-card-status">
+                          <div className="grid-status-item">
+                            <div className={`status-dot ${professional.isActive ? 'active' : 'inactive'}`} />
+                            <span className="status-text">{professional.isActive ? 'Active' : 'Inactive'}</span>
+                          </div>
+                          {professional.whatsappVerified && (
+                            <div className="whatsapp-verified">
+                              <Shield size={12} />
+                              <span>WhatsApp Verified</span>
                             </div>
                           )}
                         </div>
                       </div>
 
-                      <div className="card-row">
-                        <div className="card-label">Category & Type</div>
-                        <div className="card-value">
-                          <div className="category-type mobile">
-                            <span className="category-badge">
-                              {professional.category || 'Uncategorized'}
-                            </span>
-                            <div className="type-info">
-                              {getTypeIcon(professional.type)}
-                              <span>{professional.type || 'individual'}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="card-row">
-                        <div className="card-label">Stats</div>
-                        <div className="card-value">
-                          <div className="stats-grid-mobile">
-                            <div className="stat-mobile">
-                              <span className="stat-label-mobile">Bookings</span>
-                              <span className="stat-value-mobile">{professional.totalBookings || 0}</span>
-                            </div>
-                            <div className="stat-mobile">
-                              <span className="stat-label-mobile">Rating</span>
-                              <span className="stat-value-mobile">
-                                <Star size={12} className="text-yellow-500 fill-current" />
-                                {professional.rating?.average?.toFixed(1) || '0.0'}
-                              </span>
-                            </div>
-                            <div className="stat-mobile">
-                              <span className="stat-label-mobile">Services</span>
-                              <span className="stat-value-mobile">{professional.services?.length || 0}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="card-row">
-                        <div className="card-label">Status</div>
-                        <div className="card-value">
-                          <div className="status-info-mobile">
-                            <div className="active-status">
-                              <div className={`status-dot ${professional.isActive ? 'active' : 'inactive'}`} />
-                              <span>{professional.isActive ? 'Active' : 'Inactive'}</span>
-                            </div>
-                            {professional.whatsappVerified && (
-                              <div className="whatsapp-verified mobile">
-                                <Shield size={12} />
-                                <span>WhatsApp Verified</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="card-footer">
-                      <div className="mobile-actions">
-                        <Link
-                          href={`/admin/bookingService/bookingmng/${professional._id}`}
-                          className="mobile-action-button view"
-                          title="View Details"
-                        >
-                          <Eye size={16} />
-                          <span>View</span>
-                        </Link>
-                        
-                        <Link
-                          href={`/admin/bookingService/bookingmng/${professional._id}/edit`}
-                          className="mobile-action-button edit"
-                          title="Edit"
-                        >
-                          <Edit size={16} />
-                          <span>Edit</span>
-                        </Link>
-                        
-                        <button
-                          onClick={() => {
-                            setProfessionalToDelete(professional._id);
-                            setShowDeleteModal(true);
-                          }}
-                          className="mobile-action-button delete"
-                          title="Delete Professional"
-                          disabled={actionLoading}
-                        >
-                          <Trash2 size={16} />
-                          <span>Delete</span>
-                        </button>
-                        
-                        <div className="mobile-more-actions">
-                          <button className="mobile-more-button">
-                            <MoreVertical size={16} />
+                      <div className="grid-card-footer">
+                        <div className="grid-actions">
+                          <Link
+                            href={`/admin/bookingService/bookingmng/${professional._id}`}
+                            className="grid-action view"
+                            title="View Details"
+                          >
+                            <Eye size={16} />
+                            <span>View</span>
+                          </Link>
+                          <Link
+                            href={`/admin/bookingService/bookingmng/${professional._id}/edit`}
+                            className="grid-action edit"
+                            title="Edit"
+                          >
+                            <Edit size={16} />
+                            <span>Edit</span>
+                          </Link>
+                          {professional.verificationStatus === 'pending' && (
+                            <button
+                              onClick={() => handleAction(professional._id, 'verify')}
+                              className="grid-action verify"
+                              disabled={actionLoading}
+                            >
+                              <CheckCircle size={16} />
+                              <span>Verify</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setProfessionalToDelete(professional._id);
+                              setShowDeleteModal(true);
+                            }}
+                            className="grid-action delete"
+                            disabled={actionLoading}
+                          >
+                            <Trash2 size={16} />
+                            <span>Delete</span>
                           </button>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               {/* Pagination */}
               {pagination.pages > 1 && (
@@ -814,7 +913,7 @@ export default function BookingmngPage() {
             <div className="modal-container">
               <div className="modal-header">
                 <div className="modal-icon">
-                  <Trash2 className="text-red-600" size={24} />
+                  <AlertTriangle className="text-red-600" size={24} />
                 </div>
                 <h3 className="modal-title">Delete Professional</h3>
               </div>
@@ -853,7 +952,7 @@ export default function BookingmngPage() {
       </div>
 
       <style jsx>{`
-        /* Container Styles */
+        /* ==================== CONTAINER STYLES ==================== */
         .professionals-container {
           padding: 1.5rem;
           max-width: 1400px;
@@ -861,7 +960,13 @@ export default function BookingmngPage() {
           width: 100%;
         }
 
-        /* Header */
+        @media (max-width: 640px) {
+          .professionals-container {
+            padding: 1rem;
+          }
+        }
+
+        /* ==================== HEADER STYLES ==================== */
         .page-header {
           margin-bottom: 2rem;
         }
@@ -881,8 +986,8 @@ export default function BookingmngPage() {
         }
 
         .page-title {
-          font-size: clamp(1.75rem, 3vw, 2.25rem);
-          font-weight: bold;
+          font-size: clamp(1.5rem, 4vw, 2.25rem);
+          font-weight: 700;
           color: #1f2937;
           margin: 0;
           line-height: 1.2;
@@ -901,32 +1006,11 @@ export default function BookingmngPage() {
           align-items: center;
         }
 
-        .export-button {
+        .export-button, .add-button {
           display: flex;
           align-items: center;
           gap: 0.5rem;
           padding: 0.625rem 1rem;
-          background: white;
-          border: 1px solid #d1d5db;
-          border-radius: 0.5rem;
-          color: #374151;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .export-button:hover {
-          background: #f9fafb;
-          border-color: #9ca3af;
-        }
-
-        .add-button {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.625rem 1.25rem;
-          background: #3b82f6;
-          color: white;
           border-radius: 0.5rem;
           font-weight: 500;
           cursor: pointer;
@@ -935,41 +1019,99 @@ export default function BookingmngPage() {
           white-space: nowrap;
         }
 
+        .export-button {
+          background: white;
+          border: 1px solid #d1d5db;
+          color: #374151;
+        }
+
+        .export-button:hover {
+          background: #f9fafb;
+          border-color: #9ca3af;
+        }
+
+        .add-button {
+          background: #3b82f6;
+          color: white;
+          border: none;
+        }
+
         .add-button:hover {
           background: #2563eb;
           transform: translateY(-1px);
           box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
         }
 
-        /* Error Alert */
+        @media (max-width: 480px) {
+          .export-text, .add-text {
+            display: none;
+          }
+          
+          .export-button, .add-button {
+            padding: 0.625rem;
+          }
+        }
+
+        /* ==================== ERROR ALERT ==================== */
         .error-alert {
           margin-bottom: 1.5rem;
-          padding: 1rem;
+          padding: 1rem 1.5rem;
           background: #fef2f2;
           border: 1px solid #fecaca;
           border-radius: 0.5rem;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
           color: #dc2626;
-          font-size: 0.875rem;
         }
 
-        /* Stats */
+        .error-alert p {
+          flex: 1;
+          margin: 0;
+        }
+
+        .retry-icon {
+          background: none;
+          border: none;
+          color: #dc2626;
+          cursor: pointer;
+          padding: 0.25rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 0.25rem;
+          transition: background 0.2s;
+        }
+
+        .retry-icon:hover {
+          background: rgba(220, 38, 38, 0.1);
+        }
+
+        /* ==================== STATS CARDS ==================== */
         .stats-container {
           margin-bottom: 2rem;
           overflow-x: auto;
           -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin;
         }
 
         .stats-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          grid-template-columns: repeat(4, 1fr);
           gap: 1rem;
           min-width: 300px;
+        }
+
+        @media (max-width: 1024px) {
+          .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
         }
 
         @media (max-width: 640px) {
           .stats-grid {
             grid-template-columns: repeat(2, 1fr);
-            min-width: 200px;
+            gap: 0.75rem;
           }
         }
 
@@ -999,8 +1141,8 @@ export default function BookingmngPage() {
         }
 
         .stat-value {
-          font-size: 1.875rem;
-          font-weight: bold;
+          font-size: clamp(1.25rem, 3vw, 1.875rem);
+          font-weight: 700;
           color: #1f2937;
         }
 
@@ -1012,13 +1154,16 @@ export default function BookingmngPage() {
           justify-content: center;
         }
 
-        /* Filters */
+        /* ==================== FILTERS WRAPPER ==================== */
+        .filters-wrapper {
+          margin-bottom: 2rem;
+        }
+
         .filters-container {
           background: white;
           border: 1px solid #e5e7eb;
           border-radius: 0.75rem;
           padding: 1.5rem;
-          margin-bottom: 2rem;
         }
 
         .filters-header {
@@ -1032,12 +1177,79 @@ export default function BookingmngPage() {
           display: flex;
           align-items: center;
           gap: 0.5rem;
+          flex-wrap: wrap;
         }
 
         .filters-title-text {
           font-size: 1.125rem;
           font-weight: 600;
           color: #374151;
+        }
+
+        .clear-filters-btn {
+          display: flex;
+          align-items: center;
+          gap: 0.25rem;
+          padding: 0.25rem 0.75rem;
+          background: #fee2e2;
+          border: 1px solid #fecaca;
+          border-radius: 9999px;
+          color: #dc2626;
+          font-size: 0.75rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .clear-filters-btn:hover {
+          background: #fecaca;
+        }
+
+        .filters-right {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
+
+        .view-toggle {
+          display: flex;
+          gap: 0.25rem;
+          padding: 0.25rem;
+          background: #f3f4f6;
+          border-radius: 0.5rem;
+        }
+
+        .view-btn {
+          padding: 0.5rem;
+          background: transparent;
+          border: none;
+          border-radius: 0.375rem;
+          color: #6b7280;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .view-btn:hover {
+          color: #3b82f6;
+        }
+
+        .view-btn.active {
+          background: white;
+          color: #3b82f6;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .desktop-only {
+          display: none;
+        }
+
+        @media (min-width: 1024px) {
+          .desktop-only {
+            display: flex;
+          }
         }
 
         .mobile-filters-toggle {
@@ -1047,7 +1259,7 @@ export default function BookingmngPage() {
           padding: 0.5rem 0.75rem;
           background: #f3f4f6;
           border: 1px solid #d1d5db;
-          border-radius: 0.375rem;
+          border-radius: 0.5rem;
           color: #374151;
           font-size: 0.875rem;
           font-weight: 500;
@@ -1060,10 +1272,28 @@ export default function BookingmngPage() {
           }
         }
 
+        .chevron {
+          transition: transform 0.3s ease;
+        }
+
+        .chevron.up {
+          transform: rotate(180deg);
+        }
+
         .filters-grid {
           display: grid;
           grid-template-columns: repeat(1, 1fr);
           gap: 1rem;
+          max-height: 0;
+          overflow: hidden;
+          opacity: 0;
+          transition: all 0.3s ease;
+        }
+
+        .filters-grid.show {
+          max-height: 500px;
+          opacity: 1;
+          margin-top: 1rem;
         }
 
         @media (min-width: 640px) {
@@ -1075,16 +1305,8 @@ export default function BookingmngPage() {
         @media (min-width: 1024px) {
           .filters-grid {
             grid-template-columns: repeat(4, 1fr);
-          }
-          
-          .filters-grid.show {
-            display: grid;
-          }
-        }
-
-        @media (max-width: 1023px) {
-          .filters-grid:not(.show) {
-            display: none;
+            max-height: none;
+            opacity: 1;
           }
         }
 
@@ -1129,6 +1351,27 @@ export default function BookingmngPage() {
           box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
 
+        .clear-search {
+          position: absolute;
+          right: 0.75rem;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: #9ca3af;
+          cursor: pointer;
+          padding: 0.25rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 0.25rem;
+        }
+
+        .clear-search:hover {
+          color: #ef4444;
+          background: #f3f4f6;
+        }
+
         .filter-select {
           width: 100%;
           padding: 0.625rem 0.75rem;
@@ -1152,7 +1395,43 @@ export default function BookingmngPage() {
           box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
 
-        /* Loading State */
+        /* ==================== MOBILE VIEW TOGGLE ==================== */
+        .mobile-view-toggle {
+          display: flex;
+          gap: 0.5rem;
+          margin-top: 1rem;
+        }
+
+        @media (min-width: 1024px) {
+          .mobile-view-toggle {
+            display: none;
+          }
+        }
+
+        .mobile-view-btn {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          padding: 0.75rem;
+          background: white;
+          border: 1px solid #e5e7eb;
+          border-radius: 0.5rem;
+          color: #6b7280;
+          font-size: 0.875rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .mobile-view-btn.active {
+          background: #3b82f6;
+          border-color: #3b82f6;
+          color: white;
+        }
+
+        /* ==================== LOADING STATE ==================== */
         .loading-container {
           padding: 3rem 1rem;
           text-align: center;
@@ -1174,7 +1453,7 @@ export default function BookingmngPage() {
           font-weight: 500;
         }
 
-        /* Error State */
+        /* ==================== ERROR STATE ==================== */
         .error-state {
           padding: 3rem 1rem;
           text-align: center;
@@ -1200,13 +1479,16 @@ export default function BookingmngPage() {
         }
 
         .retry-button {
-          padding: 0.5rem 1.5rem;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.625rem 1.5rem;
           background: #3b82f6;
           color: white;
-          border-radius: 0.375rem;
+          border: none;
+          border-radius: 0.5rem;
           font-weight: 500;
           cursor: pointer;
-          border: none;
           transition: background-color 0.2s ease;
         }
 
@@ -1214,7 +1496,7 @@ export default function BookingmngPage() {
           background: #2563eb;
         }
 
-        /* Empty State */
+        /* ==================== EMPTY STATE ==================== */
         .empty-state {
           padding: 3rem 1rem;
           text-align: center;
@@ -1249,6 +1531,7 @@ export default function BookingmngPage() {
           padding: 0.625rem 1.25rem;
           background: #3b82f6;
           color: white;
+          border: none;
           border-radius: 0.5rem;
           font-weight: 500;
           text-decoration: none;
@@ -1259,25 +1542,19 @@ export default function BookingmngPage() {
           background: #2563eb;
         }
 
-        /* Desktop Table */
+        /* ==================== DESKTOP TABLE ==================== */
         .desktop-table-container {
-          display: block;
-        }
-
-        @media (max-width: 1023px) {
-          .desktop-table-container {
-            display: none;
-          }
+          background: white;
+          border: 1px solid #e5e7eb;
+          border-radius: 0.75rem;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
         }
 
         .professionals-table {
           width: 100%;
-          border-collapse: separate;
-          border-spacing: 0;
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 0.75rem;
-          overflow: hidden;
+          border-collapse: collapse;
+          min-width: 1000px;
         }
 
         .professionals-table th {
@@ -1302,7 +1579,7 @@ export default function BookingmngPage() {
           border-bottom: none;
         }
 
-        .professionals-table tr:hover {
+        .professionals-table tr:hover td {
           background: #f9fafb;
         }
 
@@ -1343,6 +1620,9 @@ export default function BookingmngPage() {
         }
 
         .featured-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
           padding: 0.125rem 0.5rem;
           background: #fef3c7;
           color: #92400e;
@@ -1430,6 +1710,7 @@ export default function BookingmngPage() {
           font-size: 0.75rem;
           font-weight: 600;
           border-radius: 9999px;
+          width: fit-content;
         }
 
         .type-info {
@@ -1446,6 +1727,9 @@ export default function BookingmngPage() {
         }
 
         .experience {
+          display: flex;
+          align-items: center;
+          gap: 0.375rem;
           color: #6b7280;
           font-size: 0.75rem;
         }
@@ -1485,6 +1769,10 @@ export default function BookingmngPage() {
           gap: 0.75rem;
         }
 
+        .status-badge-wrapper {
+          display: inline-block;
+        }
+
         .active-status {
           display: flex;
           align-items: center;
@@ -1500,10 +1788,12 @@ export default function BookingmngPage() {
 
         .status-dot.active {
           background: #10b981;
+          box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
         }
 
         .status-dot.inactive {
           background: #ef4444;
+          box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
         }
 
         .status-text.active {
@@ -1590,32 +1880,47 @@ export default function BookingmngPage() {
           cursor: not-allowed;
         }
 
-        /* Mobile Cards */
-        .mobile-cards-container {
-          display: none;
+        /* ==================== GRID VIEW ==================== */
+        .grid-view-container {
+          display: grid;
+          grid-template-columns: repeat(1, 1fr);
+          gap: 1rem;
         }
 
-        @media (max-width: 1023px) {
-          .mobile-cards-container {
-            display: block;
+        @media (min-width: 640px) {
+          .grid-view-container {
+            grid-template-columns: repeat(2, 1fr);
           }
         }
 
-        .professional-card {
+        @media (min-width: 1024px) {
+          .grid-view-container {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+
+        @media (min-width: 1280px) {
+          .grid-view-container {
+            grid-template-columns: repeat(4, 1fr);
+          }
+        }
+
+        .grid-card {
           background: white;
           border: 1px solid #e5e7eb;
           border-radius: 0.75rem;
-          margin-bottom: 1rem;
           overflow: hidden;
           transition: all 0.2s ease;
+          height: fit-content;
         }
 
-        .professional-card:hover {
+        .grid-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
           border-color: #d1d5db;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
 
-        .card-header {
+        .grid-card-header {
           display: flex;
           align-items: flex-start;
           gap: 0.75rem;
@@ -1623,145 +1928,165 @@ export default function BookingmngPage() {
           border-bottom: 1px solid #f3f4f6;
         }
 
-        .professional-avatar.mobile {
-          width: 2.5rem;
-          height: 2.5rem;
+        .grid-card-avatar {
+          flex-shrink: 0;
+          width: 3rem;
+          height: 3rem;
           background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-          border-radius: 0.5rem;
+          border-radius: 0.75rem;
           display: flex;
           align-items: center;
           justify-content: center;
-          flex-shrink: 0;
         }
 
-        .professional-name-mobile {
+        .grid-card-title {
           flex: 1;
           min-width: 0;
         }
 
-        .professional-name-mobile span {
-          display: block;
+        .grid-card-name {
           font-weight: 600;
           color: #1f2937;
-          font-size: 0.95rem;
-          margin-bottom: 0.5rem;
+          font-size: 1rem;
+          margin: 0 0 0.5rem 0;
+          line-height: 1.4;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
 
-        .mobile-badges {
+        .grid-card-badges {
           display: flex;
           gap: 0.5rem;
           flex-wrap: wrap;
         }
 
-        .card-body {
+        .grid-card-body {
           padding: 1rem;
         }
 
-        .card-row {
+        .grid-card-tagline {
+          color: #6b7280;
+          font-size: 0.8125rem;
+          margin-bottom: 1rem;
+          line-height: 1.5;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        .grid-card-contact {
           display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          margin-bottom: 1rem;
+          padding-bottom: 1rem;
+          border-bottom: 1px solid #f3f4f6;
+        }
+
+        .grid-contact-item {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          color: #374151;
+          font-size: 0.8125rem;
+        }
+
+        .grid-contact-item svg {
+          flex-shrink: 0;
+          color: #9ca3af;
+        }
+
+        .grid-card-details {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
           margin-bottom: 1rem;
         }
 
-        .card-row:last-child {
-          margin-bottom: 0;
-        }
-
-        .card-label {
-          width: 120px;
-          flex-shrink: 0;
-          color: #6b7280;
-          font-size: 0.875rem;
-          font-weight: 500;
-        }
-
-        .card-value {
-          flex: 1;
-          min-width: 0;
-        }
-
-        .contact-item.mobile {
+        .grid-detail-item {
           display: flex;
+          justify-content: space-between;
           align-items: center;
-          gap: 0.5rem;
-          color: #374151;
           font-size: 0.8125rem;
-          margin-bottom: 0.375rem;
         }
 
-        .contact-item.mobile:last-child {
-          margin-bottom: 0;
+        .detail-label {
+          color: #6b7280;
         }
 
-        .category-type.mobile {
+        .detail-value {
+          font-weight: 500;
+          color: #1f2937;
           display: flex;
           align-items: center;
-          gap: 0.75rem;
-          flex-wrap: wrap;
+          gap: 0.25rem;
         }
 
-        .stats-grid-mobile {
+        .type-value {
+          text-transform: capitalize;
+        }
+
+        .grid-card-stats {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 0.75rem;
+          gap: 0.5rem;
+          margin-bottom: 1rem;
+          padding: 0.75rem;
+          background: #f9fafb;
+          border-radius: 0.5rem;
         }
 
-        .stat-mobile {
+        .grid-stat {
           display: flex;
           flex-direction: column;
-          gap: 0.25rem;
+          align-items: center;
+          text-align: center;
         }
 
-        .stat-label-mobile {
-          color: #6b7280;
-          font-size: 0.75rem;
-        }
-
-        .stat-value-mobile {
+        .stat-num {
+          font-size: 1rem;
           font-weight: 600;
           color: #1f2937;
-          font-size: 0.875rem;
           display: flex;
           align-items: center;
-          gap: 0.25rem;
+          gap: 0.125rem;
         }
 
-        .status-info-mobile {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
+        .grid-stat .stat-label {
+          font-size: 0.625rem;
+          color: #6b7280;
         }
 
-        .active-status {
+        .grid-card-status {
           display: flex;
+          justify-content: space-between;
           align-items: center;
-          gap: 0.5rem;
-          font-size: 0.8125rem;
-          color: #374151;
-        }
-
-        .whatsapp-verified.mobile {
-          display: flex;
-          align-items: center;
-          gap: 0.375rem;
-          color: #059669;
-          font-size: 0.75rem;
-          font-weight: 500;
-        }
-
-        .card-footer {
-          padding: 1rem;
+          padding-top: 0.75rem;
           border-top: 1px solid #f3f4f6;
-          background: #f9fafb;
         }
 
-        .mobile-actions {
+        .grid-status-item {
           display: flex;
-          gap: 0.5rem;
           align-items: center;
+          gap: 0.5rem;
         }
 
-        .mobile-action-button {
-          flex: 1;
+        .grid-card-footer {
+          padding: 1rem;
+          background: #f9fafb;
+          border-top: 1px solid #f3f4f6;
+        }
+
+        .grid-actions {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 0.5rem;
+        }
+
+        .grid-action {
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -1769,7 +2094,7 @@ export default function BookingmngPage() {
           padding: 0.5rem;
           border-radius: 0.5rem;
           text-decoration: none;
-          font-size: 0.75rem;
+          font-size: 0.625rem;
           font-weight: 500;
           transition: all 0.2s ease;
           border: none;
@@ -1777,54 +2102,44 @@ export default function BookingmngPage() {
           cursor: pointer;
         }
 
-        .mobile-action-button.view {
+        .grid-action.view {
           color: #3b82f6;
         }
 
-        .mobile-action-button.view:hover {
+        .grid-action.view:hover {
           background: #eff6ff;
         }
 
-        .mobile-action-button.edit {
+        .grid-action.edit {
           color: #10b981;
         }
 
-        .mobile-action-button.edit:hover {
+        .grid-action.edit:hover {
           background: #ecfdf5;
         }
 
-        .mobile-action-button.delete {
+        .grid-action.verify {
+          color: #10b981;
+        }
+
+        .grid-action.verify:hover {
+          background: #ecfdf5;
+        }
+
+        .grid-action.delete {
           color: #ef4444;
         }
 
-        .mobile-action-button.delete:hover {
+        .grid-action.delete:hover {
           background: #fef2f2;
         }
 
-        .mobile-more-actions {
-          flex-shrink: 0;
+        .grid-action:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
-        .mobile-more-button {
-          width: 2.5rem;
-          height: 2.5rem;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 0.5rem;
-          background: white;
-          border: 1px solid #e5e7eb;
-          color: #6b7280;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .mobile-more-button:hover {
-          background: #f3f4f6;
-          border-color: #d1d5db;
-        }
-
-        /* Pagination */
+        /* ==================== PAGINATION ==================== */
         .pagination-container {
           margin-top: 2rem;
           padding: 1.5rem;
@@ -1871,8 +2186,14 @@ export default function BookingmngPage() {
           font-weight: 500;
           cursor: pointer;
           transition: all 0.2s ease;
-          min-width: 120px;
+          min-width: 100px;
           justify-content: center;
+        }
+
+        @media (min-width: 640px) {
+          .pagination-button {
+            min-width: 120px;
+          }
         }
 
         .pagination-button:disabled {
@@ -1885,42 +2206,20 @@ export default function BookingmngPage() {
           border-color: #9ca3af;
         }
 
-        .pagination-button.prev {
-          order: 1;
-        }
-
-        @media (min-width: 640px) {
-          .pagination-button.prev {
-            order: 0;
-          }
-        }
-
-        .pagination-button.next {
-          order: 3;
-        }
-
-        @media (min-width: 640px) {
-          .pagination-button.next {
-            order: 0;
-          }
-        }
-
         .pagination-numbers {
-          order: 2;
           display: flex;
           gap: 0.25rem;
-          margin: 1rem 0;
+          order: 2;
         }
 
         @media (min-width: 640px) {
           .pagination-numbers {
             order: 0;
-            margin: 0;
           }
         }
 
         .pagination-number {
-          width: 2.5rem;
+          min-width: 2.5rem;
           height: 2.5rem;
           display: flex;
           align-items: center;
@@ -1945,7 +2244,7 @@ export default function BookingmngPage() {
           border-color: #9ca3af;
         }
 
-        /* Delete Modal */
+        /* ==================== MODAL ==================== */
         .modal-overlay {
           position: fixed;
           inset: 0;
@@ -1955,6 +2254,7 @@ export default function BookingmngPage() {
           justify-content: center;
           padding: 1rem;
           z-index: 50;
+          backdrop-filter: blur(4px);
         }
 
         .modal-container {
@@ -1964,6 +2264,18 @@ export default function BookingmngPage() {
           max-width: 28rem;
           width: 100%;
           box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+          animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+          from {
+            transform: translateY(-20px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
         }
 
         .modal-header {
@@ -2037,44 +2349,25 @@ export default function BookingmngPage() {
           animation: spin 1s linear infinite;
         }
 
-        /* Animations */
+        /* ==================== ANIMATIONS ==================== */
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
 
-        /* Responsive Adjustments */
-        @media (max-width: 640px) {
-          .professionals-container {
-            padding: 1rem;
-          }
-          
-          .page-title {
-            font-size: 1.5rem;
-          }
-          
-          .header-actions {
-            flex-direction: column;
-            width: 100%;
-          }
-          
-          .export-button, .add-button {
-            width: 100%;
-            justify-content: center;
-          }
-          
-          .mobile-actions {
-            flex-wrap: wrap;
-          }
-          
-          .mobile-action-button {
-            flex: 0 0 calc(33.333% - 0.333rem);
-          }
-          
-          .mobile-more-actions {
-            display: none;
-          }
-        }
+        /* ==================== UTILITY CLASSES ==================== */
+        .text-yellow-500 { color: #f59e0b; }
+        .text-green-600 { color: #059669; }
+        .text-blue-600 { color: #2563eb; }
+        .text-purple-600 { color: #9333ea; }
+        .text-red-600 { color: #dc2626; }
+
+        .bg-blue-50 { background-color: #eff6ff; }
+        .bg-green-50 { background-color: #ecfdf5; }
+        .bg-yellow-50 { background-color: #fffbeb; }
+        .bg-purple-50 { background-color: #faf5ff; }
+
+        .fill-current { fill: currentColor; }
       `}</style>
     </>
   );

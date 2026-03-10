@@ -1908,11 +1908,9 @@
 // }
 
 
-
-
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Head from 'next/head';
 import { appTheme } from '../../../../../src/constants/theme';
@@ -2019,25 +2017,32 @@ const GENDER_PREFERENCES = [
 
 const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 420, 480];
 
+// Helper to validate ObjectId
+const isValidObjectId = (id) => {
+    return /^[0-9a-fA-F]{24}$/.test(id);
+};
+
 export default function CreateServicePage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const serviceId = searchParams.get('id');
+    const isEditing = !!serviceId;
     
     // Refs for focus management
     const inputRefs = useRef({});
     
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(isEditing);
     const [saving, setSaving] = useState(false);
     const [expandedSections, setExpandedSections] = useState(['basic']);
     const [activeTab, setActiveTab] = useState('basic');
     const [toast, setToast] = useState({ show: false, type: '', message: '' });
     const [isMobile, setIsMobile] = useState(false);
     
-    // NEW: State for professionals dropdown
+    // State for professionals dropdown
     const [professionals, setProfessionals] = useState([]);
     const [loadingProfessionals, setLoadingProfessionals] = useState(true);
     
     const [formData, setFormData] = useState({
-        // NEW: professionalId field
         professionalId: '',
         name: '',
         description: '',
@@ -2075,6 +2080,13 @@ export default function CreateServicePage() {
         fetchProfessionals();
     }, []);
 
+    // Fetch service data if editing
+    useEffect(() => {
+        if (serviceId) {
+            fetchService();
+        }
+    }, [serviceId]);
+
     const fetchProfessionals = async () => {
         try {
             setLoadingProfessionals(true);
@@ -2088,6 +2100,53 @@ export default function CreateServicePage() {
             showToast('error', 'Failed to load professionals');
         } finally {
             setLoadingProfessionals(false);
+        }
+    };
+
+    const fetchService = async () => {
+        try {
+            setLoading(true);
+            const res = await fetch(`/api/bookingService/service?id=${serviceId}`);
+            const data = await res.json();
+            
+            if (data.success) {
+                const service = data.data;
+                setFormData({
+                    professionalId: service.professionalId || '',
+                    name: service.name || '',
+                    description: service.description || '',
+                    category: service.category || 'beauty',
+                    type: service.type || 'physical',
+                    subcategory: service.subcategory || '',
+                    basePrice: service.basePrice || 0,
+                    duration: service.duration || 60,
+                    currency: service.currency || 'INR',
+                    
+                    tags: service.tags || [],
+                    clientRequirements: service.clientRequirements?.length ? service.clientRequirements : [''],
+                    professionalProvides: service.professionalProvides?.length ? service.professionalProvides : [''],
+                    variations: service.variations || [],
+                    addons: service.addons || [],
+                    images: service.images || [],
+                    
+                    bufferTime: service.bufferTime || 0,
+                    advanceBooking: service.advanceBooking || 30,
+                    minAge: service.minAge || null,
+                    maxAge: service.maxAge || null,
+                    genderPreference: service.genderPreference || 'any',
+                    isActive: service.isActive !== false,
+                    isPopular: service.isPopular || false,
+                    isFeatured: service.isFeatured || false
+                });
+                showToast('success', 'Service loaded successfully');
+            } else {
+                showToast('error', 'Failed to load service');
+            }
+        } catch (error) {
+            console.error('Error fetching service:', error);
+            showToast('error', 'Failed to load service');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -2276,9 +2335,11 @@ export default function CreateServicePage() {
     const validateForm = () => {
         const newErrors = {};
 
-        // NEW: Validate professionalId
+        // Validate professionalId
         if (!formData.professionalId) {
             newErrors.professionalId = 'Please select a professional/business';
+        } else if (!isValidObjectId(formData.professionalId)) {
+            newErrors.professionalId = 'Invalid professional ID format';
         }
 
         if (!formData.name.trim()) {
@@ -2315,13 +2376,11 @@ export default function CreateServicePage() {
             
             // Scroll to the error
             if (firstError) {
-                // Check if the field is in the current section, if not expand that section
                 const errorSection = getFieldSection(firstError);
                 if (errorSection && !expandedSections.includes(errorSection)) {
                     setExpandedSections(prev => [...prev, errorSection]);
                     setActiveTab(errorSection);
                     
-                    // Small delay to allow section to expand before scrolling
                     setTimeout(() => {
                         const element = document.getElementById(firstError);
                         if (element) {
@@ -2350,12 +2409,21 @@ export default function CreateServicePage() {
                 ...formData,
                 clientRequirements: filteredRequirements,
                 professionalProvides: filteredProvides,
-                totalBookings: 0,
-                popularity: 0
+                totalBookings: isEditing ? undefined : 0,
+                popularity: isEditing ? undefined : 0
             };
 
-            const res = await fetch('/api/bookingService/service', {
-                method: 'POST',
+            // Remove undefined fields
+            Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+
+            const url = isEditing 
+                ? `/api/bookingService/service?id=${serviceId}`
+                : '/api/bookingService/service';
+            
+            const method = isEditing ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
@@ -2363,14 +2431,14 @@ export default function CreateServicePage() {
             const data = await res.json();
 
             if (data.success) {
-                showToast('success', 'Service created successfully!');
+                showToast('success', isEditing ? 'Service updated successfully!' : 'Service created successfully!');
                 setTimeout(() => router.push('/admin/bookingService/service'), 1500);
             } else {
-                showToast('error', `Error: ${data.error || 'Failed to create service'}`);
+                showToast('error', `Error: ${data.error || 'Failed to save service'}`);
             }
         } catch (error) {
-            console.error('Error creating service:', error);
-            showToast('error', 'Failed to create service. Please try again.');
+            console.error('Error saving service:', error);
+            showToast('error', 'Failed to save service. Please try again.');
         } finally {
             setSaving(false);
         }
@@ -2468,7 +2536,7 @@ export default function CreateServicePage() {
     return (
         <>
             <Head>
-                <title>Add New Service | LFMS</title>
+                <title>{isEditing ? 'Edit Service' : 'Add New Service'} | LFMS</title>
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
             </Head>
 
@@ -2493,10 +2561,10 @@ export default function CreateServicePage() {
                             </Link>
                             <h1 className="page-title">
                                 <Tag size={28} className="title-icon" />
-                                Add New Service
+                                {isEditing ? 'Edit Service' : 'Add New Service'}
                             </h1>
                             <p className="page-description">
-                                Create a new service offering with complete details
+                                {isEditing ? 'Update your service information' : 'Create a new service offering with complete details'}
                             </p>
                         </div>
                         <div className="header-actions">
@@ -2514,7 +2582,12 @@ export default function CreateServicePage() {
                             >
                                 <Layout size={18} />
                             </button>
-                            <span className="status-badge draft">Draft</span>
+                            {!isEditing && <span className="status-badge draft">Draft</span>}
+                            {isEditing && (
+                                <span className={`status-badge ${formData.isActive ? 'active' : 'inactive'}`}>
+                                    {formData.isActive ? 'Active' : 'Inactive'}
+                                </span>
+                            )}
                             <button
                                 onClick={handleSubmit}
                                 disabled={saving}
@@ -2523,12 +2596,12 @@ export default function CreateServicePage() {
                                 {saving ? (
                                     <>
                                         <div className="button-spinner"></div>
-                                        <span>Creating...</span>
+                                        <span>Saving...</span>
                                     </>
                                 ) : (
                                     <>
                                         <Save size={16} />
-                                        <span>Create Service</span>
+                                        <span>{isEditing ? 'Update Service' : 'Create Service'}</span>
                                     </>
                                 )}
                             </button>
@@ -3284,7 +3357,7 @@ export default function CreateServicePage() {
                         ) : (
                             <>
                                 <Save size={18} />
-                                <span>Create Service</span>
+                                <span>{isEditing ? 'Update Service' : 'Create Service'}</span>
                             </>
                         )}
                     </button>
@@ -3456,6 +3529,16 @@ export default function CreateServicePage() {
                 .status-badge.draft {
                     background: #dbeafe;
                     color: #1e40af;
+                }
+
+                .status-badge.active {
+                    background: #f0fdf4;
+                    color: #22c55e;
+                }
+
+                .status-badge.inactive {
+                    background: #fef2f2;
+                    color: #ef4444;
                 }
 
                 .save-button {
