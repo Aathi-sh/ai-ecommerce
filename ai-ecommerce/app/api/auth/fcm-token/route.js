@@ -1,13 +1,16 @@
-// // app/api/auth/fcm-token/route.js
-// import { connectDB } from '../../../../utils/db';
-// import DeviceToken from '../../../../models/AdminDeviceToken';
-// import User from '../../../../models/user';
+
+
+
+// // app/api/auth/fcm-token/route.js - COMPLETE FIXED VERSION
+// import { connectDB } from "../../../../utils/db";  // Update path if different
+// import DeviceToken from '../../../../models/AdminDeviceToken'; // Use your DeviceToken model
+// import User from '../../../../models/user';  // Use your User model
 // import crypto from 'crypto';
 
 // // ==================== RATE LIMITING ====================
 // const rateLimits = new Map();
 // const RATE_LIMIT_WINDOW = 30000;
-// const MAX_REQUESTS = 3;
+// const MAX_REQUESTS = 5;
 
 // const checkRateLimit = (userIdentifier) => {
 //   const now = Date.now();
@@ -28,13 +31,19 @@
 //   if (!identifier) return null;
   
 //   try {
-//     let user = await User.findById(identifier);
-    
-//     if (!user && identifier.includes('@')) {
-//       user = await User.findOne({ email: identifier.toLowerCase().trim() });
+//     // Try as MongoDB ID first
+//     if (/^[0-9a-fA-F]{24}$/.test(identifier)) {
+//       const user = await User.findById(identifier);
+//       if (user) return user;
 //     }
     
-//     return user;
+//     // Try as email
+//     if (identifier.includes('@')) {
+//       const user = await User.findOne({ email: identifier.toLowerCase().trim() });
+//       if (user) return user;
+//     }
+    
+//     return null;
 //   } catch (error) {
 //     console.error('Error finding user:', error);
 //     return null;
@@ -73,7 +82,7 @@
 //   return false;
 // };
 
-// // ==================== MAIN API HANDLER ====================
+// // ==================== POST HANDLER (SAVE TOKEN) ====================
 // export async function POST(request) {
 //   try {
 //     console.log('🔐 POST /api/auth/fcm-token');
@@ -89,7 +98,7 @@
 //       }, { status: 400 });
 //     }
     
-//     const { token, deviceInfo = {}, userId, email } = body;
+//     const { token, deviceInfo = {}, userId, email, role = 'user' } = body;
     
 //     // Validate required fields
 //     if (!token || typeof token !== 'string' || token.trim().length < 10) {
@@ -167,59 +176,44 @@
 //     const trimmedToken = token.trim();
     
 //     try {
-//       // CRITICAL FIX: Use findOneAndUpdate with upsert
-//       // This finds by userId + deviceId (not fcmToken) and updates or creates
-//       const updateData = {
-//         fcmToken: trimmedToken,
-//         deviceInfo: enhancedDeviceInfo,
-//         lastActive: new Date(),
-//         isActive: true,
-//       };
-      
-//       // Check if we need to update device info
+//       // Find by userId + deviceId
 //       const existingToken = await DeviceToken.findOne({
 //         userId: user._id,
 //         deviceId: deviceId
 //       });
       
-//       if (existingToken) {
-//         const needsDeviceInfoUpdate = deviceInfoChanged(existingToken.deviceInfo, enhancedDeviceInfo);
-//         if (!needsDeviceInfoUpdate) {
-//           // Remove deviceInfo from update to avoid unnecessary changes
-//           delete updateData.deviceInfo;
-//         }
-//       }
+//       const updateData = {
+//         fcmToken: trimmedToken,
+//         userId: user._id,
+//         deviceId: deviceId,
+//         role: role,
+//         deviceInfo: enhancedDeviceInfo,
+//         lastActive: new Date(),
+//         isActive: true
+//       };
       
 //       // Perform upsert operation
 //       const result = await DeviceToken.findOneAndUpdate(
+//         { userId: user._id, deviceId: deviceId },
+//         { $set: updateData },
 //         {
-//           userId: user._id,
-//           deviceId: deviceId
-//         },
-//         {
-//           $set: updateData,
-//           $setOnInsert: {
-//             createdAt: new Date()
-//           }
-//         },
-//         {
-//           upsert: true, // Create if doesn't exist
-//           new: true, // Return updated document
+//           upsert: true,
+//           new: true,
 //           runValidators: true
 //         }
 //       );
       
 //       console.log('Token operation successful:', result._id);
       
-//       // Cleanup old tokens for this user
+//       // Cleanup old tokens for this user (keep only last 5)
 //       const userTokens = await DeviceToken.find({ userId: user._id })
 //         .sort({ lastActive: -1 });
       
 //       if (userTokens.length > 5) {
 //         const tokensToDelete = userTokens.slice(5);
-//         for (const tokenToDelete of tokensToDelete) {
-//           await DeviceToken.findByIdAndDelete(tokenToDelete._id);
-//         }
+//         const deleteIds = tokensToDelete.map(t => t._id);
+        
+//         await DeviceToken.deleteMany({ _id: { $in: deleteIds } });
 //         console.log('Cleaned up', tokensToDelete.length, 'old tokens');
 //       }
       
@@ -232,42 +226,21 @@
 //         deviceId: deviceId,
 //         tokenId: result._id,
 //         userId: user._id,
-//         timestamp: result.lastActive
+//         userRole: user.role,
+//         userEmail: user.email,
+//         timestamp: new Date().toISOString()
 //       }, { status: action === 'created' ? 201 : 200 });
       
 //     } catch (dbError) {
 //       console.error('Database operation error:', dbError.message);
       
-//       // Handle specific errors
 //       if (dbError.code === 11000) {
-//         // If we still get duplicate key, it means unique index on fcmToken exists
-//         // Try to find and update the existing token with this fcmToken
-//         try {
-//           const existingTokenWithSameFCM = await DeviceToken.findOne({
-//             fcmToken: trimmedToken
-//           });
-          
-//           if (existingTokenWithSameFCM) {
-//             // Update the existing token with new userId/deviceId
-//             existingTokenWithSameFCM.userId = user._id;
-//             existingTokenWithSameFCM.deviceId = deviceId;
-//             existingTokenWithSameFCM.deviceInfo = enhancedDeviceInfo;
-//             existingTokenWithSameFCM.lastActive = new Date();
-//             await existingTokenWithSameFCM.save();
-            
-//             console.log('Reassociated existing token');
-            
-//             return Response.json({
-//               success: true,
-//               message: 'Token reassociated successfully',
-//               action: 'reassociated',
-//               deviceId: deviceId,
-//               tokenId: existingTokenWithSameFCM._id
-//             }, { status: 200 });
-//           }
-//         } catch (reassocError) {
-//           console.error('Reassociation failed:', reassocError);
-//         }
+//         // Duplicate key error
+//         return Response.json({
+//           success: false,
+//           message: 'Token already exists',
+//           error: 'DUPLICATE_TOKEN'
+//         }, { status: 409 });
 //       }
       
 //       return Response.json({ 
@@ -287,36 +260,56 @@
 //   }
 // }
 
-// // GET handler (unchanged)
+// // ==================== GET HANDLER (GET TOKENS) ====================
 // export async function GET(request) {
 //   try {
 //     const url = new URL(request.url);
 //     const userId = url.searchParams.get('userId');
+//     const role = url.searchParams.get('role');
     
+//     await connectDB();
+    
+//     let query = {};
+    
+//     // Filter by user ID
 //     if (userId) {
-//       await connectDB();
-//       const tokens = await DeviceToken.find({ userId }).sort({ lastActive: -1 });
-      
-//       return Response.json({
-//         success: true,
-//         tokens: tokens.map(t => ({
-//           id: t._id,
-//           deviceId: t.deviceId,
-//           lastActive: t.lastActive,
-//           isActive: t.isActive,
-//           deviceInfo: t.deviceInfo
-//         }))
-//       }, { status: 200 });
+//       query.userId = userId;
 //     }
+    
+//     // Filter by role
+//     if (role) {
+//       query.role = role;
+//     }
+    
+//     const tokens = await DeviceToken.find(query)
+//       .sort({ lastActive: -1 });
+    
+//     // Format tokens for response
+//     const tokenData = tokens.map(t => ({
+//       id: t._id,
+//       fcmToken: t.fcmToken,
+//       deviceId: t.deviceId,
+//       userId: t.userId,
+//       role: t.role,
+//       lastActive: t.lastActive,
+//       isActive: t.isActive,
+//       deviceInfo: t.deviceInfo
+//     }));
+    
+//     // Extract just token strings
+//     const tokenStrings = tokens
+//       .map(t => t.fcmToken)
+//       .filter(token => token && typeof token === 'string' && token.trim() !== '');
     
 //     return Response.json({
 //       success: true,
-//       message: 'FCM Token API',
-//       endpoints: {
-//         POST: 'Save FCM token (requires token and userId/email in body)',
-//         GET: 'Get API info (add ?userId=... to get user tokens)'
-//       }
+//       tokens: tokenData,
+//       tokenStrings: tokenStrings,
+//       count: tokens.length,
+//       message: userId ? `Found ${tokens.length} tokens for user` : `Found ${tokens.length} tokens`,
+//       timestamp: new Date().toISOString()
 //     }, { status: 200 });
+    
 //   } catch (error) {
 //     console.error('Error in GET handler:', error);
 //     return Response.json({ 
@@ -326,7 +319,7 @@
 //   }
 // }
 
-// // DELETE handler (unchanged)
+// // ==================== DELETE HANDLER ====================
 // export async function DELETE(request) {
 //   try {
 //     const body = await request.json();
@@ -394,7 +387,8 @@
 //   }
 // }
 
-// export async function OPTIONS(request) {
+// // ==================== OPTIONS HANDLER ====================
+// export async function OPTIONS() {
 //   return Response.json({
 //     success: true,
 //     allowedMethods: ['POST', 'GET', 'DELETE', 'OPTIONS']
@@ -411,10 +405,26 @@
 
 
 
-// app/api/auth/fcm-token/route.js - COMPLETE FIXED VERSION
-import { connectDB } from "../../../../utils/db";  // Update path if different
-import DeviceToken from '../../../../models/AdminDeviceToken'; // Use your DeviceToken model
-import User from '../../../../models/user';  // Use your User model
+
+
+
+// above code i working without saas 
+
+
+
+
+
+
+
+
+
+
+
+// app/api/auth/fcm-token/route.js - COMPLETE FIXED VERSION WITH SAAS MULTI-TENANCY
+import { connectDB } from "../../../../utils/db";
+import DeviceToken from '../../../../models/AdminDeviceToken'; // Fixed import path
+import User from '../../../../models/user';
+import Company from '../../../../models/Company';
 import crypto from 'crypto';
 
 // ==================== RATE LIMITING ====================
@@ -508,7 +518,7 @@ export async function POST(request) {
       }, { status: 400 });
     }
     
-    const { token, deviceInfo = {}, userId, email, role = 'user' } = body;
+    const { token, deviceInfo = {}, userId, email, role = 'user', companyId } = body;
     
     // Validate required fields
     if (!token || typeof token !== 'string' || token.trim().length < 10) {
@@ -561,10 +571,47 @@ export async function POST(request) {
       }, { status: 404 });
     }
     
+    // ===== SAAS: COMPANY VALIDATION =====
+    // Get effective company ID (from request or user)
+    let effectiveCompanyId = companyId || user.companyId;
+    
+    // If company ID is provided, verify user belongs to that company
+    if (companyId && user.companyId?.toString() !== companyId) {
+      console.error('Company mismatch:', { 
+        userCompanyId: user.companyId,
+        requestCompanyId: companyId 
+      });
+      return Response.json({ 
+        success: false,
+        message: 'Invalid company ID for this user' 
+      }, { status: 403 });
+    }
+    
+    // Check if company exists and is active
+    if (effectiveCompanyId) {
+      const company = await Company.findById(effectiveCompanyId).select('status');
+      if (!company) {
+        console.error('Company not found:', effectiveCompanyId);
+        return Response.json({ 
+          success: false,
+          message: 'Company not found' 
+        }, { status: 404 });
+      }
+      
+      if (company.status !== 'active') {
+        console.error('Company not active:', company.status);
+        return Response.json({ 
+          success: false,
+          message: 'Company is not active' 
+        }, { status: 403 });
+      }
+    }
+    
     console.log('User found:', {
       id: user._id,
       email: user.email,
-      role: user.role
+      role: user.role,
+      companyId: effectiveCompanyId
     });
     
     // Prepare device info
@@ -578,6 +625,7 @@ export async function POST(request) {
       userAgent,
       ipAddress,
       userId: user._id.toString(),
+      companyId: effectiveCompanyId?.toString(),
     };
     
     const deviceId = generateDeviceId(user._id.toString(), userAgent, deviceInfo);
@@ -586,25 +634,36 @@ export async function POST(request) {
     const trimmedToken = token.trim();
     
     try {
-      // Find by userId + deviceId
+      // Find by userId + deviceId + companyId
       const existingToken = await DeviceToken.findOne({
         userId: user._id,
-        deviceId: deviceId
+        deviceId: deviceId,
+        companyId: effectiveCompanyId
       });
       
       const updateData = {
         fcmToken: trimmedToken,
         userId: user._id,
         deviceId: deviceId,
+        companyId: effectiveCompanyId, // ADDED: Company context
         role: role,
         deviceInfo: enhancedDeviceInfo,
         lastActive: new Date(),
-        isActive: true
+        isActive: true,
+        source: deviceInfo.source || 'admin_panel', // Track token source
+        notificationPreferences: {
+          ...deviceInfo.notificationPreferences,
+          companyId: effectiveCompanyId
+        }
       };
       
-      // Perform upsert operation
+      // Perform upsert operation with company context
       const result = await DeviceToken.findOneAndUpdate(
-        { userId: user._id, deviceId: deviceId },
+        { 
+          userId: user._id, 
+          deviceId: deviceId,
+          companyId: effectiveCompanyId 
+        },
         { $set: updateData },
         {
           upsert: true,
@@ -615,16 +674,18 @@ export async function POST(request) {
       
       console.log('Token operation successful:', result._id);
       
-      // Cleanup old tokens for this user (keep only last 5)
-      const userTokens = await DeviceToken.find({ userId: user._id })
-        .sort({ lastActive: -1 });
+      // Cleanup old tokens for this user and company (keep only last 5 per company)
+      const userTokens = await DeviceToken.find({ 
+        userId: user._id,
+        companyId: effectiveCompanyId 
+      }).sort({ lastActive: -1 });
       
       if (userTokens.length > 5) {
         const tokensToDelete = userTokens.slice(5);
         const deleteIds = tokensToDelete.map(t => t._id);
         
         await DeviceToken.deleteMany({ _id: { $in: deleteIds } });
-        console.log('Cleaned up', tokensToDelete.length, 'old tokens');
+        console.log('Cleaned up', tokensToDelete.length, 'old tokens for company', effectiveCompanyId);
       }
       
       const action = existingToken ? 'updated' : 'created';
@@ -636,6 +697,7 @@ export async function POST(request) {
         deviceId: deviceId,
         tokenId: result._id,
         userId: user._id,
+        companyId: effectiveCompanyId,
         userRole: user.role,
         userEmail: user.email,
         timestamp: new Date().toISOString()
@@ -648,7 +710,7 @@ export async function POST(request) {
         // Duplicate key error
         return Response.json({
           success: false,
-          message: 'Token already exists',
+          message: 'Token already exists for this company',
           error: 'DUPLICATE_TOKEN'
         }, { status: 409 });
       }
@@ -676,6 +738,8 @@ export async function GET(request) {
     const url = new URL(request.url);
     const userId = url.searchParams.get('userId');
     const role = url.searchParams.get('role');
+    const companyId = url.searchParams.get('companyId');
+    const active = url.searchParams.get('active') === 'true';
     
     await connectDB();
     
@@ -686,9 +750,19 @@ export async function GET(request) {
       query.userId = userId;
     }
     
+    // Filter by company ID (SAAS)
+    if (companyId) {
+      query.companyId = companyId;
+    }
+    
     // Filter by role
     if (role) {
       query.role = role;
+    }
+    
+    // Filter by active status
+    if (active) {
+      query.isActive = true;
     }
     
     const tokens = await DeviceToken.find(query)
@@ -700,10 +774,12 @@ export async function GET(request) {
       fcmToken: t.fcmToken,
       deviceId: t.deviceId,
       userId: t.userId,
+      companyId: t.companyId, // ADDED: Company context
       role: t.role,
       lastActive: t.lastActive,
       isActive: t.isActive,
-      deviceInfo: t.deviceInfo
+      deviceInfo: t.deviceInfo,
+      source: t.source
     }));
     
     // Extract just token strings
@@ -716,6 +792,7 @@ export async function GET(request) {
       tokens: tokenData,
       tokenStrings: tokenStrings,
       count: tokens.length,
+      companyId: companyId || null,
       message: userId ? `Found ${tokens.length} tokens for user` : `Found ${tokens.length} tokens`,
       timestamp: new Date().toISOString()
     }, { status: 200 });
@@ -733,7 +810,7 @@ export async function GET(request) {
 export async function DELETE(request) {
   try {
     const body = await request.json();
-    const { token, deviceId, userId, clearAll = false } = body;
+    const { token, deviceId, userId, companyId, clearAll = false } = body;
     
     if (!userId) {
       return Response.json({ 
@@ -744,17 +821,29 @@ export async function DELETE(request) {
     
     await connectDB();
     
+    // Build query with company context
+    let query = { userId };
+    
+    // Add company filter if provided (SAAS)
+    if (companyId) {
+      query.companyId = companyId;
+    }
+    
     if (clearAll) {
-      const result = await DeviceToken.deleteMany({ userId });
-      console.log('Deleted all tokens for user:', userId, 'count:', result.deletedCount);
+      // Clear all tokens for this user in this company
+      const result = await DeviceToken.deleteMany(query);
+      console.log('Deleted all tokens for user:', userId, 'company:', companyId, 'count:', result.deletedCount);
       
       return Response.json({
         success: true,
         message: `Deleted ${result.deletedCount} tokens`,
-        deletedCount: result.deletedCount
+        deletedCount: result.deletedCount,
+        companyId: companyId || null
       }, { status: 200 });
     } else if (token) {
-      const result = await DeviceToken.findOneAndDelete({ fcmToken: token.trim(), userId });
+      // Delete specific token within company
+      query.fcmToken = token.trim();
+      const result = await DeviceToken.findOneAndDelete(query);
       
       if (result) {
         return Response.json({
@@ -764,11 +853,13 @@ export async function DELETE(request) {
       } else {
         return Response.json({
           success: false,
-          message: 'Token not found'
+          message: 'Token not found in this company'
         }, { status: 404 });
       }
     } else if (deviceId) {
-      const result = await DeviceToken.findOneAndDelete({ deviceId, userId });
+      // Delete specific device within company
+      query.deviceId = deviceId;
+      const result = await DeviceToken.findOneAndDelete(query);
       
       if (result) {
         return Response.json({
@@ -778,13 +869,13 @@ export async function DELETE(request) {
       } else {
         return Response.json({
           success: false,
-          message: 'Device token not found'
+          message: 'Device token not found in this company'
         }, { status: 404 });
       }
     } else {
       return Response.json({ 
         success: false,
-        message: 'Specify token, deviceId, or set clearAll=true' 
+        message: 'Specify token, deviceId, companyId, or set clearAll=true' 
       }, { status: 400 });
     }
     
@@ -806,7 +897,7 @@ export async function OPTIONS() {
     status: 200,
     headers: {
       'Access-Control-Allow-Methods': 'POST, GET, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Company-ID',
     }
   });
 }

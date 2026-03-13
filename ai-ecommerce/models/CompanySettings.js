@@ -1,3 +1,6 @@
+
+
+
 // import mongoose from 'mongoose';
 
 // // ==================== SCHEMA DEFINITIONS ====================
@@ -733,6 +736,16 @@
 //     isActive: {
 //         type: Boolean,
 //         default: true
+//     },
+    
+//     // ✅ ADDED: Order flow mode for WhatsApp bot
+//     // Values: 'short' (combined address) or 'long' (step by step)
+//     // Default: 'short' for new installations
+//     orderFlowMode: {
+//         type: String,
+//         enum: ['short', 'long'],
+//         default: 'short',
+//         description: 'Order flow mode for WhatsApp bot: short (combined address) or long (step by step)'
 //     }
 // }, {
 //     timestamps: true,
@@ -899,7 +912,9 @@
 //                     appType: 'paytm',
 //                     isActive: true
 //                 }
-//             ]
+//             ],
+//             // ✅ ADDED: Default order flow mode for new installations
+//             orderFlowMode: 'short'
 //         });
 //     }
     
@@ -989,6 +1004,8 @@
 //  */
 // CompanySettingsSchema.post('save', function(doc) {
 //     console.log(`🏢 Company settings updated (v${doc.version}) by ${doc.updatedBy || 'system'}`);
+//     // ✅ ADDED: Log order flow mode
+//     console.log(`📋 Order flow mode: ${doc.orderFlowMode || 'short'}`);
 // });
 
 // // ==================== EXPORT ====================
@@ -1001,6 +1018,24 @@
 
 
 
+
+
+
+// above code is without saas \
+
+
+
+
+
+
+
+
+
+
+
+
+
+// models/CompanySettings.js - UPDATED FOR SAAS MULTI-TENANCY
 import mongoose from 'mongoose';
 
 // ==================== SCHEMA DEFINITIONS ====================
@@ -1016,7 +1051,6 @@ const UpiIdSchema = new mongoose.Schema({
         lowercase: true,
         validate: {
             validator: function(v) {
-                // UPI format: username@provider (e.g., name@oksbi, business@paytm)
                 return /^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/.test(v);
             },
             message: props => `${props.value} is not a valid UPI ID! Must be in format: username@provider`
@@ -1027,7 +1061,6 @@ const UpiIdSchema = new mongoose.Schema({
         required: [true, 'Display name is required'],
         trim: true,
         default: function() {
-            // Default name from UPI ID
             return this.id.split('@')[0];
         }
     },
@@ -1081,7 +1114,6 @@ const BankDetailsSchema = new mongoose.Schema({
         validate: {
             validator: function(v) {
                 if (!v) return true;
-                // Basic account number validation (at least 9 digits)
                 return /^\d{9,18}$/.test(v.replace(/\s/g, ''));
             },
             message: 'Account number must be between 9-18 digits'
@@ -1094,7 +1126,6 @@ const BankDetailsSchema = new mongoose.Schema({
         validate: {
             validator: function(v) {
                 if (!v) return true;
-                // IFSC format: 4 letters, 0, then 6 alphanumeric
                 return /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v);
             },
             message: 'IFSC code must be in format: ABCD0123456'
@@ -1238,7 +1269,6 @@ const SupportSettingsSchema = new mongoose.Schema({
         validate: {
             validator: function(v) {
                 if (!v) return true;
-                // Allow +91, spaces, etc.
                 const digits = v.replace(/\D/g, '');
                 return digits.length >= 10 && digits.length <= 12;
             },
@@ -1488,12 +1518,31 @@ const BusinessHoursSchema = new mongoose.Schema({
 // ==================== MAIN COMPANY SETTINGS SCHEMA ====================
 
 const CompanySettingsSchema = new mongoose.Schema({
-    // ========== BASIC INFO ==========
+    // ===== SAAS MULTI-TENANCY (ADDED) =====
+    companyId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Company',
+        required: [true, 'Company ID is required'],
+        unique: true,
+        index: true
+    },
+    
+    // ===== AUDIT FIELDS (UPDATED) =====
+    createdBy: {
+        type: mongoose.Schema.Types.ObjectId, // Changed from String to ObjectId
+        ref: 'User',
+        required: [true, 'Created by user is required']
+    },
+    updatedBy: {
+        type: mongoose.Schema.Types.ObjectId, // Changed from String to ObjectId
+        ref: 'User'
+    },
+    
+    // ===== BASIC INFO =====
     companyName: {
         type: String,
         required: [true, 'Company name is required'],
         trim: true,
-        index: true,
         maxlength: [100, 'Company name cannot exceed 100 characters']
     },
     legalName: {
@@ -1507,7 +1556,7 @@ const CompanySettingsSchema = new mongoose.Schema({
         maxlength: [200, 'Tagline cannot exceed 200 characters']
     },
     
-    // ========== CONTACT INFO ==========
+    // ===== CONTACT INFO =====
     phone: {
         type: String,
         required: [true, 'Phone number is required'],
@@ -1544,7 +1593,7 @@ const CompanySettingsSchema = new mongoose.Schema({
         }
     },
     
-    // ========== ADDRESS ==========
+    // ===== ADDRESS =====
     address: {
         type: String,
         required: [true, 'Address is required'],
@@ -1580,7 +1629,7 @@ const CompanySettingsSchema = new mongoose.Schema({
         }
     },
     
-    // ========== TAX & LEGAL ==========
+    // ===== TAX & LEGAL =====
     gstin: {
         type: String,
         trim: true,
@@ -1588,7 +1637,6 @@ const CompanySettingsSchema = new mongoose.Schema({
         validate: {
             validator: function(v) {
                 if (!v) return true;
-                // GSTIN format: 2 digits state code, 10 PAN, 1 entity number, 1 Z, 1 check digit
                 return /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(v);
             },
             message: 'Please enter a valid GSTIN (e.g., 27ABCDE1234F1Z5)'
@@ -1601,7 +1649,6 @@ const CompanySettingsSchema = new mongoose.Schema({
         validate: {
             validator: function(v) {
                 if (!v) return true;
-                // PAN format: 5 letters, 4 digits, 1 letter
                 return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(v);
             },
             message: 'Please enter a valid PAN (e.g., ABCDE1234F)'
@@ -1614,14 +1661,13 @@ const CompanySettingsSchema = new mongoose.Schema({
         validate: {
             validator: function(v) {
                 if (!v) return true;
-                // CIN format: L or U, 5 digits, 2 letters, 4 digits, 3 letters, 6 digits
                 return /^[LU][0-9]{5}[A-Z]{2}[0-9]{4}[A-Z]{3}[0-9]{6}$/.test(v);
             },
             message: 'Please enter a valid CIN'
         }
     },
     
-    // ========== PAYMENT SETTINGS ==========
+    // ===== PAYMENT SETTINGS =====
     upiIds: [UpiIdSchema],
     
     bank: {
@@ -1629,31 +1675,31 @@ const CompanySettingsSchema = new mongoose.Schema({
         default: () => ({})
     },
     
-    // ========== INVOICE SETTINGS ==========
+    // ===== INVOICE SETTINGS =====
     invoiceSettings: {
         type: InvoiceSettingsSchema,
         default: () => ({})
     },
     
-    // ========== SUPPORT SETTINGS ==========
+    // ===== SUPPORT SETTINGS =====
     support: {
         type: SupportSettingsSchema,
         default: () => ({})
     },
     
-    // ========== SOCIAL MEDIA ==========
+    // ===== SOCIAL MEDIA =====
     social: {
         type: SocialLinksSchema,
         default: () => ({})
     },
     
-    // ========== BUSINESS HOURS ==========
+    // ===== BUSINESS HOURS =====
     businessHours: {
         type: BusinessHoursSchema,
         default: () => ({})
     },
     
-    // ========== BRANDING ==========
+    // ===== BRANDING =====
     logo: {
         type: String,
         trim: true,
@@ -1699,13 +1745,13 @@ const CompanySettingsSchema = new mongoose.Schema({
         }
     },
     
-    // ========== THEME ==========
+    // ===== THEME =====
     theme: {
         type: ThemeSchema,
         default: () => ({})
     },
     
-    // ========== META ==========
+    // ===== META =====
     metaTitle: {
         type: String,
         trim: true,
@@ -1718,29 +1764,18 @@ const CompanySettingsSchema = new mongoose.Schema({
     },
     metaKeywords: [String],
     
-    // ========== TRACKING ==========
-    createdBy: {
-        type: String,
-        ref: 'User'
-    },
-    updatedBy: {
-        type: String,
-        ref: 'User'
-    },
-    
-    // ========== SYSTEM FIELDS ==========
+    // ===== SYSTEM FIELDS =====
     version: {
         type: Number,
         default: 1
     },
     isActive: {
         type: Boolean,
-        default: true
+        default: true,
+        index: true
     },
     
-    // ✅ ADDED: Order flow mode for WhatsApp bot
-    // Values: 'short' (combined address) or 'long' (step by step)
-    // Default: 'short' for new installations
+    // WhatsApp Bot Order Flow Mode
     orderFlowMode: {
         type: String,
         enum: ['short', 'long'],
@@ -1754,12 +1789,12 @@ const CompanySettingsSchema = new mongoose.Schema({
 });
 
 // ==================== INDEXES ====================
-
-// Ensure only one settings document exists
+//CompanySettingsSchema.index({ companyId: 1 }, { unique: true });
+//CompanySettingsSchema.index({ companyId: 1, isActive: 1 });
+//CompanySettingsSchema.index({ 'upiIds.id': 1 });
+//CompanySettingsSchema.index({ 'upiIds.isActive': 1 });
 CompanySettingsSchema.index({ createdAt: 1 });
 CompanySettingsSchema.index({ updatedAt: -1 });
-CompanySettingsSchema.index({ 'upiIds.id': 1 });
-CompanySettingsSchema.index({ 'upiIds.isActive': 1 });
 
 // ==================== VIRTUALS ====================
 
@@ -1785,7 +1820,28 @@ CompanySettingsSchema.virtual('formattedBankDetails').get(function() {
     return `${this.bank.name}\nA/C: ${this.bank.account}\nIFSC: ${this.bank.ifsc}\n${this.bank.branch}`;
 });
 
+// Virtual for audit info
+CompanySettingsSchema.virtual('auditInfo').get(function() {
+    return {
+        created: {
+            at: this.createdAt,
+            by: this.createdBy
+        },
+        updated: {
+            at: this.updatedAt,
+            by: this.updatedBy
+        }
+    };
+});
+
 // ==================== METHODS ====================
+
+/**
+ * Check if settings belong to company
+ */
+CompanySettingsSchema.methods.belongsToCompany = function(companyId) {
+    return this.companyId && this.companyId.toString() === companyId.toString();
+};
 
 /**
  * Get active UPI IDs as array of strings
@@ -1874,46 +1930,37 @@ CompanySettingsSchema.methods.updateInvoiceSettings = function(invoiceData) {
     return this.save();
 };
 
-// ==================== STATICS ====================
+// ==================== STATICS (UPDATED FOR SAAS) ====================
 
 /**
- * Get or create singleton settings
+ * Get settings for a specific company
  */
-CompanySettingsSchema.statics.getSettings = async function() {
-    let settings = await this.findOne();
+CompanySettingsSchema.statics.getSettings = async function(companyId) {
+    const settings = await this.findOne({ companyId });
+    
+    if (!settings) {
+        throw new Error(`Settings not found for company ${companyId}`);
+    }
+    
+    return settings;
+};
+
+/**
+ * Get or create settings for a company (called during company creation)
+ */
+CompanySettingsSchema.statics.getOrCreateSettings = async function(companyId, createdBy, companyData = {}) {
+    let settings = await this.findOne({ companyId });
     
     if (!settings) {
         settings = await this.create({
-            companyName: 'PosterPro Store',
-            legalName: 'PosterPro Entertainment Private Limited',
-            tagline: 'Premium Posters & Art Prints',
-            phone: '+91 98765 43210',
-            email: 'support@posterpro.store',
-            address: '123 Business Street, Andheri East',
-            city: 'Mumbai, Maharashtra 400001',
-            gstin: '27ABCDE1234F1Z5',
-            pan: 'ABCDE1234F',
-            upiIds: [
-                {
-                    id: 'subaask21@oksbi',
-                    name: 'Primary UPI',
-                    appType: 'other',
-                    isActive: true
-                },
-                {
-                    id: 'posterpro.store@okaxis',
-                    name: 'PhonePe UPI',
-                    appType: 'phonepe',
-                    isActive: true
-                },
-                {
-                    id: 'posterpro.store@paytm',
-                    name: 'Paytm UPI',
-                    appType: 'paytm',
-                    isActive: true
-                }
-            ],
-            // ✅ ADDED: Default order flow mode for new installations
+            companyId,
+            createdBy,
+            companyName: companyData.companyName || 'New Company',
+            phone: companyData.phone || '+91 00000 00000',
+            email: companyData.email || 'info@company.com',
+            address: companyData.address || 'Address pending',
+            city: companyData.city || 'City pending',
+            upiIds: [],
             orderFlowMode: 'short'
         });
     }
@@ -1924,24 +1971,24 @@ CompanySettingsSchema.statics.getSettings = async function() {
 /**
  * Get active UPI IDs for payment verification
  */
-CompanySettingsSchema.statics.getActiveUpiIds = async function() {
-    const settings = await this.getSettings();
+CompanySettingsSchema.statics.getActiveUpiIds = async function(companyId) {
+    const settings = await this.getSettings(companyId);
     return settings.getActiveUpiIdStrings();
 };
 
 /**
- * Validate a payment screenshot UPI ID
+ * Validate a payment screenshot UPI ID for a company
  */
-CompanySettingsSchema.statics.validateUpiId = async function(upiId) {
-    const settings = await this.getSettings();
+CompanySettingsSchema.statics.validateUpiId = async function(companyId, upiId) {
+    const settings = await this.getSettings(companyId);
     return settings.isValidUpiId(upiId);
 };
 
 /**
  * Get company info for invoice
  */
-CompanySettingsSchema.statics.getInvoiceInfo = async function() {
-    const settings = await this.getSettings();
+CompanySettingsSchema.statics.getInvoiceInfo = async function(companyId) {
+    const settings = await this.getSettings(companyId);
     
     return {
         companyName: settings.companyName,
@@ -1961,10 +2008,10 @@ CompanySettingsSchema.statics.getInvoiceInfo = async function() {
 };
 
 /**
- * Get support information
+ * Get support information for a company
  */
-CompanySettingsSchema.statics.getSupportInfo = async function() {
-    const settings = await this.getSettings();
+CompanySettingsSchema.statics.getSupportInfo = async function(companyId) {
+    const settings = await this.getSettings(companyId);
     
     return {
         email: settings.support?.email || settings.email,
@@ -1978,19 +2025,23 @@ CompanySettingsSchema.statics.getSupportInfo = async function() {
     };
 };
 
+/**
+ * Get order flow mode for WhatsApp bot
+ */
+CompanySettingsSchema.statics.getOrderFlowMode = async function(companyId) {
+    const settings = await this.getSettings(companyId);
+    return settings.orderFlowMode || 'short';
+};
+
 // ==================== MIDDLEWARE ====================
 
 /**
- * Pre-save middleware to ensure only one document
+ * Pre-save middleware
  */
 CompanySettingsSchema.pre('save', async function(next) {
-    // Ensure this is the only document
-    if (this.isNew) {
-        const count = await mongoose.model('CompanySettings').countDocuments();
-        if (count > 0) {
-            const error = new Error('Company settings already exist. Use find and update instead.');
-            return next(error);
-        }
+    // Ensure companyId exists
+    if (!this.companyId) {
+        return next(new Error('Company ID is required'));
     }
     
     // Increment version
@@ -2000,17 +2051,15 @@ CompanySettingsSchema.pre('save', async function(next) {
 });
 
 /**
- * Post-save middleware to log changes
+ * Post-save middleware
  */
 CompanySettingsSchema.post('save', function(doc) {
-    console.log(`🏢 Company settings updated (v${doc.version}) by ${doc.updatedBy || 'system'}`);
-    // ✅ ADDED: Log order flow mode
+    console.log(`🏢 Company settings updated for company ${doc.companyId} (v${doc.version}) by ${doc.updatedBy || doc.createdBy || 'system'}`);
     console.log(`📋 Order flow mode: ${doc.orderFlowMode || 'short'}`);
 });
 
 // ==================== EXPORT ====================
 
-// Check if model already exists to prevent overwrite
 const CompanySettings = mongoose.models.CompanySettings || mongoose.model('CompanySettings', CompanySettingsSchema);
 
 export default CompanySettings;

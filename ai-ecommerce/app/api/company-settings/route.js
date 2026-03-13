@@ -1,3 +1,6 @@
+
+
+
 // import { NextResponse } from 'next/server';
 // import { connectDB } from '@/utils/db';
 // import CompanySettings from '@/models/CompanySettings';
@@ -86,6 +89,14 @@
 //  */
 // function isValidColor(color) {
 //     return /^#[0-9A-F]{6}$/i.test(color);
+// }
+
+// /**
+//  * Validate order flow mode
+//  * ✅ ADDED: Validation for orderFlowMode field
+//  */
+// function isValidOrderFlowMode(mode) {
+//     return mode === 'short' || mode === 'long';
 // }
 
 // /**
@@ -262,7 +273,9 @@
 //                     primary: '#2c3e50',
 //                     secondary: '#34495e',
 //                     accent: '#27ae60'
-//                 }
+//                 },
+//                 // ✅ ADDED: Default order flow mode
+//                 orderFlowMode: 'short'
 //             });
 //         }
         
@@ -460,6 +473,11 @@
 //             }
 //         }
 
+//         // ✅ ADDED: Order flow mode validation
+//         if (body.orderFlowMode !== undefined && !isValidOrderFlowMode(body.orderFlowMode)) {
+//             errors.orderFlowMode = 'Order flow mode must be either "short" or "long"';
+//         }
+
 //         // If validation errors, return 400
 //         if (Object.keys(errors).length > 0) {
 //             return NextResponse.json(
@@ -587,6 +605,11 @@
 //             };
 //         }
         
+//         // ✅ ADDED: Order flow mode
+//         if (body.orderFlowMode !== undefined) {
+//             settings.orderFlowMode = body.orderFlowMode;
+//         }
+        
 //         // Images (if uploaded)
 //         if (body.logo !== undefined) settings.logo = body.logo;
 //         if (body.favicon !== undefined) settings.favicon = body.favicon;
@@ -604,6 +627,7 @@
 //         invalidateCache();
 
 //         console.log(`✅ Company settings updated by ${session.user.email}`);
+//         console.log(`📋 Order flow mode set to: ${settings.orderFlowMode}`); // ✅ ADDED: Log mode
 
 //         return NextResponse.json({
 //             success: true,
@@ -774,6 +798,31 @@
 //             });
 //         }
         
+//         // ✅ ADDED: New action for updating order flow mode
+//         else if (action === 'update-order-flow') {
+//             // Update only order flow mode
+//             const { mode } = data;
+            
+//             if (!isValidOrderFlowMode(mode)) {
+//                 return NextResponse.json(
+//                     { success: false, error: 'Order flow mode must be either "short" or "long"' },
+//                     { status: 400 }
+//                 );
+//             }
+            
+//             settings.orderFlowMode = mode;
+//             await settings.save();
+//             invalidateCache();
+            
+//             console.log(`📋 Order flow mode updated to: ${mode} by ${session.user.email}`);
+            
+//             return NextResponse.json({
+//                 success: true,
+//                 message: `Order flow mode updated to ${mode}`,
+//                 data: settings
+//             });
+//         }
+        
 //         else {
 //             return NextResponse.json(
 //                 { success: false, error: 'Invalid action' },
@@ -919,7 +968,9 @@
 //             'toggle-upi': 'Activate/deactivate UPI ID',
 //             'delete-upi': 'Delete UPI ID',
 //             'update-bank': 'Update bank details only',
-//             'update-invoice-settings': 'Update invoice settings only'
+//             'update-invoice-settings': 'Update invoice settings only',
+//             // ✅ ADDED: New action
+//             'update-order-flow': 'Update order flow mode (short/long)'
 //         }
 //     });
 // }
@@ -928,37 +979,76 @@
 
 
 
+
+
+
+
+
+
+// above code is without saas
+
+
+
+
+
+
+
+
+
+
+
+
+// app/api/company-settings/route.js
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/utils/db';
 import CompanySettings from '@/models/CompanySettings';
+import Company from '@/models/Company';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/nextauth';
 import { writeFile, unlink, mkdir } from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
+import mongoose from 'mongoose';
 
 // ==================== CONFIGURATION ====================
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const maxDuration = 30;
+export const revalidate = 0;
+
 const UPLOAD_DIR = path.join(process.cwd(), 'public/uploads/company');
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
 
-// ==================== CACHE MANAGEMENT ====================
-let settingsCache = {
-    data: null,
-    timestamp: null
-};
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
 // ==================== HELPER FUNCTIONS ====================
+
+const isValidObjectId = (id) => {
+    return mongoose.Types.ObjectId.isValid(id) && 
+           /^[0-9a-fA-F]{24}$/.test(id);
+};
+
+const getCompanyContext = async (request) => {
+    try {
+        const companyId = request.headers.get('x-company-id') || 
+                         request.nextUrl?.searchParams.get('companyId');
+        
+        if (companyId && isValidObjectId(companyId)) {
+            const company = await Company.findById(companyId);
+            if (company) return companyId;
+        }
+        return null;
+    } catch (error) {
+        console.error('Error getting company context:', error);
+        return null;
+    }
+};
 
 /**
  * Validate UPI ID format
  */
 function isValidUpiId(upiId) {
     if (!upiId || typeof upiId !== 'string') return false;
-    
-    // Basic UPI format: username@provider
     const upiPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/;
     return upiPattern.test(upiId);
 }
@@ -967,8 +1057,7 @@ function isValidUpiId(upiId) {
  * Validate GSTIN format
  */
 function isValidGstin(gstin) {
-    if (!gstin) return true; // Optional
-    // GSTIN: 15 characters, first 2 digits state code, next 10 PAN, last 3 alphanumeric
+    if (!gstin) return true;
     const gstinPattern = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
     return gstinPattern.test(gstin);
 }
@@ -977,8 +1066,7 @@ function isValidGstin(gstin) {
  * Validate PAN format
  */
 function isValidPan(pan) {
-    if (!pan) return true; // Optional
-    // PAN: 5 letters, 4 digits, 1 letter
+    if (!pan) return true;
     const panPattern = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
     return panPattern.test(pan);
 }
@@ -987,8 +1075,7 @@ function isValidPan(pan) {
  * Validate IFSC code format
  */
 function isValidIfsc(ifsc) {
-    if (!ifsc) return true; // Optional
-    // IFSC: 4 letters, 0 or 7, then 6 digits/letters
+    if (!ifsc) return true;
     const ifscPattern = /^[A-Z]{4}0[A-Z0-9]{6}$/;
     return ifscPattern.test(ifsc);
 }
@@ -1003,7 +1090,7 @@ function isValidEmail(email) {
 }
 
 /**
- * Validate phone number (basic)
+ * Validate phone number
  */
 function isValidPhone(phone) {
     if (!phone) return false;
@@ -1020,7 +1107,6 @@ function isValidColor(color) {
 
 /**
  * Validate order flow mode
- * ✅ ADDED: Validation for orderFlowMode field
  */
 function isValidOrderFlowMode(mode) {
     return mode === 'short' || mode === 'long';
@@ -1034,42 +1120,29 @@ async function processAndSaveImage(file, type) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
         
-        // Check file size
         if (buffer.length > MAX_FILE_SIZE) {
             throw new Error(`File size exceeds ${MAX_FILE_SIZE / (1024 * 1024)}MB limit`);
         }
         
-        // Ensure upload directory exists
-        try {
-            await mkdir(UPLOAD_DIR, { recursive: true });
-        } catch (err) {
-            // Directory might already exist
-        }
+        await mkdir(UPLOAD_DIR, { recursive: true }).catch(() => {});
         
-        // Generate unique filename
         const extension = file.name.split('.').pop() || 'png';
         const filename = `${type}-${uuidv4()}.${extension}`;
         const filepath = path.join(UPLOAD_DIR, filename);
         
-        // Process image with sharp (optimize)
         let processedBuffer = buffer;
         
-        // Only process raster images with sharp
         if (file.type.startsWith('image/') && file.type !== 'image/svg+xml') {
             try {
                 processedBuffer = await sharp(buffer)
                     .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
                     .toBuffer();
             } catch (sharpError) {
-                console.warn('Sharp processing failed, using original:', sharpError.message);
-                // Fall back to original buffer
+                console.warn('Sharp processing failed:', sharpError.message);
             }
         }
         
-        // Save file
         await writeFile(filepath, processedBuffer);
-        
-        // Return public URL
         return `/uploads/company/${filename}`;
         
     } catch (error) {
@@ -1083,138 +1156,47 @@ async function processAndSaveImage(file, type) {
  */
 async function deleteOldImage(imageUrl) {
     if (!imageUrl) return;
-    
     try {
         const filename = path.basename(imageUrl);
         const filepath = path.join(UPLOAD_DIR, filename);
-        await unlink(filepath);
+        await unlink(filepath).catch(() => {});
     } catch (error) {
-        // Ignore errors if file doesn't exist
         console.warn('Failed to delete old image:', error.message);
     }
 }
 
-/**
- * Invalidate cache
- */
-function invalidateCache() {
-    settingsCache = {
-        data: null,
-        timestamp: null
-    };
-}
-
 // ==================== GET HANDLER ====================
 
-export async function GET() {
+export async function GET(request) {
     try {
-        // Check cache first
-        if (settingsCache.data && settingsCache.timestamp) {
-            const age = Date.now() - settingsCache.timestamp;
-            if (age < CACHE_TTL) {
-                console.log('📦 Serving company settings from cache');
-                return NextResponse.json({
-                    success: true,
-                    data: settingsCache.data,
-                    cached: true
-                });
-            }
+        // Get company context
+        const companyId = await getCompanyContext(request);
+        if (!companyId) {
+            return NextResponse.json({
+                success: false,
+                message: 'Company context required',
+                error: 'Missing or invalid company ID'
+            }, { status: 400 });
         }
 
         await connectDB();
         
-        // Get settings (singleton pattern)
-        let settings = await CompanySettings.findOne();
+        // Get settings for this specific company
+        let settings = await CompanySettings.findOne({ companyId });
         
-        // If no settings exist, create default
+        // If no settings exist, return 404 (should be created during company setup)
         if (!settings) {
-            console.log('🏢 Creating default company settings');
-            settings = await CompanySettings.create({
-                companyName: 'PosterPro Store',
-                legalName: 'PosterPro Entertainment Private Limited',
-                tagline: 'Premium Posters & Art Prints',
-                phone: '+91 98765 43210',
-                email: 'support@posterpro.store',
-                website: 'www.posterpro.store',
-                address: '123 Business Street, Andheri East',
-                city: 'Mumbai, Maharashtra 400001',
-                gstin: '27ABCDE1234F1Z5',
-                pan: 'ABCDE1234F',
-                cin: 'U12345MH2023PTC123456',
-                upiIds: [
-                    {
-                        id: 'subaask21@oksbi',
-                        name: 'Primary UPI',
-                        appType: 'other',
-                        isActive: true,
-                        description: 'Main business UPI ID'
-                    },
-                    {
-                        id: 'posterpro.store@okaxis',
-                        name: 'PhonePe UPI',
-                        appType: 'phonepe',
-                        isActive: true,
-                        description: 'PhonePe business account'
-                    },
-                    {
-                        id: 'posterpro.store@paytm',
-                        name: 'Paytm UPI',
-                        appType: 'paytm',
-                        isActive: true,
-                        description: 'Paytm business account'
-                    }
-                ],
-                bank: {
-                    name: 'State Bank of India',
-                    account: '12345678901',
-                    ifsc: 'SBIN0001234',
-                    branch: 'Andheri East Branch',
-                    accountType: 'Current Account'
-                },
-                invoiceSettings: {
-                    prefix: 'INV',
-                    separator: '-',
-                    dateFormat: 'dd/mm/yyyy',
-                    currency: '₹',
-                    taxSystem: 'GST',
-                    gstBreakdown: true,
-                    showCGSTSGST: true,
-                    roundAmount: true,
-                    paymentTerms: 'Due on receipt',
-                    deliveryTerms: '3-5 business days after payment confirmation',
-                    warrantyTerms: '7 days replacement for manufacturing defects',
-                    refundPolicy: 'No refunds after order processing'
-                },
-                support: {
-                    email: 'care@posterpro.store',
-                    phone: '+91 98765 43210',
-                    hours: 'Mon-Sat, 10:00 AM - 7:00 PM'
-                },
-                social: {
-                    facebook: '',
-                    instagram: '',
-                    twitter: '',
-                    youtube: ''
-                },
-                theme: {
-                    primary: '#2c3e50',
-                    secondary: '#34495e',
-                    accent: '#27ae60'
-                },
-                // ✅ ADDED: Default order flow mode
-                orderFlowMode: 'short'
-            });
+            return NextResponse.json({
+                success: false,
+                message: 'Company settings not found',
+                error: 'Settings not configured for this company'
+            }, { status: 404 });
         }
-        
-        // Update cache
-        settingsCache = {
-            data: settings,
-            timestamp: Date.now()
-        };
         
         return NextResponse.json({
             success: true,
-            data: settings
+            data: settings,
+            companyId
         });
         
     } catch (error) {
@@ -1243,17 +1225,19 @@ export async function PUT(request) {
             );
         }
 
-        // Check admin role
-        if (session.user.role !== 'admin') {
-            return NextResponse.json(
-                { success: false, error: 'Admin access required' },
-                { status: 403 }
-            );
+        // Get company context
+        const companyId = await getCompanyContext(request);
+        if (!companyId) {
+            return NextResponse.json({
+                success: false,
+                message: 'Company context required',
+                error: 'Missing or invalid company ID'
+            }, { status: 400 });
         }
 
         await connectDB();
         
-        // Parse form data (supports both JSON and FormData)
+        // Parse form data
         let body;
         let files = {};
         
@@ -1262,11 +1246,9 @@ export async function PUT(request) {
         if (contentType.includes('multipart/form-data')) {
             const formData = await request.formData();
             
-            // Parse text fields
             body = {};
             for (const [key, value] of formData.entries()) {
                 if (!(value instanceof File)) {
-                    // Handle nested objects with dot notation
                     if (key.includes('.')) {
                         const parts = key.split('.');
                         let current = body;
@@ -1283,63 +1265,25 @@ export async function PUT(request) {
                 }
             }
             
-            // Parse JSON fields that might be stringified
-            if (body.upiIds && typeof body.upiIds === 'string') {
-                try {
-                    body.upiIds = JSON.parse(body.upiIds);
-                } catch (e) {
-                    // Keep as is
+            // Parse JSON fields
+            ['upiIds', 'bank', 'invoiceSettings', 'support', 'social', 'theme'].forEach(field => {
+                if (body[field] && typeof body[field] === 'string') {
+                    try {
+                        body[field] = JSON.parse(body[field]);
+                    } catch (e) {}
                 }
-            }
-            
-            if (body.bank && typeof body.bank === 'string') {
-                try {
-                    body.bank = JSON.parse(body.bank);
-                } catch (e) {
-                    // Keep as is
-                }
-            }
-            
-            if (body.invoiceSettings && typeof body.invoiceSettings === 'string') {
-                try {
-                    body.invoiceSettings = JSON.parse(body.invoiceSettings);
-                } catch (e) {
-                    // Keep as is
-                }
-            }
-            
-            if (body.support && typeof body.support === 'string') {
-                try {
-                    body.support = JSON.parse(body.support);
-                } catch (e) {
-                    // Keep as is
-                }
-            }
-            
-            if (body.social && typeof body.social === 'string') {
-                try {
-                    body.social = JSON.parse(body.social);
-                } catch (e) {
-                    // Keep as is
-                }
-            }
-            
-            if (body.theme && typeof body.theme === 'string') {
-                try {
-                    body.theme = JSON.parse(body.theme);
-                } catch (e) {
-                    // Keep as is
-                }
-            }
+            });
             
         } else {
             body = await request.json();
         }
 
+        // Add companyId to body
+        body.companyId = companyId;
+
         // ==================== VALIDATION ====================
         const errors = {};
 
-        // Basic Info Validation
         if (!body.companyName?.trim()) {
             errors.companyName = 'Company name is required';
         }
@@ -1364,21 +1308,18 @@ export async function PUT(request) {
             errors.city = 'City is required';
         }
 
-        // Tax validation
         if (body.gstin && !isValidGstin(body.gstin)) {
-            errors.gstin = 'Please enter a valid GSTIN (15 characters)';
+            errors.gstin = 'Please enter a valid GSTIN';
         }
 
         if (body.pan && !isValidPan(body.pan)) {
-            errors.pan = 'Please enter a valid PAN (e.g., ABCDE1234F)';
+            errors.pan = 'Please enter a valid PAN';
         }
 
-        // Bank validation
         if (body.bank?.ifsc && !isValidIfsc(body.bank.ifsc)) {
-            errors.bankIfsc = 'Please enter a valid IFSC code (e.g., SBIN0001234)';
+            errors.bankIfsc = 'Please enter a valid IFSC code';
         }
 
-        // UPI validation
         if (body.upiIds && Array.isArray(body.upiIds)) {
             body.upiIds.forEach((upi, index) => {
                 if (!isValidUpiId(upi.id)) {
@@ -1387,7 +1328,6 @@ export async function PUT(request) {
             });
         }
 
-        // Theme validation
         if (body.theme) {
             if (!isValidColor(body.theme.primary)) {
                 errors.themePrimary = 'Primary color must be a valid hex code';
@@ -1400,12 +1340,10 @@ export async function PUT(request) {
             }
         }
 
-        // ✅ ADDED: Order flow mode validation
         if (body.orderFlowMode !== undefined && !isValidOrderFlowMode(body.orderFlowMode)) {
             errors.orderFlowMode = 'Order flow mode must be either "short" or "long"';
         }
 
-        // If validation errors, return 400
         if (Object.keys(errors).length > 0) {
             return NextResponse.json(
                 { 
@@ -1418,10 +1356,21 @@ export async function PUT(request) {
         }
 
         // ==================== GET EXISTING SETTINGS ====================
-        let settings = await CompanySettings.findOne();
+        let settings = await CompanySettings.findOne({ companyId });
         
         if (!settings) {
-            settings = new CompanySettings();
+            return NextResponse.json({
+                success: false,
+                error: 'Settings not found for this company'
+            }, { status: 404 });
+        }
+
+        // Verify ownership
+        if (!settings.belongsToCompany(companyId)) {
+            return NextResponse.json({
+                success: false,
+                error: 'Access denied'
+            }, { status: 403 });
         }
 
         // ==================== PROCESS IMAGE UPLOADS ====================
@@ -1431,7 +1380,6 @@ export async function PUT(request) {
             if (files[field]) {
                 const file = files[field];
                 
-                // Validate file type
                 if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
                     return NextResponse.json(
                         { 
@@ -1443,10 +1391,7 @@ export async function PUT(request) {
                 }
                 
                 try {
-                    // Delete old image
                     await deleteOldImage(settings[field]);
-                    
-                    // Upload new image
                     const imageUrl = await processAndSaveImage(file, field);
                     body[field] = imageUrl;
                     
@@ -1465,7 +1410,6 @@ export async function PUT(request) {
 
         // ==================== UPDATE FIELDS ====================
         
-        // Basic Info
         if (body.companyName !== undefined) settings.companyName = body.companyName;
         if (body.legalName !== undefined) settings.legalName = body.legalName;
         if (body.tagline !== undefined) settings.tagline = body.tagline;
@@ -1475,14 +1419,11 @@ export async function PUT(request) {
         if (body.address !== undefined) settings.address = body.address;
         if (body.city !== undefined) settings.city = body.city;
         
-        // Tax & Legal
         if (body.gstin !== undefined) settings.gstin = body.gstin;
         if (body.pan !== undefined) settings.pan = body.pan;
         if (body.cin !== undefined) settings.cin = body.cin;
         
-        // UPI IDs
         if (body.upiIds !== undefined) {
-            // Ensure each UPI has required fields
             settings.upiIds = body.upiIds.map(upi => ({
                 id: upi.id,
                 name: upi.name || upi.id.split('@')[0],
@@ -1492,7 +1433,6 @@ export async function PUT(request) {
             }));
         }
         
-        // Bank Details
         if (body.bank) {
             settings.bank = {
                 ...settings.bank,
@@ -1500,7 +1440,6 @@ export async function PUT(request) {
             };
         }
         
-        // Invoice Settings
         if (body.invoiceSettings) {
             settings.invoiceSettings = {
                 ...settings.invoiceSettings,
@@ -1508,7 +1447,6 @@ export async function PUT(request) {
             };
         }
         
-        // Support
         if (body.support) {
             settings.support = {
                 ...settings.support,
@@ -1516,7 +1454,6 @@ export async function PUT(request) {
             };
         }
         
-        // Social Media
         if (body.social) {
             settings.social = {
                 ...settings.social,
@@ -1524,7 +1461,6 @@ export async function PUT(request) {
             };
         }
         
-        // Theme
         if (body.theme) {
             settings.theme = {
                 ...settings.theme,
@@ -1532,34 +1468,28 @@ export async function PUT(request) {
             };
         }
         
-        // ✅ ADDED: Order flow mode
         if (body.orderFlowMode !== undefined) {
             settings.orderFlowMode = body.orderFlowMode;
         }
         
-        // Images (if uploaded)
         if (body.logo !== undefined) settings.logo = body.logo;
         if (body.favicon !== undefined) settings.favicon = body.favicon;
         if (body.signature !== undefined) settings.signature = body.signature;
         if (body.stamp !== undefined) settings.stamp = body.stamp;
         
-        // Update metadata
-        settings.updatedBy = session.user.email;
+        settings.updatedBy = session.user.id;
         settings.updatedAt = new Date();
 
-        // ==================== SAVE TO DATABASE ====================
         await settings.save();
 
-        // ==================== INVALIDATE CACHE ====================
-        invalidateCache();
-
-        console.log(`✅ Company settings updated by ${session.user.email}`);
-        console.log(`📋 Order flow mode set to: ${settings.orderFlowMode}`); // ✅ ADDED: Log mode
+        console.log(`✅ Company settings updated for company ${companyId} by ${session.user.email}`);
+        console.log(`📋 Order flow mode: ${settings.orderFlowMode}`);
 
         return NextResponse.json({
             success: true,
             message: 'Company settings updated successfully',
-            data: settings
+            data: settings,
+            companyId
         });
 
     } catch (error) {
@@ -1575,11 +1505,10 @@ export async function PUT(request) {
     }
 }
 
-// ==================== PATCH HANDLER (Partial Update) ====================
+// ==================== PATCH HANDLER ====================
 
 export async function PATCH(request) {
     try {
-        // Check authentication
         const session = await getServerSession(authOptions);
         if (!session) {
             return NextResponse.json(
@@ -1588,28 +1517,38 @@ export async function PATCH(request) {
             );
         }
 
-        // Check admin role
-        if (session.user.role !== 'admin') {
-            return NextResponse.json(
-                { success: false, error: 'Admin access required' },
-                { status: 403 }
-            );
+        const companyId = await getCompanyContext(request);
+        if (!companyId) {
+            return NextResponse.json({
+                success: false,
+                message: 'Company context required',
+                error: 'Missing or invalid company ID'
+            }, { status: 400 });
         }
 
         await connectDB();
         const body = await request.json();
         const { action, ...data } = body;
 
-        let settings = await CompanySettings.findOne();
+        let settings = await CompanySettings.findOne({ companyId });
         
         if (!settings) {
-            settings = new CompanySettings();
+            return NextResponse.json({
+                success: false,
+                error: 'Settings not found for this company'
+            }, { status: 404 });
         }
 
-        // ==================== HANDLE SPECIFIC ACTIONS ====================
+        if (!settings.belongsToCompany(companyId)) {
+            return NextResponse.json({
+                success: false,
+                error: 'Access denied'
+            }, { status: 403 });
+        }
+
+        // ==================== HANDLE ACTIONS ====================
         
         if (action === 'add-upi') {
-            // Add a single UPI ID
             const { id, name, appType, description } = data;
             
             if (!id || !isValidUpiId(id)) {
@@ -1619,7 +1558,6 @@ export async function PATCH(request) {
                 );
             }
             
-            // Check for duplicate
             const exists = settings.upiIds.some(upi => upi.id === id);
             if (exists) {
                 return NextResponse.json(
@@ -1636,8 +1574,8 @@ export async function PATCH(request) {
                 description: description || ''
             });
             
+            settings.updatedBy = session.user.id;
             await settings.save();
-            invalidateCache();
             
             return NextResponse.json({
                 success: true,
@@ -1647,7 +1585,6 @@ export async function PATCH(request) {
         }
         
         else if (action === 'toggle-upi') {
-            // Toggle UPI active status
             const { id, isActive } = data;
             
             const upiIndex = settings.upiIds.findIndex(upi => upi.id === id);
@@ -1659,8 +1596,8 @@ export async function PATCH(request) {
             }
             
             settings.upiIds[upiIndex].isActive = isActive !== false;
+            settings.updatedBy = session.user.id;
             await settings.save();
-            invalidateCache();
             
             return NextResponse.json({
                 success: true,
@@ -1670,7 +1607,6 @@ export async function PATCH(request) {
         }
         
         else if (action === 'delete-upi') {
-            // Delete a UPI ID
             const { id } = data;
             
             const initialLength = settings.upiIds.length;
@@ -1683,8 +1619,8 @@ export async function PATCH(request) {
                 );
             }
             
+            settings.updatedBy = session.user.id;
             await settings.save();
-            invalidateCache();
             
             return NextResponse.json({
                 success: true,
@@ -1694,13 +1630,12 @@ export async function PATCH(request) {
         }
         
         else if (action === 'update-bank') {
-            // Update only bank details
             settings.bank = {
                 ...settings.bank,
                 ...data
             };
+            settings.updatedBy = session.user.id;
             await settings.save();
-            invalidateCache();
             
             return NextResponse.json({
                 success: true,
@@ -1710,13 +1645,12 @@ export async function PATCH(request) {
         }
         
         else if (action === 'update-invoice-settings') {
-            // Update only invoice settings
             settings.invoiceSettings = {
                 ...settings.invoiceSettings,
                 ...data
             };
+            settings.updatedBy = session.user.id;
             await settings.save();
-            invalidateCache();
             
             return NextResponse.json({
                 success: true,
@@ -1725,9 +1659,7 @@ export async function PATCH(request) {
             });
         }
         
-        // ✅ ADDED: New action for updating order flow mode
         else if (action === 'update-order-flow') {
-            // Update only order flow mode
             const { mode } = data;
             
             if (!isValidOrderFlowMode(mode)) {
@@ -1738,10 +1670,10 @@ export async function PATCH(request) {
             }
             
             settings.orderFlowMode = mode;
+            settings.updatedBy = session.user.id;
             await settings.save();
-            invalidateCache();
             
-            console.log(`📋 Order flow mode updated to: ${mode} by ${session.user.email}`);
+            console.log(`📋 Order flow mode updated to: ${mode} for company ${companyId}`);
             
             return NextResponse.json({
                 success: true,
@@ -1774,7 +1706,6 @@ export async function PATCH(request) {
 
 export async function DELETE(request) {
     try {
-        // Check authentication
         const session = await getServerSession(authOptions);
         if (!session) {
             return NextResponse.json(
@@ -1783,12 +1714,13 @@ export async function DELETE(request) {
             );
         }
 
-        // Check admin role
-        if (session.user.role !== 'admin') {
-            return NextResponse.json(
-                { success: false, error: 'Admin access required' },
-                { status: 403 }
-            );
+        const companyId = await getCompanyContext(request);
+        if (!companyId) {
+            return NextResponse.json({
+                success: false,
+                message: 'Company context required',
+                error: 'Missing or invalid company ID'
+            }, { status: 400 });
         }
 
         const { searchParams } = new URL(request.url);
@@ -1797,7 +1729,7 @@ export async function DELETE(request) {
 
         await connectDB();
         
-        let settings = await CompanySettings.findOne();
+        let settings = await CompanySettings.findOne({ companyId });
         
         if (!settings) {
             return NextResponse.json(
@@ -1806,10 +1738,16 @@ export async function DELETE(request) {
             );
         }
 
-        // ==================== HANDLE DIFFERENT DELETE OPERATIONS ====================
+        if (!settings.belongsToCompany(companyId)) {
+            return NextResponse.json({
+                success: false,
+                error: 'Access denied'
+            }, { status: 403 });
+        }
+
+        // ==================== HANDLE DELETE OPERATIONS ====================
         
         if (type === 'upi' && id) {
-            // Delete specific UPI ID
             const upiIndex = settings.upiIds.findIndex(upi => upi.id === id);
             if (upiIndex === -1) {
                 return NextResponse.json(
@@ -1819,8 +1757,8 @@ export async function DELETE(request) {
             }
             
             settings.upiIds.splice(upiIndex, 1);
+            settings.updatedBy = session.user.id;
             await settings.save();
-            invalidateCache();
             
             return NextResponse.json({
                 success: true,
@@ -1830,7 +1768,6 @@ export async function DELETE(request) {
         }
         
         else if (type === 'image') {
-            // Delete uploaded image
             const imageField = searchParams.get('field');
             const validImageFields = ['logo', 'favicon', 'signature', 'stamp'];
             
@@ -1845,8 +1782,8 @@ export async function DELETE(request) {
             if (imageUrl) {
                 await deleteOldImage(imageUrl);
                 settings[imageField] = null;
+                settings.updatedBy = session.user.id;
                 await settings.save();
-                invalidateCache();
             }
             
             return NextResponse.json({
@@ -1881,22 +1818,22 @@ export async function DELETE(request) {
 export async function OPTIONS() {
     return NextResponse.json({
         methods: ['GET', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        description: 'Company Settings API',
+        description: 'Multi-tenant Company Settings API',
         features: [
-            'GET - Fetch company settings (public)',
+            'Company-based data isolation',
+            'GET - Fetch company settings (requires companyId)',
             'PUT - Full update of settings (admin only)',
             'PATCH - Partial updates with actions (admin only)',
             'DELETE - Delete specific items (admin only)',
-            'Supports multipart/form-data for image uploads',
-            'Cache invalidation on updates'
+            'Supports multipart/form-data for image uploads'
         ],
+        required: ['companyId'],
         actions: {
             'add-upi': 'Add a new UPI ID',
             'toggle-upi': 'Activate/deactivate UPI ID',
             'delete-upi': 'Delete UPI ID',
             'update-bank': 'Update bank details only',
             'update-invoice-settings': 'Update invoice settings only',
-            // ✅ ADDED: New action
             'update-order-flow': 'Update order flow mode (short/long)'
         }
     });

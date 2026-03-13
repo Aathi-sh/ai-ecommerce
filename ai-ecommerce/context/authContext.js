@@ -1,5 +1,4 @@
 
-
 // 'use client';
 
 // import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
@@ -55,14 +54,13 @@
 //       role: session.user.role || 'user',
 //       isVerified: session.user.isVerified || false,
 //       phone: session.user.phone || '',
-//       status: session.user.status || 'active', // ✅ Add status from session
+//       status: session.user.status || 'active',
 //       isAdmin: session.user.role === 'admin',
 //       isManager: session.user.role === 'manager',
 //       preferences: session.user.preferences || {},
 //       notificationSettings: session.user.notificationSettings || {},
 //       isAuthenticated: true,
-//       // ✅ Fix: Use actual status from database, not virtual
-//       isActive: session.user.status === 'active', // Derived from status, not stored in DB
+//       isActive: session.user.status === 'active',
 //     };
 //   }, [session]);
 
@@ -82,9 +80,9 @@
 //           email: session?.user?.email,
 //           role: session?.user?.role,
 //           isVerified: session?.user?.isVerified,
-//           status: session?.user?.status, // ✅ Log actual status
-//           isActive: session?.user?.status === 'active', // ✅ Log derived isActive
-//           status: sessionStatus
+//           status: session?.user?.status,
+//           isActive: session?.user?.status === 'active',
+//           sessionStatus
 //         });
 
 //         if (session?.user) {
@@ -92,12 +90,11 @@
 //             email: session.user.email,
 //             role: session.user.role,
 //             isVerified: session.user.isVerified,
-//             status: session.user.status, // ✅ Log actual status
-//             isActive: session.user.status === 'active' // ✅ Log derived isActive
+//             status: session.user.status,
+//             isActive: session.user.status === 'active'
 //           });
           
 //           // Store minimal user info for non-auth features (like FCM)
-//           // This is NOT for authentication, only for features that need user info
 //           if (typeof window !== 'undefined') {
 //             try {
 //               localStorage.setItem('user_info', JSON.stringify({
@@ -108,9 +105,8 @@
 //                 isAdmin: session.user.role === 'admin',
 //                 isManager: session.user.role === 'manager',
 //                 isVerified: session.user.isVerified,
-//                 status: session.user.status, // ✅ Store actual status
-//                 isActive: session.user.status === 'active', // ✅ Store derived isActive
-//                 // Only store non-sensitive information
+//                 status: session.user.status,
+//                 isActive: session.user.status === 'active',
 //               }));
 //             } catch (e) {
 //               console.warn('⚠️ [AuthContext] Could not store user info in localStorage:', e);
@@ -143,7 +139,6 @@
       
 //       console.log('🔐 [AuthContext] Attempting login for:', email);
       
-//       // Use NextAuth's signIn function
 //       const result = await nextAuthSignIn('credentials', {
 //         email: email.trim().toLowerCase(),
 //         password,
@@ -159,7 +154,6 @@
 //         let errorMessage = 'Authentication failed. Please try again.';
 //         let errorType = 'error';
         
-//         // ✅ Handle all account status errors professionally
 //         if (result.error === 'PENDING_VERIFICATION') {
 //           errorMessage = 'Please verify your email address before logging in';
 //           errorType = 'warning';
@@ -189,10 +183,8 @@
 
 //       console.log('✅ [AuthContext] Login successful');
       
-//       // Update session to get latest data
 //       await updateSession();
       
-//       // Wait a moment for session to update
 //       await new Promise(resolve => setTimeout(resolve, 500));
       
 //       return {
@@ -228,7 +220,6 @@
 //         try {
 //           console.log('🔧 [AuthContext] Getting FCM token for cleanup');
           
-//           // Dynamically import FCM service only when needed
 //           const fcmModule = await import('../lib/firebase/fcm-token-service');
 //           fcmToken = await fcmModule.getCurrentFCMToken();
           
@@ -260,32 +251,26 @@
 //         });
 //       } catch (apiError) {
 //         console.warn('⚠️ [AuthContext] Logout API error:', apiError);
-//         // Continue with client-side logout even if API fails
 //       }
       
 //       // Step 3: Clear client-side storage
 //       if (typeof window !== 'undefined') {
 //         try {
-//           // Clear auth-related storage
 //           localStorage.removeItem('user_info');
 //           sessionStorage.removeItem('user');
           
-//           // Clear any cached auth data
 //           localStorage.removeItem('nextauth.message');
 //           localStorage.removeItem('auth_token');
 //           localStorage.removeItem('token_expiry');
           
-//           // Clear FCM-related storage
 //           localStorage.removeItem('fcm_token');
 //           localStorage.removeItem('fcm_token_sent_to_server');
           
-//           // Notify other tabs if needed
 //           if (notifyOtherTabs) {
 //             localStorage.setItem('logout_event', Date.now().toString());
 //             setTimeout(() => localStorage.removeItem('logout_event'), 1000);
 //           }
           
-//           // Dispatch logout event for other components
 //           window.dispatchEvent(new Event('user-logged-out'));
 //           window.dispatchEvent(new CustomEvent('auth-state-changed', {
 //             detail: { user: null, isAuthenticated: false }
@@ -296,7 +281,7 @@
 //         }
 //       }
       
-//       // Step 4: Sign out via NextAuth (this clears the session cookie)
+//       // Step 4: Sign out via NextAuth
 //       console.log('🔐 [AuthContext] Signing out via NextAuth');
 //       const signOutResult = await nextAuthSignOut({ 
 //         redirect: false,
@@ -318,7 +303,7 @@
 //       if (typeof window !== 'undefined') {
 //         setTimeout(() => {
 //           router.push(finalRedirectUrl);
-//           router.refresh(); // Force refresh to update server components
+//           router.refresh();
 //         }, 100);
 //       }
       
@@ -331,7 +316,6 @@
 //     } catch (error) {
 //       console.error('❌ [AuthContext] Logout error:', error);
       
-//       // Force redirect on error
 //       if (typeof window !== 'undefined') {
 //         localStorage.clear();
 //         sessionStorage.clear();
@@ -354,7 +338,6 @@
       
 //       console.log('🔄 [AuthContext] Updating user data');
       
-//       // Call your API to update user data
 //       const response = await fetch('/api/user/profile', {
 //         method: 'PUT',
 //         headers: { 
@@ -369,7 +352,6 @@
 //         throw new Error(data.message || 'Update failed');
 //       }
       
-//       // Update session with new data
 //       await updateSession({
 //         ...session,
 //         user: {
@@ -405,7 +387,7 @@
 //     return roles.includes(user.role);
 //   }, [user]);
 
-//   // ✅ FIXED: Check if user is active based on status, not virtual isActive
+//   // Check if user is active based on status
 //   const isActive = useMemo(() => {
 //     return user?.status === 'active';
 //   }, [user]);
@@ -438,11 +420,10 @@
 //     }
 //   }, [updateSession]);
 
-//   // Get user permissions (extend based on your permission system)
+//   // Get user permissions
 //   const getPermissions = useCallback(() => {
 //     if (!user) return [];
     
-//     // Permission mapping based on role (extend as needed)
 //     const permissionMap = {
 //       admin: ['read', 'write', 'delete', 'manage_users', 'manage_settings', 'view_analytics', 'manage_products'],
 //       manager: ['read', 'write', 'manage_orders', 'view_reports', 'manage_inventory'],
@@ -458,12 +439,11 @@
 //     return permissions.includes(permission);
 //   }, [getPermissions]);
 
-//   // ✅ FIXED: Handle route protection with proper status checks
+//   // Handle route protection with proper status checks
 //   useEffect(() => {
 //     if (loading || !authChecked) return;
 
 //     const handleRouteProtection = () => {
-//       // Define public paths that don't require authentication
 //       const publicPaths = [
 //         '/',
 //         '/login',
@@ -475,16 +455,15 @@
 //         '/auth/error',
 //         '/auth/verify-request',
 //         '/auth/new-user',
-//         '/account-inactive', // ✅ Add page for inactive accounts
-//         '/account-suspended', // ✅ Add page for suspended accounts
-//         '/account-pending', // ✅ Add page for pending verification
+//         '/account-inactive',
+//         '/account-suspended',
+//         '/account-pending',
 //       ];
 
 //       const isPublicPath = publicPaths.some(path => 
 //         pathname === path || pathname?.startsWith(`${path}/`)
 //       );
 
-//       // If user is not authenticated and trying to access protected route
 //       if (!isAuthenticated && !isPublicPath) {
 //         console.log('🔄 [AuthContext] Redirecting unauthenticated user to login from:', pathname);
 //         const loginUrl = `/login?callbackUrl=${encodeURIComponent(pathname)}`;
@@ -492,7 +471,6 @@
 //         return;
 //       }
 
-//       // If user is authenticated but trying to access auth pages
 //       if (isAuthenticated && (pathname === '/login' || pathname === '/signup' || pathname === '/register')) {
 //         console.log('🔄 [AuthContext] Redirecting authenticated user from auth page:', pathname);
 //         const redirectPath = user.role === 'admin' 
@@ -504,9 +482,7 @@
 //         return;
 //       }
 
-//       // ✅ FIXED: Check account status and redirect appropriately
 //       if (isAuthenticated) {
-//         // Handle different account statuses
 //         if (user.status === 'pending') {
 //           console.log('🔄 [AuthContext] Redirecting pending verification user:', pathname);
 //           if (!pathname?.includes('/verify-email')) {
@@ -527,22 +503,18 @@
 //           }
 //         } else if (user.status === 'deleted') {
 //           console.log('⛔ [AuthContext] Deleted account attempted access:', pathname);
-//           // Force logout for deleted accounts
 //           logout({ notifyOtherTabs: true });
 //           router.push('/login?error=account_deleted');
 //           return;
 //         }
 
-//         // Role-based route protection (only for active accounts)
 //         if (user.status === 'active') {
-//           // Admin routes require admin role
 //           if (pathname?.startsWith('/admin') && !user.isAdmin) {
 //             console.log('⛔ [AuthContext] Non-admin user attempting to access admin route:', pathname);
 //             router.push('/dashboard');
 //             return;
 //           }
 
-//           // Manager routes require manager or admin role
 //           if (pathname?.startsWith('/manager') && !isManagerOrAdmin) {
 //             console.log('⛔ [AuthContext] Unauthorized user attempting to access manager route:', pathname);
 //             router.push('/dashboard');
@@ -591,32 +563,27 @@
 //     };
 //   }, [logout]);
 
-//   // Monitor session activity (optional for session extension)
+//   // Monitor session activity
 //   useEffect(() => {
 //     if (!isAuthenticated || !user?.isAdmin || user.status !== 'active') return;
 
 //     let activityTimer;
     
 //     const handleUserActivity = () => {
-//       // Clear existing timer
 //       if (activityTimer) clearTimeout(activityTimer);
       
-//       // Set new timer to update last activity
 //       activityTimer = setTimeout(async () => {
 //         try {
-//           // Optional: Update last activity in database for admin users
 //           await fetch('/api/user/activity', {
 //             method: 'POST',
 //             headers: { 'Content-Type': 'application/json' },
 //             body: JSON.stringify({ userId: user.id }),
 //           }).catch(err => console.debug('Activity update failed:', err));
 //         } catch (error) {
-//           // Silent fail for activity tracking
 //         }
-//       }, 60000); // Update every minute of activity
+//       }, 60000);
 //     };
 
-//     // Track user activity events
 //     const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
 //     events.forEach(event => {
 //       window.addEventListener(event, handleUserActivity, { passive: true });
@@ -632,42 +599,27 @@
 
 //   // Context value
 //   const contextValue = useMemo(() => ({
-//     // Authentication state
 //     user,
 //     isAuthenticated,
 //     loading: loading || sessionStatus === 'loading',
 //     authChecked,
-    
-//     // Authentication methods
 //     login,
 //     logout,
 //     updateUser,
 //     refreshSession,
-    
-//     // Role and permission checks
 //     hasRole,
 //     hasAnyRole,
 //     isAdmin,
 //     isManagerOrAdmin,
 //     hasPermission,
 //     getPermissions,
-    
-//     // ✅ Account status helpers
-//     isActive, // ✅ Derived from status, not stored in DB
-//     accountStatus: user?.status || 'unknown', // ✅ Direct status from DB
-    
-//     // NextAuth session (for advanced use cases)
+//     isActive,
+//     accountStatus: user?.status || 'unknown',
 //     session,
 //     sessionStatus,
-    
-//     // Helper methods
 //     checkAuth: () => updateSession(),
-    
-//     // Compatibility aliases
 //     signIn: login,
 //     signOut: logout,
-    
-//     // Utility functions
 //     requireAuth: (requiredRole = null) => {
 //       if (!isAuthenticated) return { authorized: false, error: 'Not authenticated' };
 //       if (user.status !== 'active') return { 
@@ -681,11 +633,9 @@
 //       }
 //       return { authorized: true, user };
 //     },
-    
-//     // Check if current user can access a specific route
 //     canAccessRoute: (route) => {
 //       if (!isAuthenticated) return false;
-//       if (user.status !== 'active') return false; // ✅ Only active users can access routes
+//       if (user.status !== 'active') return false;
 //       if (route.startsWith('/admin') && !isAdmin) return false;
 //       if (route.startsWith('/manager') && !isManagerOrAdmin) return false;
 //       return true;
@@ -724,7 +674,7 @@
 //     requiredRole = null, 
 //     redirectTo = '/login',
 //     requireVerified = true,
-//     requireActive = true // ✅ Add option to require active account
+//     requireActive = true
 //   } = options;
   
 //   return function WithAuthWrapper(props) {
@@ -740,7 +690,6 @@
 //         return;
 //       }
 
-//       // ✅ Check if account is active
 //       if (requireActive && user && user.status !== 'active') {
 //         if (user.status === 'pending') {
 //           router.push(`/verify-email?email=${encodeURIComponent(user.email)}&callbackUrl=${encodeURIComponent(pathname)}`);
@@ -834,26 +783,21 @@
 //         ...options,
 //         headers: {
 //           ...options.headers,
-//           // Add any authentication headers here if needed
 //         },
 //       });
 
-//       // Handle 401 Unauthorized - refresh session or logout
 //       if (response.status === 401) {
 //         console.log('🔄 [useProtectedFetch] Session expired, attempting refresh');
 //         const refreshResult = await refreshSession();
         
 //         if (!refreshResult.success) {
-//           // Refresh failed, trigger logout
 //           await logout();
 //           throw new Error('Session expired. Please log in again.');
 //         }
         
-//         // Retry the request once with refreshed session
 //         return await fetch(url, options);
 //       }
 
-//       // Handle 403 Forbidden (insufficient permissions)
 //       if (response.status === 403) {
 //         const data = await response.json().catch(() => ({}));
 //         throw new Error(data.message || 'You do not have permission to perform this action.');
@@ -876,7 +820,7 @@
   
 //   const canAccessRoute = useCallback((route) => {
 //     if (!isAuthenticated || !user) return false;
-//     if (user.status !== 'active') return false; // ✅ Only active users can access routes
+//     if (user.status !== 'active') return false;
     
 //     if (route.startsWith('/admin')) {
 //       return user.role === 'admin';
@@ -905,6 +849,25 @@
 
 // // Export context for direct usage if needed
 // export { AuthContext };
+
+
+
+
+
+
+// above code is working without saas
+
+
+
+
+
+
+
+
+
+
+
+
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
@@ -918,9 +881,9 @@ import { useSession, signOut as nextAuthSignOut, signIn as nextAuthSignIn } from
  * using NextAuth as the single source of truth.
  * 
  * Features:
- * - No custom JWT handling
- * - No localStorage/sessionStorage auth state
- * - Pure NextAuth integration
+ * - Multi-tenant SaaS support with company isolation
+ * - Super admin vs company admin distinction
+ * - Company context in all API calls
  * - Role-based helper functions
  * - Session state management
  * - FCM notification cleanup for admin users
@@ -947,6 +910,7 @@ export function AuthProvider({ children }) {
   // Local state for UI loading and auth processing
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
+  const [currentCompany, setCurrentCompany] = useState(null); // For super admin company switching
 
   // Derive user from session with enhanced properties
   const user = useMemo(() => {
@@ -958,15 +922,27 @@ export function AuthProvider({ children }) {
       email: session.user.email,
       name: session.user.name || session.user.fullName || session.user.email?.split('@')[0],
       role: session.user.role || 'user',
+      adminType: session.user.adminType || null, // 'super' or 'company' for admin roles
+      companyId: session.user.companyId || null, // CRITICAL for multi-tenancy
+      companyName: session.user.companyName || null,
       isVerified: session.user.isVerified || false,
       phone: session.user.phone || '',
       status: session.user.status || 'active',
+      
+      // Role helpers
       isAdmin: session.user.role === 'admin',
+      isSuperAdmin: session.user.role === 'admin' && session.user.adminType === 'super',
+      isCompanyAdmin: session.user.role === 'admin' && session.user.adminType === 'company',
       isManager: session.user.role === 'manager',
+      isUser: session.user.role === 'user',
+      
       preferences: session.user.preferences || {},
       notificationSettings: session.user.notificationSettings || {},
       isAuthenticated: true,
       isActive: session.user.status === 'active',
+      
+      // Company info
+      hasCompany: !!session.user.companyId,
     };
   }, [session]);
 
@@ -985,9 +961,10 @@ export function AuthProvider({ children }) {
           authenticated: !!session?.user,
           email: session?.user?.email,
           role: session?.user?.role,
+          adminType: session?.user?.adminType,
+          companyId: session?.user?.companyId,
           isVerified: session?.user?.isVerified,
           status: session?.user?.status,
-          isActive: session?.user?.status === 'active',
           sessionStatus
         });
 
@@ -995,21 +972,25 @@ export function AuthProvider({ children }) {
           console.log('✅ [AuthContext] User authenticated:', {
             email: session.user.email,
             role: session.user.role,
+            adminType: session.user.adminType,
+            companyId: session.user.companyId,
             isVerified: session.user.isVerified,
-            status: session.user.status,
-            isActive: session.user.status === 'active'
+            status: session.user.status
           });
           
-          // Store minimal user info for non-auth features (like FCM)
+          // Store minimal user info for non-auth features
           if (typeof window !== 'undefined') {
             try {
               localStorage.setItem('user_info', JSON.stringify({
                 id: session.user.id,
                 email: session.user.email,
                 role: session.user.role,
+                adminType: session.user.adminType,
+                companyId: session.user.companyId,
+                companyName: session.user.companyName,
                 name: session.user.name,
-                isAdmin: session.user.role === 'admin',
-                isManager: session.user.role === 'manager',
+                isSuperAdmin: session.user.role === 'admin' && session.user.adminType === 'super',
+                isCompanyAdmin: session.user.role === 'admin' && session.user.adminType === 'company',
                 isVerified: session.user.isVerified,
                 status: session.user.status,
                 isActive: session.user.status === 'active',
@@ -1018,10 +999,23 @@ export function AuthProvider({ children }) {
               console.warn('⚠️ [AuthContext] Could not store user info in localStorage:', e);
             }
           }
+
+          // For super admin, check if they have a current company context
+          if (user?.isSuperAdmin && typeof window !== 'undefined') {
+            try {
+              const savedCompany = localStorage.getItem('current_company');
+              if (savedCompany) {
+                setCurrentCompany(JSON.parse(savedCompany));
+              }
+            } catch (e) {
+              console.warn('⚠️ [AuthContext] Could not restore company context:', e);
+            }
+          }
         } else {
           // Clear any cached user info on logout
           if (typeof window !== 'undefined') {
             localStorage.removeItem('user_info');
+            localStorage.removeItem('current_company');
           }
           
           console.log('ℹ️ [AuthContext] No active session');
@@ -1036,7 +1030,7 @@ export function AuthProvider({ children }) {
     };
 
     initializeAuth();
-  }, [session, sessionStatus]);
+  }, [session, sessionStatus, user]);
 
   // Enhanced login function using NextAuth
   const login = useCallback(async (email, password, options = {}) => {
@@ -1069,6 +1063,10 @@ export function AuthProvider({ children }) {
           errorMessage = 'Your account has been suspended. Please contact support for assistance';
         } else if (result.error === 'ACCOUNT_DELETED') {
           errorMessage = 'This account has been deleted. Please create a new account';
+        } else if (result.error === 'COMPANY_INACTIVE') {
+          errorMessage = 'Your company account is inactive. Please contact support';
+        } else if (result.error === 'COMPANY_SUSPENDED') {
+          errorMessage = 'Your company has been suspended. Please contact support';
         } else if (result.error.includes('Invalid email or password') || result.error.includes('Invalid password')) {
           errorMessage = 'Invalid email or password';
         } else if (result.error.includes('Too many requests')) {
@@ -1144,8 +1142,12 @@ export function AuthProvider({ children }) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'x-company-id': user?.companyId || '', // Pass company context
           },
-          body: JSON.stringify({ fcmToken }),
+          body: JSON.stringify({ 
+            fcmToken,
+            companyId: user?.companyId 
+          }),
         }).then(res => {
           if (res.ok) {
             console.log('✅ [AuthContext] Server logout successful');
@@ -1163,6 +1165,7 @@ export function AuthProvider({ children }) {
       if (typeof window !== 'undefined') {
         try {
           localStorage.removeItem('user_info');
+          localStorage.removeItem('current_company');
           sessionStorage.removeItem('user');
           
           localStorage.removeItem('nextauth.message');
@@ -1248,6 +1251,7 @@ export function AuthProvider({ children }) {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
+          'x-company-id': user.companyId || '', // Pass company context
         },
         body: JSON.stringify(updatedData),
       });
@@ -1282,6 +1286,64 @@ export function AuthProvider({ children }) {
     }
   }, [user, session, updateSession]);
 
+  // Switch company (for super admin only)
+  const switchCompany = useCallback(async (companyId, companyName) => {
+    try {
+      if (!user?.isSuperAdmin) {
+        throw new Error('Only super admin can switch companies');
+      }
+
+      console.log('🔄 [AuthContext] Switching to company:', companyId);
+
+      const response = await fetch('/api/auth/switch-company', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ companyId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to switch company');
+      }
+
+      // Update session with new company context
+      await updateSession({
+        ...session,
+        user: {
+          ...session.user,
+          companyId,
+          companyName,
+        },
+      });
+
+      // Store current company for super admin
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('current_company', JSON.stringify({
+          id: companyId,
+          name: companyName,
+        }));
+      }
+
+      setCurrentCompany({ id: companyId, name: companyName });
+
+      console.log('✅ [AuthContext] Switched to company:', companyId);
+
+      return {
+        success: true,
+        message: `Switched to ${companyName}`,
+      };
+    } catch (error) {
+      console.error('❌ [AuthContext] Switch company error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to switch company',
+      };
+    }
+  }, [user, session, updateSession]);
+
   // Check if user has specific role
   const hasRole = useCallback((role) => {
     return user?.role === role;
@@ -1303,10 +1365,42 @@ export function AuthProvider({ children }) {
     return user?.role === 'admin';
   }, [user]);
 
+  // Check if user is super admin
+  const isSuperAdmin = useMemo(() => {
+    return user?.role === 'admin' && user?.adminType === 'super';
+  }, [user]);
+
+  // Check if user is company admin
+  const isCompanyAdmin = useMemo(() => {
+    return user?.role === 'admin' && user?.adminType === 'company';
+  }, [user]);
+
   // Check if user is manager or admin
   const isManagerOrAdmin = useMemo(() => {
     return ['admin', 'manager'].includes(user?.role);
   }, [user]);
+
+  // Get company ID for API calls
+  const getCompanyId = useCallback(() => {
+    if (isSuperAdmin && currentCompany) {
+      return currentCompany.id; // Super admin switched context
+    }
+    return user?.companyId; // Regular user's company
+  }, [isSuperAdmin, currentCompany, user]);
+
+  // Get headers for API calls (includes company context)
+  const getAuthHeaders = useCallback(() => {
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+
+    const companyId = getCompanyId();
+    if (companyId) {
+      headers['x-company-id'] = companyId;
+    }
+
+    return headers;
+  }, [getCompanyId]);
 
   // Refresh session
   const refreshSession = useCallback(async () => {
@@ -1331,10 +1425,15 @@ export function AuthProvider({ children }) {
     if (!user) return [];
     
     const permissionMap = {
-      admin: ['read', 'write', 'delete', 'manage_users', 'manage_settings', 'view_analytics', 'manage_products'],
+      super_admin: ['read', 'write', 'delete', 'manage_users', 'manage_settings', 'view_analytics', 'manage_products', 'manage_companies', 'switch_company'],
+      company_admin: ['read', 'write', 'delete', 'manage_users', 'manage_settings', 'view_analytics', 'manage_products'],
       manager: ['read', 'write', 'manage_orders', 'view_reports', 'manage_inventory'],
       user: ['read', 'write_own', 'view_profile'],
     };
+    
+    if (user.isSuperAdmin) {
+      return permissionMap.super_admin;
+    }
     
     return permissionMap[user.role] || ['read'];
   }, [user]);
@@ -1364,6 +1463,7 @@ export function AuthProvider({ children }) {
         '/account-inactive',
         '/account-suspended',
         '/account-pending',
+        '/company-inactive', // New for company status
       ];
 
       const isPublicPath = publicPaths.some(path => 
@@ -1379,16 +1479,19 @@ export function AuthProvider({ children }) {
 
       if (isAuthenticated && (pathname === '/login' || pathname === '/signup' || pathname === '/register')) {
         console.log('🔄 [AuthContext] Redirecting authenticated user from auth page:', pathname);
-        const redirectPath = user.role === 'admin' 
-          ? '/admin/dashboards' 
-          : user.role === 'manager' 
-            ? '/manager/dashboard' 
-            : '/dashboard';
+        const redirectPath = user.isSuperAdmin 
+          ? '/super-admin/dashboard' 
+          : user.isCompanyAdmin 
+            ? '/admin/dashboards' 
+            : user.role === 'manager' 
+              ? '/manager/dashboard' 
+              : '/dashboard';
         router.push(redirectPath);
         return;
       }
 
       if (isAuthenticated) {
+        // Check user status first
         if (user.status === 'pending') {
           console.log('🔄 [AuthContext] Redirecting pending verification user:', pathname);
           if (!pathname?.includes('/verify-email')) {
@@ -1414,7 +1517,20 @@ export function AuthProvider({ children }) {
           return;
         }
 
+        // Company status check (for non-super-admin)
+        if (!user.isSuperAdmin && user.companyId) {
+          // This would require company status in session
+          // You'd need to add companyStatus to session
+        }
+
         if (user.status === 'active') {
+          // Role-based route access
+          if (pathname?.startsWith('/super-admin') && !user.isSuperAdmin) {
+            console.log('⛔ [AuthContext] Non-super-admin user attempting to access super admin route:', pathname);
+            router.push('/admin/dashboards');
+            return;
+          }
+
           if (pathname?.startsWith('/admin') && !user.isAdmin) {
             console.log('⛔ [AuthContext] Non-admin user attempting to access admin route:', pathname);
             router.push('/dashboard');
@@ -1482,7 +1598,7 @@ export function AuthProvider({ children }) {
         try {
           await fetch('/api/user/activity', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({ userId: user.id }),
           }).catch(err => console.debug('Activity update failed:', err));
         } catch (error) {
@@ -1501,7 +1617,7 @@ export function AuthProvider({ children }) {
       });
       if (activityTimer) clearTimeout(activityTimer);
     };
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, getAuthHeaders]);
 
   // Context value
   const contextValue = useMemo(() => ({
@@ -1512,14 +1628,20 @@ export function AuthProvider({ children }) {
     login,
     logout,
     updateUser,
+    switchCompany,
     refreshSession,
     hasRole,
     hasAnyRole,
     isAdmin,
+    isSuperAdmin,
+    isCompanyAdmin,
     isManagerOrAdmin,
     hasPermission,
     getPermissions,
+    getCompanyId,
+    getAuthHeaders,
     isActive,
+    currentCompany,
     accountStatus: user?.status || 'unknown',
     session,
     sessionStatus,
@@ -1534,16 +1656,34 @@ export function AuthProvider({ children }) {
         status: user.status 
       };
       if (!user.isVerified) return { authorized: false, error: 'Email not verified' };
-      if (requiredRole && user.role !== requiredRole) {
-        return { authorized: false, error: `Required role: ${requiredRole}` };
+      
+      // Check company status would go here
+      
+      if (requiredRole) {
+        if (requiredRole === 'super_admin' && !user.isSuperAdmin) {
+          return { authorized: false, error: 'Super admin access required' };
+        }
+        if (requiredRole === 'company_admin' && !user.isCompanyAdmin) {
+          return { authorized: false, error: 'Company admin access required' };
+        }
+        if (requiredRole === 'admin' && !user.isAdmin) {
+          return { authorized: false, error: 'Admin access required' };
+        }
+        if (requiredRole === 'manager' && !isManagerOrAdmin) {
+          return { authorized: false, error: 'Manager access required' };
+        }
       }
+      
       return { authorized: true, user };
     },
     canAccessRoute: (route) => {
       if (!isAuthenticated) return false;
       if (user.status !== 'active') return false;
-      if (route.startsWith('/admin') && !isAdmin) return false;
+      
+      if (route.startsWith('/super-admin') && !user.isSuperAdmin) return false;
+      if (route.startsWith('/admin') && !user.isAdmin) return false;
       if (route.startsWith('/manager') && !isManagerOrAdmin) return false;
+      
       return true;
     }
   }), [
@@ -1552,16 +1692,22 @@ export function AuthProvider({ children }) {
     loading,
     authChecked,
     sessionStatus,
+    currentCompany,
     login,
     logout,
     updateUser,
+    switchCompany,
     refreshSession,
     hasRole,
     hasAnyRole,
     isAdmin,
+    isSuperAdmin,
+    isCompanyAdmin,
     isManagerOrAdmin,
     hasPermission,
     getPermissions,
+    getCompanyId,
+    getAuthHeaders,
     isActive,
     session,
     updateSession
@@ -1580,11 +1726,12 @@ export function withAuth(Component, options = {}) {
     requiredRole = null, 
     redirectTo = '/login',
     requireVerified = true,
-    requireActive = true
+    requireActive = true,
+    requireCompany = true // New option for SaaS
   } = options;
   
   return function WithAuthWrapper(props) {
-    const { user, loading, isAuthenticated } = useAuth();
+    const { user, loading, isAuthenticated, isSuperAdmin, isCompanyAdmin } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
 
@@ -1614,16 +1761,39 @@ export function withAuth(Component, options = {}) {
         return;
       }
 
-      if (requiredRole && user?.role !== requiredRole) {
-        console.warn(`User role ${user?.role} does not match required role ${requiredRole}`);
-        router.push('/dashboard');
+      // Company check for non-super-admin users
+      if (requireCompany && !isSuperAdmin && !user?.companyId) {
+        console.error('User has no company association');
+        router.push('/login?error=no_company');
         return;
       }
-    }, [loading, isAuthenticated, user, requiredRole, router, pathname, requireVerified, requireActive]);
 
-    if (loading || !isAuthenticated || (requiredRole && user?.role !== requiredRole) || 
-        (requireVerified && user && !user.isVerified) ||
-        (requireActive && user && user.status !== 'active')) {
+      // Role-based access control
+      if (requiredRole) {
+        if (requiredRole === 'super_admin' && !isSuperAdmin) {
+          console.warn('Super admin access required');
+          router.push('/admin/dashboards');
+          return;
+        }
+        if (requiredRole === 'company_admin' && !isCompanyAdmin) {
+          console.warn('Company admin access required');
+          router.push('/dashboard');
+          return;
+        }
+        if (requiredRole === 'admin' && !user?.isAdmin) {
+          console.warn('Admin access required');
+          router.push('/dashboard');
+          return;
+        }
+        if (requiredRole === 'manager' && !['admin', 'manager'].includes(user?.role)) {
+          console.warn('Manager access required');
+          router.push('/dashboard');
+          return;
+        }
+      }
+    }, [loading, isAuthenticated, user, requiredRole, router, pathname, requireVerified, requireActive, requireCompany, isSuperAdmin, isCompanyAdmin]);
+
+    if (loading || !isAuthenticated) {
       return (
         <div style={{
           display: 'flex',
@@ -1679,17 +1849,21 @@ export function withAuth(Component, options = {}) {
   };
 }
 
-// Hook for protected API calls with automatic token refresh
+// Hook for protected API calls with automatic token refresh and company context
 export function useProtectedFetch() {
-  const { user, refreshSession, logout } = useAuth();
+  const { user, refreshSession, logout, getAuthHeaders } = useAuth();
   
   const protectedFetch = useCallback(async (url, options = {}) => {
     try {
+      // Merge headers with company context
+      const headers = {
+        ...getAuthHeaders(),
+        ...options.headers,
+      };
+
       const response = await fetch(url, {
         ...options,
-        headers: {
-          ...options.headers,
-        },
+        headers,
       });
 
       if (response.status === 401) {
@@ -1701,7 +1875,14 @@ export function useProtectedFetch() {
           throw new Error('Session expired. Please log in again.');
         }
         
-        return await fetch(url, options);
+        // Retry with new session
+        return await fetch(url, {
+          ...options,
+          headers: {
+            ...getAuthHeaders(),
+            ...options.headers,
+          },
+        });
       }
 
       if (response.status === 403) {
@@ -1714,30 +1895,34 @@ export function useProtectedFetch() {
       console.error('❌ [useProtectedFetch] Request failed:', error);
       throw error;
     }
-  }, [refreshSession, logout]);
+  }, [refreshSession, logout, getAuthHeaders]);
 
   return protectedFetch;
 }
 
 // Hook to check if user can access a specific route
 export function useRouteAccess() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isSuperAdmin, isAdmin, isManagerOrAdmin } = useAuth();
   const router = useRouter();
   
   const canAccessRoute = useCallback((route) => {
     if (!isAuthenticated || !user) return false;
     if (user.status !== 'active') return false;
     
+    if (route.startsWith('/super-admin')) {
+      return isSuperAdmin;
+    }
+    
     if (route.startsWith('/admin')) {
-      return user.role === 'admin';
+      return isAdmin;
     }
     
     if (route.startsWith('/manager')) {
-      return ['admin', 'manager'].includes(user.role);
+      return isManagerOrAdmin;
     }
     
     return true;
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, isSuperAdmin, isAdmin, isManagerOrAdmin]);
   
   const navigateIfAuthorized = useCallback((route) => {
     if (canAccessRoute(route)) {

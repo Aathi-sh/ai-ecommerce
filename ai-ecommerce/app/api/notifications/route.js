@@ -41,7 +41,7 @@ const notificationSchema = new mongoose.Schema({
       'ORDER_STATUS_CHANGED',
       'SYSTEM_ALERT',
       'ADMIN_ALERT',
-      'TEST_NOTIFICATION'
+      
     ]
   },
   

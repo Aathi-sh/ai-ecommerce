@@ -2772,3 +2772,77 @@ async getProducts() {
 // Create and export singleton instance
 const apiService = new ApiService();
 export default apiService;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// // Add this method to your ApiService class to identify company from WhatsApp number
+// async identifyCompanyFromWhatsApp(whatsappNumber) {
+//     try {
+//         if (!whatsappNumber) {
+//             console.log('⚠️ No WhatsApp number provided');
+//             return null;
+//         }
+
+//         const cleanNumber = this.cleanPhoneNumber(whatsappNumber);
+//         console.log(`🔍 Identifying company for WhatsApp number: ${cleanNumber}`);
+
+//         // Call your API endpoint that finds company by WhatsApp number
+//         const response = await this.client.get(`/api/companies/by-whatsapp/${cleanNumber}`);
+        
+//         if (response.data?.success && response.data?.companyId) {
+//             console.log(`✅ Company identified: ${response.data.companyId}`);
+            
+//             // Store the company ID for subsequent requests
+//             this.companyId = response.data.companyId;
+            
+//             // Set default header for all future requests
+//             this.client.defaults.headers.common['x-company-id'] = this.companyId;
+            
+//             return this.companyId;
+//         }
+        
+//         console.log('⚠️ No company found for this WhatsApp number');
+//         return null;
+        
+//     } catch (error) {
+//         console.error('❌ Failed to identify company:', error.message);
+        
+//         // Return null but don't throw - let the calling code handle it
+//         return null;
+//     }
+// }
+
+// // Add helper method to get current company ID
+// getCompanyId() {
+//     return this.companyId;
+// }
+
+// // Add helper method to set company ID manually (if needed)
+// setCompanyId(companyId) {
+//     if (companyId) {
+//         this.companyId = companyId;
+//         this.client.defaults.headers.common['x-company-id'] = companyId;
+//         console.log(`✅ Company ID set manually: ${companyId}`);
+//     }
+// }
+
+// // Add helper method to clear company context (e.g., when switching WhatsApp numbers)
+// clearCompanyContext() {
+//     this.companyId = null;
+//     delete this.client.defaults.headers.common['x-company-id'];
+//     console.log('🧹 Company context cleared');
+// }

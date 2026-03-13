@@ -1,8 +1,9 @@
 
+
 // "use client";
 
 // import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
-// import { useAuth } from '../../../context/authContext';
+// import { useAuth } from "../../../context/AuthContext";
 // import { appTheme } from "../../../src/constants/theme";
 // import { useNotification } from "../../../hooks/useNotification";
 // import {
@@ -32,7 +33,7 @@
 // );
 
 // export default function DashboardPage() {
-//   const { user, loading: authLoading, isAuthenticated } = useAuth();
+//   const { user, loading: authLoading, isAuthenticated, session } = useAuth();
 //   const { showNotification } = useNotification();
   
 //   const [orders, setOrders] = useState([]);
@@ -51,6 +52,9 @@
 //   const [notificationPermission, setNotificationPermission] = useState(
 //     typeof window !== 'undefined' ? Notification.permission : 'default'
 //   );
+//   const [isMobile, setIsMobile] = useState(false);
+//   const [isTablet, setIsTablet] = useState(false);
+//   const [isDesktop, setIsDesktop] = useState(false);
   
 //   const dataFetchedRef = useRef(false);
 //   const fetchInProgressRef = useRef(false);
@@ -60,9 +64,19 @@
 //   const notificationPermissionRequestedRef = useRef(false);
 //   const socketEventListenerRef = useRef(null);
 
-//   const getToken = useCallback(() => {
-//     if (typeof window === 'undefined') return null;
-//     return localStorage.getItem('token');
+//   // Check screen size on mount and resize
+//   useEffect(() => {
+//     const checkScreenSize = () => {
+//       const width = window.innerWidth;
+//       setIsMobile(width < 768);
+//       setIsTablet(width >= 768 && width < 992);
+//       setIsDesktop(width >= 992);
+//     };
+    
+//     checkScreenSize();
+//     window.addEventListener('resize', checkScreenSize);
+    
+//     return () => window.removeEventListener('resize', checkScreenSize);
 //   }, []);
 
 //   // ==================== LISTEN FOR SOCKET EVENTS FROM LAYOUT ====================
@@ -185,15 +199,12 @@
 //   const fetchNotifications = useCallback(async () => {
 //     if (!isAuthenticated || !user || user.role !== 'admin') return;
     
-//     const token = getToken();
-//     if (!token) return;
-    
 //     try {
 //       const response = await fetch('/api/notifications?limit=10&page=1', {
 //         headers: {
-//           'Authorization': `Bearer ${token}`,
 //           'Content-Type': 'application/json'
-//         }
+//         },
+//         credentials: 'include'
 //       });
       
 //       if (response.ok) {
@@ -205,20 +216,19 @@
 //     } catch (error) {
 //       console.warn('Failed to fetch notifications:', error);
 //     }
-//   }, [isAuthenticated, user, getToken]);
+//   }, [isAuthenticated, user]);
 
 //   const markNotificationAsRead = useCallback(async (notificationId) => {
-//     const token = getToken();
-//     if (!token) return;
+//     if (!isAuthenticated) return;
     
 //     try {
 //       await fetch(`/api/notifications?id=${notificationId}`, {
 //         method: 'PUT',
 //         headers: {
-//           'Authorization': `Bearer ${token}`,
 //           'Content-Type': 'application/json'
 //         },
-//         body: JSON.stringify({ markAsRead: true })
+//         body: JSON.stringify({ markAsRead: true }),
+//         credentials: 'include'
 //       });
       
 //       setNotifications(prev => 
@@ -229,7 +239,7 @@
 //     } catch (error) {
 //       console.warn('Failed to mark notification as read:', error);
 //     }
-//   }, [getToken]);
+//   }, [isAuthenticated]);
 
 //   // ==================== DATA FETCHING ====================
 //   const fetchDashboardData = useCallback(async (force = false) => {
@@ -256,24 +266,26 @@
 //         return;
 //       }
       
-//       const token = getToken();
-//       if (!token) {
-//         console.error('No token found');
+//       // Check if user is admin
+//       if (user.role !== 'admin') {
 //         if (isMountedRef.current) {
-//           setError("Authentication token not found. Please login again.");
+//           setError("Admin access required");
 //           setLoading(false);
 //         }
 //         return;
 //       }
       
 //       const headers = {
-//         'Content-Type': 'application/json',
-//         'Authorization': `Bearer ${token}`
+//         'Content-Type': 'application/json'
 //       };
       
 //       const fetchWithTimeout = (url, options, timeout = 10000) => {
 //         return Promise.race([
-//           fetch(url, options),
+//           fetch(url, {
+//             ...options,
+//             credentials: 'include',
+//             headers
+//           }),
 //           new Promise((_, reject) =>
 //             setTimeout(() => reject(new Error('Request timeout')), timeout)
 //           )
@@ -281,10 +293,7 @@
 //       };
       
 //       const fetchPromises = [
-//         fetchWithTimeout("/api/orders", { 
-//           headers,
-//           credentials: 'include'
-//         }, 8000).then(async res => {
+//         fetchWithTimeout("/api/orders", {}, 8000).then(async res => {
 //           if (!res.ok) {
 //             if (res.status === 401) {
 //               throw new Error("Session expired. Please login again.");
@@ -297,10 +306,7 @@
 //           return data.success ? (data.data || []) : [];
 //         }),
         
-//         fetchWithTimeout("/api/products", { 
-//           headers,
-//           credentials: 'include'
-//         }, 8000).then(async res => {
+//         fetchWithTimeout("/api/products", {}, 8000).then(async res => {
 //           if (!res.ok) {
 //             const errorText = await res.text();
 //             console.warn(`Products API failed: ${res.status}`, errorText);
@@ -310,10 +316,7 @@
 //           return data.success ? (data.data || []) : [];
 //         }),
         
-//         fetchWithTimeout("/api/users", { 
-//           headers,
-//           credentials: 'include'
-//         }, 8000).then(async res => {
+//         fetchWithTimeout("/api/users", {}, 8000).then(async res => {
 //           if (!res.ok) {
 //             if (res.status === 403) {
 //               return [];
@@ -368,7 +371,7 @@
 //         fetchInProgressRef.current = false;
 //       }
 //     }
-//   }, [isAuthenticated, user, getToken, fetchNotifications]);
+//   }, [isAuthenticated, user, fetchNotifications]);
 
 //   // ==================== INITIALIZATION ====================
 //   useEffect(() => {
@@ -389,9 +392,7 @@
 //         return;
 //       }
       
-//       const token = getToken();
-      
-//       if (!dataFetchedRef.current && !fetchInProgressRef.current && token) {
+//       if (!dataFetchedRef.current && !fetchInProgressRef.current) {
 //         await fetchDashboardData();
 //       }
 //     };
@@ -405,7 +406,7 @@
 //       isMountedRef.current = false;
 //       fetchInProgressRef.current = false;
 //     };
-//   }, [authLoading, isAuthenticated, user, getToken, fetchDashboardData]);
+//   }, [authLoading, isAuthenticated, user, fetchDashboardData]);
 
 //   // ==================== AUTO REFRESH ====================
 //   useEffect(() => {
@@ -441,7 +442,7 @@
 //     }
 //   }, [showNotification]);
 
-//   // ==================== DATA PROCESSING (Keep your existing code) ====================
+//   // ==================== DATA PROCESSING ====================
 //   const filteredOrders = useMemo(() => {
 //     const now = new Date();
 //     return orders.filter((order) => {
@@ -618,6 +619,9 @@
 //         labels: {
 //           usePointStyle: true,
 //           padding: 15,
+//           font: {
+//             size: isMobile ? 10 : 12
+//           }
 //         }
 //       },
 //     },
@@ -626,30 +630,43 @@
 //         beginAtZero: true,
 //         grid: {
 //           color: `${appTheme.colors.border}40`,
+//         },
+//         ticks: {
+//           font: {
+//             size: isMobile ? 9 : 11
+//           }
 //         }
 //       },
 //       x: {
 //         grid: {
 //           color: `${appTheme.colors.border}40`,
+//         },
+//         ticks: {
+//           font: {
+//             size: isMobile ? 9 : 11
+//           }
 //         }
 //       },
 //     },
-//   }), [appTheme.colors.border]);
+//   }), [appTheme.colors.border, isMobile]);
 
 //   const doughnutOptions = useMemo(() => ({
 //     responsive: true,
 //     maintainAspectRatio: false,
 //     plugins: {
 //       legend: {
-//         position: 'bottom',
+//         position: isMobile ? 'right' : 'bottom',
 //         labels: {
 //           usePointStyle: true,
-//           padding: 15,
+//           padding: 10,
+//           font: {
+//             size: isMobile ? 9 : 11
+//           }
 //         }
 //       },
 //     },
-//     cutout: '65%',
-//   }), []);
+//     cutout: isMobile ? '55%' : '65%',
+//   }), [isMobile]);
 
 //   // ==================== EVENT HANDLERS ====================
 //   const handleRetry = useCallback(() => {
@@ -710,31 +727,43 @@
     
 //     return (
 //       <div style={{ 
-//         padding: "40px", 
+//         padding: isMobile ? "20px 16px" : "40px", 
 //         backgroundColor: appTheme.colors.background,
 //         minHeight: "100vh",
 //         display: "flex",
 //         justifyContent: "center",
 //         alignItems: "center",
 //         flexDirection: "column",
-//         gap: "20px"
+//         gap: isMobile ? "15px" : "20px",
+//         textAlign: "center"
 //       }}>
-//         <div style={{ fontSize: "3rem" }}>{isSessionExpired ? "⏰" : "⚠️"}</div>
-//         <h2 style={{ color: appTheme.colors.error }}>{isSessionExpired ? "Session Expired" : "Error"}</h2>
-//         <p style={{ color: appTheme.colors.textSecondary }}>{error}</p>
-//         <div style={{ display: "flex", gap: "10px" }}>
+//         <div style={{ fontSize: isMobile ? "2.5rem" : "3rem" }}>{isSessionExpired ? "⏰" : "⚠️"}</div>
+//         <h2 style={{ 
+//           color: appTheme.colors.error,
+//           fontSize: isMobile ? "1.3rem" : "1.5rem",
+//           margin: "5px 0"
+//         }}>{isSessionExpired ? "Session Expired" : "Error"}</h2>
+//         <p style={{ 
+//           color: appTheme.colors.textSecondary,
+//           fontSize: isMobile ? "0.9rem" : "1rem",
+//           lineHeight: 1.5,
+//           maxWidth: "400px"
+//         }}>{error}</p>
+//         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" }}>
 //           {isSessionExpired ? (
 //             <button
 //               onClick={handleSessionExpired}
 //               style={{
-//                 padding: "12px 24px",
+//                 padding: isMobile ? "10px 20px" : "12px 24px",
 //                 backgroundColor: appTheme.colors.primary,
 //                 color: "white",
 //                 border: "none",
 //                 borderRadius: "8px",
 //                 cursor: "pointer",
-//                 fontSize: "16px",
-//                 fontWeight: "600"
+//                 fontSize: isMobile ? "14px" : "16px",
+//                 fontWeight: "600",
+//                 minWidth: "120px",
+//                 minHeight: "44px"
 //               }}
 //             >
 //               Go to Login
@@ -744,14 +773,16 @@
 //               <button
 //                 onClick={handleLoginRedirect}
 //                 style={{
-//                   padding: "12px 24px",
+//                   padding: isMobile ? "10px 20px" : "12px 24px",
 //                   backgroundColor: appTheme.colors.primary,
 //                   color: "white",
 //                   border: "none",
 //                   borderRadius: "8px",
 //                   cursor: "pointer",
-//                   fontSize: "16px",
-//                   fontWeight: "600"
+//                   fontSize: isMobile ? "14px" : "16px",
+//                   fontWeight: "600",
+//                   minWidth: "120px",
+//                   minHeight: "44px"
 //                 }}
 //               >
 //                 Go to Login
@@ -759,14 +790,16 @@
 //               <button
 //                 onClick={handleRetry}
 //                 style={{
-//                   padding: "12px 24px",
+//                   padding: isMobile ? "10px 20px" : "12px 24px",
 //                   backgroundColor: appTheme.colors.secondary,
 //                   color: "white",
 //                   border: "none",
 //                   borderRadius: "8px",
 //                   cursor: "pointer",
-//                   fontSize: "16px",
-//                   fontWeight: "600"
+//                   fontSize: isMobile ? "14px" : "16px",
+//                   fontWeight: "600",
+//                   minWidth: "120px",
+//                   minHeight: "44px"
 //                 }}
 //               >
 //                 Retry
@@ -781,7 +814,7 @@
 //   if (loading || authLoading) {
 //     return (
 //       <div style={{ 
-//         padding: "40px", 
+//         padding: isMobile ? "20px 16px" : "40px", 
 //         backgroundColor: appTheme.colors.background,
 //         minHeight: "100vh",
 //         display: "flex",
@@ -793,12 +826,12 @@
 //           color: appTheme.colors.textSecondary
 //         }}>
 //           <div style={{ 
-//             width: "60px", 
-//             height: "60px", 
+//             width: isMobile ? "50px" : "60px", 
+//             height: isMobile ? "50px" : "60px", 
 //             border: `4px solid ${appTheme.colors.border}`,
 //             borderTop: `4px solid ${appTheme.colors.primary}`,
 //             borderRadius: "50%",
-//             margin: "0 auto 20px",
+//             margin: "0 auto",
 //             animation: "spin 1s linear infinite"
 //           }} />
 //           <style>{`
@@ -807,7 +840,10 @@
 //               100% { transform: rotate(360deg); }
 //             }
 //           `}</style>
-//           <p style={{ fontSize: "1.2rem", marginTop: "15px" }}>Loading Dashboard...</p>
+//           <p style={{ 
+//             fontSize: isMobile ? "1rem" : "1.2rem", 
+//             marginTop: isMobile ? "15px" : "20px" 
+//           }}>Loading Dashboard...</p>
 //         </div>
 //       </div>
 //     );
@@ -817,240 +853,356 @@
 
 //   return (
 //     <div style={{ 
-//       padding: "30px", 
+//       padding: isMobile ? "12px" : "24px", 
 //       backgroundColor: appTheme.colors.background, 
-//       minHeight: "100vh"
+//       minHeight: "100vh",
+//       maxWidth: "100vw",
+//       overflowX: "hidden",
+//       boxSizing: "border-box"
 //     }}>
+//       {/* Header Section */}
 //       <div style={{
 //         display: "flex",
+//         flexDirection: isMobile ? "column" : "row",
 //         justifyContent: "space-between",
-//         alignItems: "flex-start",
-//         marginBottom: "30px",
-//         flexWrap: "wrap",
-//         gap: "20px"
+//         alignItems: isMobile ? "stretch" : "flex-start",
+//         marginBottom: isMobile ? "16px" : "24px",
+//         gap: isMobile ? "12px" : "20px",
+//         width: "100%"
 //       }}>
-//         <div>
+//         <div style={{ flex: 1, minWidth: 0 }}>
 //           <h1 style={{ 
 //             color: appTheme.colors.textPrimary, 
-//             marginBottom: "8px",
-//             fontSize: "2rem",
-//             fontWeight: "700"
+//             marginBottom: isMobile ? "4px" : "6px",
+//             fontSize: isMobile ? "1.3rem" : "1.8rem",
+//             fontWeight: "700",
+//             lineHeight: 1.2,
+//             wordBreak: "break-word"
 //           }}>
 //             Dashboard Overview
 //           </h1>
-//           <p style={{ 
-//             color: appTheme.colors.textSecondary,
-//             fontSize: "1rem"
+//           <div style={{ 
+//             display: "flex",
+//             flexWrap: "wrap",
+//             alignItems: "center",
+//             gap: isMobile ? "6px" : "8px",
+//             marginTop: isMobile ? "4px" : "6px"
 //           }}>
-//             Welcome to your e-commerce dashboard
+//             <p style={{ 
+//               color: appTheme.colors.textSecondary,
+//               fontSize: isMobile ? "0.8rem" : "0.9rem",
+//               margin: 0,
+//               lineHeight: 1.3
+//             }}>
+//               Welcome to your e-commerce dashboard
+//             </p>
+            
 //             {socketStatus.connected && (
 //               <span style={{ 
-//                 marginLeft: "10px",
-//                 fontSize: "0.8rem",
+//                 fontSize: isMobile ? "0.7rem" : "0.75rem",
 //                 backgroundColor: "#10b98120",
 //                 color: "#10b981",
-//                 padding: "2px 6px",
-//                 borderRadius: "4px",
-//                 display: "inline-flex",
-//                 alignItems: "center",
-//                 gap: "4px"
-//               }}>
-//                 <span>🔗</span>Live Updates
-//               </span>
-//             )}
-//             {!socketStatus.connected && (
-//               <span style={{ 
-//                 marginLeft: "10px",
-//                 fontSize: "0.8rem",
-//                 backgroundColor: "#ef444420",
-//                 color: "#ef4444",
-//                 padding: "2px 6px",
-//                 borderRadius: "4px",
+//                 padding: "3px 8px",
+//                 borderRadius: "12px",
 //                 display: "inline-flex",
 //                 alignItems: "center",
 //                 gap: "4px",
-//                 cursor: "pointer"
-//               }}
-//               onClick={handleReconnectSocket}
-//               title="Click to reconnect"
+//                 whiteSpace: "nowrap",
+//                 flexShrink: 0
+//               }}>
+//                 <span>🔗</span>Live
+//               </span>
+//             )}
+            
+//             {!socketStatus.connected && (
+//               <button
+//                 onClick={handleReconnectSocket}
+//                 style={{
+//                   fontSize: isMobile ? "0.7rem" : "0.75rem",
+//                   backgroundColor: "#ef444420",
+//                   color: "#ef4444",
+//                   padding: "3px 8px",
+//                   borderRadius: "12px",
+//                   border: "none",
+//                   display: "inline-flex",
+//                   alignItems: "center",
+//                   gap: "4px",
+//                   cursor: "pointer",
+//                   whiteSpace: "nowrap",
+//                   flexShrink: 0,
+//                   minHeight: "28px"
+//                 }}
+//                 title="Click to reconnect"
 //               >
 //                 <span>❌</span>Offline
-//               </span>
+//               </button>
 //             )}
+            
 //             {unreadNotifications > 0 && (
-//               <span style={{ 
-//                 marginLeft: "10px",
-//                 fontSize: "0.8rem",
-//                 backgroundColor: "#f59e0b20",
-//                 color: "#f59e0b",
-//                 padding: "2px 6px",
-//                 borderRadius: "4px",
-//                 display: "inline-flex",
-//                 alignItems: "center",
-//                 gap: "4px",
-//                 cursor: "pointer"
-//               }}
-//               onClick={handleViewAllNotifications}
-//               title="View notifications"
+//               <button
+//                 onClick={handleViewAllNotifications}
+//                 style={{
+//                   fontSize: isMobile ? "0.7rem" : "0.75rem",
+//                   backgroundColor: "#f59e0b20",
+//                   color: "#f59e0b",
+//                   padding: "3px 8px",
+//                   borderRadius: "12px",
+//                   border: "none",
+//                   display: "inline-flex",
+//                   alignItems: "center",
+//                   gap: "4px",
+//                   cursor: "pointer",
+//                   whiteSpace: "nowrap",
+//                   flexShrink: 0,
+//                   minHeight: "28px"
+//                 }}
+//                 title="View notifications"
 //               >
 //                 <span>🔔</span>{unreadNotifications} new
-//               </span>
+//               </button>
 //             )}
-//           </p>
+//           </div>
+          
 //           {user && (
-//             <div style={{ marginTop: "5px" }}>
-//               <p style={{ 
-//                 fontSize: "0.9rem", 
-//                 color: appTheme.colors.primary,
-//                 marginBottom: "2px"
-//               }}>
-//                 Logged in as: {user.email}
-//               </p>
-//               <p style={{ 
-//                 fontSize: "0.8rem", 
+//             <div style={{ 
+//               marginTop: isMobile ? "8px" : "12px",
+//               display: "flex",
+//               flexWrap: "wrap",
+//               alignItems: "center",
+//               gap: isMobile ? "8px" : "10px",
+//               fontSize: isMobile ? "0.75rem" : "0.8rem"
+//             }}>
+//               <span style={{ 
 //                 color: appTheme.colors.textSecondary,
+//                 flexShrink: 0
 //               }}>
-//                 Role: <span style={{ 
+//                 Logged in as:
+//               </span>
+//               <span style={{ 
+//                 color: appTheme.colors.primary,
+//                 fontWeight: "500",
+//                 wordBreak: "break-word",
+//                 flex: 1,
+//                 minWidth: 0
+//               }}>
+//                 {user.email}
+//               </span>
+//               <div style={{ 
+//                 display: "flex",
+//                 alignItems: "center",
+//                 gap: isMobile ? "6px" : "8px",
+//                 flexWrap: "wrap",
+//                 flexShrink: 0
+//               }}>
+//                 <span style={{ 
+//                   fontSize: "0.75rem",
+//                   color: appTheme.colors.textSecondary,
+//                   flexShrink: 0
+//                 }}>
+//                   Role:
+//                 </span>
+//                 <span style={{ 
+//                   fontSize: isMobile ? "0.75rem" : "0.8rem",
 //                   backgroundColor: user.role === 'admin' ? `${appTheme.colors.success}20` : `${appTheme.colors.info}20`,
-//                   padding: "2px 6px",
+//                   padding: "2px 8px",
 //                   borderRadius: "4px",
-//                   marginLeft: "5px"
+//                   whiteSpace: "nowrap",
+//                   flexShrink: 0
 //                 }}>
 //                   {user.role}
 //                 </span>
 //                 {notificationPermission === 'granted' && (
 //                   <span style={{ 
-//                     marginLeft: "10px",
+//                     fontSize: isMobile ? "0.7rem" : "0.75rem",
 //                     backgroundColor: `${appTheme.colors.success}20`,
 //                     color: appTheme.colors.success,
-//                     padding: "2px 6px",
+//                     padding: "2px 8px",
 //                     borderRadius: "4px",
 //                     display: "inline-flex",
 //                     alignItems: "center",
-//                     gap: "4px"
+//                     gap: "4px",
+//                     whiteSpace: "nowrap",
+//                     flexShrink: 0
 //                   }}>
-//                     <span>🔔</span>Notifications On
+//                     <span>🔔</span>On
 //                   </span>
 //                 )}
 //                 {notificationPermission === 'default' && (
 //                   <button
 //                     onClick={handleRequestNotificationPermission}
 //                     style={{
-//                       marginLeft: "10px",
+//                       fontSize: isMobile ? "0.7rem" : "0.75rem",
 //                       backgroundColor: `${appTheme.colors.primary}20`,
 //                       color: appTheme.colors.primary,
-//                       padding: "2px 6px",
+//                       padding: "2px 8px",
 //                       borderRadius: "4px",
 //                       border: `1px solid ${appTheme.colors.primary}30`,
 //                       cursor: "pointer",
-//                       fontSize: "0.7rem",
 //                       display: "inline-flex",
 //                       alignItems: "center",
-//                       gap: "4px"
+//                       gap: "4px",
+//                       whiteSpace: "nowrap",
+//                       minHeight: "24px",
+//                       flexShrink: 0
 //                     }}
 //                   >
-//                     <span>🔔</span>Enable Notifications
+//                     <span>🔔</span>Enable
 //                   </button>
 //                 )}
-//               </p>
+//               </div>
 //             </div>
 //           )}
 //         </div>
 
+//         {/* Filters and Actions */}
 //         <div style={{
 //           display: "flex",
+//           flexDirection: isMobile ? "row" : "row",
 //           alignItems: "center",
-//           gap: "12px",
-//           flexWrap: "wrap"
+//           gap: isMobile ? "8px" : "10px",
+//           flexWrap: "wrap",
+//           justifyContent: isMobile ? "space-between" : "flex-end",
+//           width: isMobile ? "100%" : "auto"
 //         }}>
-//           <label style={{ 
-//             color: appTheme.colors.textSecondary,
-//             fontWeight: "500"
-//           }}>Period: </label>
-//           <select
-//             value={timeFilter}
-//             onChange={(e) => setTimeFilter(e.target.value)}
-//             style={{
-//               padding: "10px 16px",
-//               borderRadius: "10px",
-//               border: `1.5px solid ${appTheme.colors.border}`,
-//               fontFamily: appTheme.fonts.primary,
-//               backgroundColor: appTheme.colors.surface,
-//               color: appTheme.colors.textPrimary,
-//               fontSize: "0.9rem",
-//               cursor: "pointer",
-//               minWidth: "120px"
-//             }}
-//           >
-//             <option value="today">Today</option>
-//             <option value="week">This Week</option>
-//             <option value="month">This Month</option>
-//             <option value="year">This Year</option>
-//           </select>
-//           <button
-//             onClick={() => fetchDashboardData(true)}
-//             style={{
-//               padding: "8px 16px",
-//               backgroundColor: `${appTheme.colors.primary}15`,
-//               color: appTheme.colors.primary,
-//               border: `1px solid ${appTheme.colors.primary}30`,
-//               borderRadius: "8px",
-//               cursor: "pointer",
-//               fontSize: "0.9rem",
+//           <div style={{
+//             display: "flex",
+//             alignItems: "center",
+//             gap: isMobile ? "6px" : "8px",
+//             flex: isMobile ? 1 : "none"
+//           }}>
+//             <label style={{ 
+//               color: appTheme.colors.textSecondary,
 //               fontWeight: "500",
-//               display: "flex",
-//               alignItems: "center",
-//               gap: "5px"
-//             }}
-//           >
-//             🔄 Refresh Data
-//           </button>
-//           {!socketStatus.connected && (
-//             <button
-//               onClick={handleReconnectSocket}
+//               fontSize: isMobile ? "0.85rem" : "0.9rem",
+//               whiteSpace: "nowrap",
+//               flexShrink: 0
+//             }}>Period: </label>
+//             <select
+//               value={timeFilter}
+//               onChange={(e) => setTimeFilter(e.target.value)}
 //               style={{
-//                 padding: "8px 16px",
-//                 backgroundColor: `${appTheme.colors.error}15`,
-//                 color: appTheme.colors.error,
-//                 border: `1px solid ${appTheme.colors.error}30`,
+//                 padding: isMobile ? "8px 12px" : "9px 14px",
+//                 borderRadius: "8px",
+//                 border: `1.5px solid ${appTheme.colors.border}`,
+//                 fontFamily: appTheme.fonts.primary,
+//                 backgroundColor: appTheme.colors.surface,
+//                 color: appTheme.colors.textPrimary,
+//                 fontSize: isMobile ? "0.85rem" : "0.9rem",
+//                 cursor: "pointer",
+//                 minWidth: isMobile ? "100px" : "120px",
+//                 maxWidth: "100%",
+//                 flex: isMobile ? 1 : "none",
+//                 minHeight: "36px",
+//                 appearance: "none",
+//                 backgroundImage: "url(\"data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e\")",
+//                 backgroundRepeat: "no-repeat",
+//                 backgroundPosition: "right 8px center",
+//                 backgroundSize: "16px",
+//                 paddingRight: "32px"
+//               }}
+//             >
+//               <option value="today">Today</option>
+//               <option value="week">This Week</option>
+//               <option value="month">This Month</option>
+//               <option value="year">This Year</option>
+//             </select>
+//           </div>
+          
+//           <div style={{
+//             display: "flex",
+//             alignItems: "center",
+//             gap: isMobile ? "6px" : "8px",
+//             flex: isMobile ? 1 : "none",
+//             justifyContent: isMobile ? "flex-end" : "flex-start"
+//           }}>
+//             <button
+//               onClick={() => fetchDashboardData(true)}
+//               style={{
+//                 padding: isMobile ? "8px 12px" : "9px 14px",
+//                 backgroundColor: `${appTheme.colors.primary}15`,
+//                 color: appTheme.colors.primary,
+//                 border: `1px solid ${appTheme.colors.primary}30`,
 //                 borderRadius: "8px",
 //                 cursor: "pointer",
-//                 fontSize: "0.9rem",
+//                 fontSize: isMobile ? "0.85rem" : "0.9rem",
 //                 fontWeight: "500",
 //                 display: "flex",
 //                 alignItems: "center",
-//                 gap: "5px"
+//                 gap: "5px",
+//                 whiteSpace: "nowrap",
+//                 minHeight: "36px",
+//                 flexShrink: 0
 //               }}
-//               title="Reconnect to real-time server"
 //             >
-//               🔌 Reconnect
+//               <span>🔄</span>
+//               <span style={{ display: isMobile ? "none" : "inline" }}>Refresh</span>
 //             </button>
-//           )}
+            
+//             {!socketStatus.connected && (
+//               <button
+//                 onClick={handleReconnectSocket}
+//                 style={{
+//                   padding: isMobile ? "8px 12px" : "9px 14px",
+//                   backgroundColor: `${appTheme.colors.error}15`,
+//                   color: appTheme.colors.error,
+//                   border: `1px solid ${appTheme.colors.error}30`,
+//                   borderRadius: "8px",
+//                   cursor: "pointer",
+//                   fontSize: isMobile ? "0.85rem" : "0.9rem",
+//                   fontWeight: "500",
+//                   display: "flex",
+//                   alignItems: "center",
+//                   gap: "5px",
+//                   whiteSpace: "nowrap",
+//                   minHeight: "36px",
+//                   flexShrink: 0
+//                 }}
+//                 title="Reconnect to real-time server"
+//               >
+//                 <span>🔌</span>
+//                 <span style={{ display: isMobile ? "none" : "inline" }}>Reconnect</span>
+//               </button>
+//             )}
+//           </div>
 //         </div>
 //       </div>
 
 //       {/* Quick Stats Row */}
 //       <div style={{ 
 //         display: "grid", 
-//         gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", 
-//         gap: "20px", 
-//         marginBottom: "30px"
+//         gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(220px, 1fr))", 
+//         gap: isMobile ? "12px" : "16px", 
+//         marginBottom: isMobile ? "20px" : "25px"
 //       }}>
 //         <div style={{
 //           background: `linear-gradient(135deg, ${appTheme.colors.primary}, ${appTheme.colors.secondary})`,
-//           padding: "25px",
-//           borderRadius: "16px",
-//           boxShadow: "0 8px 32px rgba(0, 0, 0, 0.12)",
+//           padding: isMobile ? "16px" : "20px",
+//           borderRadius: "12px",
+//           boxShadow: "0 6px 20px rgba(0, 0, 0, 0.1)",
 //           color: "white",
 //           position: "relative",
 //           overflow: "hidden"
 //         }}>
 //           <div style={{ position: "relative", zIndex: 2 }}>
-//             <div style={{ fontSize: "0.9rem", opacity: 0.9, marginBottom: "8px" }}>Total Revenue</div>
-//             <div style={{ fontSize: "2rem", fontWeight: "700", marginBottom: "8px" }}>
+//             <div style={{ 
+//               fontSize: isMobile ? "0.8rem" : "0.85rem", 
+//               opacity: 0.9, 
+//               marginBottom: "6px" 
+//             }}>
+//               Total Revenue
+//             </div>
+//             <div style={{ 
+//               fontSize: isMobile ? "1.5rem" : "1.8rem", 
+//               fontWeight: "700", 
+//               marginBottom: "4px",
+//               lineHeight: 1.2
+//             }}>
 //               ₹{totalRevenue.toLocaleString()}
 //             </div>
-//             <div style={{ fontSize: "0.8rem", opacity: 0.8 }}>
+//             <div style={{ 
+//               fontSize: isMobile ? "0.75rem" : "0.8rem", 
+//               opacity: 0.8 
+//             }}>
 //               {timeFilter === 'today' ? 'Today' : 
 //                timeFilter === 'week' ? 'This Week' : 
 //                timeFilter === 'month' ? 'This Month' : 'This Year'}
@@ -1058,57 +1210,81 @@
 //           </div>
 //         </div>
         
-//         <MetricCard 
-//           icon="📦" 
-//           title="Total Orders" 
-//           value={totalOrders} 
-//           color={appTheme.colors.info}
-//           appTheme={appTheme}
-//         />
-//         <MetricCard 
-//           icon="👥" 
-//           title="Total Users" 
-//           value={totalCustomers} 
-//           color={appTheme.colors.success}
-//           appTheme={appTheme}
-//         />
+//         <div style={{
+//           display: "grid",
+//           gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "1fr",
+//           gap: isMobile ? "12px" : "16px",
+//           gridColumn: isMobile ? "span 1" : "auto"
+//         }}>
+//           <MetricCard 
+//             icon="📦" 
+//             title="Total Orders" 
+//             value={totalOrders} 
+//             color={appTheme.colors.info}
+//             appTheme={appTheme}
+//             isMobile={isMobile}
+//           />
+//           <MetricCard 
+//             icon="👥" 
+//             title="Total Users" 
+//             value={totalCustomers} 
+//             color={appTheme.colors.success}
+//             appTheme={appTheme}
+//             isMobile={isMobile}
+//           />
+//         </div>
+        
 //         <MetricCard 
 //           icon="🛍️" 
 //           title="Total Products" 
 //           value={totalProducts} 
 //           color={appTheme.colors.warning}
 //           appTheme={appTheme}
+//           isMobile={isMobile}
 //         />
 //       </div>
 
 //       {/* Charts Row */}
 //       <div style={{ 
-//         display: "grid", 
-//         gridTemplateColumns: "2fr 1fr", 
-//         gap: "20px", 
-//         marginBottom: "30px" 
+//         display: "flex", 
+//         flexDirection: isMobile ? "column" : "row",
+//         gap: isMobile ? "16px" : "20px", 
+//         marginBottom: isMobile ? "20px" : "25px"
 //       }}>
 //         <div style={{
 //           backgroundColor: appTheme.colors.surface,
-//           padding: "25px",
-//           borderRadius: "16px",
-//           boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
-//           border: `1px solid ${appTheme.colors.border}30`,
+//           padding: isMobile ? "16px" : "20px",
+//           borderRadius: "12px",
+//           boxShadow: "0 4px 15px rgba(0, 0, 0, 0.06)",
+//           border: `1px solid ${appTheme.colors.border}20`,
+//           height: "100%",
+//           flex: isMobile ? "none" : 2,
+//           width: "100%"
 //         }}>
-//           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-//             <h3 style={{ color: appTheme.colors.textPrimary, margin: 0 }}>
+//           <div style={{ 
+//             display: "flex", 
+//             justifyContent: "space-between", 
+//             alignItems: "center", 
+//             marginBottom: "15px" 
+//           }}>
+//             <h3 style={{ 
+//               color: appTheme.colors.textPrimary, 
+//               margin: 0,
+//               fontSize: isMobile ? "1rem" : "1.1rem"
+//             }}>
 //               Revenue Trend
 //             </h3>
 //             {socketStatus.connected && (
 //               <div style={{
-//                 fontSize: "0.7rem",
-//                 padding: "2px 8px",
+//                 fontSize: isMobile ? "0.65rem" : "0.7rem",
+//                 padding: "3px 8px",
 //                 borderRadius: "12px",
 //                 backgroundColor: "#10b98120",
 //                 color: "#10b981",
 //                 display: "inline-flex",
 //                 alignItems: "center",
-//                 gap: "4px"
+//                 gap: "4px",
+//                 whiteSpace: "nowrap"
 //               }}>
 //                 <div style={{
 //                   width: "6px",
@@ -1121,38 +1297,52 @@
 //               </div>
 //             )}
 //           </div>
-//           <div style={{ height: "300px" }}>
+//           <div style={{ height: isMobile ? "220px" : "280px", width: "100%" }}>
 //             <Line data={revenueChartData} options={chartOptions} />
 //           </div>
 //         </div>
 
 //         <div style={{
 //           backgroundColor: appTheme.colors.surface,
-//           padding: "25px",
-//           borderRadius: "16px",
-//           boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
-//           border: `1px solid ${appTheme.colors.border}30`,
+//           padding: isMobile ? "16px" : "20px",
+//           borderRadius: "12px",
+//           boxShadow: "0 4px 15px rgba(0, 0, 0, 0.06)",
+//           border: `1px solid ${appTheme.colors.border}20`,
+//           height: "100%",
+//           flex: isMobile ? "none" : 1,
+//           width: "100%"
 //         }}>
-//           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-//             <h3 style={{ color: appTheme.colors.textPrimary, margin: 0 }}>
+//           <div style={{ 
+//             display: "flex", 
+//             justifyContent: "space-between", 
+//             alignItems: "center", 
+//             marginBottom: "15px" 
+//           }}>
+//             <h3 style={{ 
+//               color: appTheme.colors.textPrimary, 
+//               margin: 0,
+//               fontSize: isMobile ? "1rem" : "1.1rem"
+//             }}>
 //               Order Status
 //             </h3>
 //             <button
 //               onClick={handleRetry}
 //               style={{
-//                 padding: "4px 12px",
-//                 fontSize: "0.7rem",
+//                 padding: "4px 10px",
+//                 fontSize: isMobile ? "0.65rem" : "0.7rem",
 //                 backgroundColor: `${appTheme.colors.primary}15`,
 //                 color: appTheme.colors.primary,
 //                 border: `1px solid ${appTheme.colors.primary}30`,
 //                 borderRadius: "6px",
-//                 cursor: "pointer"
+//                 cursor: "pointer",
+//                 whiteSpace: "nowrap",
+//                 minHeight: "24px"
 //               }}
 //             >
 //               Update
 //             </button>
 //           </div>
-//           <div style={{ height: "300px" }}>
+//           <div style={{ height: isMobile ? "220px" : "280px", width: "100%" }}>
 //             <Doughnut data={orderStatusData} options={doughnutOptions} />
 //           </div>
 //         </div>
@@ -1160,69 +1350,98 @@
 
 //       {/* Recent Data Row */}
 //       <div style={{ 
-//         display: "grid", 
-//         gridTemplateColumns: "1fr 1fr 1fr", 
-//         gap: "20px" 
+//         display: "flex", 
+//         flexDirection: isMobile ? "column" : "row",
+//         gap: isMobile ? "16px" : "20px",
+//         marginBottom: isMobile ? "20px" : "25px"
 //       }}>
 //         <div style={{
 //           backgroundColor: appTheme.colors.surface,
-//           padding: "25px",
-//           borderRadius: "16px",
-//           boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
-//           border: `1px solid ${appTheme.colors.border}30`,
-//           gridColumn: notifications.length > 0 ? "span 2" : "span 3"
+//           padding: isMobile ? "16px" : "20px",
+//           borderRadius: "12px",
+//           boxShadow: "0 4px 15px rgba(0, 0, 0, 0.06)",
+//           border: `1px solid ${appTheme.colors.border}20`,
+//           flex: notifications.length > 0 ? (isMobile ? "none" : 2) : 1,
+//           width: "100%"
 //         }}>
-//           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-//             <h3 style={{ color: appTheme.colors.textPrimary, margin: 0 }}>
+//           <div style={{ 
+//             display: "flex", 
+//             justifyContent: "space-between", 
+//             alignItems: "center", 
+//             marginBottom: "15px" 
+//           }}>
+//             <h3 style={{ 
+//               color: appTheme.colors.textPrimary, 
+//               margin: 0,
+//               fontSize: isMobile ? "1rem" : "1.1rem"
+//             }}>
 //               Recent Orders
 //             </h3>
 //             {socketStatus.connected && (
 //               <div style={{
-//                 fontSize: "0.7rem",
-//                 padding: "2px 8px",
+//                 fontSize: isMobile ? "0.65rem" : "0.7rem",
+//                 padding: "3px 8px",
 //                 borderRadius: "12px",
 //                 backgroundColor: "#3b82f620",
 //                 color: "#3b82f6",
 //                 display: "inline-flex",
 //                 alignItems: "center",
-//                 gap: "4px"
+//                 gap: "4px",
+//                 whiteSpace: "nowrap"
 //               }}>
-//                 <span>📡</span>Real-time
+//                 <span>📡</span>
+//                 <span style={{ display: isMobile ? "none" : "inline" }}>Real-time</span>
 //               </div>
 //             )}
 //           </div>
-//           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+//           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
 //             {recentOrders.length > 0 ? recentOrders.map((order) => (
 //               <div key={order._id} style={{
 //                 display: "flex",
 //                 justifyContent: "space-between",
 //                 alignItems: "center",
-//                 padding: "12px",
+//                 padding: isMobile ? "10px" : "12px",
 //                 backgroundColor: `${appTheme.colors.background}50`,
 //                 borderRadius: "8px",
-//                 border: `1px solid ${appTheme.colors.border}20`,
+//                 border: `1px solid ${appTheme.colors.border}15`,
 //                 transition: "all 0.2s ease",
-//                 ":hover": {
+//                 ':hover': {
 //                   backgroundColor: `${appTheme.colors.background}70`,
 //                   transform: "translateY(-1px)",
 //                   boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)"
 //                 }
 //               }}>
-//                 <div>
-//                   <div style={{ fontWeight: "600", color: appTheme.colors.textPrimary, fontSize: "0.9rem" }}>
+//                 <div style={{ flex: 1, minWidth: 0, marginRight: "10px" }}>
+//                   <div style={{ 
+//                     fontWeight: "600", 
+//                     color: appTheme.colors.textPrimary, 
+//                     fontSize: isMobile ? "0.85rem" : "0.9rem",
+//                     whiteSpace: "nowrap",
+//                     overflow: "hidden",
+//                     textOverflow: "ellipsis"
+//                   }}>
 //                     #{order.orderNumber}
 //                   </div>
-//                   <div style={{ fontSize: "0.8rem", color: appTheme.colors.textSecondary }}>
+//                   <div style={{ 
+//                     fontSize: isMobile ? "0.75rem" : "0.8rem", 
+//                     color: appTheme.colors.textSecondary,
+//                     whiteSpace: "nowrap",
+//                     overflow: "hidden",
+//                     textOverflow: "ellipsis"
+//                   }}>
 //                     {order.createdBy} • ₹{order.totalPrice.toLocaleString()}
 //                   </div>
 //                 </div>
-//                 <StatusBadge status={order.status} appTheme={appTheme} />
+//                 <div style={{ flexShrink: 0 }}>
+//                   <StatusBadge status={order.status} appTheme={appTheme} isMobile={isMobile} />
+//                 </div>
 //               </div>
 //             )) : (
 //               <div style={{ 
 //                 textAlign: "center", 
 //                 padding: "20px", 
-//                 color: appTheme.colors.textSecondary 
+//                 color: appTheme.colors.textSecondary,
+//                 fontSize: isMobile ? "0.9rem" : "1rem"
 //               }}>
 //                 No recent orders
 //               </div>
@@ -1230,30 +1449,47 @@
 //           </div>
 //         </div>
 
-//         {/* Notifications Panel */}
+//         {/* Notifications Panel - FIXED for mobile */}
 //         {notifications.length > 0 && (
 //           <div style={{
 //             backgroundColor: appTheme.colors.surface,
-//             padding: "25px",
-//             borderRadius: "16px",
-//             boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
-//             border: `1px solid ${appTheme.colors.border}30`,
+//             padding: isMobile ? "16px" : "20px",
+//             borderRadius: "12px",
+//             boxShadow: "0 4px 15px rgba(0, 0, 0, 0.06)",
+//             border: `1px solid ${appTheme.colors.border}20`,
+//             flex: isMobile ? "none" : 1,
+//             width: "100%",
+//             maxWidth: "100%",
+//             overflow: "hidden"
 //           }}>
-//             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-//               <h3 style={{ color: appTheme.colors.textPrimary, margin: 0 }}>
-//                 Recent Notifications
+//             <div style={{ 
+//               display: "flex", 
+//               justifyContent: "space-between", 
+//               alignItems: "center", 
+//               marginBottom: "15px",
+//               flexWrap: "wrap",
+//               gap: "8px"
+//             }}>
+//               <h3 style={{ 
+//                 color: appTheme.colors.textPrimary, 
+//                 margin: 0,
+//                 fontSize: isMobile ? "1rem" : "1.1rem"
+//               }}>
+//                 Notifications
 //               </h3>
-//               <div style={{ display: "flex", gap: "8px" }}>
+//               <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
 //                 <button
 //                   onClick={handleClearNotifications}
 //                   style={{
-//                     padding: "4px 12px",
-//                     fontSize: "0.7rem",
+//                     padding: "5px 10px",
+//                     fontSize: isMobile ? "0.65rem" : "0.7rem",
 //                     backgroundColor: `${appTheme.colors.error}15`,
 //                     color: appTheme.colors.error,
 //                     border: `1px solid ${appTheme.colors.error}30`,
 //                     borderRadius: "6px",
-//                     cursor: "pointer"
+//                     cursor: "pointer",
+//                     whiteSpace: "nowrap",
+//                     minHeight: "28px"
 //                   }}
 //                 >
 //                   Clear
@@ -1261,21 +1497,23 @@
 //                 <button
 //                   onClick={handleViewAllNotifications}
 //                   style={{
-//                     padding: "4px 12px",
-//                     fontSize: "0.7rem",
+//                     padding: "5px 10px",
+//                     fontSize: isMobile ? "0.65rem" : "0.7rem",
 //                     backgroundColor: `${appTheme.colors.primary}15`,
 //                     color: appTheme.colors.primary,
 //                     border: `1px solid ${appTheme.colors.primary}30`,
 //                     borderRadius: "6px",
-//                     cursor: "pointer"
+//                     cursor: "pointer",
+//                     whiteSpace: "nowrap",
+//                     minHeight: "28px"
 //                   }}
 //                 >
 //                   View All
 //                 </button>
 //               </div>
 //             </div>
-//             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-//               {notifications.map((notification) => (
+//             <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxWidth: "100%" }}>
+//               {notifications.slice(0, isMobile ? 3 : 5).map((notification) => (
 //                 <div 
 //                   key={notification.id} 
 //                   onClick={() => markNotificationAsRead(notification.id)}
@@ -1283,27 +1521,37 @@
 //                     display: "flex",
 //                     justifyContent: "space-between",
 //                     alignItems: "flex-start",
-//                     padding: "12px",
+//                     padding: isMobile ? "10px" : "12px",
 //                     backgroundColor: notification.status !== 'read' ? `${appTheme.colors.warning}10` : `${appTheme.colors.background}50`,
 //                     borderRadius: "8px",
-//                     border: `1px solid ${appTheme.colors.border}20`,
+//                     border: `1px solid ${appTheme.colors.border}15`,
 //                     cursor: "pointer",
 //                     transition: "all 0.2s ease",
-//                     ":hover": {
+//                     ':hover': {
 //                       backgroundColor: notification.status !== 'read' ? `${appTheme.colors.warning}20` : `${appTheme.colors.background}70`,
 //                       transform: "translateY(-1px)"
-//                     }
+//                     },
+//                     maxWidth: "100%",
+//                     overflow: "hidden"
 //                   }}
 //                 >
-//                   <div style={{ flex: 1 }}>
+//                   <div style={{ 
+//                     flex: 1, 
+//                     minWidth: 0, 
+//                     marginRight: "8px",
+//                     overflow: "hidden"
+//                   }}>
 //                     <div style={{ 
 //                       display: "flex", 
-//                       alignItems: "center", 
+//                       alignItems: "flex-start", 
 //                       gap: "8px",
-//                       marginBottom: "4px" 
+//                       marginBottom: "4px",
+//                       maxWidth: "100%"
 //                     }}>
 //                       <div style={{
-//                         fontSize: "1rem"
+//                         fontSize: isMobile ? "0.9rem" : "1rem",
+//                         flexShrink: 0,
+//                         marginTop: "1px"
 //                       }}>
 //                         {notification.type === 'NEW_ORDER' && '🛍️'}
 //                         {notification.type === 'PAYMENT_RECEIVED' && '💰'}
@@ -1311,45 +1559,63 @@
 //                         {!['NEW_ORDER', 'PAYMENT_RECEIVED', 'ORDER_STATUS_CHANGED'].includes(notification.type) && '📢'}
 //                       </div>
 //                       <div style={{ 
-//                         fontWeight: notification.status !== 'read' ? "700" : "600", 
-//                         color: appTheme.colors.textPrimary, 
-//                         fontSize: "0.85rem",
-//                         opacity: notification.status === 'read' ? 0.8 : 1
+//                         flex: 1,
+//                         minWidth: 0
 //                       }}>
-//                         {notification.title}
+//                         <div style={{ 
+//                           fontWeight: notification.status !== 'read' ? "700" : "600", 
+//                           color: appTheme.colors.textPrimary, 
+//                           fontSize: isMobile ? "0.8rem" : "0.85rem",
+//                           opacity: notification.status === 'read' ? 0.8 : 1,
+//                           overflow: "hidden",
+//                           textOverflow: "ellipsis",
+//                           whiteSpace: "nowrap",
+//                           lineHeight: 1.3
+//                         }}>
+//                           {notification.title}
+//                         </div>
+//                         <div style={{ 
+//                           fontSize: isMobile ? "0.7rem" : "0.75rem", 
+//                           color: appTheme.colors.textSecondary,
+//                           marginTop: "2px",
+//                           overflow: "hidden",
+//                           textOverflow: "ellipsis",
+//                           whiteSpace: "nowrap"
+//                         }}>
+//                           {notification.message}
+//                         </div>
+//                         {notification.orderNumber && (
+//                           <div style={{ 
+//                             marginTop: "2px",
+//                             fontSize: isMobile ? "0.65rem" : "0.7rem",
+//                             color: appTheme.colors.primary,
+//                             overflow: "hidden",
+//                             textOverflow: "ellipsis",
+//                             whiteSpace: "nowrap"
+//                           }}>
+//                             Order #{notification.orderNumber}
+//                           </div>
+//                         )}
 //                       </div>
 //                       {notification.status !== 'read' && (
 //                         <div style={{
-//                           width: "8px",
-//                           height: "8px",
+//                           width: "6px",
+//                           height: "6px",
 //                           borderRadius: "50%",
 //                           backgroundColor: appTheme.colors.warning,
-//                           flexShrink: 0
+//                           flexShrink: 0,
+//                           marginTop: "4px"
 //                         }} />
-//                       )}
-//                     </div>
-//                     <div style={{ 
-//                       fontSize: "0.75rem", 
-//                       color: appTheme.colors.textSecondary,
-//                       marginLeft: "24px"
-//                     }}>
-//                       {notification.message}
-//                       {notification.orderNumber && (
-//                         <div style={{ 
-//                           marginTop: "4px",
-//                           fontSize: "0.7rem",
-//                           color: appTheme.colors.primary
-//                         }}>
-//                           Order #{notification.orderNumber}
-//                         </div>
 //                       )}
 //                     </div>
 //                   </div>
 //                   <div style={{ 
-//                     fontSize: "0.65rem", 
+//                     fontSize: isMobile ? "0.6rem" : "0.65rem", 
 //                     color: appTheme.colors.textSecondary,
 //                     whiteSpace: "nowrap",
-//                     marginLeft: "8px"
+//                     marginLeft: "4px",
+//                     flexShrink: 0,
+//                     paddingTop: "1px"
 //                   }}>
 //                     {notification.timeSince || 'Just now'}
 //                   </div>
@@ -1361,71 +1627,97 @@
 //       </div>
 
 //       {/* Top Selling Products */}
-//       <div style={{ marginTop: "20px" }}>
+//       <div style={{ marginTop: isMobile ? "16px" : "20px" }}>
 //         <div style={{
 //           backgroundColor: appTheme.colors.surface,
-//           padding: "25px",
-//           borderRadius: "16px",
-//           boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
-//           border: `1px solid ${appTheme.colors.border}30`,
+//           padding: isMobile ? "16px" : "20px",
+//           borderRadius: "12px",
+//           boxShadow: "0 4px 15px rgba(0, 0, 0, 0.06)",
+//           border: `1px solid ${appTheme.colors.border}20`,
+//           width: "100%"
 //         }}>
-//           <h3 style={{ marginBottom: "20px", color: appTheme.colors.textPrimary }}>
+//           <h3 style={{ 
+//             marginBottom: "15px", 
+//             color: appTheme.colors.textPrimary,
+//             fontSize: isMobile ? "1rem" : "1.1rem"
+//           }}>
 //             Top Selling Products
 //           </h3>
-//           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+//           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
 //             {topSellingProducts.length > 0 ? topSellingProducts.map((product, index) => (
 //               <div key={product.id || index} style={{
 //                 display: "flex",
 //                 justifyContent: "space-between",
 //                 alignItems: "center",
-//                 padding: "12px",
+//                 padding: isMobile ? "10px" : "12px",
 //                 backgroundColor: `${appTheme.colors.background}50`,
 //                 borderRadius: "8px",
-//                 border: `1px solid ${appTheme.colors.border}20`,
+//                 border: `1px solid ${appTheme.colors.border}15`,
 //                 transition: "all 0.2s ease",
-//                 ":hover": {
+//                 ':hover': {
 //                   backgroundColor: `${appTheme.colors.background}70`,
 //                   transform: "translateY(-1px)",
 //                   boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)"
 //                 }
 //               }}>
-//                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+//                 <div style={{ 
+//                   display: "flex", 
+//                   alignItems: "center", 
+//                   gap: isMobile ? "10px" : "12px",
+//                   flex: 1,
+//                   minWidth: 0
+//                 }}>
 //                   <div style={{
-//                     width: "32px",
-//                     height: "32px",
+//                     width: isMobile ? "28px" : "32px",
+//                     height: isMobile ? "28px" : "32px",
 //                     borderRadius: "6px",
 //                     background: `linear-gradient(135deg, ${appTheme.colors.primary}20, ${appTheme.colors.secondary}20)`,
 //                     display: "flex",
 //                     alignItems: "center",
 //                     justifyContent: "center",
-//                     fontSize: "0.8rem",
+//                     fontSize: isMobile ? "0.75rem" : "0.8rem",
 //                     fontWeight: "600",
-//                     color: appTheme.colors.primary
+//                     color: appTheme.colors.primary,
+//                     flexShrink: 0
 //                   }}>
 //                     {index + 1}
 //                   </div>
-//                   <div>
-//                     <div style={{ fontWeight: "600", color: appTheme.colors.textPrimary, fontSize: "0.9rem" }}>
+//                   <div style={{ flex: 1, minWidth: 0 }}>
+//                     <div style={{ 
+//                       fontWeight: "600", 
+//                       color: appTheme.colors.textPrimary, 
+//                       fontSize: isMobile ? "0.85rem" : "0.9rem",
+//                       whiteSpace: "nowrap",
+//                       overflow: "hidden",
+//                       textOverflow: "ellipsis"
+//                     }}>
 //                       {product.name}
 //                     </div>
-//                     <div style={{ fontSize: "0.7rem", color: appTheme.colors.textSecondary }}>
+//                     <div style={{ 
+//                       fontSize: isMobile ? "0.75rem" : "0.8rem", 
+//                       color: appTheme.colors.textSecondary 
+//                     }}>
 //                       {product.quantity} sold
 //                     </div>
 //                   </div>
-//               </div>
+//                 </div>
 //                 <div style={{ 
 //                   fontWeight: "600", 
 //                   color: appTheme.colors.primary,
-//                   fontSize: "0.9rem"
+//                   fontSize: isMobile ? "0.85rem" : "0.9rem",
+//                   whiteSpace: "nowrap",
+//                   marginLeft: "10px",
+//                   flexShrink: 0
 //                 }}>
 //                   ₹{product.revenue.toLocaleString()}
-//               </div>
+//                 </div>
 //               </div>
 //             )) : (
 //               <div style={{ 
 //                 textAlign: "center", 
 //                 padding: "20px", 
-//                 color: appTheme.colors.textSecondary 
+//                 color: appTheme.colors.textSecondary,
+//                 fontSize: isMobile ? "0.9rem" : "1rem"
 //               }}>
 //                 No sales data
 //               </div>
@@ -1439,43 +1731,92 @@
 //           0%, 100% { opacity: 1; }
 //           50% { opacity: 0.5; }
 //         }
+        
+//         @keyframes spin {
+//           0% { transform: rotate(0deg); }
+//           100% { transform: rotate(360deg); }
+//         }
+        
+//         /* Improve mobile scrolling */
+//         @media (max-width: 768px) {
+//           body {
+//             -webkit-overflow-scrolling: touch;
+//             overflow-x: hidden;
+//           }
+          
+//           * {
+//             -webkit-tap-highlight-color: transparent;
+//             box-sizing: border-box;
+//           }
+          
+//           select, button, input {
+//             font-size: 16px !important; /* Prevents iOS zoom */
+//             min-height: 44px !important; /* Better touch targets */
+//           }
+//         }
+        
+//         /* Desktop hover effects */
+//         @media (hover: hover) and (pointer: fine) {
+//           button:not(:disabled):hover {
+//             transform: translateY(-1px);
+//             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+//           }
+          
+//           button:not(:disabled):active {
+//             transform: translateY(0);
+//           }
+//         }
 //       `}</style>
 //     </div>
 //   );
 // }
 
-// const MetricCard = ({ icon, title, value, color, appTheme }) => (
+// const MetricCard = ({ icon, title, value, color, appTheme, isMobile }) => (
 //   <div style={{
 //     backgroundColor: appTheme.colors.surface,
-//     padding: "25px",
-//     borderRadius: "16px",
-//     boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
-//     border: `1px solid ${appTheme.colors.border}30`,
+//     padding: isMobile ? "14px" : "18px",
+//     borderRadius: "12px",
+//     boxShadow: "0 4px 15px rgba(0, 0, 0, 0.06)",
+//     border: `1px solid ${appTheme.colors.border}20`,
 //     transition: "all 0.2s ease",
-//     ":hover": {
+//     height: "100%",
+//     ':hover': {
 //       transform: "translateY(-2px)",
 //       boxShadow: "0 8px 25px rgba(0, 0, 0, 0.12)"
 //     }
 //   }}>
-//     <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+//     <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "12px" : "15px" }}>
 //       <div style={{
-//         width: "48px",
-//         height: "48px",
-//         borderRadius: "12px",
+//         width: isMobile ? "40px" : "48px",
+//         height: isMobile ? "40px" : "48px",
+//         borderRadius: "10px",
 //         background: `${color}20`,
 //         display: "flex",
 //         alignItems: "center",
 //         justifyContent: "center",
-//         fontSize: "1.5rem",
-//         color: color
+//         fontSize: isMobile ? "1.2rem" : "1.5rem",
+//         color: color,
+//         flexShrink: 0
 //       }}>
 //         {icon}
 //       </div>
-//       <div>
-//         <div style={{ fontSize: "0.9rem", color: appTheme.colors.textSecondary, marginBottom: "4px" }}>
+//       <div style={{ flex: 1, minWidth: 0 }}>
+//         <div style={{ 
+//           fontSize: isMobile ? "0.8rem" : "0.85rem", 
+//           color: appTheme.colors.textSecondary, 
+//           marginBottom: "2px",
+//           whiteSpace: "nowrap",
+//           overflow: "hidden",
+//           textOverflow: "ellipsis"
+//         }}>
 //           {title}
 //         </div>
-//         <div style={{ fontSize: "1.8rem", fontWeight: "700", color: appTheme.colors.textPrimary }}>
+//         <div style={{ 
+//           fontSize: isMobile ? "1.4rem" : "1.6rem", 
+//           fontWeight: "700", 
+//           color: appTheme.colors.textPrimary,
+//           lineHeight: 1.2
+//         }}>
 //           {value}
 //         </div>
 //       </div>
@@ -1483,7 +1824,7 @@
 //   </div>
 // );
 
-// const StatusBadge = ({ status, appTheme }) => {
+// const StatusBadge = ({ status, appTheme, isMobile }) => {
 //   const getStatusConfig = (status) => {
 //     switch (status) {
 //       case 'delivered':
@@ -1501,21 +1842,62 @@
   
 //   return (
 //     <div style={{
-//       padding: "4px 12px",
-//       borderRadius: "20px",
-//       fontSize: "0.7rem",
+//       padding: isMobile ? "3px 8px" : "4px 10px",
+//       borderRadius: "12px",
+//       fontSize: isMobile ? "0.65rem" : "0.7rem",
 //       fontWeight: "600",
 //       backgroundColor: config.bg,
 //       color: config.color,
 //       display: "flex",
 //       alignItems: "center",
-//       gap: "4px"
+//       gap: "3px",
+//       whiteSpace: "nowrap"
 //     }}>
 //       <span>{config.icon}</span>
-//       <span>{status}</span>
+//       <span>{isMobile ? status.substring(0, 4) : status}</span>
 //     </div>
 //   );
 // };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1552,7 +1934,7 @@ ChartJS.register(
 );
 
 export default function DashboardPage() {
-  const { user, loading: authLoading, isAuthenticated, session } = useAuth();
+  const { user, loading: authLoading, isAuthenticated, session, getAuthHeaders } = useAuth();
   const { showNotification } = useNotification();
   
   const [orders, setOrders] = useState([]);
@@ -1716,13 +2098,11 @@ export default function DashboardPage() {
 
   // ==================== FETCH NOTIFICATIONS ====================
   const fetchNotifications = useCallback(async () => {
-    if (!isAuthenticated || !user || user.role !== 'admin') return;
+    if (!isAuthenticated || !user) return;
     
     try {
       const response = await fetch('/api/notifications?limit=10&page=1', {
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: getAuthHeaders(),
         credentials: 'include'
       });
       
@@ -1735,7 +2115,7 @@ export default function DashboardPage() {
     } catch (error) {
       console.warn('Failed to fetch notifications:', error);
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, getAuthHeaders]);
 
   const markNotificationAsRead = useCallback(async (notificationId) => {
     if (!isAuthenticated) return;
@@ -1743,9 +2123,7 @@ export default function DashboardPage() {
     try {
       await fetch(`/api/notifications?id=${notificationId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ markAsRead: true }),
         credentials: 'include'
       });
@@ -1758,7 +2136,7 @@ export default function DashboardPage() {
     } catch (error) {
       console.warn('Failed to mark notification as read:', error);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, getAuthHeaders]);
 
   // ==================== DATA FETCHING ====================
   const fetchDashboardData = useCallback(async (force = false) => {
@@ -1794,16 +2172,22 @@ export default function DashboardPage() {
         return;
       }
       
-      const headers = {
-        'Content-Type': 'application/json'
-      };
+      // Get auth headers with user ID and company ID
+      const authHeaders = getAuthHeaders();
+      
+      console.log('📊 Fetching dashboard data with headers:', {
+        hasAuth: !!authHeaders.Authorization,
+        hasCompanyId: !!authHeaders['x-company-id'],
+        hasUserId: !!authHeaders['x-user-id'],
+        companyId: authHeaders['x-company-id']
+      });
       
       const fetchWithTimeout = (url, options, timeout = 10000) => {
         return Promise.race([
           fetch(url, {
             ...options,
             credentials: 'include',
-            headers
+            headers: authHeaders
           }),
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Request timeout')), timeout)
@@ -1812,32 +2196,49 @@ export default function DashboardPage() {
       };
       
       const fetchPromises = [
-        fetchWithTimeout("/api/orders", {}, 8000).then(async res => {
+        fetchWithTimeout("/api/orders?limit=100", {}, 8000).then(async res => {
           if (!res.ok) {
             if (res.status === 401) {
               throw new Error("Session expired. Please login again.");
             }
+            if (res.status === 403) {
+              console.warn('Access denied to orders API - admin only');
+              return [];
+            }
             const errorText = await res.text();
             console.warn(`Orders API failed: ${res.status}`, errorText);
-            throw new Error(`Failed to load orders: ${res.status}`);
+            return [];
           }
           const data = await res.json();
+          console.log('📊 Orders fetched:', data.success ? `${data.data?.length || 0} orders` : 'failed');
           return data.success ? (data.data || []) : [];
+        }).catch(err => {
+          console.warn('Orders fetch error:', err.message);
+          return [];
         }),
         
-        fetchWithTimeout("/api/products", {}, 8000).then(async res => {
-          if (!res.ok) {
-            const errorText = await res.text();
-            console.warn(`Products API failed: ${res.status}`, errorText);
-            throw new Error(`Failed to load products: ${res.status}`);
-          }
-          const data = await res.json();
-          return data.success ? (data.data || []) : [];
-        }),
-        
-        fetchWithTimeout("/api/users", {}, 8000).then(async res => {
+        fetchWithTimeout("/api/products?limit=100", {}, 8000).then(async res => {
           if (!res.ok) {
             if (res.status === 403) {
+              console.warn('Access denied to products API');
+              return [];
+            }
+            const errorText = await res.text();
+            console.warn(`Products API failed: ${res.status}`, errorText);
+            return [];
+          }
+          const data = await res.json();
+          console.log('📊 Products fetched:', data.success ? `${data.data?.length || 0} products` : 'failed');
+          return data.success ? (data.data || []) : [];
+        }).catch(err => {
+          console.warn('Products fetch error:', err.message);
+          return [];
+        }),
+        
+        fetchWithTimeout("/api/users?limit=100", {}, 8000).then(async res => {
+          if (!res.ok) {
+            if (res.status === 403) {
+              console.warn('Access denied to users API');
               return [];
             }
             return [];
@@ -1855,7 +2256,11 @@ export default function DashboardPage() {
               usersArray = data.users;
             }
           }
+          console.log('📊 Users fetched:', usersArray.length);
           return usersArray.filter(u => u && typeof u === 'object');
+        }).catch(err => {
+          console.warn('Users fetch error:', err.message);
+          return [];
         })
       ];
       
@@ -1865,6 +2270,12 @@ export default function DashboardPage() {
         const ordersResult = ordersData.status === 'fulfilled' ? ordersData.value : [];
         const productsResult = productsData.status === 'fulfilled' ? productsData.value : [];
         const usersResult = usersData.status === 'fulfilled' ? usersData.value : [];
+        
+        console.log('📊 Dashboard data loaded:', {
+          orders: ordersResult.length,
+          products: productsResult.length,
+          users: usersResult.length
+        });
         
         setOrders(ordersResult);
         setProducts(productsResult);
@@ -1890,7 +2301,7 @@ export default function DashboardPage() {
         fetchInProgressRef.current = false;
       }
     }
-  }, [isAuthenticated, user, fetchNotifications]);
+  }, [isAuthenticated, user, fetchNotifications, getAuthHeaders]);
 
   // ==================== INITIALIZATION ====================
   useEffect(() => {
@@ -1912,7 +2323,7 @@ export default function DashboardPage() {
       }
       
       if (!dataFetchedRef.current && !fetchInProgressRef.current) {
-        await fetchDashboardData();
+        await fetchDashboardData(true);
       }
     };
     
@@ -2060,7 +2471,6 @@ export default function DashboardPage() {
 
   const revenueChartData = useMemo(() => {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const currentMonth = new Date().getMonth();
     
     const data = Array(12).fill(0);
     
@@ -2085,7 +2495,7 @@ export default function DashboardPage() {
         },
       ],
     };
-  }, [orders, appTheme.colors.primary]);
+  }, [orders]);
 
   const ordersChartData = useMemo(() => ({
     labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
@@ -2103,7 +2513,7 @@ export default function DashboardPage() {
         borderRadius: 8,
       },
     ],
-  }), [orders, appTheme.colors.secondary]);
+  }), [orders]);
 
   const orderStatusData = useMemo(() => ({
     labels: ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"],
@@ -2127,7 +2537,7 @@ export default function DashboardPage() {
         borderColor: appTheme.colors.surface,
       },
     ],
-  }), [orderStatusMetrics, appTheme.colors.surface]);
+  }), [orderStatusMetrics]);
 
   const chartOptions = useMemo(() => ({
     responsive: true,
@@ -2167,7 +2577,7 @@ export default function DashboardPage() {
         }
       },
     },
-  }), [appTheme.colors.border, isMobile]);
+  }), [isMobile]);
 
   const doughnutOptions = useMemo(() => ({
     responsive: true,
@@ -2968,7 +3378,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Notifications Panel - FIXED for mobile */}
+        {/* Notifications Panel */}
         {notifications.length > 0 && (
           <div style={{
             backgroundColor: appTheme.colors.surface,
@@ -3352,8 +3762,12 @@ const StatusBadge = ({ status, appTheme, isMobile }) => {
         return { bg: `${appTheme.colors.info}20`, color: appTheme.colors.info, icon: '🚚' };
       case 'processing':
         return { bg: `${appTheme.colors.warning}20`, color: appTheme.colors.warning, icon: '⏳' };
+      case 'pending':
+        return { bg: '#FF638420', color: '#FF6384', icon: '⏰' };
+      case 'cancelled':
+        return { bg: '#FF9F4020', color: '#FF9F40', icon: '❌' };
       default:
-        return { bg: `${appTheme.colors.error}20`, color: appTheme.colors.error, icon: '❌' };
+        return { bg: `${appTheme.colors.error}20`, color: appTheme.colors.error, icon: '❓' };
     }
   };
   

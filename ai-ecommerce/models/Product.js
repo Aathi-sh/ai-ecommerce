@@ -1,3 +1,5 @@
+
+// // models/Product.js
 // import mongoose from 'mongoose';
 // import Counter from './Counter';
 
@@ -22,12 +24,14 @@
 //             required: true,
 //             unique: true,
 //             lowercase: true,
+//             index: true, // ✅ Added index here
 //         },
 //         sku: { // Stock Keeping Unit
 //             type: String,
 //             required: [true, "SKU is required"],
 //             unique: true,
 //             uppercase: true,
+//             index: true, // ✅ Added index here
 //         },
 //         hsnCode: { // HSN code for GST
 //             type: String,
@@ -41,18 +45,27 @@
 //             max: 28,
 //         },
         
+//         // ✅ Category as ObjectId reference to Category model
 //         category: { 
-//             type: String, 
+//             type: mongoose.Schema.Types.ObjectId,
+//             ref: 'Category',
 //             required: [true, "Category is required"],
 //             index: true,
 //         },
+        
+//         // ✅ SubCategory as ObjectId reference to Category model
 //         subCategory: {
-//             type: String,
+//             type: mongoose.Schema.Types.ObjectId,
+//             ref: 'Category',
 //             required: false,
+//             index: true,
 //         },
+        
+//         // ✅ Brand kept as string
 //         brand: {
 //             type: String,
 //             required: false,
+//             index: true,
 //         },
         
 //         // Pricing
@@ -169,10 +182,12 @@
 //         isActive: {
 //             type: Boolean,
 //             default: true,
+//             index: true, // ✅ Added index here
 //         },
 //         isFeatured: {
 //             type: Boolean,
 //             default: false,
+//             index: true, // ✅ Added index here
 //         },
 //         isOnSale: {
 //             type: Boolean,
@@ -236,11 +251,29 @@
 //     }
 // );
 
-// // ✅ FIXED: Virtual for formatted ID - ONLY NUMBERS (00100 format)
+// // ========== VIRTUALS ==========
+
+// // Virtual for formatted ID - ONLY NUMBERS (00100 format)
 // ProductSchema.virtual('formattedId').get(function() {
 //     if (!this.customId) return '00000';
 //     // Pad with zeros to make it 5 digits
 //     return String(this.customId).padStart(5, '0');
+// });
+
+// // Virtual for category name (for convenience)
+// ProductSchema.virtual('categoryName').get(async function() {
+//     if (!this.category) return null;
+//     const Category = mongoose.model('Category');
+//     const cat = await Category.findById(this.category);
+//     return cat ? cat.name : null;
+// });
+
+// // Virtual for subCategory name (for convenience)
+// ProductSchema.virtual('subCategoryName').get(async function() {
+//     if (!this.subCategory) return null;
+//     const Category = mongoose.model('Category');
+//     const subCat = await Category.findById(this.subCategory);
+//     return subCat ? subCat.name : null;
 // });
 
 // // Virtual for in-stock status
@@ -256,7 +289,9 @@
 //     return 0;
 // });
 
-// // ✅ FIXED: Pre-save middleware with proper atomic counter increment
+// // ========== MIDDLEWARE ==========
+
+// // Pre-save middleware with proper atomic counter increment
 // ProductSchema.pre('save', async function(next) {
 //     try {
 //         // Generate slug from product name if not provided
@@ -272,7 +307,7 @@
 //             this.margin = ((this.discountPrice - this.costPrice) / this.costPrice) * 100;
 //         }
         
-//         // ✅ FIXED: Auto-generate customId for new products (starts from 100)
+//         // Auto-generate customId for new products (starts from 100)
 //         if (this.isNew && !this.customId) {
 //             try {
 //                 console.log(`🔢 Generating custom ID for new product: ${this.productName}`);
@@ -293,6 +328,32 @@
 //             }
 //         }
         
+//         // Validate that category exists in Category model
+//         if (this.category) {
+//             const Category = mongoose.model('Category');
+//             const categoryExists = await Category.findById(this.category);
+//             if (!categoryExists) {
+//                 return next(new Error(`Category with ID ${this.category} does not exist`));
+//             }
+//         }
+        
+//         // Validate that subCategory exists in Category model (if provided)
+//         if (this.subCategory) {
+//             const Category = mongoose.model('Category');
+//             const subCategoryExists = await Category.findById(this.subCategory);
+//             if (!subCategoryExists) {
+//                 return next(new Error(`SubCategory with ID ${this.subCategory} does not exist`));
+//             }
+            
+//             // Optional: Validate that subCategory belongs to the selected category
+//             if (this.category) {
+//                 const subCat = await Category.findById(this.subCategory);
+//                 if (subCat && subCat.parentId && subCat.parentId.toString() !== this.category.toString()) {
+//                     console.warn(`⚠️ Warning: SubCategory ${subCat.name} does not belong to selected category`);
+//                 }
+//             }
+//         }
+        
 //         next();
 //     } catch (error) {
 //         console.error('❌ Error in product pre-save:', error);
@@ -300,34 +361,85 @@
 //     }
 // });
 
-// // ✅ Post-save middleware to log creation
+// // Pre-update middleware to validate category/subcategory
+// ProductSchema.pre('findOneAndUpdate', async function(next) {
+//     try {
+//         const update = this.getUpdate();
+        
+//         // Check if category is being updated
+//         if (update.category || (update.$set && update.$set.category)) {
+//             const categoryId = update.category || update.$set.category;
+//             const Category = mongoose.model('Category');
+//             const categoryExists = await Category.findById(categoryId);
+//             if (!categoryExists) {
+//                 return next(new Error(`Category with ID ${categoryId} does not exist`));
+//             }
+//         }
+        
+//         // Check if subCategory is being updated
+//         if (update.subCategory || (update.$set && update.$set.subCategory)) {
+//             const subCategoryId = update.subCategory || update.$set.subCategory;
+//             if (subCategoryId) {
+//                 const Category = mongoose.model('Category');
+//                 const subCategoryExists = await Category.findById(subCategoryId);
+//                 if (!subCategoryExists) {
+//                     return next(new Error(`SubCategory with ID ${subCategoryId} does not exist`));
+//                 }
+//             }
+//         }
+        
+//         next();
+//     } catch (error) {
+//         console.error('❌ Error in product pre-update:', error);
+//         next(error);
+//     }
+// });
+
+// // Post-save middleware to log creation
 // ProductSchema.post('save', function(doc) {
 //     console.log(`✅ Product saved: ${doc.productName} (ID: ${doc.formattedId})`);
 // });
 
-// // Indexes for better performance
+// // ========== INDEXES ==========
+// // ✅ FIXED: Removed duplicate indexes to eliminate warnings
+
+// // Text index for search (special compound index)
 // ProductSchema.index({ productName: 'text', description: 'text' });
-// ProductSchema.index({ sku: 1 });
-// ProductSchema.index({ slug: 1 });
+
+// // Compound indexes for efficient queries
 // ProductSchema.index({ category: 1, subCategory: 1 });
 // ProductSchema.index({ isActive: 1, isFeatured: 1 });
+
+// // Single field indexes (only where not already indexed in schema)
 // ProductSchema.index({ discountPrice: 1 });
 // ProductSchema.index({ createdAt: -1 });
-// ProductSchema.index({ customId: 1 });
 
-// // ✅ Static method to get product by formatted ID
+// // Note: The following fields are already indexed in the schema:
+// // - customId (index: true in schema)
+// // - productName (index: true in schema)
+// // - slug (index: true in schema)
+// // - sku (index: true in schema)
+// // - category (index: true in schema)
+// // - subCategory (index: true in schema)
+// // - brand (index: true in schema)
+// // - isActive (index: true in schema)
+// // - isFeatured (index: true in schema)
+
+// // ========== STATIC METHODS ==========
+
+// // Get product by formatted ID
 // ProductSchema.statics.findByFormattedId = function(formattedId) {
 //     // Convert "00123" back to number 123
 //     const customId = parseInt(formattedId, 10);
 //     return this.findOne({ customId });
 // };
 
-// // ✅ Static method to get product by customId number
+// // Get product by customId number
 // ProductSchema.statics.findByCustomId = function(customId) {
 //     return this.findOne({ customId });
 // };
 
-// // ✅ Static method to get next available customId
+// // Get next available customId
 // ProductSchema.statics.getNextCustomId = async function() {
 //     try {
 //         const counter = await Counter.findOne({ name: 'productId' });
@@ -346,7 +458,7 @@
 //     }
 // };
 
-// // ✅ Static method to get product count
+// // Get product stats
 // ProductSchema.statics.getProductStats = async function() {
 //     const total = await this.countDocuments();
 //     const active = await this.countDocuments({ isActive: true });
@@ -357,10 +469,56 @@
 //     });
 //     const outOfStock = await this.countDocuments({ stock: 0, isActive: true });
     
-//     return { total, active, lowStock, outOfStock };
+//     // Get category distribution
+//     const categoryDistribution = await this.aggregate([
+//         { $match: { category: { $ne: null } } },
+//         { $group: {
+//             _id: '$category',
+//             count: { $sum: 1 }
+//         }},
+//         { $sort: { count: -1 } },
+//         { $limit: 5 },
+//         { $lookup: {
+//             from: 'categories',
+//             localField: '_id',
+//             foreignField: '_id',
+//             as: 'categoryInfo'
+//         }},
+//         { $unwind: { path: '$categoryInfo', preserveNullAndEmptyArrays: true } },
+//         { $project: {
+//             categoryName: '$categoryInfo.name',
+//             count: 1
+//         }}
+//     ]);
+    
+//     return { 
+//         total, 
+//         active, 
+//         lowStock, 
+//         outOfStock,
+//         categoryDistribution 
+//     };
 // };
 
-// // ✅ Instance method to get product info with formatted ID
+// // Get products by category
+// ProductSchema.statics.findByCategory = function(categoryId) {
+//     return this.find({ category: categoryId })
+//         .populate('category', 'name slug')
+//         .populate('subCategory', 'name slug')
+//         .sort({ createdAt: -1 });
+// };
+
+// // Get products by subCategory
+// ProductSchema.statics.findBySubCategory = function(subCategoryId) {
+//     return this.find({ subCategory: subCategoryId })
+//         .populate('category', 'name slug')
+//         .populate('subCategory', 'name slug')
+//         .sort({ createdAt: -1 });
+// };
+
+// // ========== INSTANCE METHODS ==========
+
+// // Get product info with formatted ID
 // ProductSchema.methods.getInfo = function() {
 //     return {
 //         id: this._id,
@@ -369,9 +527,26 @@
 //         name: this.productName,
 //         price: this.discountPrice,
 //         stock: this.stock,
-//         isActive: this.isActive
+//         isActive: this.isActive,
+//         category: this.category,
+//         subCategory: this.subCategory
 //     };
 // };
+
+// // Get populated category info
+// ProductSchema.methods.getCategoryInfo = async function() {
+//     const Category = mongoose.model('Category');
+//     const catInfo = await Category.findById(this.category).select('name slug');
+//     const subCatInfo = this.subCategory ? 
+//         await Category.findById(this.subCategory).select('name slug') : null;
+    
+//     return {
+//         category: catInfo,
+//         subCategory: subCatInfo
+//     };
+// };
+
+// // ========== JSON TRANSFORM ==========
 
 // // Ensure virtuals are included in JSON output
 // ProductSchema.set('toJSON', { 
@@ -396,7 +571,17 @@
 //     }
 // });
 
+// // ========== EXPORT ==========
+
 // export default mongoose.models.Product || mongoose.model("Product", ProductSchema);
+
+
+
+
+// above code is without saas
+
+
+
 
 
 // models/Product.js
@@ -405,12 +590,40 @@ import Counter from './Counter';
 
 const ProductSchema = new mongoose.Schema(
     {
-        // ✅ Custom numeric ID starting from 100
+        // ===== COMPANY CONTEXT =====
+        companyId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Company',
+            required: [true, "Company ID is required"],
+            index: true,
+        },
+        
+        // ===== CUSTOM ID (AUTO-GENERATED) =====
         customId: {
             type: Number,
-            unique: true,
+            required: true,
             index: true,
-            min: 1,
+        },
+        
+        // ===== AUDIT TRAIL FIELDS =====
+        createdBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: [true, "Created by user is required"]
+        },
+        updatedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+        },
+        deletedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+        },
+        
+        // ===== SOFT DELETE =====
+        deletedAt: {
+            type: Date,
+            index: true,
         },
         
         productName: { 
@@ -419,25 +632,23 @@ const ProductSchema = new mongoose.Schema(
             trim: true,
             index: true,           
         },
-        slug: { // URL-friendly name
+        slug: {
             type: String,
             required: true,
-            unique: true,
             lowercase: true,
-            index: true, // ✅ Added index here
+            index: true,
         },
-        sku: { // Stock Keeping Unit
+        sku: {
             type: String,
             required: [true, "SKU is required"],
-            unique: true,
             uppercase: true,
-            index: true, // ✅ Added index here
+            index: true,
         },
-        hsnCode: { // HSN code for GST
+        hsnCode: {
             type: String,
             required: [true, "HSN code is required"],
         },
-        gstRate: { // GST percentage
+        gstRate: {
             type: Number,
             required: [true, "GST rate is required"],
             default: 18,
@@ -445,7 +656,6 @@ const ProductSchema = new mongoose.Schema(
             max: 28,
         },
         
-        // ✅ Category as ObjectId reference to Category model
         category: { 
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Category',
@@ -453,15 +663,13 @@ const ProductSchema = new mongoose.Schema(
             index: true,
         },
         
-        // ✅ SubCategory as ObjectId reference to Category model
         subCategory: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Category',
-            required: false,
+            required: true,
             index: true,
         },
         
-        // ✅ Brand kept as string
         brand: {
             type: String,
             required: false,
@@ -469,26 +677,26 @@ const ProductSchema = new mongoose.Schema(
         },
         
         // Pricing
-        mrp: { // Maximum Retail Price
+        mrp: {
             type: Number, 
             required: [true, "MRP is required"],
             min: 0,
         },
-        discountPrice: { // Discounted price
+        discountPrice: {
             type: Number,
             required: [true, "Discount price is required"],
             min: 0,
         },
-        costPrice: { // Your cost price (for profit calculation)
+        costPrice: {
             type: Number,
             required: false,
             min: 0,
         },
-        margin: { // Profit margin
+        margin: {
             type: Number,
             default: 0,
         },
-        gstIncluded: { // Whether price includes GST
+        gstIncluded: {
             type: Boolean,
             default: true,
         },
@@ -515,7 +723,7 @@ const ProductSchema = new mongoose.Schema(
                 message: "At least one product image is required"
             }
         },
-        videoUrl: { // Product video
+        videoUrl: {
             type: String,
             required: false,
         },
@@ -582,12 +790,12 @@ const ProductSchema = new mongoose.Schema(
         isActive: {
             type: Boolean,
             default: true,
-            index: true, // ✅ Added index here
+            index: true,
         },
         isFeatured: {
             type: Boolean,
             default: false,
-            index: true, // ✅ Added index here
+            index: true,
         },
         isOnSale: {
             type: Boolean,
@@ -610,7 +818,7 @@ const ProductSchema = new mongoose.Schema(
         },
         
         // Shipping
-        weight: { // in kg
+        weight: {
             type: Number,
             required: false,
         },
@@ -629,20 +837,6 @@ const ProductSchema = new mongoose.Schema(
             type: Number,
             default: 10,
         },
-        
-        // Tracking
-        createdBy: {
-            type: String,
-            ref: 'User',
-            required: [true, "Created by user is required"]
-        },
-        updatedBy: {
-            type: String,
-            ref: 'User',
-            required: false,
-        },
-        
-        // Timestamps added automatically
     },
     { 
         timestamps: true,
@@ -651,37 +845,45 @@ const ProductSchema = new mongoose.Schema(
     }
 );
 
-// ========== VIRTUALS ==========
+// ========== COMPOUND INDEXES ==========
+ProductSchema.index({ companyId: 1, customId: 1 }, { unique: true });
+ProductSchema.index({ companyId: 1, sku: 1 }, { unique: true });
+ProductSchema.index({ companyId: 1, slug: 1 }, { unique: true });
+ProductSchema.index({ companyId: 1, productName: 1 });
+ProductSchema.index({ companyId: 1, category: 1, subCategory: 1 });
+ProductSchema.index({ companyId: 1, isActive: 1, isFeatured: 1 });
+ProductSchema.index({ companyId: 1, brand: 1 });
+ProductSchema.index({ companyId: 1, createdAt: -1 });
+ProductSchema.index({ companyId: 1, discountPrice: 1 });
+ProductSchema.index({ companyId: 1, stock: 1 });
+ProductSchema.index({ companyId: 1, deletedAt: 1 }, { sparse: true });
 
-// Virtual for formatted ID - ONLY NUMBERS (00100 format)
+// Text index for search
+ProductSchema.index({ 
+    companyId: 1, 
+    productName: 'text', 
+    description: 'text',
+    sku: 'text',
+    brand: 'text'
+}, {
+    weights: {
+        productName: 10,
+        sku: 8,
+        brand: 5,
+        description: 3
+    }
+});
+
+// ========== VIRTUALS ==========
 ProductSchema.virtual('formattedId').get(function() {
     if (!this.customId) return '00000';
-    // Pad with zeros to make it 5 digits
     return String(this.customId).padStart(5, '0');
 });
 
-// Virtual for category name (for convenience)
-ProductSchema.virtual('categoryName').get(async function() {
-    if (!this.category) return null;
-    const Category = mongoose.model('Category');
-    const cat = await Category.findById(this.category);
-    return cat ? cat.name : null;
-});
-
-// Virtual for subCategory name (for convenience)
-ProductSchema.virtual('subCategoryName').get(async function() {
-    if (!this.subCategory) return null;
-    const Category = mongoose.model('Category');
-    const subCat = await Category.findById(this.subCategory);
-    return subCat ? subCat.name : null;
-});
-
-// Virtual for in-stock status
 ProductSchema.virtual('inStock').get(function() {
     return this.stock > 0;
 });
 
-// Virtual for discount percentage
 ProductSchema.virtual('discountPercentage').get(function() {
     if (this.mrp && this.discountPrice) {
         return Math.round(((this.mrp - this.discountPrice) / this.mrp) * 100);
@@ -689,90 +891,277 @@ ProductSchema.virtual('discountPercentage').get(function() {
     return 0;
 });
 
-// ========== MIDDLEWARE ==========
-
-// Pre-save middleware with proper atomic counter increment
-ProductSchema.pre('save', async function(next) {
-    try {
-        // Generate slug from product name if not provided
-        if (!this.slug && this.productName) {
-            this.slug = this.productName
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/^-|-$/g, '');
+ProductSchema.virtual('auditInfo').get(function() {
+    return {
+        created: {
+            at: this.createdAt,
+            by: this.createdBy
+        },
+        updated: {
+            at: this.updatedAt,
+            by: this.updatedBy
+        },
+        deleted: {
+            at: this.deletedAt,
+            by: this.deletedBy
         }
+    };
+});
+
+ProductSchema.virtual('companyContext').get(function() {
+    return {
+        companyId: this.companyId,
+        isolated: true
+    };
+});
+
+// ========== PRE-SAVE MIDDLEWARE ==========
+// ========== PRE-SAVE MIDDLEWARE WITH ULTRA DEBUG ==========
+ProductSchema.pre('save', async function(next) {
+    console.log('\n🔴🔴🔴 ===== PRE-SAVE MIDDLEWARE STARTED ===== 🔴🔴🔴');
+    console.log('📦 PRODUCT:', this.productName || 'UNNAMED');
+    console.log('🆔 ID:', this._id);
+    console.log('🆕 isNew:', this.isNew);
+    console.log('🔢 has customId?', !!this.customId);
+    console.log('🔢 customId value:', this.customId);
+    console.log('🏢 companyId:', this.companyId?.toString());
+    console.log('📝 SKU:', this.sku);
+    console.log('🔤 CURRENT SLUG VALUE:', this.slug); // 👈 Added this
+    
+    try {
+        // ===== STEP 1: Validate companyId =====
+        console.log('\n🔍 STEP 1: Validating companyId');
+        if (!this.companyId) {
+            console.error('❌ ERROR: No companyId provided');
+            return next(new Error('Company ID is required for product creation'));
+        }
+        console.log('✅ companyId valid:', this.companyId.toString());
         
-        // Calculate margin
+       // ===== STEP 2: PRESERVE EXISTING SLUG - DO NOT MODIFY =====
+console.log('\n🔍 STEP 2: Checking slug');
+console.log('🔍 Current slug value in pre-save:', this.slug);
+
+// CRITICAL: If slug already exists from API route, KEEP IT
+if (this.slug) {
+    console.log('✅ Slug already exists, KEEPING:', this.slug);
+    // Do nothing - keep existing slug
+} 
+// Only generate if slug is completely missing
+else if (!this.slug && this.productName) {
+    console.log('⚠️ No slug found, generating from product name');
+    let baseSlug = this.productName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+    
+    // Check for existing slug
+    const existingProduct = await this.constructor.findOne({
+        companyId: this.companyId,
+        slug: baseSlug,
+        _id: { $ne: this._id }
+    });
+    
+    if (existingProduct) {
+        baseSlug = `${baseSlug}-${Date.now().toString().slice(-4)}`;
+    }
+    
+    this.slug = baseSlug;
+    console.log('✅ Generated fallback slug:', this.slug);
+}
+
+console.log('🔍 Slug value after STEP 2:', this.slug);
+        
+        // ===== STEP 3: Calculate margin =====
+        console.log('\n🔍 STEP 3: Calculating margin');
         if (this.costPrice && this.discountPrice && this.costPrice > 0) {
             this.margin = ((this.discountPrice - this.costPrice) / this.costPrice) * 100;
+            console.log('💰 Margin calculated:', this.margin.toFixed(2) + '%');
+        } else {
+            console.log('💰 Margin not calculated (missing costPrice or discountPrice)');
         }
         
-        // Auto-generate customId for new products (starts from 100)
+        // ===== STEP 4: CRITICAL - GENERATE customId =====
+        console.log('\n🔍 STEP 4: Checking customId generation');
+        console.log('   Condition: isNew =', this.isNew, '!customId =', !this.customId);
+        
         if (this.isNew && !this.customId) {
-            try {
-                console.log(`🔢 Generating custom ID for new product: ${this.productName}`);
-                
-                // Use Counter.incrementCounter method
-                const Counter = mongoose.model('Counter');
-                const nextSeq = await Counter.incrementCounter('productId');
-                
-                this.customId = nextSeq;
-                console.log(`✅ Generated product ID: ${this.formattedId} (${this.customId}) for: ${this.productName}`);
-            } catch (counterError) {
-                console.error('❌ Counter operation failed:', counterError);
-                
-                // Fallback: Generate timestamp-based ID
-                const timestamp = parseInt(Date.now().toString().slice(-6));
-                this.customId = timestamp;
-                console.log(`⚠️ Using fallback ID: ${this.formattedId} (${this.customId}) for: ${this.productName}`);
-            }
-        }
-        
-        // Validate that category exists in Category model
-        if (this.category) {
-            const Category = mongoose.model('Category');
-            const categoryExists = await Category.findById(this.category);
-            if (!categoryExists) {
-                return next(new Error(`Category with ID ${this.category} does not exist`));
-            }
-        }
-        
-        // Validate that subCategory exists in Category model (if provided)
-        if (this.subCategory) {
-            const Category = mongoose.model('Category');
-            const subCategoryExists = await Category.findById(this.subCategory);
-            if (!subCategoryExists) {
-                return next(new Error(`SubCategory with ID ${this.subCategory} does not exist`));
-            }
+            console.log('✅✅✅ CONDITION MET - GENERATING customId');
+            console.log(`🔢 Generating custom ID for company: ${this.companyId}`);
             
-            // Optional: Validate that subCategory belongs to the selected category
-            if (this.category) {
-                const subCat = await Category.findById(this.subCategory);
-                if (subCat && subCat.parentId && subCat.parentId.toString() !== this.category.toString()) {
-                    console.warn(`⚠️ Warning: SubCategory ${subCat.name} does not belong to selected category`);
+            try {
+                // Get Counter model
+                console.log('📞 Getting Counter model...');
+                const Counter = mongoose.model('Counter');
+                console.log('✅ Counter model retrieved');
+                
+                // Log the exact call being made
+                console.log('📞 Calling Counter.incrementCounter with:', { 
+                    name: 'productId', 
+                    companyId: this.companyId?.toString() 
+                });
+                
+                // THIS IS THE CRITICAL CALL
+                const nextSeq = await Counter.incrementCounter('productId', this.companyId);
+                
+                console.log('📞 Counter.incrementCounter RETURNED:', nextSeq);
+                console.log('📞 Return type:', typeof nextSeq);
+                
+                if (nextSeq === undefined || nextSeq === null) {
+                    throw new Error('Counter returned undefined');
                 }
+                
+                // Set the customId
+                this.customId = nextSeq;
+                console.log(`✅✅✅ customId SET to: ${this.customId}`);
+                console.log(`✅ Formatted ID will be: ${String(this.customId).padStart(5, '0')}`);
+                
+            } catch (counterError) {
+                console.error('❌❌❌ COUNTER ERROR DETECTED ❌❌❌');
+                console.error('Error name:', counterError.name);
+                console.error('Error message:', counterError.message);
+                console.error('Error stack:', counterError.stack);
+                
+                if (counterError.code) {
+                    console.error('MongoDB Error Code:', counterError.code);
+                }
+                
+                // Check if Counter collection exists
+                try {
+                    const conn = mongoose.connection;
+                    const collections = await conn.db.listCollections().toArray();
+                    console.log('📚 Available collections:', collections.map(c => c.name));
+                } catch (e) {
+                    console.error('Could not list collections:', e);
+                }
+                
+                // FALLBACK: Generate timestamp-based ID
+                console.log('⚠️⚠️⚠️ USING FALLBACK TIMESTAMP ID ⚠️⚠️⚠️');
+                const timestamp = parseInt(Date.now().toString().slice(-6));
+                console.log('⏰ Timestamp generated:', timestamp);
+                this.customId = timestamp;
+                console.log(`⚠️ FALLBACK customId set to: ${this.customId}`);
+            }
+        } else {
+            console.log('⏭️⏭️⏭️ SKIPPING customId generation:');
+            console.log('   - isNew:', this.isNew);
+            console.log('   - has customId:', !!this.customId);
+            if (this.customId) {
+                console.log('   - existing customId:', this.customId);
             }
         }
+        
+        // ===== STEP 5: FINAL CHECK =====
+        console.log('\n🔍 STEP 5: FINAL customId value BEFORE validation:', this.customId);
+        
+        if (!this.customId) {
+            console.error('❌❌❌ CRITICAL: customId is STILL undefined after generation!');
+            console.error('This should never happen - forcing fallback now');
+            this.customId = parseInt(Date.now().toString().slice(-6));
+            console.log('⚠️ FORCED fallback customId:', this.customId);
+        }
+        
+        // ===== STEP 6: Validate category =====
+        console.log('\n🔍 STEP 6: Validating category');
+        if (this.category) {
+            console.log('🔍 Checking category:', this.category.toString());
+            const Category = mongoose.model('Category');
+            const categoryExists = await Category.findOne({
+                _id: this.category,
+                companyId: this.companyId
+            });
+            if (!categoryExists) {
+                console.error('❌ Category not found in this company:', this.category);
+                return next(new Error(`Category with ID ${this.category} does not exist in this company`));
+            }
+            console.log('✅ Category validated');
+        } else {
+            console.log('⚠️ No category to validate');
+        }
+        
+        // ===== STEP 7: Validate subCategory =====
+        console.log('\n🔍 STEP 7: Validating subCategory');
+        if (this.subCategory) {
+            console.log('🔍 Checking subCategory:', this.subCategory.toString());
+            const Category = mongoose.model('Category');
+            const subCategoryExists = await Category.findOne({
+                _id: this.subCategory,
+                companyId: this.companyId
+            });
+            if (!subCategoryExists) {
+                console.error('❌ SubCategory not found in this company:', this.subCategory);
+                return next(new Error(`SubCategory with ID ${this.subCategory} does not exist in this company`));
+            }
+            console.log('✅ SubCategory validated');
+        } else {
+            console.log('⚠️ No subCategory to validate');
+        }
+        
+        // ===== STEP 8: Validate SKU uniqueness =====
+        console.log('\n🔍 STEP 8: Validating SKU uniqueness');
+        if (this.sku) {
+            console.log('🔍 Checking SKU:', this.sku);
+            const existingSku = await this.constructor.findOne({
+                companyId: this.companyId,
+                sku: this.sku,
+                _id: { $ne: this._id }
+            });
+            if (existingSku) {
+                console.error('❌ SKU already exists in this company:', this.sku);
+                return next(new Error(`SKU ${this.sku} already exists in this company`));
+            }
+            console.log('✅ SKU validated');
+        } else {
+            console.log('⚠️ No SKU to validate');
+        }
+        
+        // ===== STEP 9: FINAL SUMMARY =====
+        console.log('\n✅✅✅ ===== PRE-SAVE MIDDLEWARE COMPLETED SUCCESSFULLY ===== ✅✅✅');
+        console.log('📦 Product:', this.productName);
+        console.log('🔢 Final customId:', this.customId);
+        console.log('🔢 Formatted ID:', String(this.customId).padStart(5, '0'));
+        console.log('🏢 Company:', this.companyId);
+        console.log('🔤 FINAL SLUG VALUE:', this.slug); // 👈 Added this
+        console.log('📝 SKU:', this.sku);
+        console.log('🔴🔴🔴 ===== PRE-SAVE MIDDLEWARE ENDED ===== 🔴🔴🔴\n');
         
         next();
     } catch (error) {
-        console.error('❌ Error in product pre-save:', error);
+        console.error('\n❌❌❌ ===== PRE-SAVE MIDDLEWARE CATASTROPHIC ERROR ===== ❌❌❌');
+        console.error('Error:', error);
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        console.error('❌❌❌ ===== ERROR END ===== ❌❌❌\n');
         next(error);
     }
 });
 
-// Pre-update middleware to validate category/subcategory
+// ========== PRE-UPDATE MIDDLEWARE ==========
 ProductSchema.pre('findOneAndUpdate', async function(next) {
     try {
         const update = this.getUpdate();
+        const query = this.getQuery();
+        
+        let companyId = query.companyId;
+        if (!companyId && query._id) {
+            const product = await this.model.findOne(query).select('companyId');
+            companyId = product?.companyId;
+        }
+        
+        if (!companyId) {
+            return next(new Error('Company context required for product update'));
+        }
         
         // Check if category is being updated
         if (update.category || (update.$set && update.$set.category)) {
             const categoryId = update.category || update.$set.category;
             const Category = mongoose.model('Category');
-            const categoryExists = await Category.findById(categoryId);
+            const categoryExists = await Category.findOne({
+                _id: categoryId,
+                companyId: companyId
+            });
             if (!categoryExists) {
-                return next(new Error(`Category with ID ${categoryId} does not exist`));
+                return next(new Error(`Category with ID ${categoryId} does not exist in this company`));
             }
         }
         
@@ -781,11 +1170,31 @@ ProductSchema.pre('findOneAndUpdate', async function(next) {
             const subCategoryId = update.subCategory || update.$set.subCategory;
             if (subCategoryId) {
                 const Category = mongoose.model('Category');
-                const subCategoryExists = await Category.findById(subCategoryId);
+                const subCategoryExists = await Category.findOne({
+                    _id: subCategoryId,
+                    companyId: companyId
+                });
                 if (!subCategoryExists) {
-                    return next(new Error(`SubCategory with ID ${subCategoryId} does not exist`));
+                    return next(new Error(`SubCategory with ID ${subCategoryId} does not exist in this company`));
                 }
             }
+        }
+        
+        // Check if SKU is being updated
+        if (update.sku || (update.$set && update.$set.sku)) {
+            const sku = update.sku || update.$set.sku;
+            const existingSku = await this.model.findOne({
+                companyId: companyId,
+                sku: sku,
+                _id: { $ne: query._id }
+            });
+            if (existingSku) {
+                return next(new Error(`SKU ${sku} already exists in this company`));
+            }
+        }
+        
+        if (!query.companyId) {
+            this.setQuery({ ...query, companyId: companyId });
         }
         
         next();
@@ -795,54 +1204,24 @@ ProductSchema.pre('findOneAndUpdate', async function(next) {
     }
 });
 
-// Post-save middleware to log creation
+// ========== POST-SAVE MIDDLEWARE ==========
 ProductSchema.post('save', function(doc) {
-    console.log(`✅ Product saved: ${doc.productName} (ID: ${doc.formattedId})`);
+    console.log(`✅ Product saved: ${doc.productName} (ID: ${doc.formattedId}) for company: ${doc.companyId}`);
 });
 
-// ========== INDEXES ==========
-// ✅ FIXED: Removed duplicate indexes to eliminate warnings
-
-// Text index for search (special compound index)
-ProductSchema.index({ productName: 'text', description: 'text' });
-
-// Compound indexes for efficient queries
-ProductSchema.index({ category: 1, subCategory: 1 });
-ProductSchema.index({ isActive: 1, isFeatured: 1 });
-
-// Single field indexes (only where not already indexed in schema)
-ProductSchema.index({ discountPrice: 1 });
-ProductSchema.index({ createdAt: -1 });
-
-// Note: The following fields are already indexed in the schema:
-// - customId (index: true in schema)
-// - productName (index: true in schema)
-// - slug (index: true in schema)
-// - sku (index: true in schema)
-// - category (index: true in schema)
-// - subCategory (index: true in schema)
-// - brand (index: true in schema)
-// - isActive (index: true in schema)
-// - isFeatured (index: true in schema)
-
 // ========== STATIC METHODS ==========
-
-// Get product by formatted ID
-ProductSchema.statics.findByFormattedId = function(formattedId) {
-    // Convert "00123" back to number 123
+ProductSchema.statics.findByFormattedId = function(companyId, formattedId) {
     const customId = parseInt(formattedId, 10);
-    return this.findOne({ customId });
+    return this.findOne({ companyId, customId });
 };
 
-// Get product by customId number
-ProductSchema.statics.findByCustomId = function(customId) {
-    return this.findOne({ customId });
+ProductSchema.statics.findByCustomId = function(companyId, customId) {
+    return this.findOne({ companyId, customId });
 };
 
-// Get next available customId
-ProductSchema.statics.getNextCustomId = async function() {
+ProductSchema.statics.getNextCustomId = async function(companyId) {
     try {
-        const counter = await Counter.findOne({ name: 'productId' });
+        const counter = await Counter.findOne({ name: `productId_${companyId}` });
         const nextId = counter ? counter.seq + 1 : 100;
         return {
             number: nextId,
@@ -858,20 +1237,25 @@ ProductSchema.statics.getNextCustomId = async function() {
     }
 };
 
-// Get product stats
-ProductSchema.statics.getProductStats = async function() {
-    const total = await this.countDocuments();
-    const active = await this.countDocuments({ isActive: true });
+ProductSchema.statics.getProductStats = async function(companyId) {
+    const query = { companyId, deletedAt: null };
+    
+    const total = await this.countDocuments(query);
+    const active = await this.countDocuments({ ...query, isActive: true });
     const lowStock = await this.countDocuments({ 
+        ...query,
         stock: { $lte: 5 }, 
         stock: { $gt: 0 },
         isActive: true 
     });
-    const outOfStock = await this.countDocuments({ stock: 0, isActive: true });
+    const outOfStock = await this.countDocuments({ 
+        ...query,
+        stock: 0, 
+        isActive: true 
+    });
     
-    // Get category distribution
     const categoryDistribution = await this.aggregate([
-        { $match: { category: { $ne: null } } },
+        { $match: { companyId: new mongoose.Types.ObjectId(companyId), category: { $ne: null }, deletedAt: null } },
         { $group: {
             _id: '$category',
             count: { $sum: 1 }
@@ -900,45 +1284,82 @@ ProductSchema.statics.getProductStats = async function() {
     };
 };
 
-// Get products by category
-ProductSchema.statics.findByCategory = function(categoryId) {
-    return this.find({ category: categoryId })
+ProductSchema.statics.findByCategory = function(companyId, categoryId) {
+    return this.find({ companyId, category: categoryId, deletedAt: null })
         .populate('category', 'name slug')
         .populate('subCategory', 'name slug')
         .sort({ createdAt: -1 });
 };
 
-// Get products by subCategory
-ProductSchema.statics.findBySubCategory = function(subCategoryId) {
-    return this.find({ subCategory: subCategoryId })
+ProductSchema.statics.findBySubCategory = function(companyId, subCategoryId) {
+    return this.find({ companyId, subCategory: subCategoryId, deletedAt: null })
         .populate('category', 'name slug')
         .populate('subCategory', 'name slug')
         .sort({ createdAt: -1 });
+};
+
+ProductSchema.statics.findByCompany = function(companyId, filters = {}) {
+    const query = { companyId, deletedAt: null, ...filters };
+    return this.find(query)
+        .populate('category', 'name slug')
+        .populate('subCategory', 'name slug')
+        .sort({ createdAt: -1 });
+};
+
+ProductSchema.statics.search = function(companyId, searchTerm, filters = {}) {
+    const query = {
+        companyId,
+        deletedAt: null,
+        $text: { $search: searchTerm },
+        ...filters
+    };
+    
+    return this.find(query)
+        .populate('category', 'name slug')
+        .populate('subCategory', 'name slug')
+        .sort({ score: { $meta: 'textScore' } });
+};
+
+ProductSchema.statics.getLowStockProducts = function(companyId, threshold = null) {
+    const query = { 
+        companyId, 
+        deletedAt: null,
+        isActive: true,
+        $expr: { $lte: ['$stock', { $ifNull: [threshold, '$lowStockThreshold'] }] }
+    };
+    return this.find(query)
+        .populate('category', 'name slug')
+        .sort({ stock: 1 });
 };
 
 // ========== INSTANCE METHODS ==========
-
-// Get product info with formatted ID
 ProductSchema.methods.getInfo = function() {
     return {
         id: this._id,
         customId: this.customId,
-        formattedId: this.formattedId, // Returns "00123"
+        formattedId: this.formattedId,
         name: this.productName,
         price: this.discountPrice,
         stock: this.stock,
         isActive: this.isActive,
+        companyId: this.companyId,
         category: this.category,
         subCategory: this.subCategory
     };
 };
 
-// Get populated category info
 ProductSchema.methods.getCategoryInfo = async function() {
     const Category = mongoose.model('Category');
-    const catInfo = await Category.findById(this.category).select('name slug');
+    const catInfo = await Category.findOne({ 
+        _id: this.category,
+        companyId: this.companyId 
+    }).select('name slug');
+    
     const subCatInfo = this.subCategory ? 
-        await Category.findById(this.subCategory).select('name slug') : null;
+        await Category.findOne({ 
+            _id: this.subCategory,
+            companyId: this.companyId 
+        }).select('name slug') : null;
     
     return {
         category: catInfo,
@@ -946,16 +1367,37 @@ ProductSchema.methods.getCategoryInfo = async function() {
     };
 };
 
-// ========== JSON TRANSFORM ==========
+ProductSchema.methods.softDelete = async function(deletedBy) {
+    this.deletedAt = new Date();
+    this.deletedBy = deletedBy;
+    this.isActive = false;
+    return this.save();
+};
 
-// Ensure virtuals are included in JSON output
+ProductSchema.methods.restore = async function() {
+    this.deletedAt = null;
+    this.deletedBy = null;
+    return this.save();
+};
+
+ProductSchema.methods.belongsToCompany = function(companyId) {
+    return this.companyId && this.companyId.toString() === companyId.toString();
+};
+
+ProductSchema.methods.updateStock = async function(quantity, updatedBy, reason = '') {
+    this.stock += quantity;
+    this.updatedBy = updatedBy;
+    return this.save();
+};
+
+// ========== JSON TRANSFORM ==========
 ProductSchema.set('toJSON', { 
     virtuals: true,
     transform: function(doc, ret) {
         delete ret.__v;
         ret.id = ret._id;
-        // Ensure formattedId is included
         ret.formattedId = doc.formattedId;
+        if (ret.deletedAt) ret.isDeleted = true;
         return ret;
     }
 });
@@ -965,12 +1407,14 @@ ProductSchema.set('toObject', {
     transform: function(doc, ret) {
         delete ret.__v;
         ret.id = ret._id;
-        // Ensure formattedId is included
         ret.formattedId = doc.formattedId;
+        if (ret.deletedAt) ret.isDeleted = true;
         return ret;
     }
 });
 
 // ========== EXPORT ==========
+const Product = mongoose.models.Product || mongoose.model("Product", ProductSchema);
+console.log('✅ Product model loaded successfully');
 
-export default mongoose.models.Product || mongoose.model("Product", ProductSchema);
+export default Product

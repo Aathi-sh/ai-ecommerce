@@ -1,3 +1,5 @@
+
+
 // // app/api/users/route.js
 // import { connectDB } from '@/utils/db';
 // import User from '@/models/user';
@@ -10,6 +12,15 @@
 // export const fetchCache = 'force-no-store';
 // export const maxDuration = 30;
 // export const revalidate = 0;
+
+// // CORS headers for all responses
+// const corsHeaders = {
+//   'Access-Control-Allow-Origin': '*',
+//   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+//   'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Requested-With',
+//   'Access-Control-Allow-Credentials': 'true',
+//   'Access-Control-Max-Age': '86400',
+// };
 
 // // Authentication helper
 // const authenticate = async (headers) => {
@@ -43,7 +54,7 @@
 //   }
 // };
 
-// // Check if user is admin
+// // Authorization helpers
 // const isAdmin = (user) => user && user.role === 'admin';
 // const isSelf = (userId, authUser) => authUser && authUser._id.toString() === userId;
 
@@ -94,7 +105,10 @@
 //     if (!auth.success) {
 //       return NextResponse.json(
 //         { success: false, message: auth.error },
-//         { status: auth.status }
+//         { 
+//           status: auth.status,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -105,9 +119,9 @@
 //       return await handleGetSingleUser(id, authUser);
 //     }
     
-//     // Handle admins request
-//     if (searchParams.get('admins') === 'active') {
-//       return await handleGetActiveAdmins(authUser);
+//     // Handle users with active notifications request
+//     if (searchParams.get('notifications') === 'active') {
+//       return await handleGetUsersWithActiveNotifications(authUser);
 //     }
     
 //     // Handle list request
@@ -132,7 +146,10 @@
 //         message: 'Server error',
 //         error: process.env.NODE_ENV === 'development' ? error.message : undefined
 //       },
-//       { status: 500 }
+//       { 
+//         status: 500,
+//         headers: corsHeaders
+//       }
 //     );
 //   }
 // }
@@ -142,7 +159,10 @@
 //   if (!mongoose.Types.ObjectId.isValid(userId)) {
 //     return NextResponse.json(
 //       { success: false, message: 'Invalid user ID' },
-//       { status: 400 }
+//       { 
+//         status: 400,
+//         headers: corsHeaders
+//       }
 //     );
 //   }
   
@@ -150,7 +170,10 @@
 //   if (!isAdmin(authUser) && !isSelf(userId, authUser)) {
 //     return NextResponse.json(
 //       { success: false, message: 'Access denied' },
-//       { status: 403 }
+//       { 
+//         status: 403,
+//         headers: corsHeaders
+//       }
 //     );
 //   }
   
@@ -160,7 +183,10 @@
 //   if (!user || user.status === 'deleted') {
 //     return NextResponse.json(
 //       { success: false, message: 'User not found' },
-//       { status: 404 }
+//       { 
+//         status: 404,
+//         headers: corsHeaders
+//       }
 //     );
 //   }
   
@@ -171,32 +197,34 @@
 //     data: {
 //       user: formatUser(user, includeSensitive)
 //     }
+//   }, {
+//     headers: corsHeaders
 //   });
 // }
 
-// // Get active admins
-// async function handleGetActiveAdmins(authUser) {
+// // Get users with active notifications
+// async function handleGetUsersWithActiveNotifications(authUser) {
 //   if (!isAdmin(authUser)) {
 //     return NextResponse.json(
 //       { success: false, message: 'Admin access required' },
-//       { status: 403 }
+//       { 
+//         status: 403,
+//         headers: corsHeaders
+//       }
 //     );
 //   }
   
-//   const admins = await User.find({
-//     role: 'admin',
-//     status: 'active',
-//     'notificationSettings.pushNotifications.enabled': true
-//   })
-//   .select('fullName email phone notificationSettings adminPreferences')
-//   .lean();
+//   // Use the static method from User model
+//   const users = await User.findUsersWithNotificationsEnabled();
   
 //   return NextResponse.json({
 //     success: true,
 //     data: {
-//       admins: admins.map(admin => formatUser(admin)),
-//       count: admins.length
+//       users: users.map(user => formatUser(user)),
+//       count: users.length
 //     }
+//   }, {
+//     headers: corsHeaders
 //   });
 // }
 
@@ -225,13 +253,27 @@
 //     filter.status = status;
 //   }
   
-//   // Role filter - only admins can see all, regular users only see themselves
-//   if (role) {
-//     filter.role = role;
-//   } else if (!isAdmin(authUser)) {
-//     // Non-admins can only see themselves
-//     filter._id = authUser._id;
+//   // Role filter - all users are admins, but we can filter if needed
+//   if (role && role !== 'admin') {
+//     // If role is specified and not 'admin', return empty result
+//     return NextResponse.json({
+//       success: true,
+//       data: {
+//         users: [],
+//         pagination: {
+//           page: Math.max(1, page),
+//           limit: Math.min(100, Math.max(1, limit)),
+//           total: 0,
+//           pages: 0
+//         }
+//       }
+//     }, {
+//       headers: corsHeaders
+//     });
 //   }
+  
+//   // All active users can see all other users (since all are admins)
+//   // No need to restrict to self-view only
   
 //   // Search filter
 //   if (search) {
@@ -282,6 +324,8 @@
 //         pages: Math.ceil(total / limitNum)
 //       }
 //     }
+//   }, {
+//     headers: corsHeaders
 //   });
 // }
 
@@ -298,7 +342,10 @@
 //     if (!fullName || !email || !phone || !password) {
 //       return NextResponse.json(
 //         { success: false, message: 'Missing required fields' },
-//         { status: 400 }
+//         { 
+//           status: 400,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -307,7 +354,10 @@
 //     if (!emailRegex.test(email)) {
 //       return NextResponse.json(
 //         { success: false, message: 'Invalid email format' },
-//         { status: 400 }
+//         { 
+//           status: 400,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -316,7 +366,10 @@
 //     if (!phoneRegex.test(phone)) {
 //       return NextResponse.json(
 //         { success: false, message: 'Phone must be 10-15 digits' },
-//         { status: 400 }
+//         { 
+//           status: 400,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -324,7 +377,10 @@
 //     if (password.length < 6) {
 //       return NextResponse.json(
 //         { success: false, message: 'Password must be at least 6 characters' },
-//         { status: 400 }
+//         { 
+//           status: 400,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -332,7 +388,10 @@
 //     if (role !== 'admin') {
 //       return NextResponse.json(
 //         { success: false, message: 'Role must be admin' },
-//         { status: 400 }
+//         { 
+//           status: 400,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -341,7 +400,10 @@
 //     if (!auth.success || !isAdmin(auth.user)) {
 //       return NextResponse.json(
 //         { success: false, message: 'Admin privileges required to create users' },
-//         { status: 403 }
+//         { 
+//           status: 403,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -358,7 +420,10 @@
 //           message: 'User already exists',
 //           field
 //         },
-//         { status: 409 }
+//         { 
+//           status: 409,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -368,7 +433,7 @@
 //       email,
 //       phone,
 //       password,
-//       role: 'admin', // Only admin role allowed
+//       role: 'admin',
 //       status: 'active',
 //       notificationSettings: {
 //         pushNotifications: { enabled: true },
@@ -395,7 +460,10 @@
 //       data: {
 //         user: formatUser(user)
 //       }
-//     }, { status: 201 });
+//     }, { 
+//       status: 201,
+//       headers: corsHeaders
+//     });
     
 //   } catch (error) {
 //     console.error('POST /api/users error:', error);
@@ -403,7 +471,10 @@
 //     if (error.code === 11000) {
 //       return NextResponse.json(
 //         { success: false, message: 'Duplicate field value' },
-//         { status: 409 }
+//         { 
+//           status: 409,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -413,7 +484,10 @@
 //         message: 'Failed to create user',
 //         error: process.env.NODE_ENV === 'development' ? error.message : undefined
 //       },
-//       { status: 500 }
+//       { 
+//         status: 500,
+//         headers: corsHeaders
+//       }
 //     );
 //   }
 // }
@@ -430,14 +504,20 @@
 //     if (!id) {
 //       return NextResponse.json(
 //         { success: false, message: 'User ID is required' },
-//         { status: 400 }
+//         { 
+//           status: 400,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
 //     if (!mongoose.Types.ObjectId.isValid(id)) {
 //       return NextResponse.json(
 //         { success: false, message: 'Invalid user ID' },
-//         { status: 400 }
+//         { 
+//           status: 400,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -449,7 +529,10 @@
 //     if (!auth.success) {
 //       return NextResponse.json(
 //         { success: false, message: auth.error },
-//         { status: auth.status }
+//         { 
+//           status: auth.status,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -460,7 +543,10 @@
 //     if (!canUpdate) {
 //       return NextResponse.json(
 //         { success: false, message: 'Access denied' },
-//         { status: 403 }
+//         { 
+//           status: 403,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -474,7 +560,10 @@
 //     if (!user || user.status === 'deleted') {
 //       return NextResponse.json(
 //         { success: false, message: 'User not found' },
-//         { status: 404 }
+//         { 
+//           status: 404,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -488,7 +577,10 @@
 //       if (existingUser) {
 //         return NextResponse.json(
 //           { success: false, message: 'Email or phone already in use' },
-//           { status: 409 }
+//           { 
+//             status: 409,
+//             headers: corsHeaders
+//           }
 //         );
 //       }
 //     }
@@ -520,6 +612,8 @@
 //       data: {
 //         user: formatUser(user, true)
 //       }
+//     }, {
+//       headers: corsHeaders
 //     });
     
 //   } catch (error) {
@@ -528,7 +622,10 @@
 //     if (error.code === 11000) {
 //       return NextResponse.json(
 //         { success: false, message: 'Duplicate field value' },
-//         { status: 409 }
+//         { 
+//           status: 409,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -538,7 +635,10 @@
 //         message: 'Failed to update user',
 //         error: process.env.NODE_ENV === 'development' ? error.message : undefined
 //       },
-//       { status: 500 }
+//       { 
+//         status: 500,
+//         headers: corsHeaders
+//       }
 //     );
 //   }
 // }
@@ -555,14 +655,20 @@
 //     if (!id) {
 //       return NextResponse.json(
 //         { success: false, message: 'User ID is required' },
-//         { status: 400 }
+//         { 
+//           status: 400,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
 //     if (!mongoose.Types.ObjectId.isValid(id)) {
 //       return NextResponse.json(
 //         { success: false, message: 'Invalid user ID' },
-//         { status: 400 }
+//         { 
+//           status: 400,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -575,7 +681,10 @@
 //     if (!auth.success) {
 //       return NextResponse.json(
 //         { success: false, message: auth.error },
-//         { status: auth.status }
+//         { 
+//           status: auth.status,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -586,7 +695,10 @@
 //     if (!canDelete) {
 //       return NextResponse.json(
 //         { success: false, message: 'Access denied' },
-//         { status: 403 }
+//         { 
+//           status: 403,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -594,7 +706,10 @@
 //     if (permanent && !isAdmin(authUser)) {
 //       return NextResponse.json(
 //         { success: false, message: 'Admin privileges required for permanent deletion' },
-//         { status: 403 }
+//         { 
+//           status: 403,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -602,7 +717,10 @@
 //     if (!user) {
 //       return NextResponse.json(
 //         { success: false, message: 'User not found' },
-//         { status: 404 }
+//         { 
+//           status: 404,
+//           headers: corsHeaders
+//         }
 //       );
 //     }
     
@@ -624,6 +742,8 @@
 //     return NextResponse.json({
 //       success: true,
 //       message
+//     }, {
+//       headers: corsHeaders
 //     });
     
 //   } catch (error) {
@@ -634,7 +754,10 @@
 //         message: 'Failed to delete user',
 //         error: process.env.NODE_ENV === 'development' ? error.message : undefined
 //       },
-//       { status: 500 }
+//       { 
+//         status: 500,
+//         headers: corsHeaders
+//       }
 //     );
 //   }
 // }
@@ -643,38 +766,56 @@
 // export async function OPTIONS() {
 //   return new NextResponse(null, {
 //     status: 200,
-//     headers: {
-//       'Access-Control-Allow-Origin': '*',
-//       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-//       'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-//       'Access-Control-Allow-Credentials': 'true',
-//     },
+//     headers: corsHeaders
 //   });
 // }
+
+
+
+// above code is without saas
+
+
+
+
 
 // app/api/users/route.js
 import { connectDB } from '@/utils/db';
 import User from '@/models/user';
+import Company from '@/models/Company';
 import { verifyToken } from '@/utils/jwt';
 import mongoose from 'mongoose';
 import { NextResponse } from 'next/server';
 
-// App Router Config
+// ========== CONFIGURATION ==========
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const maxDuration = 30;
 export const revalidate = 0;
 
-// CORS headers for all responses
+// ========== CONSTANTS ==========
+const USER_ROLES = {
+  ADMIN: 'admin',
+  MANAGER: 'manager',
+  USER: 'user'
+};
+
+const ADMIN_TYPES = {
+  SUPER: 'super',
+  COMPANY: 'company'
+};
+
+const VALID_STATUSES = ['active', 'inactive', 'suspended', 'deleted', 'pending', 'offline'];
+
+// ========== CORS HEADERS ==========
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Requested-With',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Requested-With, X-Company-ID',
   'Access-Control-Allow-Credentials': 'true',
   'Access-Control-Max-Age': '86400',
 };
 
-// Authentication helper
+// ========== AUTHENTICATION HELPER ==========
 const authenticate = async (headers) => {
   try {
     const authHeader = headers.get('authorization');
@@ -690,7 +831,7 @@ const authenticate = async (headers) => {
     }
     
     const user = await User.findById(decoded.userId || decoded.id)
-      .select('_id role status fullName email');
+      .select('_id role adminType companyId status fullName email');
     
     if (!user) {
       return { success: false, error: 'User not found', status: 401 };
@@ -702,16 +843,30 @@ const authenticate = async (headers) => {
     
     return { success: true, user };
   } catch (error) {
+    console.error('Authentication error:', error);
     return { success: false, error: 'Authentication failed', status: 401 };
   }
 };
 
-// Authorization helpers
-const isAdmin = (user) => user && user.role === 'admin';
+// ========== AUTHORIZATION HELPERS ==========
+const isSuperAdmin = (user) => user && user.role === USER_ROLES.ADMIN && user.adminType === ADMIN_TYPES.SUPER;
+const isCompanyAdmin = (user) => user && user.role === USER_ROLES.ADMIN && user.adminType === ADMIN_TYPES.COMPANY;
+const isAdmin = (user) => user && user.role === USER_ROLES.ADMIN;
+const isManager = (user) => user && user.role === USER_ROLES.MANAGER;
 const isSelf = (userId, authUser) => authUser && authUser._id.toString() === userId;
 
-// Response formatter
-const formatUser = (userData, includeSensitive = false) => {
+// ========== COMPANY ACCESS CHECK ==========
+const canAccessCompany = (user, targetCompanyId) => {
+  if (!targetCompanyId) return false;
+  if (isSuperAdmin(user)) return true; // Super admin can access any company
+  if (isCompanyAdmin(user)) {
+    return user.companyId && user.companyId.toString() === targetCompanyId.toString();
+  }
+  return false; // Non-admins can't access company data
+};
+
+// ========== RESPONSE FORMATTER ==========
+const formatUser = (userData, includeSensitive = false, authUser = null) => {
   const user = userData.toObject ? userData.toObject() : userData;
   
   // Always remove sensitive fields
@@ -719,44 +874,157 @@ const formatUser = (userData, includeSensitive = false) => {
   delete user.resetPasswordToken;
   delete user.resetPasswordExpires;
   delete user.verificationToken;
+  delete user.security?.failedLoginAttempts;
   
   // Conditionally remove sensitive info
   if (!includeSensitive) {
-    delete user.activeSessions;
     delete user.lastLoginIp;
+    delete user.security?.loginHistory;
   }
   
   // Add computed fields
-  user.isAdmin = user.role === 'admin';
+  user.isAdmin = user.role === USER_ROLES.ADMIN;
+  user.isSuperAdmin = user.role === USER_ROLES.ADMIN && user.adminType === ADMIN_TYPES.SUPER;
+  user.isCompanyAdmin = user.role === USER_ROLES.ADMIN && user.adminType === ADMIN_TYPES.COMPANY;
+  user.isManager = user.role === USER_ROLES.MANAGER;
   user.notificationsEnabled = user.notificationSettings?.pushNotifications?.enabled || false;
-  user.activeSessionsCount = user.activeSessions?.filter(s => s.status === 'active').length || 0;
+  
+  // Add company context for super admins
+  if (authUser && isSuperAdmin(authUser)) {
+    user.companyAccess = 'all';
+  }
   
   return user;
 };
 
-// ==================== GET HANDLER ====================
+// ========== VALIDATION FUNCTIONS ==========
+const validateEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const validatePhone = (phone) => {
+  const phoneRegex = /^\d{10,15}$/;
+  return phoneRegex.test(phone);
+};
+
+const validatePassword = (password) => {
+  return password.length >= 6;
+};
+
+const validateObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id);
+};
+
+// ========== BUILD USER FILTER ==========
+const buildUserFilter = (params, authUser) => {
+  const {
+    search,
+    role,
+    status,
+    startDate,
+    endDate,
+    companyId
+  } = params;
+
+  const filter = {};
+
+  // Company-based filtering (CRITICAL for multi-tenancy)
+  if (isSuperAdmin(authUser)) {
+    // Super admin can see all companies, optionally filtered by companyId
+    if (companyId && validateObjectId(companyId)) {
+      filter.companyId = new mongoose.Types.ObjectId(companyId);
+    }
+  } else if (isCompanyAdmin(authUser)) {
+    // Company admin can only see their own company's users
+    filter.companyId = authUser.companyId;
+  } else if (isManager(authUser)) {
+    // Managers can see users in their company
+    filter.companyId = authUser.companyId;
+    filter.role = { $in: [USER_ROLES.USER] }; // Managers can only see regular users
+  } else {
+    // Regular users can only see themselves
+    filter._id = authUser._id;
+  }
+
+  // Status filter
+  if (status) {
+    if (status === 'all') {
+      filter.status = { $ne: 'deleted' };
+    } else if (VALID_STATUSES.includes(status)) {
+      filter.status = status;
+    }
+  } else {
+    filter.status = { $ne: 'deleted' }; // Default: exclude deleted
+  }
+
+  // Role filter (with proper permissions)
+  if (role) {
+    if (isSuperAdmin(authUser)) {
+      // Super admin can filter by any role
+      filter.role = role;
+    } else if (isCompanyAdmin(authUser)) {
+      // Company admin can filter by admin, manager, user
+      if ([USER_ROLES.ADMIN, USER_ROLES.MANAGER, USER_ROLES.USER].includes(role)) {
+        filter.role = role;
+      }
+    } else if (isManager(authUser)) {
+      // Manager can only filter by user
+      if (role === USER_ROLES.USER) {
+        filter.role = role;
+      }
+    }
+  }
+
+  // Search filter
+  if (search) {
+    const searchRegex = new RegExp(search, 'i');
+    filter.$or = [
+      { fullName: searchRegex },
+      { email: searchRegex },
+      { phone: searchRegex }
+    ];
+  }
+
+  // Date range filter
+  if (startDate || endDate) {
+    filter.createdAt = {};
+    if (startDate) filter.createdAt.$gte = new Date(startDate);
+    if (endDate) filter.createdAt.$lte = new Date(endDate);
+  }
+
+  return filter;
+};
+
+// ========== GET HANDLER ==========
 export async function GET(request) {
   try {
     await connectDB();
     
-    // Get query parameters
+    // Parse query parameters
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const role = searchParams.get('role');
     const search = searchParams.get('search') || '';
-    const status = searchParams.get('status') || 'active';
+    const status = searchParams.get('status');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
     const sortBy = searchParams.get('sortBy') || 'createdAt';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+    const companyId = searchParams.get('companyId');
+    const notifications = searchParams.get('notifications');
     
     // Authenticate
     const auth = await authenticate(request.headers);
     if (!auth.success) {
       return NextResponse.json(
-        { success: false, message: auth.error },
+        { 
+          success: false, 
+          message: auth.error,
+          code: 'AUTH_FAILED'
+        },
         { 
           status: auth.status,
           headers: corsHeaders
@@ -772,8 +1040,26 @@ export async function GET(request) {
     }
     
     // Handle users with active notifications request
-    if (searchParams.get('notifications') === 'active') {
-      return await handleGetUsersWithActiveNotifications(authUser);
+    if (notifications === 'active') {
+      return await handleGetUsersWithActiveNotifications(authUser, companyId);
+    }
+    
+    // Handle company users request
+    if (companyId && !isSuperAdmin(authUser)) {
+      // Non-super admins can only access their own company
+      if (!canAccessCompany(authUser, companyId)) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: 'Access denied to this company\'s data',
+            code: 'COMPANY_ACCESS_DENIED'
+          },
+          { 
+            status: 403,
+            headers: corsHeaders
+          }
+        );
+      }
     }
     
     // Handle list request
@@ -787,7 +1073,8 @@ export async function GET(request) {
       sortBy,
       sortOrder,
       startDate,
-      endDate
+      endDate,
+      companyId
     });
     
   } catch (error) {
@@ -796,7 +1083,8 @@ export async function GET(request) {
       { 
         success: false, 
         message: 'Server error',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        code: 'SERVER_ERROR',
+        ...(process.env.NODE_ENV === 'development' && { debug: error.message })
       },
       { 
         status: 500,
@@ -806,11 +1094,16 @@ export async function GET(request) {
   }
 }
 
-// Get single user
+// ========== GET SINGLE USER ==========
 async function handleGetSingleUser(userId, authUser) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
+  // Validate ObjectId
+  if (!validateObjectId(userId)) {
     return NextResponse.json(
-      { success: false, message: 'Invalid user ID' },
+      { 
+        success: false, 
+        message: 'Invalid user ID',
+        code: 'INVALID_ID'
+      },
       { 
         status: 400,
         headers: corsHeaders
@@ -818,10 +1111,17 @@ async function handleGetSingleUser(userId, authUser) {
     );
   }
   
-  // Check permissions - only admins or self can view
-  if (!isAdmin(authUser) && !isSelf(userId, authUser)) {
+  // Check permissions
+  const isOwnProfile = isSelf(userId, authUser);
+  const canViewOther = isAdmin(authUser) || isManager(authUser);
+  
+  if (!isOwnProfile && !canViewOther) {
     return NextResponse.json(
-      { success: false, message: 'Access denied' },
+      { 
+        success: false, 
+        message: 'Access denied',
+        code: 'ACCESS_DENIED'
+      },
       { 
         status: 403,
         headers: corsHeaders
@@ -829,12 +1129,17 @@ async function handleGetSingleUser(userId, authUser) {
     );
   }
   
+  // Find user
   const user = await User.findById(userId)
-    .select('-password -resetPasswordToken -verificationToken');
+    .select('-password -resetPasswordToken -verificationToken -security.failedLoginAttempts');
   
   if (!user || user.status === 'deleted') {
     return NextResponse.json(
-      { success: false, message: 'User not found' },
+      { 
+        success: false, 
+        message: 'User not found',
+        code: 'USER_NOT_FOUND'
+      },
       { 
         status: 404,
         headers: corsHeaders
@@ -842,23 +1147,55 @@ async function handleGetSingleUser(userId, authUser) {
     );
   }
   
-  const includeSensitive = isAdmin(authUser) || isSelf(userId, authUser);
+  // Check company access for non-super-admins
+  if (!isSuperAdmin(authUser) && !isOwnProfile) {
+    if (!canAccessCompany(authUser, user.companyId)) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: 'Access denied to this user\'s data',
+          code: 'COMPANY_ACCESS_DENIED'
+        },
+        { 
+          status: 403,
+          headers: corsHeaders
+        }
+      );
+    }
+  }
+  
+  // Determine sensitivity level
+  const includeSensitive = isAdmin(authUser) || isOwnProfile;
+  
+  // Fetch company details if user has companyId
+  let companyDetails = null;
+  if (user.companyId) {
+    companyDetails = await Company.findById(user.companyId)
+      .select('companyName status subscription')
+      .lean();
+  }
   
   return NextResponse.json({
     success: true,
     data: {
-      user: formatUser(user, includeSensitive)
+      user: formatUser(user, includeSensitive, authUser),
+      ...(companyDetails && { company: companyDetails })
     }
   }, {
     headers: corsHeaders
   });
 }
 
-// Get users with active notifications
-async function handleGetUsersWithActiveNotifications(authUser) {
+// ========== GET USERS WITH ACTIVE NOTIFICATIONS ==========
+async function handleGetUsersWithActiveNotifications(authUser, companyId) {
+  // Only admins can access notification settings
   if (!isAdmin(authUser)) {
     return NextResponse.json(
-      { success: false, message: 'Admin access required' },
+      { 
+        success: false, 
+        message: 'Admin access required',
+        code: 'ADMIN_REQUIRED'
+      },
       { 
         status: 403,
         headers: corsHeaders
@@ -866,13 +1203,37 @@ async function handleGetUsersWithActiveNotifications(authUser) {
     );
   }
   
-  // Use the static method from User model
-  const users = await User.findUsersWithNotificationsEnabled();
+  let query = {
+    role: USER_ROLES.ADMIN,
+    status: 'active',
+    isVerified: true,
+    'notificationSettings.pushNotifications.enabled': true,
+  };
+  
+  // Filter by company if specified and user has access
+  if (companyId && validateObjectId(companyId)) {
+    if (isSuperAdmin(authUser) || (isCompanyAdmin(authUser) && authUser.companyId.toString() === companyId)) {
+      query.$or = [
+        { adminType: ADMIN_TYPES.SUPER },
+        { companyId: new mongoose.Types.ObjectId(companyId), adminType: ADMIN_TYPES.COMPANY }
+      ];
+    }
+  } else if (isCompanyAdmin(authUser)) {
+    // Company admin sees their company admins + all super admins
+    query.$or = [
+      { adminType: ADMIN_TYPES.SUPER },
+      { companyId: authUser.companyId, adminType: ADMIN_TYPES.COMPANY }
+    ];
+  }
+  
+  const users = await User.find(query)
+    .select('_id email fullName companyId adminType notificationSettings adminPreferences')
+    .lean();
   
   return NextResponse.json({
     success: true,
     data: {
-      users: users.map(user => formatUser(user)),
+      users: users.map(user => formatUser(user, false, authUser)),
       count: users.length
     }
   }, {
@@ -880,7 +1241,7 @@ async function handleGetUsersWithActiveNotifications(authUser) {
   });
 }
 
-// Get users list with filters
+// ========== GET USERS LIST ==========
 async function handleGetUsersList(params) {
   const {
     authUser,
@@ -892,78 +1253,45 @@ async function handleGetUsersList(params) {
     sortBy,
     sortOrder,
     startDate,
-    endDate
+    endDate,
+    companyId
   } = params;
   
-  // Build query
-  const filter = {};
-  
-  // Status filter
-  if (status === 'all') {
-    filter.status = { $ne: 'deleted' };
-  } else {
-    filter.status = status;
-  }
-  
-  // Role filter - all users are admins, but we can filter if needed
-  if (role && role !== 'admin') {
-    // If role is specified and not 'admin', return empty result
-    return NextResponse.json({
-      success: true,
-      data: {
-        users: [],
-        pagination: {
-          page: Math.max(1, page),
-          limit: Math.min(100, Math.max(1, limit)),
-          total: 0,
-          pages: 0
-        }
-      }
-    }, {
-      headers: corsHeaders
-    });
-  }
-  
-  // All active users can see all other users (since all are admins)
-  // No need to restrict to self-view only
-  
-  // Search filter
-  if (search) {
-    const searchRegex = new RegExp(search, 'i');
-    filter.$or = [
-      { fullName: searchRegex },
-      { email: searchRegex },
-      { phone: searchRegex }
-    ];
-  }
-  
-  // Date range filter
-  if (startDate || endDate) {
-    filter.createdAt = {};
-    if (startDate) filter.createdAt.$gte = new Date(startDate);
-    if (endDate) filter.createdAt.$lte = new Date(endDate);
-  }
+  // Build filter with company context
+  const filter = buildUserFilter({
+    search,
+    role,
+    status,
+    startDate,
+    endDate,
+    companyId
+  }, authUser);
   
   // Pagination
   const pageNum = Math.max(1, page);
   const limitNum = Math.min(100, Math.max(1, limit));
   const skip = (pageNum - 1) * limitNum;
+  
+  // Sorting
   const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
   
   // Execute queries
-  const [users, total] = await Promise.all([
+  const [users, total, companyStats] = await Promise.all([
     User.find(filter)
-      .select('-password -resetPasswordToken -verificationToken')
+      .select('-password -resetPasswordToken -verificationToken -security.failedLoginAttempts')
       .sort(sort)
       .skip(skip)
       .limit(limitNum)
       .lean(),
-    User.countDocuments(filter)
+    User.countDocuments(filter),
+    isAdmin(authUser) ? getUserStats(filter) : null
   ]);
   
-  // Format response
+  // Determine sensitivity level
   const includeSensitive = isAdmin(authUser);
-  const formattedUsers = users.map(user => formatUser(user, includeSensitive));
+  
+  // Format users
+  const formattedUsers = users.map(user => formatUser(user, includeSensitive, authUser));
   
   return NextResponse.json({
     success: true,
@@ -973,27 +1301,75 @@ async function handleGetUsersList(params) {
         page: pageNum,
         limit: limitNum,
         total,
-        pages: Math.ceil(total / limitNum)
-      }
+        pages: Math.ceil(total / limitNum),
+        hasNext: pageNum < Math.ceil(total / limitNum),
+        hasPrev: pageNum > 1
+      },
+      ...(companyStats && { stats: companyStats })
     }
   }, {
     headers: corsHeaders
   });
 }
 
-// ==================== POST HANDLER ====================
+// ========== GET USER STATS ==========
+async function getUserStats(filter) {
+  const stats = await User.aggregate([
+    { $match: filter },
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 }
+      }
+    }
+  ]);
+  
+  const result = {
+    total: stats.reduce((acc, curr) => acc + curr.count, 0),
+    byStatus: {}
+  };
+  
+  stats.forEach(stat => {
+    result.byStatus[stat._id] = stat.count;
+  });
+  
+  return result;
+}
+
+// ========== POST HANDLER ==========
 export async function POST(request) {
   try {
     await connectDB();
     
     // Parse request body
     const body = await request.json();
-    const { fullName, email, phone, password, role = 'admin' } = body;
+    const { 
+      fullName, 
+      email, 
+      phone, 
+      password, 
+      role = USER_ROLES.ADMIN,
+      adminType = ADMIN_TYPES.COMPANY,
+      companyId,
+      notificationSettings,
+      adminPreferences
+    } = body;
     
     // Validate required fields
-    if (!fullName || !email || !phone || !password) {
+    const missingFields = [];
+    if (!fullName) missingFields.push('fullName');
+    if (!email) missingFields.push('email');
+    if (!phone) missingFields.push('phone');
+    if (!password) missingFields.push('password');
+    
+    if (missingFields.length > 0) {
       return NextResponse.json(
-        { success: false, message: 'Missing required fields' },
+        { 
+          success: false, 
+          message: 'Missing required fields',
+          code: 'MISSING_FIELDS',
+          fields: missingFields
+        },
         { 
           status: 400,
           headers: corsHeaders
@@ -1002,10 +1378,13 @@ export async function POST(request) {
     }
     
     // Validate email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!validateEmail(email)) {
       return NextResponse.json(
-        { success: false, message: 'Invalid email format' },
+        { 
+          success: false, 
+          message: 'Invalid email format',
+          code: 'INVALID_EMAIL'
+        },
         { 
           status: 400,
           headers: corsHeaders
@@ -1014,10 +1393,13 @@ export async function POST(request) {
     }
     
     // Validate phone
-    const phoneRegex = /^\d{10,15}$/;
-    if (!phoneRegex.test(phone)) {
+    if (!validatePhone(phone)) {
       return NextResponse.json(
-        { success: false, message: 'Phone must be 10-15 digits' },
+        { 
+          success: false, 
+          message: 'Phone must be 10-15 digits',
+          code: 'INVALID_PHONE'
+        },
         { 
           status: 400,
           headers: corsHeaders
@@ -1026,9 +1408,13 @@ export async function POST(request) {
     }
     
     // Validate password
-    if (password.length < 6) {
+    if (!validatePassword(password)) {
       return NextResponse.json(
-        { success: false, message: 'Password must be at least 6 characters' },
+        { 
+          success: false, 
+          message: 'Password must be at least 6 characters',
+          code: 'INVALID_PASSWORD'
+        },
         { 
           status: 400,
           headers: corsHeaders
@@ -1036,27 +1422,133 @@ export async function POST(request) {
       );
     }
     
-    // Validate role - only admin is allowed
-    if (role !== 'admin') {
-      return NextResponse.json(
-        { success: false, message: 'Role must be admin' },
-        { 
-          status: 400,
-          headers: corsHeaders
-        }
-      );
-    }
-    
-    // Check if creating admin (requires existing admin privileges)
+    // Authenticate
     const auth = await authenticate(request.headers);
-    if (!auth.success || !isAdmin(auth.user)) {
+    if (!auth.success) {
       return NextResponse.json(
-        { success: false, message: 'Admin privileges required to create users' },
         { 
-          status: 403,
+          success: false, 
+          message: auth.error,
+          code: 'AUTH_FAILED'
+        },
+        { 
+          status: auth.status,
           headers: corsHeaders
         }
       );
+    }
+    
+    const { user: authUser } = auth;
+    
+    // Validate role permissions
+    if (role === USER_ROLES.ADMIN) {
+      // Only admins can create other admins
+      if (!isAdmin(authUser)) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: 'Admin privileges required to create admin users',
+            code: 'ADMIN_REQUIRED'
+          },
+          { 
+            status: 403,
+            headers: corsHeaders
+          }
+        );
+      }
+      
+      // Validate adminType
+      if (adminType === ADMIN_TYPES.SUPER) {
+        // Only super admin can create other super admins
+        if (!isSuperAdmin(authUser)) {
+          return NextResponse.json(
+            { 
+              success: false, 
+              message: 'Super admin privileges required to create super admin',
+              code: 'SUPER_ADMIN_REQUIRED'
+            },
+            { 
+              status: 403,
+              headers: corsHeaders
+            }
+          );
+        }
+      }
+    }
+    
+    // Validate companyId
+    let targetCompanyId = companyId;
+    
+    if (role === USER_ROLES.ADMIN && adminType === ADMIN_TYPES.COMPANY) {
+      // Company admin must have companyId
+      if (!targetCompanyId) {
+        if (isCompanyAdmin(authUser)) {
+          // If company admin is creating another admin, use their company
+          targetCompanyId = authUser.companyId;
+        } else {
+          return NextResponse.json(
+            { 
+              success: false, 
+              message: 'companyId is required for company admin',
+              code: 'COMPANY_ID_REQUIRED'
+            },
+            { 
+              status: 400,
+              headers: corsHeaders
+            }
+          );
+        }
+      }
+      
+      // Verify company exists
+      const company = await Company.findById(targetCompanyId);
+      if (!company) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: 'Company not found',
+            code: 'COMPANY_NOT_FOUND'
+          },
+          { 
+            status: 404,
+            headers: corsHeaders
+          }
+        );
+      }
+      
+      // Check if user has access to this company
+      if (!canAccessCompany(authUser, targetCompanyId)) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: 'Access denied to this company',
+            code: 'COMPANY_ACCESS_DENIED'
+          },
+          { 
+            status: 403,
+            headers: corsHeaders
+          }
+        );
+      }
+    } else if (role === USER_ROLES.MANAGER || role === USER_ROLES.USER) {
+      // Managers and users must be created under a company
+      if (!targetCompanyId) {
+        if (isCompanyAdmin(authUser) || isManager(authUser)) {
+          targetCompanyId = authUser.companyId;
+        } else {
+          return NextResponse.json(
+            { 
+              success: false, 
+              message: 'companyId is required for non-admin users',
+              code: 'COMPANY_ID_REQUIRED'
+            },
+            { 
+              status: 400,
+              headers: corsHeaders
+            }
+          );
+        }
+      }
     }
     
     // Check for existing user
@@ -1069,7 +1561,8 @@ export async function POST(request) {
       return NextResponse.json(
         { 
           success: false, 
-          message: 'User already exists',
+          message: `${field} already in use`,
+          code: 'DUPLICATE_FIELD',
           field
         },
         { 
@@ -1080,14 +1573,16 @@ export async function POST(request) {
     }
     
     // Create user
-    const user = await User.create({
+    const userData = {
       fullName,
       email,
       phone,
       password,
-      role: 'admin',
+      role,
       status: 'active',
-      notificationSettings: {
+      isVerified: true,
+      createdBy: authUser._id,
+      notificationSettings: notificationSettings || {
         pushNotifications: { enabled: true },
         notificationTypes: {
           newOrders: { enabled: true, priority: 'high', sound: true },
@@ -1097,20 +1592,34 @@ export async function POST(request) {
           orderUpdates: { enabled: true, priority: 'normal', sound: true }
         }
       },
-      adminPreferences: {
+      adminPreferences: adminPreferences || {
         dashboardLayout: 'default',
         defaultView: 'orders',
         refreshInterval: 30000,
         theme: 'light'
-      },
-      createdBy: auth.user._id
-    });
+      }
+    };
+    
+    // Add adminType for admin users
+    if (role === USER_ROLES.ADMIN) {
+      userData.adminType = adminType || ADMIN_TYPES.COMPANY;
+    }
+    
+    // Add companyId for non-super-admin users
+    if (targetCompanyId && !(role === USER_ROLES.ADMIN && userData.adminType === ADMIN_TYPES.SUPER)) {
+      userData.companyId = targetCompanyId;
+    }
+    
+    const user = await User.create(userData);
+    
+    // Log activity for audit
+    console.log(`User created: ${user._id} by ${authUser._id} (Role: ${role}, Company: ${targetCompanyId || 'N/A'})`);
     
     return NextResponse.json({
       success: true,
-      message: 'Admin user created successfully',
+      message: 'User created successfully',
       data: {
-        user: formatUser(user)
+        user: formatUser(user, true, authUser)
       }
     }, { 
       status: 201,
@@ -1120,11 +1629,35 @@ export async function POST(request) {
   } catch (error) {
     console.error('POST /api/users error:', error);
     
+    // Handle duplicate key error
     if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
       return NextResponse.json(
-        { success: false, message: 'Duplicate field value' },
+        { 
+          success: false, 
+          message: `${field} already in use`,
+          code: 'DUPLICATE_FIELD',
+          field
+        },
         { 
           status: 409,
+          headers: corsHeaders
+        }
+      );
+    }
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: 'Validation failed',
+          code: 'VALIDATION_ERROR',
+          errors
+        },
+        { 
+          status: 400,
           headers: corsHeaders
         }
       );
@@ -1134,7 +1667,8 @@ export async function POST(request) {
       { 
         success: false, 
         message: 'Failed to create user',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        code: 'SERVER_ERROR',
+        ...(process.env.NODE_ENV === 'development' && { debug: error.message })
       },
       { 
         status: 500,
@@ -1144,18 +1678,22 @@ export async function POST(request) {
   }
 }
 
-// ==================== PUT HANDLER ====================
+// ========== PUT HANDLER ==========
 export async function PUT(request) {
   try {
     await connectDB();
     
-    // Get query parameters
+    // Parse query parameters
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     
     if (!id) {
       return NextResponse.json(
-        { success: false, message: 'User ID is required' },
+        { 
+          success: false, 
+          message: 'User ID is required',
+          code: 'ID_REQUIRED'
+        },
         { 
           status: 400,
           headers: corsHeaders
@@ -1163,9 +1701,13 @@ export async function PUT(request) {
       );
     }
     
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!validateObjectId(id)) {
       return NextResponse.json(
-        { success: false, message: 'Invalid user ID' },
+        { 
+          success: false, 
+          message: 'Invalid user ID',
+          code: 'INVALID_ID'
+        },
         { 
           status: 400,
           headers: corsHeaders
@@ -1180,7 +1722,11 @@ export async function PUT(request) {
     const auth = await authenticate(request.headers);
     if (!auth.success) {
       return NextResponse.json(
-        { success: false, message: auth.error },
+        { 
+          success: false, 
+          message: auth.error,
+          code: 'AUTH_FAILED'
+        },
         { 
           status: auth.status,
           headers: corsHeaders
@@ -1190,11 +1736,33 @@ export async function PUT(request) {
     
     const { user: authUser } = auth;
     
-    // Check permissions
-    const canUpdate = isAdmin(authUser) || isSelf(id, authUser);
-    if (!canUpdate) {
+    // Find target user
+    const targetUser = await User.findById(id);
+    if (!targetUser || targetUser.status === 'deleted') {
       return NextResponse.json(
-        { success: false, message: 'Access denied' },
+        { 
+          success: false, 
+          message: 'User not found',
+          code: 'USER_NOT_FOUND'
+        },
+        { 
+          status: 404,
+          headers: corsHeaders
+        }
+      );
+    }
+    
+    // Check permissions
+    const isOwnProfile = isSelf(id, authUser);
+    const canUpdateOther = isAdmin(authUser);
+    
+    if (!isOwnProfile && !canUpdateOther) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: 'Access denied',
+          code: 'ACCESS_DENIED'
+        },
         { 
           status: 403,
           headers: corsHeaders
@@ -1202,21 +1770,50 @@ export async function PUT(request) {
       );
     }
     
-    // Non-admins cannot update role or status
-    if (!isAdmin(authUser)) {
-      delete updateData.role;
-      delete updateData.status;
+    // Check company access for non-super-admins
+    if (!isSuperAdmin(authUser) && !isOwnProfile) {
+      if (!canAccessCompany(authUser, targetUser.companyId)) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: 'Access denied to this user\'s data',
+            code: 'COMPANY_ACCESS_DENIED'
+          },
+          { 
+            status: 403,
+            headers: corsHeaders
+          }
+        );
+      }
     }
     
-    const user = await User.findById(id);
-    if (!user || user.status === 'deleted') {
-      return NextResponse.json(
-        { success: false, message: 'User not found' },
-        { 
-          status: 404,
-          headers: corsHeaders
-        }
-      );
+    // Restrict updates based on role
+    const restrictedFields = [];
+    
+    if (!isSuperAdmin(authUser)) {
+      // Non-super admins cannot change adminType
+      if (updateData.adminType && updateData.adminType !== targetUser.adminType) {
+        restrictedFields.push('adminType');
+        delete updateData.adminType;
+      }
+      
+      // Non-super admins cannot change companyId
+      if (updateData.companyId && updateData.companyId.toString() !== targetUser.companyId?.toString()) {
+        restrictedFields.push('companyId');
+        delete updateData.companyId;
+      }
+    }
+    
+    if (!isAdmin(authUser)) {
+      // Non-admins cannot change role or status
+      if (updateData.role && updateData.role !== targetUser.role) {
+        restrictedFields.push('role');
+        delete updateData.role;
+      }
+      if (updateData.status && updateData.status !== targetUser.status) {
+        restrictedFields.push('status');
+        delete updateData.status;
+      }
     }
     
     // Check for duplicate email/phone
@@ -1227,8 +1824,14 @@ export async function PUT(request) {
       
       const existingUser = await User.findOne(duplicateQuery);
       if (existingUser) {
+        const field = existingUser.email === updateData.email ? 'email' : 'phone';
         return NextResponse.json(
-          { success: false, message: 'Email or phone already in use' },
+          { 
+            success: false, 
+            message: `${field} already in use`,
+            code: 'DUPLICATE_FIELD',
+            field
+          },
           { 
             status: 409,
             headers: corsHeaders
@@ -1237,32 +1840,40 @@ export async function PUT(request) {
       }
     }
     
-    // Update notification settings if provided
+    // Handle notification settings update
     if (updateData.notificationSettings) {
-      user.updateNotificationSettings(updateData.notificationSettings);
+      targetUser.updateNotificationSettings(updateData.notificationSettings);
       delete updateData.notificationSettings;
     }
     
     // Update user fields
+    let hasChanges = false;
     Object.keys(updateData).forEach(key => {
-      if (key !== 'password' && user[key] !== undefined) {
-        user[key] = updateData[key];
+      if (key !== 'password' && targetUser[key] !== undefined && targetUser[key] !== updateData[key]) {
+        targetUser[key] = updateData[key];
+        hasChanges = true;
       }
     });
     
     // Handle password update
     if (updateData.password) {
-      user.password = updateData.password;
+      targetUser.password = updateData.password;
+      hasChanges = true;
     }
     
-    user.updatedBy = authUser._id;
-    await user.save();
+    if (hasChanges) {
+      targetUser.updatedBy = authUser._id;
+      await targetUser.save();
+    }
     
     return NextResponse.json({
       success: true,
-      message: 'User updated successfully',
+      message: hasChanges ? 'User updated successfully' : 'No changes detected',
       data: {
-        user: formatUser(user, true)
+        user: formatUser(targetUser, true, authUser),
+        ...(restrictedFields.length > 0 && { 
+          warning: `Some fields were not updated due to permission restrictions: ${restrictedFields.join(', ')}` 
+        })
       }
     }, {
       headers: corsHeaders
@@ -1271,11 +1882,35 @@ export async function PUT(request) {
   } catch (error) {
     console.error('PUT /api/users error:', error);
     
+    // Handle duplicate key error
     if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
       return NextResponse.json(
-        { success: false, message: 'Duplicate field value' },
+        { 
+          success: false, 
+          message: `${field} already in use`,
+          code: 'DUPLICATE_FIELD',
+          field
+        },
         { 
           status: 409,
+          headers: corsHeaders
+        }
+      );
+    }
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: 'Validation failed',
+          code: 'VALIDATION_ERROR',
+          errors
+        },
+        { 
+          status: 400,
           headers: corsHeaders
         }
       );
@@ -1285,7 +1920,8 @@ export async function PUT(request) {
       { 
         success: false, 
         message: 'Failed to update user',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        code: 'SERVER_ERROR',
+        ...(process.env.NODE_ENV === 'development' && { debug: error.message })
       },
       { 
         status: 500,
@@ -1295,18 +1931,22 @@ export async function PUT(request) {
   }
 }
 
-// ==================== DELETE HANDLER ====================
+// ========== DELETE HANDLER ==========
 export async function DELETE(request) {
   try {
     await connectDB();
     
-    // Get query parameters
+    // Parse query parameters
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     
     if (!id) {
       return NextResponse.json(
-        { success: false, message: 'User ID is required' },
+        { 
+          success: false, 
+          message: 'User ID is required',
+          code: 'ID_REQUIRED'
+        },
         { 
           status: 400,
           headers: corsHeaders
@@ -1314,9 +1954,13 @@ export async function DELETE(request) {
       );
     }
     
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!validateObjectId(id)) {
       return NextResponse.json(
-        { success: false, message: 'Invalid user ID' },
+        { 
+          success: false, 
+          message: 'Invalid user ID',
+          code: 'INVALID_ID'
+        },
         { 
           status: 400,
           headers: corsHeaders
@@ -1324,15 +1968,19 @@ export async function DELETE(request) {
       );
     }
     
-    // Parse request body for permanent option
+    // Parse request body for options
     const body = await request.json().catch(() => ({}));
-    const { permanent = false } = body;
+    const { permanent = false, reason = '' } = body;
     
     // Authenticate
     const auth = await authenticate(request.headers);
     if (!auth.success) {
       return NextResponse.json(
-        { success: false, message: auth.error },
+        { 
+          success: false, 
+          message: auth.error,
+          code: 'AUTH_FAILED'
+        },
         { 
           status: auth.status,
           headers: corsHeaders
@@ -1342,33 +1990,15 @@ export async function DELETE(request) {
     
     const { user: authUser } = auth;
     
-    // Check permissions
-    const canDelete = isAdmin(authUser) || isSelf(id, authUser);
-    if (!canDelete) {
+    // Find target user
+    const targetUser = await User.findById(id);
+    if (!targetUser) {
       return NextResponse.json(
-        { success: false, message: 'Access denied' },
         { 
-          status: 403,
-          headers: corsHeaders
-        }
-      );
-    }
-    
-    // Admins can permanently delete, users can only soft delete themselves
-    if (permanent && !isAdmin(authUser)) {
-      return NextResponse.json(
-        { success: false, message: 'Admin privileges required for permanent deletion' },
-        { 
-          status: 403,
-          headers: corsHeaders
-        }
-      );
-    }
-    
-    const user = await User.findById(id);
-    if (!user) {
-      return NextResponse.json(
-        { success: false, message: 'User not found' },
+          success: false, 
+          message: 'User not found',
+          code: 'USER_NOT_FOUND'
+        },
         { 
           status: 404,
           headers: corsHeaders
@@ -1376,24 +2006,104 @@ export async function DELETE(request) {
       );
     }
     
+    // Check permissions
+    const isOwnProfile = isSelf(id, authUser);
+    const canDeleteOther = isAdmin(authUser);
+    
+    if (!isOwnProfile && !canDeleteOther) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: 'Access denied',
+          code: 'ACCESS_DENIED'
+        },
+        { 
+          status: 403,
+          headers: corsHeaders
+        }
+      );
+    }
+    
+    // Check company access for non-super-admins
+    if (!isSuperAdmin(authUser) && !isOwnProfile) {
+      if (!canAccessCompany(authUser, targetUser.companyId)) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: 'Access denied to this user\'s data',
+            code: 'COMPANY_ACCESS_DENIED'
+          },
+          { 
+            status: 403,
+            headers: corsHeaders
+          }
+        );
+      }
+    }
+    
+    // Prevent deleting own account if not super admin
+    if (isOwnProfile && !isSuperAdmin(authUser) && permanent) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: 'Cannot permanently delete your own account',
+          code: 'SELF_DELETE_FORBIDDEN'
+        },
+        { 
+          status: 403,
+          headers: corsHeaders
+        }
+      );
+    }
+    
+    // Prevent deleting last super admin
+    if (targetUser.isSuperAdmin) {
+      const superAdminCount = await User.countDocuments({
+        role: USER_ROLES.ADMIN,
+        adminType: ADMIN_TYPES.SUPER,
+        status: { $ne: 'deleted' }
+      });
+      
+      if (superAdminCount <= 1 && !permanent) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: 'Cannot delete the last super admin',
+            code: 'LAST_SUPER_ADMIN'
+          },
+          { 
+            status: 403,
+            headers: corsHeaders
+          }
+        );
+      }
+    }
+    
     let message;
+    let data = {};
     
     if (permanent && isAdmin(authUser)) {
-      // Permanent delete
+      // Permanent delete (admin only)
       await User.findByIdAndDelete(id);
       message = 'User permanently deleted';
+      data.permanent = true;
+      
+      // Log audit
+      console.log(`User permanently deleted: ${id} by ${authUser._id}`);
     } else {
       // Soft delete
-      user.status = 'deleted';
-      user.deletedAt = new Date();
-      user.updatedBy = authUser._id;
-      await user.save();
-      message = 'User deactivated';
+      await targetUser.softDelete(authUser._id, reason || 'User deleted');
+      message = 'User deactivated successfully';
+      data.permanent = false;
+      
+      // Log audit
+      console.log(`User soft deleted: ${id} by ${authUser._id}${reason ? ` (Reason: ${reason})` : ''}`);
     }
     
     return NextResponse.json({
       success: true,
-      message
+      message,
+      data
     }, {
       headers: corsHeaders
     });
@@ -1404,7 +2114,8 @@ export async function DELETE(request) {
       { 
         success: false, 
         message: 'Failed to delete user',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        code: 'SERVER_ERROR',
+        ...(process.env.NODE_ENV === 'development' && { debug: error.message })
       },
       { 
         status: 500,
@@ -1414,7 +2125,7 @@ export async function DELETE(request) {
   }
 }
 
-// ==================== OPTIONS HANDLER (CORS) ====================
+// ========== OPTIONS HANDLER (CORS) ==========
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
