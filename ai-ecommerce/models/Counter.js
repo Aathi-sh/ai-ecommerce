@@ -292,9 +292,6 @@
 
 
 
-
-
-
 import mongoose from "mongoose";
 
 /**
@@ -408,7 +405,7 @@ CounterSchema.statics.incrementCounter = async function (name, companyId) {
     
   } catch (error) {
     console.error('❌ Counter error:', error);
-    throw error; // Let the calling function handle the error
+    throw error;
   }
 };
 
@@ -438,6 +435,15 @@ CounterSchema.statics.resetCounter = async function (name, companyId, newValue, 
   
   console.log(`🔄 Counter reset to: ${newValue}`);
   return counter;
+};
+
+/**
+ * Initialize counters for a new company
+ * This is a placeholder - counters are created dynamically when first used
+ */
+CounterSchema.statics.initializeCompanyCounters = async function(companyId, createdBy = null) {
+  console.log('🔄 Counters will be created dynamically when needed for company:', companyId);
+  return true;
 };
 
 // ===== SAFE MODEL REGISTRATION =====

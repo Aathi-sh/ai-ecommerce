@@ -1,0 +1,120 @@
+// # Next.js API Configuration
+// NEXTJS_API_URL=http://localhost:3000
+
+
+// # WhatsApp Bot Configuration
+// BOT_NAME=PosterPro-Bot
+// CLIENT_ID=ecommerce-bot
+
+// # Optional: For admin features
+// ADMIN_NUMBERS=91xxxxxxxx
+
+// # Database (only if bot needs direct access - usually not needed)
+// # MONGO_URI=mongodb+srv://adghwrtu419_db_user:Edyt0WVSo9dFPsiP@cluster0.yxthpvj.mongodb.net/
+
+
+
+// WEB_PUSH_KEY=BKrzsfLdWfc99E8Km0VW6Lcn84XNZcjIgJhJdz0u0KE2ZdiXbiYOvJARd3CXVWprdeFRMf6fFwZT8Qt1WbtrK88
+
+// # .env
+// PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+// NODE_ENV=development
+
+
+
+
+// # WhatsApp Bot Configuration
+
+// BOT_NAME=PosterPro-Bot
+// CLIENT_ID=ecommerce-bot
+
+// # Next.js API Configuration (Bot needs to connect to Next.js)
+//  # NEXTJS_API_URL=http://localhost:3000/api
+// NEXTJS_BASE_URL=http://localhost:3000
+
+// # WebSocket Configuration
+// WS_URL=ws://localhost:3001/ws
+
+// # Optional: For admin features
+// ADMIN_NUMBERS=91xxxxxxxx
+
+// # Optional: Bot settings
+// AUTO_RECONNECT=true
+// MAX_RECONNECT_ATTEMPTS=5
+// RECONNECT_DELAY=5000
+
+// # Database (for bot if needed - but usually uses API)
+// # MONGO_URI is not needed in bot since it uses API to Next.js
+// BOT_SERVER_URL=http://localhost:3001
+
+
+
+
+// # Firebase Configuration
+// FIREBASE_TYPE=service_account
+// FIREBASE_PROJECT_ID=ai-ecommerce-4cc1e
+// FIREBASE_PRIVATE_KEY_ID=7d0bcd6483a1aceba5661869e1af597322afa5e8
+// FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC1QJTtPukJZvS2\nmfYmx/j3/dwyLTpmQFYbRFpW60pI9RI9EkeEx9Lg1frQFKGVMRfxB9xEPmYswVuu\nxIeBp1Ncm0UAxD+w43VGVeA9EJI3JoZkk9lXnNHVTEI0YeCW2R7erzFc4igbFJjR\n81qdC6kZo0ZfocGvmjENeklBLIJ78qmsm4CLa6dni6YlVJU7+PLfEzexUpivEmqV\ngQuz62ybTEWAnIjf4EdjE3CmqbAlJ+CurWZzRgqzur5X+4xQrH762b1tcvLQLapq\nQRE79GMgvZgqX4uIh125huxTHoin6Tq6YKVj9K8ZTqMO198+pAl1MGkdt3lnTuUs\nU3LZToqpAgMBAAECggEAHft95zTl5alDR8V2I3om5Bb5Ss+SfoGb/My0yPYJBsKL\nbtDMRdmsN4cOA0e2ZvCFDlkHhb5wtmyR1voplDfyoToKExNjmcY2ixj/i/pmxXq4\n9oBCjqyhRVBlDzc1qJ5n7dw7JStACSLCGNDRp3LbWSNaK82dNYgjHyCgZ4iOWSRG\nfKdoJQV3+lg2/5iesFTdwxQh1E+pajl9X31LR6BCPjk9x3Q3VDNxyS9aoZ5jXWy6\nLIg2kb5yKE4K7LRpQuX0ZAzRi9e0xhm6kIW+s7ZtHZxCfR/06srbjUr0EjBwRXTS\nP9tJ/x+9hiTG9vMoirkdcLgl2Pj4H1AkO7GLA/UntQKBgQDsUNNYn1L18k2SFS5H\nSD2JaNb8uzbCgyJh0q6knxduW0DTM2gIJp/j7kKgjazP0Aeb9p3U9Hj6PejYLtHU\nQHPnD1dEeQu5ZVbss5Sq2wHgwmSvb3JPx4djnasHExNy/P+WpngUVIsA2aumJIbf\nBrkn7RtyqexTLObxjYpz15juBwKBgQDEWZaYRJBYfA/5wvDP2qoZxAXBPnlm56Xl\nRQOYoCNpC5AWKq5zcVQVO0/od8w7UmiDaH70FcPtkIXPJJ8CxVwB+HgFXzQh7Qjt\nyS33BxG1HUISbGxMtvghBW/ycnKA2rSQP+OERnahJUCuGRfLxj9eQ9LIYOINf2Bh\n2sUnZgSVzwKBgE0TI4txE37SE4jEzb5ECoYJoqz1ZqvUV19udrWMifjdXGxGBPU7\nm8ScjjCNZMK2x/SPX/T384kyrgHsa1V93A+Nilnz3OYP7mTvQVrkaV1kKbCqea8Z\nlcfgwcph52MGr1n0W4/N7zRMylY67Z5KNBOYmu4wC7spFv3Lu0+DDwb7AoGAQdft\nGUi8wv9veAj4KiugqR1D9MaXfXum9RhMmWzyEvLOsbBEafASC0CljkZGFYqQA6kS\nEZYO6uZxCMK2E/7M2NhSnzKKz+ml+d9h65nSRVL3aigztRISaThijwH0BePRcyIJ\nkLz0YRuV8gv2H95uN5U05P8gLviNAKOVQ54BYZ8CgYEAjnEkecokEPFV2l4ApE4F\nOLX9Gy0I/ntOAcbT9M5lfZg+0QS9TEPqh5Ue7yDAxU7TkTMxfCyPAaGU3EHAGSP3\nY+a+LaGsmLLzc04F+s4zTbc0ig2hmPPhxAkuyBgeAHx0sMoOe+gBARyDrBpGYRvn\n/dyv0g3TYqaeIP+SFP0fSkY=\n-----END PRIVATE KEY-----\n"
+// FIREBASE_CLIENT_EMAIL=firebase-adminsdk-fbsvc@ai-ecommerce-4cc1e.iam.gserviceaccount.com
+// FIREBASE_CLIENT_ID=110507340889466139151
+// FIREBASE_AUTH_URI=https://accounts.google.com/o/oauth2/auth
+// FIREBASE_TOKEN_URI=https://oauth2.googleapis.com/token
+// FIREBASE_AUTH_PROVIDER_CERT_URL=https://www.googleapis.com/oauth2/v1/certs
+// FIREBASE_CLIENT_CERT_URL=https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc@ai-ecommerce-4cc1e.iam.gserviceaccount.com
+// FIREBASE_UNIVERSE_DOMAIN=googleapis.com
+// FIREBASE_DATABASE_URL=https://ai-ecommerce-4cc1e-default-rtdb.asia-southeast1.firebasedatabase.app/
+
+
+
+
+
+// BOT_SERVER_URL=http://localhost:3001
+// NEXT_PUBLIC_WS_URL=ws://localhost:3001
+// BOT_PORT=3001
+
+
+// # Development Mode Settings
+// NODE_ENV=development
+// DISABLE_RATE_LIMIT=true  # Optional extra safety
+
+// # WebSocket Configuration
+// WS_MAX_CONNECTIONS_PER_MINUTE=100  # High limit for development
+
+
+
+// MONGODB_URI=mongodb+srv://adghwrtu419_db_user:Edyt0WVSo9dFPsiP@cluster0.yxthpvj.mongodb.net/
+
+
+
+// # Frontend MongoDB (where FCM tokens are stored)
+// FRONTEND_MONGODB_URI=mongodb+srv://adghwrtu419_db_user:Edyt0WVSo9dFPsiP@cluster0.yxthpvj.mongodb.net/
+// FRONTEND_DB_NAME=adghwrtu419_db
+
+
+
+
+// # WebSocket Notification Server
+// NOTIFICATION_WS_PORT=3001
+// NOTIFICATION_WS_URL=ws://localhost:3001
+
+// # Admin authentication (for WebSocket)
+// ADMIN_API_KEY=b1004a37b4a8c4080f9220c8b43d58547f030067e0db438c87af777a12cf308b
+
+// NOTIFICATION_API_KEY=b1004a37b4a8c4080f9220c8b43d58547f030067e0db438c87af777a12cf308b
+// # Backend .env
+// NOTIFICATION_WS_PORT=3001
+// # NEXTJS_API_URL=http://localhost:3000
+// #ADMIN_API_KEY=b1004a37b4a8c4080f9220c8b43d58547f030067e0db438c87af777a12cf308b
+// FIREBASE_ENABLED=true
+
+// # Check if these exist:
+// FIREBASE_ENABLED=true  # Should be "true"
+// NEXT_PUBLIC_FIREBASE_ENABLED=true  # For frontend
+
+// NEXTJS_API_URL=http://localhost:3000
+
+
+// # Backend .env - ADD THESE:
+// SOCKET_PATH=/socket.io/
+// SOCKET_PING_TIMEOUT=30000
+// DEBUG=socket.io*,engine*

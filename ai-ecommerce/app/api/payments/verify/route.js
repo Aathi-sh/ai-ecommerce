@@ -1358,7 +1358,7 @@ import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import { connectDB } from '@/utils/db';
-import PaymentVerification from '@/models/paymentVerification';
+import PaymentVerification from '@/models/PaymentVerification';
 import Order from '@/models/Order';
 import Company from '@/models/Company';
 import CompanySettings from '@/models/CompanySettings';

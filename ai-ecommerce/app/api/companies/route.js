@@ -637,8 +637,13 @@ export async function POST(request) {
         },
       }], { session: dbSession });
 
-      // 4. Initialize Counters for the company
-      await Counter.initializeCompanyCounters(companyId, adminUser._id);
+      // 4. Initialize Counters for the company - WITH DEFENSIVE CHECK
+      if (typeof Counter.initializeCompanyCounters === 'function') {
+        await Counter.initializeCompanyCounters(companyId, adminUser._id);
+        console.log('✅ Counters initialized for company:', companyId);
+      } else {
+        console.log('⚠️ Counter.initializeCompanyCounters not available - counters will be created on-demand');
+      }
 
       // Update company with createdBy as the admin user
       company.createdBy = adminUser._id;
