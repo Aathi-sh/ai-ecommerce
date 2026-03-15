@@ -1,176 +1,327 @@
 // app/super-admin/dashboard/page.js
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
+  LayoutDashboard,
   Building2,
   Users,
-  Package,
-  ShoppingCart,
-  Calendar,
-  CreditCard,
+  DollarSign,
   TrendingUp,
   TrendingDown,
-  DollarSign,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  Loader2,
-  ArrowUpRight,
-  ArrowDownRight,
-  MoreVertical,
-  Eye,
-  Edit,
-  Trash2,
-  RefreshCw,
-  Download,
-  Printer,
-  Share2,
+  Activity,
   Bell,
   Settings,
-  UserPlus,
   Plus,
   Search,
-  Filter,
-  ChevronDown,
-  ChevronUp,
-  ChevronLeft,
+  RefreshCw,
   ChevronRight,
-  Calendar as CalendarIcon,
+  ChevronLeft,
   BarChart3,
   PieChart,
-  LineChart,
-  Activity,
-  Globe,
+  Award,
+  UserPlus,
+  Server,
+  AlertCircle,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  AlertTriangle,
+  Eye,
+  EyeOff,
   Mail,
   Phone,
   MapPin,
-  Award,
+  Globe,
   Zap,
   Shield,
-  AlertTriangle,
-  HelpCircle,
-  Info,
-  Moon,
+  Wallet,
+  CalendarDays,
+  FileText,
+  Download,
+  Printer,
+  Share2,
+  Bookmark,
+  Star,
+  Heart,
+  ThumbsUp,
   Sun,
-  Sunset,
-  Sunrise,
+  Moon,
   Cloud,
-  CloudRain,
-  CloudSnow,
-  CloudLightning,
   Wind,
   Thermometer,
-  Droplets,
-  Eye as EyeIcon,
-  EyeOff,
   Lock,
   Unlock,
   Key,
   Fingerprint,
   ScanFace,
   QrCode,
-  Barcode,
   Camera,
   Video,
-  Mic,
-  Headphones,
-  Speaker,
-  Volume1,
-  Volume2,
-  VolumeX,
-  Music,
-  Disc,
-  Disc3,
-  Radio,
-  RadioTower,
-  Podcast,
-  Play,
-  Pause,
-  Stop,
-  SkipBack,
-  SkipForward,
-  Rewind,
-  FastForward,
-  Shuffle,
-  Repeat,
-  Repeat1,
-  Infinity,
-  Heart,
-  HeartOff,
-  ThumbsUp,
-  ThumbsDown,
-  Smile,
-  Frown,
-  Meh,
-  Laugh,
-  Angry,
-  Sad,
-  Surprise,
-  Wink,
-  Tongue,
-  Skull,
-  Ghost,
-  Alien,
-  Robot,
-  Cat,
-  Dog,
-  Bird,
-  Fish,
-  Bug,
-  Ant,
-  Bee,
-  Butterfly,
-  Leaf,
-  Tree,
-  Flower,
-  Mountain,
-  Sunset as SunsetIcon,
-  Sunrise as SunriseIcon,
-  Moon as MoonIcon,
-  Cloud as CloudIcon,
-  CloudRain as CloudRainIcon,
-  CloudSnow as CloudSnowIcon,
-  CloudLightning as CloudLightningIcon,
-  Wind as WindIcon,
-  Thermometer as ThermometerIcon,
-  Droplets as DropletsIcon,
+  LogOut,
+  Menu,
+  Home,
+  CreditCard,
+  Package,
+  ShoppingCart,
+  Calendar,
+  UserCheck,
+  UserX,
+  UserCircle,
+  ArrowUpRight,
+  ArrowDownRight,
+  MoreVertical,
+  Edit,
+  Trash2,
+  Copy,
+  Check,
+  X,
+  Save,
+  Filter,
+  DownloadCloud,
+  UploadCloud,
+  HelpCircle,
+  Info,
+  ExternalLink,
+  Link,
 } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
 
+// ============== STATISTICS CARD ==============
+const StatCard = ({ title, value, icon: Icon, change, changeType, color, loading, prefix = '' }) => {
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 animate-pulse">
+        <div className="flex items-center justify-between mb-4">
+          <div className={`p-3 rounded-lg bg-${color}-100`}>
+            <Icon className={`w-5 h-5 text-${color}-600`} />
+          </div>
+        </div>
+        <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+        <div className="h-6 bg-gray-300 rounded w-24"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 hover:shadow-md transition-all">
+      <div className="flex items-center justify-between mb-4">
+        <div className={`p-3 rounded-lg bg-${color}-100`}>
+          <Icon className={`w-5 h-5 text-${color}-600`} />
+        </div>
+        {change !== undefined && change !== null && (
+          <div className={`flex items-center text-xs sm:text-sm ${
+            changeType === 'positive' ? 'text-green-600' : 
+            changeType === 'negative' ? 'text-red-600' : 'text-gray-600'
+          }`}>
+            {changeType === 'positive' && <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />}
+            {changeType === 'negative' && <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />}
+            <span>{Math.abs(change)}%</span>
+          </div>
+        )}
+      </div>
+      <div>
+        <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1 truncate">{title}</p>
+        <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+          {prefix}{typeof value === 'number' ? value.toLocaleString('en-IN') : value}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ============== NAVIGATION CARD ==============
+const NavigationCard = ({ title, description, icon: Icon, color, onClick }) => {
+  return (
+    <button
+      onClick={onClick}
+      className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 hover:shadow-md hover:border-indigo-300 transition-all text-left w-full group"
+    >
+      <div className="flex items-start">
+        <div className={`p-3 rounded-lg bg-${color}-100 group-hover:bg-${color}-200 transition-colors`}>
+          <Icon className={`w-5 h-5 sm:w-6 sm:h-6 text-${color}-600`} />
+        </div>
+        <div className="ml-3 sm:ml-4 flex-1">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900">{title}</h3>
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">{description}</p>
+        </div>
+        <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 group-hover:text-indigo-600 transition-colors" />
+      </div>
+    </button>
+  );
+};
+
+// ============== RECENT COMPANY ROW ==============
+const RecentCompanyRow = ({ company, onView }) => {
+  const getPlanColor = (plan) => {
+    switch(plan) {
+      case 'enterprise': return 'bg-purple-100 text-purple-800';
+      case 'pro': return 'bg-blue-100 text-blue-800';
+      case 'basic': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch(status) {
+      case 'active': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'suspended': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-between p-3 sm:p-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
+      <div className="flex items-center min-w-0 flex-1">
+        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
+          <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+        </div>
+        <div className="ml-2 sm:ml-3 min-w-0 flex-1">
+          <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{company.name}</p>
+          <p className="text-[10px] sm:text-xs text-gray-500 truncate">{company.email}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 sm:gap-2 ml-2">
+        <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${getPlanColor(company.plan)}`}>
+          {company.plan}
+        </span>
+        <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${getStatusColor(company.status)}`}>
+          {company.status}
+        </span>
+        <button
+          onClick={() => onView(company.id)}
+          className="p-1 hover:bg-gray-200 rounded ml-1"
+          title="View Company Details"
+        >
+          <Eye className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ============== ACTIVITY ITEM ==============
+const ActivityItem = ({ activity }) => {
+  const getIcon = () => {
+    switch(activity.type) {
+      case 'company_created': return Building2;
+      case 'user_registered': return UserPlus;
+      case 'subscription_updated': return CreditCard;
+      case 'payment_received': return DollarSign;
+      default: return Activity;
+    }
+  };
+
+  const getColor = () => {
+    switch(activity.type) {
+      case 'company_created': return 'bg-blue-100 text-blue-600';
+      case 'user_registered': return 'bg-green-100 text-green-600';
+      case 'subscription_updated': return 'bg-purple-100 text-purple-600';
+      case 'payment_received': return 'bg-emerald-100 text-emerald-600';
+      default: return 'bg-gray-100 text-gray-600';
+    }
+  };
+
+  const Icon = getIcon();
+  const colorClass = getColor();
+
+  return (
+    <div className="flex items-start p-3 sm:p-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
+      <div className={`p-1.5 sm:p-2 rounded-lg ${colorClass} flex-shrink-0`}>
+        <Icon className="w-3 h-3 sm:w-4 sm:h-4" />
+      </div>
+      <div className="ml-2 sm:ml-3 flex-1 min-w-0">
+        <p className="text-xs sm:text-sm text-gray-900 break-words">{activity.message}</p>
+        <div className="flex items-center mt-1 text-[10px] sm:text-xs text-gray-500">
+          <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1 flex-shrink-0" />
+          <span>{activity.time}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============== SYSTEM HEALTH CARD ==============
+const SystemHealthCard = ({ health }) => {
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+      <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-4 flex items-center">
+        <Server className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-indigo-600" />
+        System Health
+      </h3>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <div className={`w-2 h-2 rounded-full mr-2 ${
+              health.status === 'healthy' ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'
+            }`} />
+            <span className="text-xs sm:text-sm text-gray-600">Status</span>
+          </div>
+          <span className="text-xs sm:text-sm font-medium text-gray-900 capitalize">{health.status}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs sm:text-sm text-gray-600">Uptime</span>
+          <span className="text-xs sm:text-sm font-medium text-gray-900">{health.uptime}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs sm:text-sm text-gray-600">Response Time</span>
+          <span className="text-xs sm:text-sm font-medium text-gray-900">{health.responseTime}ms</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs sm:text-sm text-gray-600">Active Sessions</span>
+          <span className="text-xs sm:text-sm font-medium text-gray-900">{health.activeSessions}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs sm:text-sm text-gray-600">Errors (24h)</span>
+          <span className="text-xs sm:text-sm font-medium text-gray-900">{health.errors24h}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============== MAIN DASHBOARD COMPONENT ==============
 export default function SuperAdminDashboard() {
   const router = useRouter();
   const { data: session, status } = useSession();
 
   // State
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState({
+    initial: true,
+    stats: true,
+    recent: true,
+    activities: true
+  });
+  const [error, setError] = useState(null);
+  const [timeRange, setTimeRange] = useState('month');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  
+  // Data states
   const [stats, setStats] = useState({
-    totalCompanies: 0,
-    activeCompanies: 0,
-    pendingCompanies: 0,
-    suspendedCompanies: 0,
-    totalUsers: 0,
-    totalProducts: 0,
-    totalOrders: 0,
-    totalBookings: 0,
-    totalRevenue: 0,
-    revenueGrowth: 0,
-    companiesGrowth: 0,
-    usersGrowth: 0,
-    ordersGrowth: 0,
+    companies: { total: 0, active: 0, pending: 0, suspended: 0, growth: 0 },
+    users: { total: 0, active: 0, growth: 0 },
+    revenue: { total: 0, growth: 0 }
   });
 
   const [recentCompanies, setRecentCompanies] = useState([]);
-  const [recentActivity, setRecentActivity] = useState([]);
-  const [chartData, setChartData] = useState([]);
-  const [timeRange, setTimeRange] = useState('week');
-  const [selectedPeriod, setSelectedPeriod] = useState('Today');
-  const [showNotifications, setShowNotifications] = useState(false);
+  const [recentActivities, setRecentActivities] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  
+  const [systemHealth, setSystemHealth] = useState({
+    status: 'healthy',
+    uptime: '99.9%',
+    responseTime: 245,
+    activeSessions: 1256,
+    errors24h: 3
+  });
 
-  // Check authentication
+  // Auth check
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
@@ -181,221 +332,163 @@ export default function SuperAdminDashboard() {
   }, [status, session, router]);
 
   // Fetch dashboard data
-  useEffect(() => {
-    fetchDashboardData();
-  }, [timeRange]);
+  const fetchDashboardData = useCallback(async () => {
+    setLoading({ initial: true, stats: true, recent: true, activities: true });
+    setError(null);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
     try {
-      // Simulate API call - Replace with actual API
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Fetch stats from analytics API
+      const statsRes = await fetch(`/api/companies/analytics?type=dashboard&range=${timeRange}`);
+      if (!statsRes.ok) throw new Error('Failed to fetch stats');
+      const statsData = await statsRes.json();
+      
+      if (statsData.success) {
+        setStats({
+          companies: {
+            total: statsData.data.totalCompanies || 0,
+            active: statsData.data.activeCompanies || 0,
+            pending: statsData.data.pendingCompanies || 0,
+            suspended: statsData.data.suspendedCompanies || 0,
+            growth: statsData.data.companyGrowth || 0
+          },
+          users: {
+            total: statsData.data.totalUsers || 0,
+            active: statsData.data.activeUsers || 0,
+            growth: statsData.data.userGrowth || 0
+          },
+          revenue: {
+            total: statsData.data.totalRevenue || 0,
+            growth: statsData.data.growthRate || 0
+          }
+        });
+      }
+      setLoading(prev => ({ ...prev, stats: false }));
 
-      // Mock data
-      setStats({
-        totalCompanies: 156,
-        activeCompanies: 142,
-        pendingCompanies: 8,
-        suspendedCompanies: 6,
-        totalUsers: 2845,
-        totalProducts: 12345,
-        totalOrders: 5678,
-        totalBookings: 2345,
-        totalRevenue: 4567890,
-        revenueGrowth: 23.5,
-        companiesGrowth: 12.3,
-        usersGrowth: 18.7,
-        ordersGrowth: 15.2,
-      });
+      // Fetch recent companies
+      const companiesRes = await fetch('/api/companies?sort=createdAt&limit=5');
+      if (!companiesRes.ok) throw new Error('Failed to fetch companies');
+      const companiesData = await companiesRes.json();
+      
+      if (companiesData.success) {
+        setRecentCompanies(companiesData.data.map(c => ({
+          id: c.id,
+          name: c.companyName,
+          email: c.companyEmail,
+          plan: c.subscription?.plan || 'free',
+          status: c.status,
+          createdAt: c.createdAt
+        })));
+      }
+      setLoading(prev => ({ ...prev, recent: false }));
 
-      setRecentCompanies([
-        {
-          id: 1,
-          name: 'Tech Solutions Inc',
-          email: 'info@techsolutions.com',
-          plan: 'pro',
-          status: 'active',
-          users: 45,
-          revenue: 125000,
-          createdAt: '2024-01-15',
-        },
-        {
-          id: 2,
-          name: 'Green Mart',
-          email: 'contact@greenmart.com',
-          plan: 'basic',
-          status: 'active',
-          users: 12,
-          revenue: 45000,
-          createdAt: '2024-01-14',
-        },
-        {
-          id: 3,
-          name: 'Fitness Pro',
-          email: 'support@fitnesspro.com',
-          plan: 'enterprise',
-          status: 'active',
-          users: 78,
-          revenue: 250000,
-          createdAt: '2024-01-13',
-        },
-        {
-          id: 4,
-          name: 'Beauty Lounge',
-          email: 'info@beautylounge.com',
-          plan: 'basic',
-          status: 'pending',
-          users: 5,
-          revenue: 15000,
-          createdAt: '2024-01-12',
-        },
-        {
-          id: 5,
-          name: 'Auto Care Center',
-          email: 'service@autocare.com',
-          plan: 'pro',
-          status: 'suspended',
-          users: 23,
-          revenue: 89000,
-          createdAt: '2024-01-11',
-        },
-      ]);
+      // Fetch recent activities from users API
+      const activitiesRes = await fetch('/api/companies/users?type=activity&limit=10');
+      if (!activitiesRes.ok) throw new Error('Failed to fetch activities');
+      const activitiesData = await activitiesRes.json();
+      
+      if (activitiesData.success) {
+        setRecentActivities(activitiesData.data);
+      }
+      setLoading(prev => ({ ...prev, activities: false }));
 
-      setRecentActivity([
-        {
-          id: 1,
-          type: 'company_created',
-          company: 'Tech Solutions Inc',
-          user: 'John Doe',
-          time: '2 minutes ago',
-          icon: Building2,
-          color: 'blue',
-        },
-        {
-          id: 2,
-          type: 'user_registered',
-          company: 'Green Mart',
-          user: 'Jane Smith',
-          time: '15 minutes ago',
-          icon: Users,
-          color: 'green',
-        },
-        {
-          id: 3,
-          type: 'order_placed',
-          company: 'Fitness Pro',
-          amount: 12500,
-          time: '1 hour ago',
-          icon: ShoppingCart,
-          color: 'purple',
-        },
-        {
-          id: 4,
-          type: 'subscription_expiring',
-          company: 'Beauty Lounge',
-          days: 5,
-          time: '3 hours ago',
-          icon: CreditCard,
-          color: 'yellow',
-        },
-        {
-          id: 5,
-          type: 'company_suspended',
-          company: 'Auto Care Center',
-          reason: 'Payment failure',
-          time: '5 hours ago',
-          icon: AlertCircle,
-          color: 'red',
-        },
-      ]);
-
-      setChartData([
-        { name: 'Mon', companies: 4, revenue: 24000 },
-        { name: 'Tue', companies: 6, revenue: 32000 },
-        { name: 'Wed', companies: 8, revenue: 45000 },
-        { name: 'Thu', companies: 7, revenue: 38000 },
-        { name: 'Fri', companies: 12, revenue: 65000 },
-        { name: 'Sat', companies: 9, revenue: 42000 },
-        { name: 'Sun', companies: 5, revenue: 28000 },
-      ]);
-
+      // Mock notifications (can be replaced with real API)
       setNotifications([
         {
-          id: 1,
-          title: 'New Company Registration',
-          message: 'Tech Solutions Inc has registered',
+          id: '1',
+          title: 'New Company Registered',
+          message: 'Tech Solutions Inc just signed up',
           time: '5 minutes ago',
           read: false,
-          type: 'success',
+          type: 'success'
         },
         {
-          id: 2,
+          id: '2',
           title: 'Subscription Expiring',
-          message: 'Beauty Lounge subscription expires in 5 days',
+          message: 'Green Mart subscription expires in 3 days',
           time: '1 hour ago',
           read: false,
-          type: 'warning',
+          type: 'warning'
         },
         {
-          id: 3,
-          title: 'Company Suspended',
-          message: 'Auto Care Center has been suspended',
+          id: '3',
+          title: 'Payment Received',
+          message: 'Payment of ₹50,000 received from Fitness Pro',
           time: '3 hours ago',
           read: true,
-          type: 'error',
-        },
+          type: 'success'
+        }
       ]);
-    } catch (error) {
-      console.error('Dashboard data error:', error);
+      setUnreadCount(2);
+
+    } catch (err) {
+      console.error('Dashboard fetch error:', err);
+      setError(err.message);
     } finally {
-      setLoading(false);
+      setLoading(prev => ({ ...prev, initial: false }));
     }
+  }, [timeRange]);
+
+  // Initial fetch
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user?.role === 'admin' && session?.user?.adminType === 'super') {
+      fetchDashboardData();
+    }
+  }, [status, session, fetchDashboardData]);
+
+  // Handle refresh
+  const handleRefresh = () => {
+    fetchDashboardData();
   };
 
+  // Handle notification read
+  const handleMarkAsRead = (id) => {
+    setNotifications(prev => prev.map(n => 
+      n.id === id ? { ...n, read: true } : n
+    ));
+    setUnreadCount(prev => Math.max(0, prev - 1));
+  };
+
+  const handleMarkAllAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setUnreadCount(0);
+  };
+
+  // Format currency
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+      maximumFractionDigits: 0
+    }).format(amount || 0);
   };
 
+  // Format number
   const formatNumber = (num) => {
-    if (num >= 1000000) {
-      return (num / 1000000).toFixed(1) + 'M';
-    }
-    if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'K';
-    }
-    return num.toString();
+    if (num >= 10000000) return (num / 10000000).toFixed(1) + 'Cr';
+    if (num >= 100000) return (num / 100000).toFixed(1) + 'L';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num?.toString() || '0';
   };
 
-  const getStatusBadge = (status) => {
-    const badges = {
-      active: { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle2, label: 'Active' },
-      pending: { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: Clock, label: 'Pending' },
-      suspended: { bg: 'bg-red-100', text: 'text-red-800', icon: XCircle, label: 'Suspended' },
-    };
-    return badges[status] || badges.pending;
+  // Navigation handlers
+  const handleNavigation = (path) => {
+    router.push(path);
   };
 
-  const getPlanBadge = (plan) => {
-    const plans = {
-      free: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Free' },
-      basic: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Basic' },
-      pro: { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Pro' },
-      enterprise: { bg: 'bg-indigo-100', text: 'text-indigo-800', label: 'Enterprise' },
-    };
-    return plans[plan] || plans.free;
-  };
-
-  if (status === 'loading' || loading) {
+  // Loading state
+  if (status === 'loading' || loading.initial) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto" />
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+          <div className="relative mx-auto w-16 h-16 sm:w-20 sm:h-20">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <LayoutDashboard className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600 animate-pulse" />
+            </div>
+          </div>
+          <p className="mt-4 text-base sm:text-lg font-medium text-gray-700">Loading Dashboard</p>
+          <p className="text-xs sm:text-sm text-gray-500">Please wait while we fetch your data...</p>
         </div>
       </div>
     );
@@ -404,25 +497,42 @@ export default function SuperAdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Super Admin Dashboard</h1>
-              <p className="mt-1 text-sm text-gray-500">
-                Welcome back, {session?.user?.name}. Here's what's happening with your platform.
-              </p>
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
+          <div className="flex items-center justify-between h-14 sm:h-16">
+            {/* Left Section */}
+            <div className="flex items-center min-w-0">
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="md:hidden p-2 mr-2 hover:bg-gray-100 rounded-lg"
+              >
+                <Menu className="w-5 h-5 text-gray-600" />
+              </button>
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <LayoutDashboard className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+                </div>
+              </div>
+              <div className="ml-2 sm:ml-4 min-w-0">
+                <h1 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900 truncate">Super Admin Dashboard</h1>
+                <p className="text-xs sm:text-sm text-gray-500 truncate hidden xs:block">
+                  Welcome back, {session?.user?.name || 'Admin'}
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              {/* Date Range Selector */}
+
+            {/* Right Section */}
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              {/* Time Range Selector */}
               <select
                 value={timeRange}
                 onChange={(e) => setTimeRange(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                className="hidden sm:block px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 bg-white"
               >
                 <option value="today">Today</option>
                 <option value="week">This Week</option>
                 <option value="month">This Month</option>
+                <option value="quarter">This Quarter</option>
                 <option value="year">This Year</option>
               </select>
 
@@ -430,38 +540,56 @@ export default function SuperAdminDashboard() {
               <div className="relative">
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="p-2 hover:bg-gray-100 rounded-lg relative"
+                  className="relative p-2 hover:bg-gray-100 rounded-lg"
                 >
                   <Bell className="w-5 h-5 text-gray-600" />
-                  {notifications.filter(n => !n.read).length > 0 && (
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-600 rounded-full"></span>
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                   )}
                 </button>
 
+                {/* Notifications Dropdown */}
                 {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                    <div className="p-3 border-b border-gray-200 flex justify-between items-center">
-                      <h3 className="font-semibold text-gray-900">Notifications</h3>
-                      <button className="text-xs text-indigo-600 hover:text-indigo-800">
-                        Mark all as read
-                      </button>
+                  <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
+                    <div className="p-3 sm:p-4 border-b border-gray-200 flex justify-between items-center">
+                      <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Notifications</h3>
+                      {unreadCount > 0 && (
+                        <button 
+                          onClick={handleMarkAllAsRead}
+                          className="text-xs text-indigo-600 hover:text-indigo-800"
+                        >
+                          Mark all as read
+                        </button>
+                      )}
                     </div>
                     <div className="max-h-96 overflow-y-auto">
-                      {notifications.map((notif) => (
-                        <div
-                          key={notif.id}
-                          className={`p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${
-                            !notif.read ? 'bg-indigo-50' : ''
-                          }`}
-                        >
-                          <p className="text-sm font-medium text-gray-900">{notif.title}</p>
-                          <p className="text-xs text-gray-500 mt-1">{notif.message}</p>
-                          <p className="text-xs text-gray-400 mt-1">{notif.time}</p>
+                      {notifications.length === 0 ? (
+                        <div className="p-6 text-center">
+                          <Bell className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                          <p className="text-xs sm:text-sm text-gray-500">No notifications</p>
                         </div>
-                      ))}
+                      ) : (
+                        notifications.map(n => (
+                          <div
+                            key={n.id}
+                            className={`p-3 sm:p-4 hover:bg-gray-50 border-b border-gray-100 last:border-0 cursor-pointer ${!n.read ? 'bg-indigo-50' : ''}`}
+                            onClick={() => handleMarkAsRead(n.id)}
+                          >
+                            <p className="text-xs sm:text-sm font-medium text-gray-900">{n.title}</p>
+                            <p className="text-[10px] sm:text-xs text-gray-600 mt-1">{n.message}</p>
+                            <p className="text-[10px] text-gray-400 mt-1">{n.time}</p>
+                          </div>
+                        ))
+                      )}
                     </div>
                     <div className="p-2 border-t border-gray-200">
-                      <button className="w-full text-center text-sm text-indigo-600 hover:text-indigo-800">
+                      <button 
+                        onClick={() => {
+                          setShowNotifications(false);
+                          handleNavigation('/super-admin/notifications');
+                        }}
+                        className="w-full text-center text-xs text-indigo-600 hover:text-indigo-800"
+                      >
                         View all notifications
                       </button>
                     </div>
@@ -471,405 +599,367 @@ export default function SuperAdminDashboard() {
 
               {/* Refresh Button */}
               <button
-                onClick={fetchDashboardData}
+                onClick={handleRefresh}
                 className="p-2 hover:bg-gray-100 rounded-lg"
+                disabled={loading.stats}
                 title="Refresh data"
               >
-                <RefreshCw className="w-5 h-5 text-gray-600" />
+                <RefreshCw className={`w-5 h-5 text-gray-600 ${loading.stats ? 'animate-spin' : ''}`} />
+              </button>
+
+              {/* Settings */}
+              <button
+                onClick={() => handleNavigation('/super-admin/settings')}
+                className="hidden sm:block p-2 hover:bg-gray-100 rounded-lg"
+                title="Settings"
+              >
+                <Settings className="w-5 h-5 text-gray-600" />
               </button>
             </div>
           </div>
+
+          {/* Mobile Time Range */}
+          <div className="sm:hidden py-2 border-t border-gray-100">
+            <select
+              value={timeRange}
+              onChange={(e) => setTimeRange(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 bg-white"
+            >
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+              <option value="quarter">This Quarter</option>
+              <option value="year">This Year</option>
+            </select>
+          </div>
         </div>
-      </div>
+      </header>
+
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden">
+          <div className="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-xl">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="font-semibold text-gray-900">Menu</h2>
+              <button 
+                onClick={() => setMobileMenuOpen(false)} 
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+            <nav className="p-4">
+              <button
+                onClick={() => {
+                  handleNavigation('/super-admin/dashboard');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left p-3 bg-indigo-50 text-indigo-700 rounded-lg mb-2 font-medium"
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => {
+                  handleNavigation('/super-admin/companies');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left p-3 hover:bg-gray-100 rounded-lg mb-2 text-gray-700"
+              >
+                Companies
+              </button>
+              <button
+                onClick={() => {
+                  handleNavigation('/super-admin/companies/create');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left p-3 hover:bg-gray-100 rounded-lg mb-2 text-gray-700"
+              >
+                Create Company
+              </button>
+              <button
+                onClick={() => {
+                  handleNavigation('/super-admin/users');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left p-3 hover:bg-gray-100 rounded-lg mb-2 text-gray-700"
+              >
+                Users
+              </button>
+              <button
+                onClick={() => {
+                  handleNavigation('/super-admin/subscriptions');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left p-3 hover:bg-gray-100 rounded-lg mb-2 text-gray-700"
+              >
+                Subscriptions
+              </button>
+              <button
+                onClick={() => {
+                  handleNavigation('/super-admin/analytics');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left p-3 hover:bg-gray-100 rounded-lg mb-2 text-gray-700"
+              >
+                Analytics
+              </button>
+              <button
+                onClick={() => {
+                  handleNavigation('/super-admin/settings');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left p-3 hover:bg-gray-100 rounded-lg mb-2 text-gray-700"
+              >
+                Settings
+              </button>
+            </nav>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {/* Total Companies */}
-          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-indigo-100 rounded-lg">
-                <Building2 className="w-6 h-6 text-indigo-600" />
-              </div>
-              <span className={`flex items-center text-sm ${
-                stats.companiesGrowth > 0 ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {stats.companiesGrowth > 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-                {Math.abs(stats.companiesGrowth)}%
-              </span>
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 sm:mb-6 bg-red-50 border border-red-200 rounded-xl p-3 sm:p-4 flex items-start">
+            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 mt-0.5 mr-2 sm:mr-3 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-xs sm:text-sm font-medium text-red-800">Error loading dashboard</p>
+              <p className="text-xs sm:text-sm text-red-600 mt-1">{error}</p>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900">{stats.totalCompanies}</h3>
-            <p className="text-sm text-gray-500 mt-1">Total Companies</p>
-            <div className="mt-4 flex items-center text-xs text-gray-500">
-              <span className="text-green-600 font-medium">{stats.activeCompanies}</span>
-              <span className="mx-2">active</span>
-              <span className="text-yellow-600 font-medium">{stats.pendingCompanies}</span>
-              <span className="mx-2">pending</span>
-              <span className="text-red-600 font-medium">{stats.suspendedCompanies}</span>
-              <span>suspended</span>
-            </div>
+            <button
+              onClick={handleRefresh}
+              className="ml-2 sm:ml-4 px-2 sm:px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs sm:text-sm whitespace-nowrap"
+            >
+              Retry
+            </button>
           </div>
+        )}
 
-          {/* Total Users */}
-          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Users className="w-6 h-6 text-green-600" />
-              </div>
-              <span className="flex items-center text-sm text-green-600">
-                <ArrowUpRight className="w-4 h-4" />
-                {stats.usersGrowth}%
-              </span>
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900">{formatNumber(stats.totalUsers)}</h3>
-            <p className="text-sm text-gray-500 mt-1">Total Users</p>
-            <div className="mt-4 h-1 w-full bg-gray-200 rounded-full">
-              <div className="h-1 w-3/4 bg-green-600 rounded-full"></div>
-            </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <StatCard
+            title="Total Companies"
+            value={formatNumber(stats.companies.total)}
+            icon={Building2}
+            change={stats.companies.growth}
+            changeType={stats.companies.growth >= 0 ? 'positive' : 'negative'}
+            color="indigo"
+            loading={loading.stats}
+          />
+          <StatCard
+            title="Active Companies"
+            value={formatNumber(stats.companies.active)}
+            icon={Building2}
+            color="green"
+            loading={loading.stats}
+          />
+          <StatCard
+            title="Total Users"
+            value={formatNumber(stats.users.total)}
+            icon={Users}
+            change={stats.users.growth}
+            changeType={stats.users.growth >= 0 ? 'positive' : 'negative'}
+            color="blue"
+            loading={loading.stats}
+          />
+          <StatCard
+            title="Total Revenue"
+            value={formatCurrency(stats.revenue.total)}
+            icon={DollarSign}
+            change={stats.revenue.growth}
+            changeType={stats.revenue.growth >= 0 ? 'positive' : 'negative'}
+            color="purple"
+            loading={loading.stats}
+          />
+        </div>
+
+        {/* Quick Stats Row */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <p className="text-xs text-gray-500 mb-1">Pending Companies</p>
+            <p className="text-lg sm:text-xl font-bold text-yellow-600">{stats.companies.pending}</p>
           </div>
-
-          {/* Total Revenue */}
-          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <DollarSign className="w-6 h-6 text-purple-600" />
-              </div>
-              <span className="flex items-center text-sm text-green-600">
-                <ArrowUpRight className="w-4 h-4" />
-                {stats.revenueGrowth}%
-              </span>
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalRevenue)}</h3>
-            <p className="text-sm text-gray-500 mt-1">Total Revenue</p>
-            <div className="mt-4 flex items-center gap-2 text-xs">
-              <span className="text-gray-500">Orders: {formatNumber(stats.totalOrders)}</span>
-              <span className="text-gray-300">|</span>
-              <span className="text-gray-500">Bookings: {formatNumber(stats.totalBookings)}</span>
-            </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <p className="text-xs text-gray-500 mb-1">Suspended</p>
+            <p className="text-lg sm:text-xl font-bold text-red-600">{stats.companies.suspended}</p>
           </div>
-
-          {/* Total Products */}
-          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-yellow-100 rounded-lg">
-                <Package className="w-6 h-6 text-yellow-600" />
-              </div>
-              <span className="flex items-center text-sm text-green-600">
-                <ArrowUpRight className="w-4 h-4" />
-                8.2%
-              </span>
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900">{formatNumber(stats.totalProducts)}</h3>
-            <p className="text-sm text-gray-500 mt-1">Total Products</p>
-            <div className="mt-4 flex items-center gap-4">
-              <div className="flex items-center text-xs text-gray-500">
-                <ShoppingCart className="w-3 h-3 mr-1" />
-                {formatNumber(stats.totalOrders)} orders
-              </div>
-              <div className="flex items-center text-xs text-gray-500">
-                <Calendar className="w-3 h-3 mr-1" />
-                {formatNumber(stats.totalBookings)} bookings
-              </div>
-            </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <p className="text-xs text-gray-500 mb-1">Active Users</p>
+            <p className="text-lg sm:text-xl font-bold text-green-600">{stats.users.active}</p>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <p className="text-xs text-gray-500 mb-1">Avg Revenue/Company</p>
+            <p className="text-lg sm:text-xl font-bold text-purple-600">
+              {stats.companies.total ? formatCurrency(stats.revenue.total / stats.companies.total) : '₹0'}
+            </p>
           </div>
         </div>
 
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Revenue Chart */}
-          <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                <BarChart3 className="w-5 h-5 mr-2 text-indigo-600" />
-                Revenue Overview
-              </h2>
-              <div className="flex gap-2">
-                <button className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
-                  <Download className="w-4 h-4" />
-                </button>
-                <button className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
-                  <Printer className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            <div className="h-64">
-              <div className="flex h-full items-end gap-2">
-                {chartData.map((item, index) => (
-                  <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                    <div className="w-full bg-indigo-100 rounded-t-lg relative group">
-                      <div
-                        className="bg-indigo-600 rounded-t-lg transition-all duration-300 group-hover:bg-indigo-700"
-                        style={{ height: `${(item.revenue / 65000) * 200}px` }}
-                      >
-                        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                          {formatCurrency(item.revenue)}
-                        </div>
-                      </div>
-                    </div>
-                    <span className="text-xs text-gray-600">{item.name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Company Distribution */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <PieChart className="w-5 h-5 mr-2 text-indigo-600" />
-              Company Distribution
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">Active</span>
-                  <span className="font-medium text-gray-900">{stats.activeCompanies}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-green-600 h-2 rounded-full" style={{ width: `${(stats.activeCompanies / stats.totalCompanies) * 100}%` }} />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">Pending</span>
-                  <span className="font-medium text-gray-900">{stats.pendingCompanies}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-yellow-600 h-2 rounded-full" style={{ width: `${(stats.pendingCompanies / stats.totalCompanies) * 100}%` }} />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">Suspended</span>
-                  <span className="font-medium text-gray-900">{stats.suspendedCompanies}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-red-600 h-2 rounded-full" style={{ width: `${(stats.suspendedCompanies / stats.totalCompanies) * 100}%` }} />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Plan Distribution</h3>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Enterprise</span>
-                  <span className="font-medium text-gray-900">24</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Pro</span>
-                  <span className="font-medium text-gray-900">52</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Basic</span>
-                  <span className="font-medium text-gray-900">48</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Free</span>
-                  <span className="font-medium text-gray-900">32</span>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* Navigation Cards */}
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <NavigationCard
+            title="Create Company"
+            description="Add a new company to the platform"
+            icon={Building2}
+            color="indigo"
+            onClick={() => handleNavigation('/super-admin/companies/create')}
+          />
+          <NavigationCard
+            title="View Companies"
+            description="Manage all registered companies"
+            icon={Building2}
+            color="blue"
+            onClick={() => handleNavigation('/super-admin/companies')}
+          />
+          <NavigationCard
+            title="Manage Users"
+            description="View and manage all users"
+            icon={Users}
+            color="green"
+            onClick={() => handleNavigation('/super-admin/users')}
+          />
+          <NavigationCard
+            title="Subscriptions"
+            description="Manage plans and subscriptions"
+            icon={CreditCard}
+            color="purple"
+            onClick={() => handleNavigation('/super-admin/subscriptions')}
+          />
+          <NavigationCard
+            title="View Analytics"
+            description="Detailed platform analytics and reports"
+            icon={BarChart3}
+            color="orange"
+            onClick={() => handleNavigation('/super-admin/analytics')}
+          />
         </div>
 
-        {/* Recent Companies & Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent Companies & Activities */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
           {/* Recent Companies */}
-          <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Building2 className="w-5 h-5 mr-2 text-indigo-600" />
-                  Recent Companies
-                </h2>
-                <button
-                  onClick={() => router.push('/super-admin/companies')}
-                  className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center"
-                >
-                  View All
-                  <ArrowUpRight className="w-4 h-4 ml-1" />
-                </button>
-              </div>
-            </div>
-            <div className="divide-y divide-gray-200">
-              {recentCompanies.map((company) => {
-                const statusBadge = getStatusBadge(company.status);
-                const planBadge = getPlanBadge(company.plan);
-                const StatusIcon = statusBadge.icon;
-                
-                return (
-                  <div key={company.id} className="p-4 hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center min-w-0">
-                        <div className="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                          <Building2 className="w-5 h-5 text-indigo-600" />
-                        </div>
-                        <div className="ml-4 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {company.name}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate">{company.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 ml-4">
-                        <div className="hidden sm:flex items-center gap-2">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${planBadge.bg} ${planBadge.text}`}>
-                            {planBadge.label}
-                          </span>
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusBadge.bg} ${statusBadge.text}`}>
-                            <StatusIcon className="w-3 h-3 mr-1" />
-                            {statusBadge.label}
-                          </span>
-                        </div>
-                        <button className="p-1 hover:bg-gray-100 rounded">
-                          <MoreVertical className="w-4 h-4 text-gray-400" />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-2 grid grid-cols-3 gap-4 text-xs text-gray-500 sm:hidden">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${planBadge.bg} ${planBadge.text} inline-block w-auto`}>
-                        {planBadge.label}
-                      </span>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusBadge.bg} ${statusBadge.text}`}>
-                        <StatusIcon className="w-3 h-3 mr-1" />
-                        {statusBadge.label}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
-                      <span className="flex items-center">
-                        <Users className="w-3 h-3 mr-1" />
-                        {company.users} users
-                      </span>
-                      <span className="flex items-center">
-                        <DollarSign className="w-3 h-3 mr-1" />
-                        {formatCurrency(company.revenue)}
-                      </span>
-                      <span className="flex items-center">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        {company.createdAt}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Recent Activity */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                <Activity className="w-5 h-5 mr-2 text-indigo-600" />
-                Recent Activity
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-sm sm:text-base font-semibold text-gray-900 flex items-center">
+                <Building2 className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-indigo-600" />
+                Recent Companies
               </h2>
-            </div>
-            <div className="divide-y divide-gray-200">
-              {recentActivity.map((activity) => {
-                const Icon = activity.icon;
-                const colors = {
-                  blue: 'text-blue-600 bg-blue-100',
-                  green: 'text-green-600 bg-green-100',
-                  purple: 'text-purple-600 bg-purple-100',
-                  yellow: 'text-yellow-600 bg-yellow-100',
-                  red: 'text-red-600 bg-red-100',
-                };
-                const colorClass = colors[activity.color] || colors.blue;
-
-                return (
-                  <div key={activity.id} className="p-4 hover:bg-gray-50 transition-colors">
-                    <div className="flex items-start">
-                      <div className={`p-2 rounded-lg ${colorClass} flex-shrink-0`}>
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <div className="ml-3 flex-1 min-w-0">
-                        <p className="text-sm text-gray-900">
-                          {activity.type === 'company_created' && (
-                            <>New company <span className="font-medium">{activity.company}</span> created</>
-                          )}
-                          {activity.type === 'user_registered' && (
-                            <>User <span className="font-medium">{activity.user}</span> registered at {activity.company}</>
-                          )}
-                          {activity.type === 'order_placed' && (
-                            <>Order of <span className="font-medium">{formatCurrency(activity.amount)}</span> placed at {activity.company}</>
-                          )}
-                          {activity.type === 'subscription_expiring' && (
-                            <><span className="font-medium">{activity.company}</span> subscription expires in {activity.days} days</>
-                          )}
-                          {activity.type === 'company_suspended' && (
-                            <><span className="font-medium">{activity.company}</span> suspended - {activity.reason}</>
-                          )}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="p-4 border-t border-gray-200">
-              <button className="w-full text-center text-sm text-indigo-600 hover:text-indigo-800">
-                View All Activity
+              <button
+                onClick={() => handleNavigation('/super-admin/companies')}
+                className="text-xs sm:text-sm text-indigo-600 hover:text-indigo-800 flex items-center"
+              >
+                View All
+                <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 ml-1" />
               </button>
             </div>
+            <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+              {loading.recent ? (
+                <div className="p-6 text-center">
+                  <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin text-indigo-600 mx-auto" />
+                  <p className="mt-2 text-xs sm:text-sm text-gray-500">Loading companies...</p>
+                </div>
+              ) : recentCompanies.length === 0 ? (
+                <div className="p-6 text-center">
+                  <Building2 className="w-8 h-8 sm:w-10 sm:h-10 text-gray-300 mx-auto mb-3" />
+                  <p className="text-xs sm:text-sm text-gray-500">No companies found</p>
+                </div>
+              ) : (
+                recentCompanies.map(company => (
+                  <RecentCompanyRow
+                    key={company.id}
+                    company={company}
+                    onView={(id) => handleNavigation(`/super-admin/companies/${id}`)}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Recent Activities */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="p-4 sm:p-6 border-b border-gray-200">
+              <h2 className="text-sm sm:text-base font-semibold text-gray-900 flex items-center">
+                <Activity className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-indigo-600" />
+                Recent Activities
+              </h2>
+            </div>
+            <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+              {loading.activities ? (
+                <div className="p-6 text-center">
+                  <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin text-indigo-600 mx-auto" />
+                  <p className="mt-2 text-xs sm:text-sm text-gray-500">Loading activities...</p>
+                </div>
+              ) : recentActivities.length === 0 ? (
+                <div className="p-6 text-center">
+                  <Activity className="w-8 h-8 sm:w-10 sm:h-10 text-gray-300 mx-auto mb-3" />
+                  <p className="text-xs sm:text-sm text-gray-500">No recent activities</p>
+                </div>
+              ) : (
+                recentActivities.map(activity => (
+                  <ActivityItem key={activity.id} activity={activity} />
+                ))
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <button
-            onClick={() => router.push('/super-admin/companies/create')}
-            className="p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all group"
-          >
-            <div className="flex items-center">
-              <div className="p-3 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">
-                <Plus className="w-5 h-5 text-indigo-600" />
-              </div>
-              <div className="ml-4 text-left">
-                <p className="text-sm font-medium text-gray-900">Create Company</p>
-                <p className="text-xs text-gray-500">Add new business</p>
+        {/* System Health & Quick Tips */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="lg:col-span-2">
+            <SystemHealthCard health={systemHealth} />
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-4 flex items-center">
+              <Info className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-indigo-600" />
+              Quick Tips
+            </h3>
+            <ul className="space-y-3 text-xs sm:text-sm text-gray-600">
+              <li className="flex items-start">
+                <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full mt-1.5 mr-2 flex-shrink-0"></span>
+                <span>New companies are created with default Free plan</span>
+              </li>
+              <li className="flex items-start">
+                <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full mt-1.5 mr-2 flex-shrink-0"></span>
+                <span>You can upgrade company plans from Subscriptions page</span>
+              </li>
+              <li className="flex items-start">
+                <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full mt-1.5 mr-2 flex-shrink-0"></span>
+                <span>Monitor pending companies that need verification</span>
+              </li>
+              <li className="flex items-start">
+                <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full mt-1.5 mr-2 flex-shrink-0"></span>
+                <span>Use Analytics page for detailed insights and reports</span>
+              </li>
+              <li className="flex items-start">
+                <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full mt-1.5 mr-2 flex-shrink-0"></span>
+                <span>Check system health regularly for optimal performance</span>
+              </li>
+            </ul>
+            
+            {/* Quick Links */}
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <h4 className="text-xs font-medium text-gray-500 mb-3">Quick Links</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleNavigation('/super-admin/companies/create')}
+                  className="p-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 text-xs flex items-center justify-center"
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  New Company
+                </button>
+                <button
+                  onClick={() => handleNavigation('/super-admin/users')}
+                  className="p-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 text-xs flex items-center justify-center"
+                >
+                  <Users className="w-3 h-3 mr-1" />
+                  Manage Users
+                </button>
               </div>
             </div>
-          </button>
-
-          <button className="p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all group">
-            <div className="flex items-center">
-              <div className="p-3 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
-                <Users className="w-5 h-5 text-green-600" />
-              </div>
-              <div className="ml-4 text-left">
-                <p className="text-sm font-medium text-gray-900">Manage Users</p>
-                <p className="text-xs text-gray-500">View all users</p>
-              </div>
-            </div>
-          </button>
-
-          <button className="p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all group">
-            <div className="flex items-center">
-              <div className="p-3 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
-                <CreditCard className="w-5 h-5 text-purple-600" />
-              </div>
-              <div className="ml-4 text-left">
-                <p className="text-sm font-medium text-gray-900">Subscriptions</p>
-                <p className="text-xs text-gray-500">Manage plans</p>
-              </div>
-            </div>
-          </button>
-
-          <button className="p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all group">
-            <div className="flex items-center">
-              <div className="p-3 bg-yellow-100 rounded-lg group-hover:bg-yellow-200 transition-colors">
-                <Settings className="w-5 h-5 text-yellow-600" />
-              </div>
-              <div className="ml-4 text-left">
-                <p className="text-sm font-medium text-gray-900">System Settings</p>
-                <p className="text-xs text-gray-500">Configure platform</p>
-              </div>
-            </div>
-          </button>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
