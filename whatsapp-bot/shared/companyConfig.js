@@ -1,5 +1,7 @@
-// //whatsapp-bot/shared/companyConfig.js
 
+
+
+// //whatsapp-bot/shared/companyConfig.js
 
 // /**
 //  * 
@@ -36,6 +38,9 @@
 //     gstin: '',
 //     pan: '',
 //     cin: '',
+    
+//     // ✅ ADDED: Default order flow mode
+//     orderFlowMode: 'short',
     
 //     // UPI IDs - These will be OVERWRITTEN by API data
 //     upiIds: [
@@ -171,6 +176,8 @@
 //             // Log what we got (without sensitive data)
 //             console.log(`📊 [CompanyConfig] Company: ${settings.companyName}`);
 //             console.log(`📊 [CompanyConfig] Active UPI IDs: ${settings.upiIds?.filter(u => u.isActive).length || 0}`);
+//             // ✅ ADDED: Log order flow mode
+//             console.log(`📊 [CompanyConfig] Order flow mode: ${settings.orderFlowMode || 'short'}`);
             
 //             return settings;
 
@@ -216,11 +223,13 @@
 //                 // ✅ CRITICAL: Cache the REAL data from API
 //                 this.cache = settings;
 //                 this.lastFetch = Date.now();
-//                 this.setupAutoRefresh();
+//               //  this.setupAutoRefresh();
                 
 //                 console.log(`✅ [CompanyConfig] Settings updated in cache`);
 //                 console.log(`   Company: ${settings.companyName}`);
 //                 console.log(`   UPI IDs: ${settings.upiIds?.length || 0} total, ${settings.upiIds?.filter(u => u.isActive).length || 0} active`);
+//                 // ✅ ADDED: Log cached mode
+//                 console.log(`   Order flow mode: ${settings.orderFlowMode || 'short'}`);
                 
 //                 return settings;
 //             } else {
@@ -244,15 +253,33 @@
 //     /**
 //      * Setup auto-refresh timer
 //      */
-//     setupAutoRefresh() {
-//         if (this.refreshTimer) {
-//             clearTimeout(this.refreshTimer);
-//         }
+//     // setupAutoRefresh() {
+//     //     if (this.refreshTimer) {
+//     //         clearTimeout(this.refreshTimer);
+//     //     }
         
-//         this.refreshTimer = setTimeout(async () => {
-//             console.log('🔄 [CompanyConfig] Auto-refreshing settings...');
-//             await this.getSettings();
-//         }, CACHE_TTL);
+//     //     this.refreshTimer = setTimeout(async () => {
+//     //         console.log('🔄 [CompanyConfig] Auto-refreshing settings...');
+//     //         await this.getSettings();
+//     //     }, CACHE_TTL);
+//     // }
+
+//     /**
+//      * ✅ ADDED: Get current order flow mode
+//      * Uses existing getSettings() method - NO NEW API CALLS!
+//      * 
+//      * @returns {Promise<string>} 'short' or 'long'
+//      */
+//     async getOrderFlowMode() {
+//         try {
+//             const settings = await this.getSettings();
+//             const mode = settings.orderFlowMode || 'short';
+//             console.log(`🔄 [CompanyConfig] Order flow mode: ${mode}`);
+//             return mode;
+//         } catch (error) {
+//             console.error('❌ [CompanyConfig] Error getting order flow mode:', error.message);
+//             return 'short'; // Default to short on error
+//         }
 //     }
 
 //     /**
@@ -307,8 +334,33 @@
 //      * @returns {Promise<Object>} Formatted company info for invoices
 //      */
 //     async getInvoiceInfo() {
+//     try {
 //         const settings = await this.getSettings();
         
+//         // ✅ CRITICAL FIX: Check if settings is null or undefined
+//         if (!settings) {
+//             console.warn('⚠️ [CompanyConfig] Settings is null/undefined, using defaults');
+//             return {
+//                 companyName: DEFAULT_SETTINGS.companyName,
+//                 legalName: DEFAULT_SETTINGS.legalName,
+//                 tagline: DEFAULT_SETTINGS.tagline,
+//                 address: DEFAULT_SETTINGS.address,
+//                 city: DEFAULT_SETTINGS.city,
+//                 gstin: DEFAULT_SETTINGS.gstin || '',
+//                 pan: DEFAULT_SETTINGS.pan || '',
+//                 cin: DEFAULT_SETTINGS.cin || '',
+//                 phone: DEFAULT_SETTINGS.phone,
+//                 email: DEFAULT_SETTINGS.email,
+//                 website: DEFAULT_SETTINGS.website,
+//                 bank: DEFAULT_SETTINGS.bank,
+//                 invoiceSettings: DEFAULT_SETTINGS.invoiceSettings,
+//                 logo: DEFAULT_SETTINGS.logo,
+//                 signature: DEFAULT_SETTINGS.signature,
+//                 stamp: DEFAULT_SETTINGS.stamp
+//             };
+//         }
+        
+//         // ✅ Safe to access settings properties now
 //         return {
 //             companyName: settings.companyName || DEFAULT_SETTINGS.companyName,
 //             legalName: settings.legalName || DEFAULT_SETTINGS.legalName,
@@ -327,7 +379,30 @@
 //             signature: settings.signature,
 //             stamp: settings.stamp
 //         };
+//     } catch (error) {
+//         console.error('❌ [CompanyConfig] Error in getInvoiceInfo:', error.message);
+        
+//         // Return defaults on any error
+//         return {
+//             companyName: DEFAULT_SETTINGS.companyName,
+//             legalName: DEFAULT_SETTINGS.legalName,
+//             tagline: DEFAULT_SETTINGS.tagline,
+//             address: DEFAULT_SETTINGS.address,
+//             city: DEFAULT_SETTINGS.city,
+//             gstin: DEFAULT_SETTINGS.gstin || '',
+//             pan: DEFAULT_SETTINGS.pan || '',
+//             cin: DEFAULT_SETTINGS.cin || '',
+//             phone: DEFAULT_SETTINGS.phone,
+//             email: DEFAULT_SETTINGS.email,
+//             website: DEFAULT_SETTINGS.website,
+//             bank: DEFAULT_SETTINGS.bank,
+//             invoiceSettings: DEFAULT_SETTINGS.invoiceSettings,
+//             logo: DEFAULT_SETTINGS.logo,
+//             signature: DEFAULT_SETTINGS.signature,
+//             stamp: DEFAULT_SETTINGS.stamp
+//         };
 //     }
+// }
 
 //     /**
 //      * Get support information
@@ -453,11 +528,27 @@
 
 
 
-//whatsapp-bot/shared/companyConfig.js
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// whatsapp-bot/shared/companyConfig.js
+// ✅ FIXED: CommonJS version (using module.exports)
 
 /**
- * 
- * 
  * COMPANY CONFIGURATION MANAGER
  * 
  * Fetches company settings from Next.js API endpoints
@@ -468,6 +559,13 @@
  * - 5-minute cache with auto-refresh
  * - Fallback defaults if API is unavailable
  * - Auto-updates when admin changes settings via API
+ * - Supports MULTIPLE PAYMENT METHODS:
+ *   ✅ UPI IDs (multiple per company)
+ *   ✅ GPay Numbers (phone-based UPI)
+ *   ✅ PhonePe Numbers
+ *   ✅ PayTM Numbers
+ *   ✅ QR Code Images
+ *   ✅ Bank Accounts
  */
 
 // ==================== CONFIGURATION ====================
@@ -491,21 +589,103 @@ const DEFAULT_SETTINGS = {
     pan: '',
     cin: '',
     
-    // ✅ ADDED: Default order flow mode
+    // ✅ Order flow mode
     orderFlowMode: 'short',
     
-    // UPI IDs - These will be OVERWRITTEN by API data
+    // ========== PAYMENT METHODS ==========
+    
+    // ✅ UPI IDs (Standard UPI format - name@bank)
     upiIds: [
         {
-            id: 'your-upi@oksbi',
-            name: 'Primary UPI',
-            appType: 'other',
+            id: 'your-business@okaxis',
+            name: 'Primary Business UPI',
+            appType: 'upi',
             isActive: true,
-            description: 'Main business UPI ID'
+            description: 'Main UPI ID for business',
+            createdAt: new Date().toISOString()
+        },
+        {
+            id: 'your-business@paytm',
+            name: 'PayTM UPI',
+            appType: 'paytm',
+            isActive: true,
+            description: 'PayTM UPI ID',
+            createdAt: new Date().toISOString()
         }
     ],
     
-    // Bank Details
+    // ✅ GPay Numbers (Phone numbers for Google Pay)
+    gpayNumbers: [
+        {
+            phoneNumber: '+919876543210',
+            name: 'Primary GPay',
+            isActive: true,
+            description: 'Main Google Pay number',
+            upiId: '9876543210@okhdfcbank', // Auto-converted format
+            createdAt: new Date().toISOString()
+        }
+    ],
+    
+    // ✅ PhonePe Numbers
+    phonePeNumbers: [
+        {
+            phoneNumber: '+919876543211',
+            name: 'Primary PhonePe',
+            isActive: true,
+            description: 'Main PhonePe number',
+            upiId: '9876543211@ybl', // Auto-converted format
+            createdAt: new Date().toISOString()
+        }
+    ],
+    
+    // ✅ PayTM Numbers
+    paytmNumbers: [
+        {
+            phoneNumber: '+919876543212',
+            name: 'Primary PayTM',
+            isActive: true,
+            description: 'Main PayTM number',
+            upiId: '9876543212@paytm', // Auto-converted format
+            createdAt: new Date().toISOString()
+        }
+    ],
+    
+    // ✅ QR Code (Base64 or URL)
+    qrCode: {
+        imageUrl: null, // URL to QR code image
+        imageData: null, // Base64 encoded QR
+        description: 'Scan to pay',
+        isActive: true,
+        updatedAt: null
+    },
+    
+    // ✅ Bank Accounts (for traditional transfers)
+    bankAccounts: [
+        {
+            accountName: 'Your Business Name',
+            accountNumber: '1234567890',
+            bankName: 'Your Bank',
+            ifscCode: 'BANK0001234',
+            branch: 'Main Branch',
+            accountType: 'Current',
+            isActive: true,
+            description: 'Primary bank account',
+            createdAt: new Date().toISOString()
+        }
+    ],
+    
+    // ✅ Payment Settings
+    paymentSettings: {
+        preferredMethod: 'upi', // 'upi', 'gpay', 'phonepe', 'paytm', 'qr', 'bank'
+        allowPartialPayments: false,
+        autoVerifyEnabled: true,
+        minConfidenceForAuto: 85,
+        paymentTimeout: 30, // minutes
+        requireTransactionId: true,
+        allowMultiplePaymentMethods: true
+    },
+    
+    // Bank Details (legacy support)
     bank: {
         name: 'Your Bank',
         account: '00000000000',
@@ -625,10 +805,14 @@ class CompanyConfig {
             const settings = await this.apiRequest('/api/company-settings');
             console.log('✅ [CompanyConfig] Settings fetched from API successfully');
             
-            // Log what we got (without sensitive data)
+            // Log what we got
             console.log(`📊 [CompanyConfig] Company: ${settings.companyName}`);
             console.log(`📊 [CompanyConfig] Active UPI IDs: ${settings.upiIds?.filter(u => u.isActive).length || 0}`);
-            // ✅ ADDED: Log order flow mode
+            console.log(`📊 [CompanyConfig] Active GPay Numbers: ${settings.gpayNumbers?.filter(g => g.isActive).length || 0}`);
+            console.log(`📊 [CompanyConfig] Active PhonePe Numbers: ${settings.phonePeNumbers?.filter(p => p.isActive).length || 0}`);
+            console.log(`📊 [CompanyConfig] Active PayTM Numbers: ${settings.paytmNumbers?.filter(p => p.isActive).length || 0}`);
+            console.log(`📊 [CompanyConfig] QR Code Active: ${settings.qrCode?.isActive ? '✅ Yes' : '❌ No'}`);
+            console.log(`📊 [CompanyConfig] Active Bank Accounts: ${settings.bankAccounts?.filter(b => b.isActive).length || 0}`);
             console.log(`📊 [CompanyConfig] Order flow mode: ${settings.orderFlowMode || 'short'}`);
             
             return settings;
@@ -636,7 +820,6 @@ class CompanyConfig {
         } catch (error) {
             console.error('❌ [CompanyConfig] API fetch failed:', error.message);
             
-            // Log more details about the error
             if (error.message.includes('ECONNREFUSED')) {
                 console.error(`💡 Make sure Next.js server is running at ${this.baseUrl}`);
             }
@@ -647,8 +830,6 @@ class CompanyConfig {
 
     /**
      * Get settings (with caching)
-     * 
-     * @returns {Promise<Object>} Company settings from API or fallback defaults
      */
     async getSettings() {
         // If cache is valid, return it
@@ -672,15 +853,18 @@ class CompanyConfig {
             const settings = await this.fetchPromise;
             
             if (settings) {
-                // ✅ CRITICAL: Cache the REAL data from API
                 this.cache = settings;
                 this.lastFetch = Date.now();
-              //  this.setupAutoRefresh();
                 
                 console.log(`✅ [CompanyConfig] Settings updated in cache`);
                 console.log(`   Company: ${settings.companyName}`);
-                console.log(`   UPI IDs: ${settings.upiIds?.length || 0} total, ${settings.upiIds?.filter(u => u.isActive).length || 0} active`);
-                // ✅ ADDED: Log cached mode
+                console.log(`   Payment methods available:`);
+                console.log(`   - UPI: ${settings.upiIds?.filter(u => u.isActive).length || 0}`);
+                console.log(`   - GPay: ${settings.gpayNumbers?.filter(g => g.isActive).length || 0}`);
+                console.log(`   - PhonePe: ${settings.phonePeNumbers?.filter(p => p.isActive).length || 0}`);
+                console.log(`   - PayTM: ${settings.paytmNumbers?.filter(p => p.isActive).length || 0}`);
+                console.log(`   - QR: ${settings.qrCode?.isActive ? 'Yes' : 'No'}`);
+                console.log(`   - Bank: ${settings.bankAccounts?.filter(b => b.isActive).length || 0}`);
                 console.log(`   Order flow mode: ${settings.orderFlowMode || 'short'}`);
                 
                 return settings;
@@ -692,35 +876,219 @@ class CompanyConfig {
                     return this.cache;
                 }
                 
-                // Ultimate fallback to defaults (only if absolutely nothing works)
+                // Ultimate fallback to defaults
                 console.warn('⚠️ [CompanyConfig] Using DEFAULT settings (API unavailable and no cache)');
-                console.warn(`   Check: Is Next.js server running at ${this.baseUrl}?`);
-                return { ...DEFAULT_SETTINGS }; // Return copy of defaults
+                return { ...DEFAULT_SETTINGS };
             }
         } finally {
             this.fetchPromise = null;
         }
     }
 
-    /**
-     * Setup auto-refresh timer
-     */
-    // setupAutoRefresh() {
-    //     if (this.refreshTimer) {
-    //         clearTimeout(this.refreshTimer);
-    //     }
-        
-    //     this.refreshTimer = setTimeout(async () => {
-    //         console.log('🔄 [CompanyConfig] Auto-refreshing settings...');
-    //         await this.getSettings();
-    //     }, CACHE_TTL);
-    // }
+    // ========== PAYMENT METHOD GETTERS ==========
 
     /**
-     * ✅ ADDED: Get current order flow mode
-     * Uses existing getSettings() method - NO NEW API CALLS!
-     * 
-     * @returns {Promise<string>} 'short' or 'long'
+     * ✅ Get all active UPI IDs
+     */
+    async getActiveUpiIds() {
+        const settings = await this.getSettings();
+        return (settings.upiIds || [])
+            .filter(upi => upi.isActive)
+            .map(upi => upi.id);
+    }
+
+    /**
+     * ✅ Get all active GPay numbers (with converted UPI format)
+     */
+    async getActiveGpayNumbers() {
+        const settings = await this.getSettings();
+        return (settings.gpayNumbers || [])
+            .filter(gpay => gpay.isActive)
+            .map(gpay => ({
+                phoneNumber: gpay.phoneNumber,
+                upiId: gpay.upiId || this.convertPhoneToUpi(gpay.phoneNumber, 'okhdfcbank'),
+                name: gpay.name,
+                description: gpay.description
+            }));
+    }
+
+    /**
+     * ✅ Get all active PhonePe numbers
+     */
+    async getActivePhonePeNumbers() {
+        const settings = await this.getSettings();
+        return (settings.phonePeNumbers || [])
+            .filter(phonepe => phonepe.isActive)
+            .map(phonepe => ({
+                phoneNumber: phonepe.phoneNumber,
+                upiId: phonepe.upiId || this.convertPhoneToUpi(phonepe.phoneNumber, 'ybl'),
+                name: phonepe.name,
+                description: phonepe.description
+            }));
+    }
+
+    /**
+     * ✅ Get all active PayTM numbers
+     */
+    async getActivePaytmNumbers() {
+        const settings = await this.getSettings();
+        return (settings.paytmNumbers || [])
+            .filter(paytm => paytm.isActive)
+            .map(paytm => ({
+                phoneNumber: paytm.phoneNumber,
+                upiId: paytm.upiId || this.convertPhoneToUpi(paytm.phoneNumber, 'paytm'),
+                name: paytm.name,
+                description: paytm.description
+            }));
+    }
+
+    /**
+     * ✅ Get active QR code
+     */
+    async getActiveQrCode() {
+        const settings = await this.getSettings();
+        if (settings.qrCode?.isActive) {
+            return settings.qrCode;
+        }
+        return null;
+    }
+
+    /**
+     * ✅ Get active bank accounts
+     */
+    async getActiveBankAccounts() {
+        const settings = await this.getSettings();
+        return (settings.bankAccounts || [])
+            .filter(bank => bank.isActive);
+    }
+
+    /**
+     * ✅ Get ALL active payment methods (for WhatsApp display)
+     */
+    async getAllPaymentMethods() {
+        const settings = await this.getSettings();
+        
+        const methods = [];
+        
+        // Add UPI IDs
+        (settings.upiIds || [])
+            .filter(u => u.isActive)
+            .forEach(upi => {
+                methods.push({
+                    type: 'upi',
+                    id: upi.id,
+                    name: upi.name,
+                    description: upi.description,
+                    appType: upi.appType,
+                    displayValue: upi.id
+                });
+            });
+        
+        // Add GPay numbers
+        (settings.gpayNumbers || [])
+            .filter(g => g.isActive)
+            .forEach(gpay => {
+                methods.push({
+                    type: 'gpay',
+                    phoneNumber: gpay.phoneNumber,
+                    upiId: gpay.upiId || this.convertPhoneToUpi(gpay.phoneNumber, 'okhdfcbank'),
+                    name: gpay.name,
+                    description: gpay.description,
+                    displayValue: gpay.phoneNumber
+                });
+            });
+        
+        // Add PhonePe numbers
+        (settings.phonePeNumbers || [])
+            .filter(p => p.isActive)
+            .forEach(phonepe => {
+                methods.push({
+                    type: 'phonepe',
+                    phoneNumber: phonepe.phoneNumber,
+                    upiId: phonepe.upiId || this.convertPhoneToUpi(phonepe.phoneNumber, 'ybl'),
+                    name: phonepe.name,
+                    description: phonepe.description,
+                    displayValue: phonepe.phoneNumber
+                });
+            });
+        
+        // Add PayTM numbers
+        (settings.paytmNumbers || [])
+            .filter(p => p.isActive)
+            .forEach(paytm => {
+                methods.push({
+                    type: 'paytm',
+                    phoneNumber: paytm.phoneNumber,
+                    upiId: paytm.upiId || this.convertPhoneToUpi(paytm.phoneNumber, 'paytm'),
+                    name: paytm.name,
+                    description: paytm.description,
+                    displayValue: paytm.phoneNumber
+                });
+            });
+        
+        // Add QR code
+        if (settings.qrCode?.isActive) {
+            methods.push({
+                type: 'qr',
+                imageUrl: settings.qrCode.imageUrl,
+                imageData: settings.qrCode.imageData,
+                description: settings.qrCode.description,
+                displayValue: 'QR Code'
+            });
+        }
+        
+        return methods;
+    }
+
+    /**
+     * ✅ Convert phone number to UPI format
+     */
+    convertPhoneToUpi(phoneNumber, handle = 'okhdfcbank') {
+        const digits = phoneNumber.replace(/\D/g, '');
+        // Take last 10 digits for UPI
+        const last10 = digits.slice(-10);
+        return `${last10}@${handle}`;
+    }
+
+    /**
+     * ✅ Validate payment method
+     */
+    async validatePaymentMethod(type, value) {
+        const settings = await this.getSettings();
+        
+        switch(type) {
+            case 'upi':
+                return (settings.upiIds || []).some(u => 
+                    u.isActive && u.id.toLowerCase() === value.toLowerCase()
+                );
+            
+            case 'gpay':
+                const gpayNumber = value.replace(/\D/g, '');
+                return (settings.gpayNumbers || []).some(g => 
+                    g.isActive && g.phoneNumber.replace(/\D/g, '') === gpayNumber
+                );
+            
+            case 'phonepe':
+                const phonepeNumber = value.replace(/\D/g, '');
+                return (settings.phonePeNumbers || []).some(p => 
+                    p.isActive && p.phoneNumber.replace(/\D/g, '') === phonepeNumber
+                );
+            
+            case 'paytm':
+                const paytmNumber = value.replace(/\D/g, '');
+                return (settings.paytmNumbers || []).some(p => 
+                    p.isActive && p.phoneNumber.replace(/\D/g, '') === paytmNumber
+                );
+            
+            default:
+                return false;
+        }
+    }
+
+    // ========== ORDER FLOW MODE ==========
+
+    /**
+     * ✅ Get current order flow mode
      */
     async getOrderFlowMode() {
         try {
@@ -730,111 +1098,75 @@ class CompanyConfig {
             return mode;
         } catch (error) {
             console.error('❌ [CompanyConfig] Error getting order flow mode:', error.message);
-            return 'short'; // Default to short on error
+            return 'short';
         }
     }
 
+    // ========== PAYMENT SETTINGS ==========
+
     /**
-     * Get active UPI IDs (for payment verification)
-     * 
-     * @returns {Promise<string[]>} Array of active UPI ID strings
+     * ✅ Get payment settings
      */
-    async getActiveUpiIds() {
+    async getPaymentSettings() {
         const settings = await this.getSettings();
-        const activeUpiIds = (settings.upiIds || [])
-            .filter(upi => upi.isActive)
-            .map(upi => upi.id);
-        
-        console.log(`💰 [CompanyConfig] Active UPI IDs: ${activeUpiIds.join(', ') || 'None'}`);
-        return activeUpiIds;
+        return settings.paymentSettings || DEFAULT_SETTINGS.paymentSettings;
     }
 
     /**
-     * Get active UPI IDs with full details
-     * 
-     * @returns {Promise<Array>} Array of active UPI objects with all details
+     * ✅ Check if auto-verify is enabled
      */
-    async getActiveUpiDetails() {
-        const settings = await this.getSettings();
-        const activeUpiDetails = (settings.upiIds || []).filter(upi => upi.isActive);
-        
-        console.log(`💰 [CompanyConfig] Active UPI details: ${activeUpiDetails.length} found`);
-        return activeUpiDetails;
+    async isAutoVerifyEnabled() {
+        const settings = await this.getPaymentSettings();
+        return settings.autoVerifyEnabled !== false;
     }
 
     /**
-     * Check if UPI ID is valid and active
-     * 
-     * @param {string} upiId - UPI ID to check
-     * @returns {Promise<boolean>} True if valid and active
+     * ✅ Get minimum confidence for auto-verify
      */
-    async isValidUpiId(upiId) {
-        if (!upiId) return false;
-        
-        const settings = await this.getSettings();
-        const isValid = (settings.upiIds || []).some(upi => 
-            upi.isActive && upi.id.toLowerCase() === upiId.toLowerCase()
-        );
-        
-        console.log(`🔍 [CompanyConfig] UPI ID ${upiId} is ${isValid ? '✅ valid' : '❌ invalid'}`);
-        return isValid;
+    async getMinConfidenceForAuto() {
+        const settings = await this.getPaymentSettings();
+        return settings.minConfidenceForAuto || 85;
     }
+
+    // ========== INVOICE & SUPPORT METHODS ==========
 
     /**
      * Get company info for invoice
-     * 
-     * @returns {Promise<Object>} Formatted company info for invoices
      */
     async getInvoiceInfo() {
-    try {
-        const settings = await this.getSettings();
-        
-        // ✅ CRITICAL FIX: Check if settings is null or undefined
-        if (!settings) {
-            console.warn('⚠️ [CompanyConfig] Settings is null/undefined, using defaults');
+        try {
+            const settings = await this.getSettings();
+            
+            if (!settings) {
+                console.warn('⚠️ [CompanyConfig] Settings is null/undefined, using defaults');
+                return this.getDefaultInvoiceInfo();
+            }
+            
             return {
-                companyName: DEFAULT_SETTINGS.companyName,
-                legalName: DEFAULT_SETTINGS.legalName,
-                tagline: DEFAULT_SETTINGS.tagline,
-                address: DEFAULT_SETTINGS.address,
-                city: DEFAULT_SETTINGS.city,
-                gstin: DEFAULT_SETTINGS.gstin || '',
-                pan: DEFAULT_SETTINGS.pan || '',
-                cin: DEFAULT_SETTINGS.cin || '',
-                phone: DEFAULT_SETTINGS.phone,
-                email: DEFAULT_SETTINGS.email,
-                website: DEFAULT_SETTINGS.website,
-                bank: DEFAULT_SETTINGS.bank,
-                invoiceSettings: DEFAULT_SETTINGS.invoiceSettings,
-                logo: DEFAULT_SETTINGS.logo,
-                signature: DEFAULT_SETTINGS.signature,
-                stamp: DEFAULT_SETTINGS.stamp
+                companyName: settings.companyName || DEFAULT_SETTINGS.companyName,
+                legalName: settings.legalName || DEFAULT_SETTINGS.legalName,
+                tagline: settings.tagline || DEFAULT_SETTINGS.tagline,
+                address: settings.address || DEFAULT_SETTINGS.address,
+                city: settings.city || DEFAULT_SETTINGS.city,
+                gstin: settings.gstin || '',
+                pan: settings.pan || '',
+                cin: settings.cin || '',
+                phone: settings.phone || DEFAULT_SETTINGS.phone,
+                email: settings.email || DEFAULT_SETTINGS.email,
+                website: settings.website || DEFAULT_SETTINGS.website,
+                bank: settings.bank || DEFAULT_SETTINGS.bank,
+                invoiceSettings: settings.invoiceSettings || DEFAULT_SETTINGS.invoiceSettings,
+                logo: settings.logo,
+                signature: settings.signature,
+                stamp: settings.stamp
             };
+        } catch (error) {
+            console.error('❌ [CompanyConfig] Error in getInvoiceInfo:', error.message);
+            return this.getDefaultInvoiceInfo();
         }
-        
-        // ✅ Safe to access settings properties now
-        return {
-            companyName: settings.companyName || DEFAULT_SETTINGS.companyName,
-            legalName: settings.legalName || DEFAULT_SETTINGS.legalName,
-            tagline: settings.tagline || DEFAULT_SETTINGS.tagline,
-            address: settings.address || DEFAULT_SETTINGS.address,
-            city: settings.city || DEFAULT_SETTINGS.city,
-            gstin: settings.gstin || '',
-            pan: settings.pan || '',
-            cin: settings.cin || '',
-            phone: settings.phone || DEFAULT_SETTINGS.phone,
-            email: settings.email || DEFAULT_SETTINGS.email,
-            website: settings.website || DEFAULT_SETTINGS.website,
-            bank: settings.bank || DEFAULT_SETTINGS.bank,
-            invoiceSettings: settings.invoiceSettings || DEFAULT_SETTINGS.invoiceSettings,
-            logo: settings.logo,
-            signature: settings.signature,
-            stamp: settings.stamp
-        };
-    } catch (error) {
-        console.error('❌ [CompanyConfig] Error in getInvoiceInfo:', error.message);
-        
-        // Return defaults on any error
+    }
+
+    getDefaultInvoiceInfo() {
         return {
             companyName: DEFAULT_SETTINGS.companyName,
             legalName: DEFAULT_SETTINGS.legalName,
@@ -854,12 +1186,9 @@ class CompanyConfig {
             stamp: DEFAULT_SETTINGS.stamp
         };
     }
-}
 
     /**
      * Get support information
-     * 
-     * @returns {Promise<Object>} Formatted support info
      */
     async getSupportInfo() {
         const settings = await this.getSettings();
@@ -875,64 +1204,22 @@ class CompanyConfig {
     }
 
     /**
-     * Get bank details
-     * 
-     * @returns {Promise<Object>} Bank details
-     */
-    async getBankDetails() {
-        const settings = await this.getSettings();
-        return settings.bank || DEFAULT_SETTINGS.bank;
-    }
-
-    /**
      * Force refresh settings (call after admin updates)
-     * 
-     * @returns {Promise<Object>} Fresh settings from API
      */
     async forceRefresh() {
         console.log('🔄 [CompanyConfig] Force refreshing settings...');
-        this.lastFetch = null; // Invalidate cache
+        this.lastFetch = null;
         this.cache = null;
         
         if (this.refreshTimer) {
             clearTimeout(this.refreshTimer);
         }
         
-        console.log('🔄 [CompanyConfig] Cache cleared, fetching fresh data...');
         return this.getSettings();
     }
 
     /**
-     * Get specific setting by path (dot notation)
-     * 
-     * @param {string} path - Dot notation path (e.g., 'bank.name')
-     * @returns {Promise<any>} Value at path or undefined
-     */
-    async get(path) {
-        const settings = await this.getSettings();
-        
-        return path.split('.').reduce((obj, key) => 
-            obj && obj[key] !== undefined ? obj[key] : undefined, settings);
-    }
-
-    /**
-     * Check if API is reachable
-     * 
-     * @returns {Promise<boolean>} True if API is reachable
-     */
-    async healthCheck() {
-        try {
-            await this.apiRequest('/api/company-settings');
-            return true;
-        } catch {
-            return false;
-        }
-    }
-
-    /**
      * Get cache status
-     * 
-     * @returns {Object} Cache status info
      */
     getCacheStatus() {
         return {
@@ -957,8 +1244,8 @@ class CompanyConfig {
 }
 
 // ==================== EXPORT SINGLETON ====================
+// ✅ FIXED: Using CommonJS module.exports instead of export default
 
-// Create and export a single instance (singleton pattern)
 const companyConfig = new CompanyConfig();
 
 // Handle process exit
@@ -975,4 +1262,5 @@ process.on('uncaughtException', (error) => {
     console.error('❌ [CompanyConfig] Uncaught exception:', error);
 });
 
+// ✅ CommonJS export
 export default companyConfig;

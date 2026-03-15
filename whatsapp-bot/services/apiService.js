@@ -1445,76 +1445,248 @@ class ApiService {
 
     // ========== PAYMENT VERIFICATION APIS ==========
 
-    async createPaymentVerification(verificationData) {
-        try {
-            console.log('🔍 Creating payment verification:', {
-                orderNumber: verificationData.orderNumber,
-                customerPhone: verificationData.customerPhone
-            });
+  async createPaymentVerification(verificationData) {
+    try {
+        console.log('🔍 Creating payment verification:', {
+            orderNumber: verificationData.orderNumber,
+            customerPhone: verificationData.customerPhone,
+            hasOcrData: !!verificationData.ocrAnalysis,
+            hasValidation: !!verificationData.validationResults,
+            engineUsed: verificationData.metadata?.ocrEngine
+        });
 
-            if (!verificationData.orderNumber || !verificationData.customerPhone) {
-                throw new Error('Order number and customer phone are required');
-            }
-
-            // Format payment verification data with enhanced fields
-            const formattedData = {
-                orderNumber: verificationData.orderNumber,
-                customerPhone: verificationData.customerPhone,
-                customerName: verificationData.customerName || '',
-                orderReference: verificationData.orderReference || verificationData.orderNumber,
-                orderDetails: {
-                    totalAmount: this.safeNumber(verificationData.orderDetails?.totalAmount || verificationData.amount),
-                    subtotal: this.safeNumber(verificationData.orderDetails?.subtotal),
-                    totalGst: this.safeNumber(verificationData.orderDetails?.totalGst),
-                    items: (verificationData.orderDetails?.items || []).map(item => ({
-                        productId: item.productId,
-                        productName: item.productName,
-                        quantity: this.safeNumber(item.quantity),
-                        price: this.safeNumber(item.price),
-                        mrp: this.safeNumber(item.mrp),
-                        gstRate: this.safeNumber(item.gstRate, 18),
-                        gstIncluded: item.gstIncluded !== false,
-                        gstAmount: this.safeNumber(item.gstAmount),
-                        totalAmount: this.safeNumber(item.totalAmount)
-                    }))
-                },
-                paymentProof: verificationData.paymentProof || {},
-                detectedPayment: {
-                    amount: this.safeNumber(verificationData.detectedPayment?.amount || verificationData.amount),
-                    upiTransactionId: verificationData.detectedPayment?.upiTransactionId || verificationData.upiTransactionId,
-                    bankReference: verificationData.detectedPayment?.bankReference,
-                    paymentMethod: verificationData.detectedPayment?.paymentMethod || verificationData.paymentMethod || 'upi',
-                    timestamp: verificationData.detectedPayment?.timestamp || new Date().toISOString(),
-                    status: verificationData.detectedPayment?.status || 'success',
-                    confidence: this.safeNumber(verificationData.detectedPayment?.confidence, 1)
-                },
-                metadata: {
-                    source: verificationData.metadata?.source || 'whatsapp',
-                    ipAddress: verificationData.metadata?.ipAddress,
-                    userAgent: verificationData.metadata?.userAgent,
-                    ...verificationData.metadata
-                }
-            };
-
-            console.log('📤 Sending to /api/payments/verify');
-            const response = await this.client.post('/api/payments/verify', formattedData);
-            
-            console.log('✅ Payment verification created successfully');
-            return this.extractData(response.data);
-
-        } catch (error) {
-            console.error('❌ Create payment verification error:', {
-                status: error.response?.status,
-                data: error.response?.data,
-                message: error.message
-            });
-            
-            if (error.response?.status === 400) {
-                throw new Error(`Invalid request: ${error.response.data?.message || 'Bad request'}`);
-            }
-            throw new Error('Failed to create payment verification: ' + (error.message || 'Unknown error'));
+        if (!verificationData.orderNumber || !verificationData.customerPhone) {
+            throw new Error('Order number and customer phone are required');
         }
+
+        // Format payment verification data with ALL professional OCR fields
+        const formattedData = {
+            // Core identifiers
+            orderNumber: verificationData.orderNumber,
+            customerPhone: verificationData.customerPhone,
+            customerName: verificationData.customerName || '',
+            orderReference: verificationData.orderReference || verificationData.orderNumber,
+            
+            // Company context for multi-tenancy
+            companyId: verificationData.companyId,
+            
+            // Complete order details
+            orderDetails: {
+                totalAmount: this.safeNumber(verificationData.orderDetails?.totalAmount || verificationData.amount),
+                subtotal: this.safeNumber(verificationData.orderDetails?.subtotal),
+                totalGst: this.safeNumber(verificationData.orderDetails?.totalGst),
+                customerName: verificationData.orderDetails?.customerName || verificationData.customerName,
+                customerEmail: verificationData.orderDetails?.customerEmail,
+                shippingAddress: verificationData.orderDetails?.shippingAddress,
+                pincode: verificationData.orderDetails?.pincode,
+                items: (verificationData.orderDetails?.items || []).map(item => ({
+                    productId: item.productId,
+                    productName: item.productName,
+                    quantity: this.safeNumber(item.quantity),
+                    price: this.safeNumber(item.price),
+                    mrp: this.safeNumber(item.mrp),
+                    gstRate: this.safeNumber(item.gstRate, 18),
+                    gstIncluded: item.gstIncluded !== false,
+                    gstAmount: this.safeNumber(item.gstAmount),
+                    totalAmount: this.safeNumber(item.totalAmount)
+                }))
+            },
+
+            // Payment proof (screenshot/QR)
+            paymentProof: {
+                imageData: verificationData.paymentProof?.imageData ? 
+                    verificationData.paymentProof.imageData.substring(0, 10000) : null, // Truncate for storage
+                mimeType: verificationData.paymentProof?.mimeType || 'image/jpeg',
+                fileName: verificationData.paymentProof?.fileName || 'payment_screenshot.jpg',
+                fileSize: verificationData.paymentProof?.fileSize,
+                uploadedAt: verificationData.paymentProof?.uploadedAt || new Date().toISOString(),
+                imageHash: verificationData.paymentProof?.imageHash
+            },
+
+            // Detected payment information (from QR/OCR)
+            detectedPayment: {
+                amount: this.safeNumber(verificationData.detectedPayment?.amount || verificationData.amount),
+                upiId: verificationData.detectedPayment?.upiId || verificationData.upiId,
+                upiTransactionId: verificationData.detectedPayment?.upiTransactionId || verificationData.upiTransactionId,
+                transactionId: verificationData.detectedPayment?.transactionId || verificationData.transactionId,
+                bankReference: verificationData.detectedPayment?.bankReference,
+                paymentMethod: verificationData.detectedPayment?.paymentMethod || verificationData.paymentMethod || 'upi',
+                timestamp: verificationData.detectedPayment?.timestamp || new Date().toISOString(),
+                status: verificationData.detectedPayment?.status || 'success',
+                confidence: this.safeNumber(verificationData.detectedPayment?.confidence, 1),
+                appName: verificationData.detectedPayment?.appName,
+                bankName: verificationData.detectedPayment?.bankName,
+                senderName: verificationData.detectedPayment?.senderName,
+                senderUpi: verificationData.detectedPayment?.senderUpi,
+                payeeVPA: verificationData.detectedPayment?.payeeVPA,
+                reference: verificationData.detectedPayment?.reference,
+                remarks: verificationData.detectedPayment?.remarks
+            },
+
+            // ========== CRITICAL: OCR ANALYSIS RESULTS ==========
+            ocrAnalysis: {
+                // Raw extracted text from screenshot (MOST IMPORTANT FOR AUDIT)
+                extractedText: verificationData.ocrAnalysis?.extractedText || '',
+                
+                // Overall confidence scores
+                confidenceScore: this.safeNumber(verificationData.ocrAnalysis?.confidenceScore, 0),
+                
+                // Extracted fields with their individual confidences
+                extractedAmount: this.safeNumber(verificationData.ocrAnalysis?.extractedAmount),
+                extractedAmountConfidence: this.safeNumber(verificationData.ocrAnalysis?.extractedAmountConfidence, 0),
+                
+                extractedUPI: verificationData.ocrAnalysis?.extractedUPI || '',
+                extractedUPIConfidence: this.safeNumber(verificationData.ocrAnalysis?.extractedUPIConfidence, 0),
+                
+                transactionId: verificationData.ocrAnalysis?.transactionId || '',
+                transactionIdConfidence: this.safeNumber(verificationData.ocrAnalysis?.transactionIdConfidence, 0),
+                
+                // Payment status detection
+                status: verificationData.ocrAnalysis?.status || 'unknown',
+                statusConfidence: this.safeNumber(verificationData.ocrAnalysis?.statusConfidence, 0),
+                
+                // Timestamp extraction
+                timestamp: verificationData.ocrAnalysis?.timestamp || '',
+                timestampConfidence: this.safeNumber(verificationData.ocrAnalysis?.timestampConfidence, 0),
+                
+                // App/Bank detection
+                appName: verificationData.ocrAnalysis?.appName || '',
+                appNameConfidence: this.safeNumber(verificationData.ocrAnalysis?.appNameConfidence, 0),
+                
+                bankName: verificationData.ocrAnalysis?.bankName || '',
+                bankNameConfidence: this.safeNumber(verificationData.ocrAnalysis?.bankNameConfidence, 0),
+                
+                // OCR metadata
+                wordCount: this.safeNumber(verificationData.ocrAnalysis?.wordCount, 0),
+                processingTime: this.safeNumber(verificationData.ocrAnalysis?.processingTime, 0),
+                ocrEngine: verificationData.ocrAnalysis?.ocrEngine || 'paddle',
+                backupUsed: verificationData.ocrAnalysis?.backupUsed || false,
+                
+                // Full raw text for debugging (truncated for performance)
+                rawText: verificationData.ocrAnalysis?.rawText ? 
+                    verificationData.ocrAnalysis.rawText.substring(0, 5000) : '',
+                
+                // Word-level data for UI highlighting
+                words: verificationData.ocrAnalysis?.words || []
+            },
+
+            // ========== VALIDATION RESULTS ==========
+            validationResults: {
+                // Amount validation
+                amountMatch: verificationData.validationResults?.amountMatch || false,
+                expectedAmount: this.safeNumber(verificationData.validationResults?.expectedAmount),
+                foundAmount: this.safeNumber(verificationData.validationResults?.foundAmount),
+                amountDifference: this.safeNumber(verificationData.validationResults?.amountDifference, 0),
+                matchQuality: verificationData.validationResults?.matchQuality || 'none', // exact/close/near/far
+                
+                // UPI validation
+                upiMatch: verificationData.validationResults?.upiMatch || false,
+                matchedUpiId: verificationData.validationResults?.matchedUpiId,
+                upiMatchType: verificationData.validationResults?.upiMatchType, // exact/contains/partial
+                
+                // Time validation
+                timeValid: verificationData.validationResults?.timeValid || false,
+                detectedTime: verificationData.validationResults?.detectedTime,
+                timeDifferenceMinutes: this.safeNumber(verificationData.validationResults?.timeDifferenceMinutes, 0),
+                
+                // Success indicators
+                successIndicators: verificationData.validationResults?.successIndicators || false,
+                
+                // Overall confidence
+                confidenceScore: this.safeNumber(verificationData.validationResults?.confidenceScore, 0),
+                
+                // Errors and warnings
+                validationErrors: verificationData.validationResults?.validationErrors || [],
+                validationWarnings: verificationData.validationResults?.validationWarnings || [],
+                
+                // Validation timestamp
+                validatedAt: verificationData.validationResults?.validatedAt || new Date().toISOString()
+            },
+
+            // ========== FRAUD ANALYSIS ==========
+            fraudAnalysis: {
+                isSuspicious: verificationData.fraudAnalysis?.isSuspicious || false,
+                fraudScore: this.safeNumber(verificationData.fraudAnalysis?.fraudScore, 0),
+                riskLevel: verificationData.fraudAnalysis?.riskLevel || 'low', // low/medium/high/critical
+                reasons: verificationData.fraudAnalysis?.reasons || [],
+                flags: verificationData.fraudAnalysis?.flags || [],
+                analysisPerformedAt: verificationData.fraudAnalysis?.analysisPerformedAt || new Date().toISOString()
+            },
+
+            // ========== METADATA ==========
+            metadata: {
+                // Source information
+                source: verificationData.metadata?.source || 'whatsapp',
+                ipAddress: verificationData.metadata?.ipAddress,
+                userAgent: verificationData.metadata?.userAgent,
+                
+                // OCR engine information
+                ocrEngine: verificationData.metadata?.ocrEngine || 'paddle',
+                backupEngine: verificationData.metadata?.backupEngine,
+                backupUsed: verificationData.metadata?.backupUsed || false,
+                
+                // Payment type detection
+                paymentType: verificationData.metadata?.paymentType || 'screenshot', // qr_code/screenshot/upi_text/phone_number
+                
+                // Performance metrics
+                processingTime: this.safeNumber(verificationData.metadata?.processingTime, 0),
+                
+                // Request tracking
+                requestId: verificationData.metadata?.requestId,
+                
+                // Any additional metadata
+                ...verificationData.metadata
+            },
+
+            // Status
+            status: verificationData.status || 'pending',
+            
+            // Timestamps
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+
+        console.log('📤 Sending to /api/payments/verify with complete OCR data:', {
+            orderNumber: formattedData.orderNumber,
+            customerPhone: formattedData.customerPhone,
+            ocrConfidence: formattedData.ocrAnalysis.confidenceScore,
+            extractedAmount: formattedData.ocrAnalysis.extractedAmount,
+            validationMatch: formattedData.validationResults.matchQuality,
+            fraudRisk: formattedData.fraudAnalysis.riskLevel,
+            engineUsed: formattedData.metadata.ocrEngine,
+            dataSize: JSON.stringify(formattedData).length
+        });
+
+        const response = await this.client.post('/api/payments/verify', formattedData);
+        
+        console.log('✅ Payment verification created successfully:', {
+            id: response.data?.data?._id,
+            status: response.data?.data?.status,
+            confidence: response.data?.data?.ocrAnalysis?.confidenceScore
+        });
+        
+        return this.extractData(response.data);
+
+    } catch (error) {
+        console.error('❌ Create payment verification error:', {
+            status: error.response?.status,
+            data: error.response?.data,
+            message: error.message,
+            orderNumber: verificationData?.orderNumber,
+            customerPhone: verificationData?.customerPhone
+        });
+        
+        if (error.response?.status === 400) {
+            throw new Error(`Invalid request: ${error.response.data?.message || 'Bad request'}`);
+        }
+        
+        if (error.response?.status === 409) {
+            throw new Error(`Duplicate verification: ${error.response.data?.message || 'Already exists'}`);
+        }
+        
+        throw new Error('Failed to create payment verification: ' + (error.message || 'Unknown error'));
     }
+}
 
     async verifyPaymentAutomatically(verificationId, verificationResult) {
         try {

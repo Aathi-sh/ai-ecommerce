@@ -1034,14 +1034,15 @@
 
 
 
+// models/CompanySettings.js - PROFESSIONAL 3-OCR MULTI-TENANT VERSION
+// Industry standard: Complete payment method configuration for each company
 
-// models/CompanySettings.js - UPDATED FOR SAAS MULTI-TENANCY
 import mongoose from 'mongoose';
 
-// ==================== SCHEMA DEFINITIONS ====================
+// ==================== PAYMENT METHOD SCHEMAS ====================
 
 /**
- * UPI ID Schema - For payment verification
+ * UPI ID Schema - Standard UPI format (name@bank)
  */
 const UpiIdSchema = new mongoose.Schema({
     id: {
@@ -1067,7 +1068,7 @@ const UpiIdSchema = new mongoose.Schema({
     appType: {
         type: String,
         enum: {
-            values: ['gpay', 'phonepe', 'paytm', 'bhim', 'other'],
+            values: ['gpay', 'phonepe', 'paytm', 'bhim', 'amazonpay', 'other'],
             message: '{VALUE} is not a valid app type'
         },
         default: 'other'
@@ -1094,14 +1095,358 @@ const UpiIdSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     }
-}, { 
-    _id: true,
-    timestamps: false 
-});
+}, { _id: true });
 
 /**
- * Bank Details Schema
+ * GPay Number Schema - Phone-based payments
  */
+const GpayNumberSchema = new mongoose.Schema({
+    phoneNumber: {
+        type: String,
+        required: [true, 'GPay phone number is required'],
+        trim: true,
+        validate: {
+            validator: function(v) {
+                const digits = v.replace(/\D/g, '');
+                return digits.length === 10;
+            },
+            message: 'Phone number must be exactly 10 digits'
+        }
+    },
+    name: {
+        type: String,
+        required: [true, 'Display name is required'],
+        trim: true
+    },
+    upiId: {
+        type: String,
+        trim: true,
+        lowercase: true,
+        default: function() {
+            const digits = this.phoneNumber.replace(/\D/g, '');
+            return `${digits}@okhdfcbank`;
+        }
+    },
+    isActive: {
+        type: Boolean,
+        default: true,
+        index: true
+    },
+    description: {
+        type: String,
+        trim: true,
+        maxlength: [200, 'Description cannot exceed 200 characters']
+    },
+    usageCount: {
+        type: Number,
+        default: 0
+    },
+    lastUsed: {
+        type: Date
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    }
+}, { _id: true });
+
+/**
+ * PhonePe Number Schema
+ */
+const PhonePeNumberSchema = new mongoose.Schema({
+    phoneNumber: {
+        type: String,
+        required: [true, 'PhonePe phone number is required'],
+        trim: true,
+        validate: {
+            validator: function(v) {
+                const digits = v.replace(/\D/g, '');
+                return digits.length === 10;
+            },
+            message: 'Phone number must be exactly 10 digits'
+        }
+    },
+    name: {
+        type: String,
+        required: [true, 'Display name is required'],
+        trim: true
+    },
+    upiId: {
+        type: String,
+        trim: true,
+        lowercase: true,
+        default: function() {
+            const digits = this.phoneNumber.replace(/\D/g, '');
+            return `${digits}@ybl`;
+        }
+    },
+    isActive: {
+        type: Boolean,
+        default: true,
+        index: true
+    },
+    description: {
+        type: String,
+        trim: true,
+        maxlength: [200, 'Description cannot exceed 200 characters']
+    },
+    usageCount: {
+        type: Number,
+        default: 0
+    },
+    lastUsed: {
+        type: Date
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    }
+}, { _id: true });
+
+/**
+ * PayTM Number Schema
+ */
+const PaytmNumberSchema = new mongoose.Schema({
+    phoneNumber: {
+        type: String,
+        required: [true, 'PayTM phone number is required'],
+        trim: true,
+        validate: {
+            validator: function(v) {
+                const digits = v.replace(/\D/g, '');
+                return digits.length === 10;
+            },
+            message: 'Phone number must be exactly 10 digits'
+        }
+    },
+    name: {
+        type: String,
+        required: [true, 'Display name is required'],
+        trim: true
+    },
+    upiId: {
+        type: String,
+        trim: true,
+        lowercase: true,
+        default: function() {
+            const digits = this.phoneNumber.replace(/\D/g, '');
+            return `${digits}@paytm`;
+        }
+    },
+    isActive: {
+        type: Boolean,
+        default: true,
+        index: true
+    },
+    description: {
+        type: String,
+        trim: true,
+        maxlength: [200, 'Description cannot exceed 200 characters']
+    },
+    usageCount: {
+        type: Number,
+        default: 0
+    },
+    lastUsed: {
+        type: Date
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    }
+}, { _id: true });
+
+/**
+ * QR Code Schema
+ */
+const QrCodeSchema = new mongoose.Schema({
+    imageUrl: {
+        type: String,
+        trim: true,
+        validate: {
+            validator: function(v) {
+                if (!v) return true;
+                return v.startsWith('/uploads/') || v.startsWith('http');
+            },
+            message: 'QR code must be a valid URL or upload path'
+        }
+    },
+    imageData: {
+        type: String,
+        select: false // Don't return by default (large)
+    },
+    name: {
+        type: String,
+        default: 'Payment QR Code'
+    },
+    description: {
+        type: String,
+        trim: true,
+        maxlength: [200, 'Description cannot exceed 200 characters']
+    },
+    isActive: {
+        type: Boolean,
+        default: true,
+        index: true
+    },
+    scanCount: {
+        type: Number,
+        default: 0
+    },
+    lastScanned: {
+        type: Date
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    },
+    updatedAt: {
+        type: Date,
+        default: Date.now
+    }
+}, { _id: true });
+
+/**
+ * Bank Account Schema
+ */
+const BankAccountSchema = new mongoose.Schema({
+    accountName: {
+        type: String,
+        required: [true, 'Account holder name is required'],
+        trim: true
+    },
+    accountNumber: {
+        type: String,
+        required: [true, 'Account number is required'],
+        trim: true,
+        validate: {
+            validator: function(v) {
+                return /^\d{9,18}$/.test(v.replace(/\s/g, ''));
+            },
+            message: 'Account number must be between 9-18 digits'
+        }
+    },
+    bankName: {
+        type: String,
+        required: [true, 'Bank name is required'],
+        trim: true
+    },
+    ifscCode: {
+        type: String,
+        required: [true, 'IFSC code is required'],
+        trim: true,
+        uppercase: true,
+        validate: {
+            validator: function(v) {
+                return /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v);
+            },
+            message: 'IFSC code must be in format: ABCD0123456'
+        }
+    },
+    branch: {
+        type: String,
+        trim: true
+    },
+    accountType: {
+        type: String,
+        enum: ['Current', 'Savings', 'Business'],
+        default: 'Current'
+    },
+    isActive: {
+        type: Boolean,
+        default: true,
+        index: true
+    },
+    isDefault: {
+        type: Boolean,
+        default: false
+    },
+    description: {
+        type: String,
+        trim: true,
+        maxlength: [200, 'Description cannot exceed 200 characters']
+    },
+    upiId: {
+        type: String,
+        trim: true,
+        lowercase: true,
+        validate: {
+            validator: function(v) {
+                if (!v) return true;
+                return /^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/.test(v);
+            },
+            message: 'Invalid UPI ID format'
+        }
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    }
+}, { _id: true });
+
+/**
+ * Payment Settings Schema - Global payment configuration
+ */
+const PaymentSettingsSchema = new mongoose.Schema({
+    preferredMethod: {
+        type: String,
+        enum: ['upi', 'gpay', 'phonepe', 'paytm', 'qr', 'bank', 'any'],
+        default: 'any'
+    },
+    allowPartialPayments: {
+        type: Boolean,
+        default: false
+    },
+    autoVerifyEnabled: {
+        type: Boolean,
+        default: true
+    },
+    minConfidenceForAuto: {
+        type: Number,
+        min: 50,
+        max: 100,
+        default: 85
+    },
+    paymentTimeout: {
+        type: Number,
+        min: 5,
+        max: 60,
+        default: 30,
+        description: 'Minutes before payment expires'
+    },
+    requireTransactionId: {
+        type: Boolean,
+        default: true
+    },
+    allowMultiplePaymentMethods: {
+        type: Boolean,
+        default: true
+    },
+    displayOrder: {
+        type: [String],
+        default: ['upi', 'gpay', 'phonepe', 'paytm', 'qr', 'bank']
+    },
+    autoVerifyThresholds: {
+        amountTolerance: {
+            type: Number,
+            default: 2,
+            description: '₹ tolerance for amount matching'
+        },
+        timeWindow: {
+            type: Number,
+            default: 15,
+            description: 'Minutes window for recent payments'
+        },
+        minConfidencePerField: {
+            amount: { type: Number, default: 80 },
+            upi: { type: Number, default: 80 },
+            transactionId: { type: Number, default: 70 }
+        }
+    }
+}, { _id: false });
+
+// ==================== BANK DETAILS SCHEMA (Legacy Support) ====================
+
 const BankDetailsSchema = new mongoose.Schema({
     name: {
         type: String,
@@ -1151,14 +1496,10 @@ const BankDetailsSchema = new mongoose.Schema({
             message: 'Invalid UPI ID format'
         }
     }
-}, { 
-    _id: false,
-    timestamps: false 
-});
+}, { _id: false });
 
-/**
- * Invoice Settings Schema
- */
+// ==================== INVOICE SETTINGS SCHEMA ====================
+
 const InvoiceSettingsSchema = new mongoose.Schema({
     prefix: {
         type: String,
@@ -1242,14 +1583,10 @@ const InvoiceSettingsSchema = new mongoose.Schema({
         type: String,
         trim: true
     }
-}, { 
-    _id: false,
-    timestamps: false 
-});
+}, { _id: false });
 
-/**
- * Support Settings Schema
- */
+// ==================== SUPPORT SETTINGS SCHEMA ====================
+
 const SupportSettingsSchema = new mongoose.Schema({
     email: {
         type: String,
@@ -1297,14 +1634,10 @@ const SupportSettingsSchema = new mongoose.Schema({
         default: 'Within 30 minutes',
         maxlength: [50, 'Response time cannot exceed 50 characters']
     }
-}, { 
-    _id: false,
-    timestamps: false 
-});
+}, { _id: false });
 
-/**
- * Social Media Links Schema
- */
+// ==================== SOCIAL MEDIA SCHEMA ====================
+
 const SocialLinksSchema = new mongoose.Schema({
     facebook: {
         type: String,
@@ -1361,14 +1694,26 @@ const SocialLinksSchema = new mongoose.Schema({
             message: 'LinkedIn URL must start with http:// or https://'
         }
     }
-}, { 
-    _id: false,
-    timestamps: false 
-});
+}, { _id: false });
 
-/**
- * Theme Settings Schema
- */
+// ==================== BUSINESS HOURS SCHEMA ====================
+
+const BusinessHoursSchema = new mongoose.Schema({
+    monday: { type: String, default: '9:00 AM - 8:00 PM' },
+    tuesday: { type: String, default: '9:00 AM - 8:00 PM' },
+    wednesday: { type: String, default: '9:00 AM - 8:00 PM' },
+    thursday: { type: String, default: '9:00 AM - 8:00 PM' },
+    friday: { type: String, default: '9:00 AM - 8:00 PM' },
+    saturday: { type: String, default: '9:00 AM - 6:00 PM' },
+    sunday: { type: String, default: 'Closed' },
+    holidays: [{
+        date: Date,
+        description: String
+    }]
+}, { _id: false });
+
+// ==================== THEME SCHEMA ====================
+
 const ThemeSchema = new mongoose.Schema({
     primary: {
         type: String,
@@ -1490,35 +1835,12 @@ const ThemeSchema = new mongoose.Schema({
             message: 'Border color must be a valid hex code'
         }
     }
-}, { 
-    _id: false,
-    timestamps: false 
-});
-
-/**
- * Business Hours Schema
- */
-const BusinessHoursSchema = new mongoose.Schema({
-    monday: { type: String, default: '9:00 AM - 8:00 PM' },
-    tuesday: { type: String, default: '9:00 AM - 8:00 PM' },
-    wednesday: { type: String, default: '9:00 AM - 8:00 PM' },
-    thursday: { type: String, default: '9:00 AM - 8:00 PM' },
-    friday: { type: String, default: '9:00 AM - 8:00 PM' },
-    saturday: { type: String, default: '9:00 AM - 6:00 PM' },
-    sunday: { type: String, default: 'Closed' },
-    holidays: [{
-        date: Date,
-        description: String
-    }]
-}, { 
-    _id: false,
-    timestamps: false 
-});
+}, { _id: false });
 
 // ==================== MAIN COMPANY SETTINGS SCHEMA ====================
 
 const CompanySettingsSchema = new mongoose.Schema({
-    // ===== SAAS MULTI-TENANCY (ADDED) =====
+    // ===== SAAS MULTI-TENANCY =====
     companyId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Company',
@@ -1527,14 +1849,14 @@ const CompanySettingsSchema = new mongoose.Schema({
         index: true
     },
     
-    // ===== AUDIT FIELDS (UPDATED) =====
+    // ===== AUDIT FIELDS =====
     createdBy: {
-        type: mongoose.Schema.Types.ObjectId, // Changed from String to ObjectId
+        type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: [true, 'Created by user is required']
     },
     updatedBy: {
-        type: mongoose.Schema.Types.ObjectId, // Changed from String to ObjectId
+        type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     },
     
@@ -1667,9 +1989,21 @@ const CompanySettingsSchema = new mongoose.Schema({
         }
     },
     
-    // ===== PAYMENT SETTINGS =====
+    // ===== PAYMENT METHODS - CRITICAL FOR 3-OCR SYSTEM =====
     upiIds: [UpiIdSchema],
+    gpayNumbers: [GpayNumberSchema],
+    phonePeNumbers: [PhonePeNumberSchema],
+    paytmNumbers: [PaytmNumberSchema],
+    qrCode: QrCodeSchema,
+    bankAccounts: [BankAccountSchema],
     
+    // ===== PAYMENT SETTINGS =====
+    paymentSettings: {
+        type: PaymentSettingsSchema,
+        default: () => ({})
+    },
+    
+    // ===== LEGACY BANK DETAILS (for backward compatibility) =====
     bank: {
         type: BankDetailsSchema,
         default: () => ({})
@@ -1764,6 +2098,14 @@ const CompanySettingsSchema = new mongoose.Schema({
     },
     metaKeywords: [String],
     
+    // ===== WHATSAPP BOT SETTINGS =====
+    orderFlowMode: {
+        type: String,
+        enum: ['short', 'long'],
+        default: 'short',
+        description: 'Order flow mode for WhatsApp bot: short (combined address) or long (step by step)'
+    },
+    
     // ===== SYSTEM FIELDS =====
     version: {
         type: Number,
@@ -1773,14 +2115,6 @@ const CompanySettingsSchema = new mongoose.Schema({
         type: Boolean,
         default: true,
         index: true
-    },
-    
-    // WhatsApp Bot Order Flow Mode
-    orderFlowMode: {
-        type: String,
-        enum: ['short', 'long'],
-        default: 'short',
-        description: 'Order flow mode for WhatsApp bot: short (combined address) or long (step by step)'
     }
 }, {
     timestamps: true,
@@ -1789,16 +2123,17 @@ const CompanySettingsSchema = new mongoose.Schema({
 });
 
 // ==================== INDEXES ====================
-//CompanySettingsSchema.index({ companyId: 1 }, { unique: true });
-//CompanySettingsSchema.index({ companyId: 1, isActive: 1 });
-//CompanySettingsSchema.index({ 'upiIds.id': 1 });
-//CompanySettingsSchema.index({ 'upiIds.isActive': 1 });
-CompanySettingsSchema.index({ createdAt: 1 });
+
+CompanySettingsSchema.index({ companyId: 1, isActive: 1 });
+CompanySettingsSchema.index({ 'upiIds.id': 1 });
+CompanySettingsSchema.index({ 'gpayNumbers.phoneNumber': 1 });
+CompanySettingsSchema.index({ 'phonePeNumbers.phoneNumber': 1 });
+CompanySettingsSchema.index({ 'paytmNumbers.phoneNumber': 1 });
+CompanySettingsSchema.index({ createdAt: -1 });
 CompanySettingsSchema.index({ updatedAt: -1 });
 
 // ==================== VIRTUALS ====================
 
-// Virtual for formatted address
 CompanySettingsSchema.virtual('fullAddress').get(function() {
     const parts = [];
     if (this.address) parts.push(this.address);
@@ -1809,18 +2144,103 @@ CompanySettingsSchema.virtual('fullAddress').get(function() {
     return parts.join(', ');
 });
 
-// Virtual for active UPI IDs
 CompanySettingsSchema.virtual('activeUpiIds').get(function() {
     return this.upiIds?.filter(upi => upi.isActive) || [];
 });
 
-// Virtual for formatted bank details
-CompanySettingsSchema.virtual('formattedBankDetails').get(function() {
-    if (!this.bank) return '';
-    return `${this.bank.name}\nA/C: ${this.bank.account}\nIFSC: ${this.bank.ifsc}\n${this.bank.branch}`;
+CompanySettingsSchema.virtual('activeGpayNumbers').get(function() {
+    return this.gpayNumbers?.filter(g => g.isActive) || [];
 });
 
-// Virtual for audit info
+CompanySettingsSchema.virtual('activePhonePeNumbers').get(function() {
+    return this.phonePeNumbers?.filter(p => p.isActive) || [];
+});
+
+CompanySettingsSchema.virtual('activePaytmNumbers').get(function() {
+    return this.paytmNumbers?.filter(p => p.isActive) || [];
+});
+
+CompanySettingsSchema.virtual('activeBankAccounts').get(function() {
+    return this.bankAccounts?.filter(b => b.isActive) || [];
+});
+
+CompanySettingsSchema.virtual('hasActiveQrCode').get(function() {
+    return !!(this.qrCode && this.qrCode.isActive && (this.qrCode.imageUrl || this.qrCode.imageData));
+});
+
+CompanySettingsSchema.virtual('allPaymentMethods').get(function() {
+    const methods = [];
+    
+    // Add UPI IDs
+    this.activeUpiIds.forEach(upi => {
+        methods.push({
+            type: 'upi',
+            id: upi.id,
+            name: upi.name,
+            appType: upi.appType,
+            displayValue: upi.id
+        });
+    });
+    
+    // Add GPay numbers
+    this.activeGpayNumbers.forEach(gpay => {
+        methods.push({
+            type: 'gpay',
+            phoneNumber: gpay.phoneNumber,
+            upiId: gpay.upiId,
+            name: gpay.name,
+            displayValue: gpay.phoneNumber
+        });
+    });
+    
+    // Add PhonePe numbers
+    this.activePhonePeNumbers.forEach(phonepe => {
+        methods.push({
+            type: 'phonepe',
+            phoneNumber: phonepe.phoneNumber,
+            upiId: phonepe.upiId,
+            name: phonepe.name,
+            displayValue: phonepe.phoneNumber
+        });
+    });
+    
+    // Add PayTM numbers
+    this.activePaytmNumbers.forEach(paytm => {
+        methods.push({
+            type: 'paytm',
+            phoneNumber: paytm.phoneNumber,
+            upiId: paytm.upiId,
+            name: paytm.name,
+            displayValue: paytm.phoneNumber
+        });
+    });
+    
+    // Add QR code
+    if (this.hasActiveQrCode) {
+        methods.push({
+            type: 'qr',
+            imageUrl: this.qrCode.imageUrl,
+            name: this.qrCode.name,
+            description: this.qrCode.description,
+            displayValue: 'QR Code'
+        });
+    }
+    
+    // Add bank accounts
+    this.activeBankAccounts.forEach(bank => {
+        methods.push({
+            type: 'bank',
+            accountName: bank.accountName,
+            bankName: bank.bankName,
+            accountNumber: bank.accountNumber.slice(-4),
+            ifscCode: bank.ifscCode,
+            displayValue: `${bank.bankName} (${bank.accountNumber.slice(-4)})`
+        });
+    });
+    
+    return methods;
+});
+
 CompanySettingsSchema.virtual('auditInfo').get(function() {
     return {
         created: {
@@ -1836,42 +2256,132 @@ CompanySettingsSchema.virtual('auditInfo').get(function() {
 
 // ==================== METHODS ====================
 
-/**
- * Check if settings belong to company
- */
 CompanySettingsSchema.methods.belongsToCompany = function(companyId) {
     return this.companyId && this.companyId.toString() === companyId.toString();
 };
 
 /**
- * Get active UPI IDs as array of strings
+ * Get all active payment identifiers (UPI IDs, phone numbers)
  */
-CompanySettingsSchema.methods.getActiveUpiIdStrings = function() {
-    return this.upiIds
-        .filter(upi => upi.isActive)
-        .map(upi => upi.id);
+CompanySettingsSchema.methods.getActivePaymentIdentifiers = function() {
+    const identifiers = [];
+    
+    // Add UPI IDs
+    this.activeUpiIds.forEach(upi => {
+        identifiers.push({
+            type: 'upi',
+            value: upi.id,
+            name: upi.name
+        });
+    });
+    
+    // Add GPay numbers
+    this.activeGpayNumbers.forEach(gpay => {
+        identifiers.push({
+            type: 'gpay',
+            value: gpay.phoneNumber,
+            upiValue: gpay.upiId,
+            name: gpay.name
+        });
+    });
+    
+    // Add PhonePe numbers
+    this.activePhonePeNumbers.forEach(phonepe => {
+        identifiers.push({
+            type: 'phonepe',
+            value: phonepe.phoneNumber,
+            upiValue: phonepe.upiId,
+            name: phonepe.name
+        });
+    });
+    
+    // Add PayTM numbers
+    this.activePaytmNumbers.forEach(paytm => {
+        identifiers.push({
+            type: 'paytm',
+            value: paytm.phoneNumber,
+            upiValue: paytm.upiId,
+            name: paytm.name
+        });
+    });
+    
+    return identifiers;
 };
 
 /**
- * Check if UPI ID exists and is active
+ * Validate a payment identifier against company settings
  */
-CompanySettingsSchema.methods.isValidUpiId = function(upiId) {
-    return this.upiIds.some(upi => 
-        upi.isActive && upi.id.toLowerCase() === upiId.toLowerCase()
-    );
-};
-
-/**
- * Increment usage count for a UPI ID
- */
-CompanySettingsSchema.methods.incrementUpiUsage = async function(upiId) {
-    const upi = this.upiIds.find(u => u.id === upiId);
-    if (upi) {
-        upi.usageCount = (upi.usageCount || 0) + 1;
-        upi.lastUsed = new Date();
-        return this.save();
+CompanySettingsSchema.methods.validatePaymentIdentifier = function(type, value) {
+    const cleanValue = value.toString().toLowerCase().trim();
+    
+    switch(type) {
+        case 'upi':
+            return this.upiIds.some(u => 
+                u.isActive && u.id.toLowerCase() === cleanValue
+            );
+        
+        case 'gpay':
+            const gpayDigits = cleanValue.replace(/\D/g, '');
+            return this.gpayNumbers.some(g => 
+                g.isActive && g.phoneNumber.replace(/\D/g, '') === gpayDigits
+            );
+        
+        case 'phonepe':
+            const phonepeDigits = cleanValue.replace(/\D/g, '');
+            return this.phonePeNumbers.some(p => 
+                p.isActive && p.phoneNumber.replace(/\D/g, '') === phonepeDigits
+            );
+        
+        case 'paytm':
+            const paytmDigits = cleanValue.replace(/\D/g, '');
+            return this.paytmNumbers.some(p => 
+                p.isActive && p.phoneNumber.replace(/\D/g, '') === paytmDigits
+            );
+        
+        default:
+            return false;
     }
-    return this;
+};
+
+/**
+ * Increment usage count for a payment method
+ */
+CompanySettingsSchema.methods.incrementUsage = async function(type, identifier) {
+    switch(type) {
+        case 'upi':
+            const upi = this.upiIds.find(u => u.id === identifier);
+            if (upi) {
+                upi.usageCount = (upi.usageCount || 0) + 1;
+                upi.lastUsed = new Date();
+            }
+            break;
+        
+        case 'gpay':
+            const gpay = this.gpayNumbers.find(g => g.phoneNumber === identifier);
+            if (gpay) {
+                gpay.usageCount = (gpay.usageCount || 0) + 1;
+                gpay.lastUsed = new Date();
+            }
+            break;
+        
+        case 'phonepe':
+            const phonepe = this.phonePeNumbers.find(p => p.phoneNumber === identifier);
+            if (phonepe) {
+                phonepe.usageCount = (phonepe.usageCount || 0) + 1;
+                phonepe.lastUsed = new Date();
+            }
+            break;
+        
+        case 'paytm':
+            const paytm = this.paytmNumbers.find(p => p.phoneNumber === identifier);
+            if (paytm) {
+                paytm.usageCount = (paytm.usageCount || 0) + 1;
+                paytm.lastUsed = new Date();
+            }
+            break;
+    }
+    
+    return this.save();
 };
 
 /**
@@ -1889,52 +2399,120 @@ CompanySettingsSchema.methods.addUpiId = function(upiData) {
 };
 
 /**
- * Remove a UPI ID
+ * Add a new GPay number
  */
-CompanySettingsSchema.methods.removeUpiId = function(upiId) {
-    this.upiIds = this.upiIds.filter(upi => upi.id !== upiId);
+CompanySettingsSchema.methods.addGpayNumber = function(gpayData) {
+    const digits = gpayData.phoneNumber.replace(/\D/g, '');
+    this.gpayNumbers.push({
+        phoneNumber: digits,
+        name: gpayData.name || `GPay ${digits.slice(-4)}`,
+        upiId: gpayData.upiId || `${digits}@okhdfcbank`,
+        isActive: gpayData.isActive !== false,
+        description: gpayData.description || ''
+    });
     return this.save();
 };
 
 /**
- * Toggle UPI ID active status
+ * Add a new PhonePe number
  */
-CompanySettingsSchema.methods.toggleUpiStatus = function(upiId) {
-    const upi = this.upiIds.find(u => u.id === upiId);
-    if (upi) {
-        upi.isActive = !upi.isActive;
-        return this.save();
+CompanySettingsSchema.methods.addPhonePeNumber = function(phonepeData) {
+    const digits = phonepeData.phoneNumber.replace(/\D/g, '');
+    this.phonePeNumbers.push({
+        phoneNumber: digits,
+        name: phonepeData.name || `PhonePe ${digits.slice(-4)}`,
+        upiId: phonepeData.upiId || `${digits}@ybl`,
+        isActive: phonepeData.isActive !== false,
+        description: phonepeData.description || ''
+    });
+    return this.save();
+};
+
+/**
+ * Add a new PayTM number
+ */
+CompanySettingsSchema.methods.addPaytmNumber = function(paytmData) {
+    const digits = paytmData.phoneNumber.replace(/\D/g, '');
+    this.paytmNumbers.push({
+        phoneNumber: digits,
+        name: paytmData.name || `PayTM ${digits.slice(-4)}`,
+        upiId: paytmData.upiId || `${digits}@paytm`,
+        isActive: paytmData.isActive !== false,
+        description: paytmData.description || ''
+    });
+    return this.save();
+};
+
+/**
+ * Update QR code
+ */
+CompanySettingsSchema.methods.updateQrCode = function(qrData) {
+    this.qrCode = {
+        ...this.qrCode,
+        ...qrData,
+        updatedAt: new Date()
+    };
+    return this.save();
+};
+
+/**
+ * Remove a payment method
+ */
+CompanySettingsSchema.methods.removePaymentMethod = function(type, id) {
+    switch(type) {
+        case 'upi':
+            this.upiIds = this.upiIds.filter(u => u.id !== id);
+            break;
+        case 'gpay':
+            this.gpayNumbers = this.gpayNumbers.filter(g => g.phoneNumber !== id);
+            break;
+        case 'phonepe':
+            this.phonePeNumbers = this.phonePeNumbers.filter(p => p.phoneNumber !== id);
+            break;
+        case 'paytm':
+            this.paytmNumbers = this.paytmNumbers.filter(p => p.phoneNumber !== id);
+            break;
+        case 'bank':
+            this.bankAccounts = this.bankAccounts.filter(b => b._id.toString() !== id);
+            break;
     }
-    return this;
-};
-
-/**
- * Update bank details
- */
-CompanySettingsSchema.methods.updateBankDetails = function(bankData) {
-    this.bank = {
-        ...this.bank,
-        ...bankData
-    };
     return this.save();
 };
 
 /**
- * Update invoice settings
+ * Toggle payment method active status
  */
-CompanySettingsSchema.methods.updateInvoiceSettings = function(invoiceData) {
-    this.invoiceSettings = {
-        ...this.invoiceSettings,
-        ...invoiceData
-    };
+CompanySettingsSchema.methods.togglePaymentMethodStatus = function(type, id) {
+    switch(type) {
+        case 'upi':
+            const upi = this.upiIds.find(u => u.id === id);
+            if (upi) upi.isActive = !upi.isActive;
+            break;
+        case 'gpay':
+            const gpay = this.gpayNumbers.find(g => g.phoneNumber === id);
+            if (gpay) gpay.isActive = !gpay.isActive;
+            break;
+        case 'phonepe':
+            const phonepe = this.phonePeNumbers.find(p => p.phoneNumber === id);
+            if (phonepe) phonepe.isActive = !phonepe.isActive;
+            break;
+        case 'paytm':
+            const paytm = this.paytmNumbers.find(p => p.phoneNumber === id);
+            if (paytm) paytm.isActive = !paytm.isActive;
+            break;
+        case 'qr':
+            if (this.qrCode) this.qrCode.isActive = !this.qrCode.isActive;
+            break;
+        case 'bank':
+            const bank = this.bankAccounts.find(b => b._id.toString() === id);
+            if (bank) bank.isActive = !bank.isActive;
+            break;
+    }
     return this.save();
 };
 
-// ==================== STATICS (UPDATED FOR SAAS) ====================
+// ==================== STATICS ====================
 
-/**
- * Get settings for a specific company
- */
 CompanySettingsSchema.statics.getSettings = async function(companyId) {
     const settings = await this.findOne({ companyId });
     
@@ -1945,9 +2523,6 @@ CompanySettingsSchema.statics.getSettings = async function(companyId) {
     return settings;
 };
 
-/**
- * Get or create settings for a company (called during company creation)
- */
 CompanySettingsSchema.statics.getOrCreateSettings = async function(companyId, createdBy, companyData = {}) {
     let settings = await this.findOne({ companyId });
     
@@ -1961,6 +2536,10 @@ CompanySettingsSchema.statics.getOrCreateSettings = async function(companyId, cr
             address: companyData.address || 'Address pending',
             city: companyData.city || 'City pending',
             upiIds: [],
+            gpayNumbers: [],
+            phonePeNumbers: [],
+            paytmNumbers: [],
+            bankAccounts: [],
             orderFlowMode: 'short'
         });
     }
@@ -1969,19 +2548,75 @@ CompanySettingsSchema.statics.getOrCreateSettings = async function(companyId, cr
 };
 
 /**
+ * Get all active payment methods for a company
+ */
+CompanySettingsSchema.statics.getActivePaymentMethods = async function(companyId) {
+    const settings = await this.getSettings(companyId);
+    return settings.allPaymentMethods;
+};
+
+/**
  * Get active UPI IDs for payment verification
  */
 CompanySettingsSchema.statics.getActiveUpiIds = async function(companyId) {
     const settings = await this.getSettings(companyId);
-    return settings.getActiveUpiIdStrings();
+    return settings.activeUpiIds.map(upi => upi.id);
 };
 
 /**
- * Validate a payment screenshot UPI ID for a company
+ * Get active GPay numbers
  */
-CompanySettingsSchema.statics.validateUpiId = async function(companyId, upiId) {
+CompanySettingsSchema.statics.getActiveGpayNumbers = async function(companyId) {
     const settings = await this.getSettings(companyId);
-    return settings.isValidUpiId(upiId);
+    return settings.activeGpayNumbers;
+};
+
+/**
+ * Get active PhonePe numbers
+ */
+CompanySettingsSchema.statics.getActivePhonePeNumbers = async function(companyId) {
+    const settings = await this.getSettings(companyId);
+    return settings.activePhonePeNumbers;
+};
+
+/**
+ * Get active PayTM numbers
+ */
+CompanySettingsSchema.statics.getActivePaytmNumbers = async function(companyId) {
+    const settings = await this.getSettings(companyId);
+    return settings.activePaytmNumbers;
+};
+
+/**
+ * Get active QR code
+ */
+CompanySettingsSchema.statics.getActiveQrCode = async function(companyId) {
+    const settings = await this.getSettings(companyId);
+    return settings.hasActiveQrCode ? settings.qrCode : null;
+};
+
+/**
+ * Validate a payment method for a company
+ */
+CompanySettingsSchema.statics.validatePaymentMethod = async function(companyId, type, value) {
+    const settings = await this.getSettings(companyId);
+    return settings.validatePaymentIdentifier(type, value);
+};
+
+/**
+ * Get payment settings for a company
+ */
+CompanySettingsSchema.statics.getPaymentSettings = async function(companyId) {
+    const settings = await this.getSettings(companyId);
+    return settings.paymentSettings || {};
+};
+
+/**
+ * Get order flow mode for WhatsApp bot
+ */
+CompanySettingsSchema.statics.getOrderFlowMode = async function(companyId) {
+    const settings = await this.getSettings(companyId);
+    return settings.orderFlowMode || 'short';
 };
 
 /**
@@ -2025,19 +2660,8 @@ CompanySettingsSchema.statics.getSupportInfo = async function(companyId) {
     };
 };
 
-/**
- * Get order flow mode for WhatsApp bot
- */
-CompanySettingsSchema.statics.getOrderFlowMode = async function(companyId) {
-    const settings = await this.getSettings(companyId);
-    return settings.orderFlowMode || 'short';
-};
-
 // ==================== MIDDLEWARE ====================
 
-/**
- * Pre-save middleware
- */
 CompanySettingsSchema.pre('save', async function(next) {
     // Ensure companyId exists
     if (!this.companyId) {
@@ -2047,14 +2671,45 @@ CompanySettingsSchema.pre('save', async function(next) {
     // Increment version
     this.version = (this.version || 0) + 1;
     
+    // Auto-generate UPI IDs for phone numbers if not provided
+    if (this.gpayNumbers) {
+        this.gpayNumbers.forEach(gpay => {
+            if (!gpay.upiId) {
+                const digits = gpay.phoneNumber.replace(/\D/g, '');
+                gpay.upiId = `${digits}@okhdfcbank`;
+            }
+        });
+    }
+    
+    if (this.phonePeNumbers) {
+        this.phonePeNumbers.forEach(phonepe => {
+            if (!phonepe.upiId) {
+                const digits = phonepe.phoneNumber.replace(/\D/g, '');
+                phonepe.upiId = `${digits}@ybl`;
+            }
+        });
+    }
+    
+    if (this.paytmNumbers) {
+        this.paytmNumbers.forEach(paytm => {
+            if (!paytm.upiId) {
+                const digits = paytm.phoneNumber.replace(/\D/g, '');
+                paytm.upiId = `${digits}@paytm`;
+            }
+        });
+    }
+    
     next();
 });
 
-/**
- * Post-save middleware
- */
 CompanySettingsSchema.post('save', function(doc) {
-    console.log(`🏢 Company settings updated for company ${doc.companyId} (v${doc.version}) by ${doc.updatedBy || doc.createdBy || 'system'}`);
+    console.log(`🏢 Company settings updated for company ${doc.companyId} (v${doc.version})`);
+    console.log(`📱 Active UPI IDs: ${doc.activeUpiIds.length}`);
+    console.log(`📞 Active GPay: ${doc.activeGpayNumbers.length}`);
+    console.log(`📞 Active PhonePe: ${doc.activePhonePeNumbers.length}`);
+    console.log(`📞 Active PayTM: ${doc.activePaytmNumbers.length}`);
+    console.log(`📱 QR Code: ${doc.hasActiveQrCode ? '✅' : '❌'}`);
+    console.log(`🏦 Active Bank Accounts: ${doc.activeBankAccounts.length}`);
     console.log(`📋 Order flow mode: ${doc.orderFlowMode || 'short'}`);
 });
 

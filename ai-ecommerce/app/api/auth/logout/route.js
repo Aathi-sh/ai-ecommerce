@@ -484,7 +484,7 @@ import { authOptions } from '@/lib/nextauth';
 import { connectDB } from '@/utils/db';
 import User from '@/models/user';
 import Company from '@/models/Company';
-import DeviceToken from '@/models/DeviceToken';
+import DeviceToken from '@/models/AdminDeviceToken';
 
 /**
  * Professional Logout API Route with SaaS Multi-tenancy

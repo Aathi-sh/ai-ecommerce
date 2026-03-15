@@ -609,7 +609,7 @@ export default function SuperAdminDashboard() {
 
               {/* Settings */}
               <button
-                onClick={() => handleNavigation('/super-admin/settings')}
+                onClick={() => handleNavigation('/admin/profile')}
                 className="hidden sm:block p-2 hover:bg-gray-100 rounded-lg"
                 title="Settings"
               >
@@ -705,7 +705,7 @@ export default function SuperAdminDashboard() {
               </button>
               <button
                 onClick={() => {
-                  handleNavigation('/super-admin/settings');
+                  handleNavigation( '/admin/profile');
                   setMobileMenuOpen(false);
                 }}
                 className="w-full text-left p-3 hover:bg-gray-100 rounded-lg mb-2 text-gray-700"

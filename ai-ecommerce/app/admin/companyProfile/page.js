@@ -1,3 +1,10 @@
+
+
+
+
+
+
+
 // "use client";
 
 // import React, { useState, useEffect } from 'react';
@@ -26,7 +33,9 @@
 //     Wifi, WifiOff, Battery, BatteryCharging, Cpu, HardDrive,
 //     Server, Cloud, CloudOff, Download as DownloadIcon, Upload as UploadIcon,
 //     Repeat, Shuffle, Play, Pause, Square, Circle, Triangle,
-//     Hexagon, Octagon, Diamond, Gem, Crown, Sparkle
+//     Hexagon, Octagon, Diamond, Gem, Crown, Sparkle,
+//     // ✅ ADDED: Import Route icon for order flow
+//     Route
 // } from 'lucide-react';
 
 // // ==================== CONSTANTS ====================
@@ -123,6 +132,8 @@
 //         gstin: '',
 //         pan: '',
 //         cin: '',
+//         // ✅ ADDED: Order flow mode field
+//         orderFlowMode: 'long', // 'long' for step-by-step, 'short' for combined address
 //         upiIds: [],
 //         bank: {
 //             name: '',
@@ -213,6 +224,8 @@
 //                 setFormData(prev => ({
 //                     ...prev,
 //                     ...data.data,
+//                     // ✅ Ensure orderFlowMode has a default
+//                     orderFlowMode: data.data.orderFlowMode || 'long',
 //                     businessHours: { ...BUSINESS_HOURS_DEFAULT, ...(data.data.businessHours || {}) },
 //                     support: { ...prev.support, ...(data.data.support || {}) },
 //                     social: { ...prev.social, ...(data.data.social || {}) },
@@ -304,6 +317,11 @@
         
 //         if (formData.bank?.ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(formData.bank.ifsc)) {
 //             newErrors.bankIfsc = 'Enter a valid IFSC code';
+//         }
+        
+//         // ✅ ADDED: Validate orderFlowMode
+//         if (formData.orderFlowMode && !['long', 'short'].includes(formData.orderFlowMode)) {
+//             newErrors.orderFlowMode = 'Order flow mode must be either "long" or "short"';
 //         }
         
 //         setErrors(newErrors);
@@ -867,6 +885,83 @@
 //                                                                     onChange={handleInputChange}
 //                                                                     placeholder="U12345MH2023PTC123456"
 //                                                                 />
+//                                                             </div>
+//                                                         </div>
+//                                                     </div>
+
+//                                                     {/* ✅ ADDED: Order Flow Configuration */}
+//                                                     <div className="form-block">
+//                                                         <h3>
+//                                                             <Route size={16} />
+//                                                             WhatsApp Order Flow Configuration
+//                                                         </h3>
+//                                                         <div className="form-grid">
+//                                                             <div className="form-field span-2">
+//                                                                 <label>Order Collection Mode</label>
+//                                                                 <div className="radio-group">
+//                                                                     <label className={`radio-label ${formData.orderFlowMode === 'long' ? 'selected' : ''}`}>
+//                                                                         <input
+//                                                                             type="radio"
+//                                                                             name="orderFlowMode"
+//                                                                             value="long"
+//                                                                             checked={formData.orderFlowMode === 'long'}
+//                                                                             onChange={handleInputChange}
+//                                                                         />
+//                                                                         <div className="radio-content">
+//                                                                             <div className="radio-header">
+//                                                                                 <strong>Long Version (Step by Step) - Default</strong>
+//                                                                                 {formData.orderFlowMode === 'long' && (
+//                                                                                     <span className="active-badge">Active</span>
+//                                                                                 )}
+//                                                                             </div>
+//                                                                             <p className="radio-description">
+//                                                                                 • Collect address one field at a time (Door No → Street → Area → City → State → Pincode)<br/>
+//                                                                                 • Product confirmation step before address<br/>
+//                                                                                 • Final confirmation before place order<br/>
+//                                                                                 • More detailed, guided process for customers
+//                                                                             </p>
+//                                                                             <div className="flow-preview">
+//                                                                                 <span className="preview-label">Flow Preview:</span>
+//                                                                                 <code>Order → Product → Confirm → Door No → Street → Area → City → State → Pincode → Final → Payment</code>
+//                                                                             </div>
+//                                                                         </div>
+//                                                                     </label>
+                                                                    
+//                                                                     <label className={`radio-label ${formData.orderFlowMode === 'short' ? 'selected' : ''}`}>
+//                                                                         <input
+//                                                                             type="radio"
+//                                                                             name="orderFlowMode"
+//                                                                             value="short"
+//                                                                             checked={formData.orderFlowMode === 'short'}
+//                                                                             onChange={handleInputChange}
+//                                                                         />
+//                                                                         <div className="radio-content">
+//                                                                             <div className="radio-header">
+//                                                                                 <strong>Short Version (Quick Order)</strong>
+//                                                                                 {formData.orderFlowMode === 'short' && (
+//                                                                                     <span className="active-badge">Active</span>
+//                                                                                 )}
+//                                                                             </div>
+//                                                                             <p className="radio-description">
+//                                                                                 • Collect full address in one message<br/>
+//                                                                                 • Format: Door No, Street, Area, City, State<br/>
+//                                                                                 • Skip product confirmation step<br/>
+//                                                                                 • Direct to place order after address<br/>
+//                                                                                 • Faster checkout experience
+//                                                                             </p>
+//                                                                             <div className="flow-preview">
+//                                                                                 <span className="preview-label">Flow Preview:</span>
+//                                                                                 <code>Order → Product → Full Address → Final → Payment</code>
+//                                                                             </div>
+//                                                                         </div>
+//                                                                     </label>
+//                                                                 </div>
+//                                                                 {errors.orderFlowMode && <span className="error-text">{errors.orderFlowMode}</span>}
+//                                                                 <span className="hint">
+//                                                                     <Info size={14} /> 
+//                                                                     Choose how customers enter their shipping address during WhatsApp checkout. 
+//                                                                     Long version provides step-by-step guidance, short version is faster for experienced customers.
+//                                                                 </span>
 //                                                             </div>
 //                                                         </div>
 //                                                     </div>
@@ -2068,6 +2163,9 @@
 //                 .hint {
 //                     font-size: 0.688rem;
 //                     color: #94a3b8;
+//                     display: flex;
+//                     align-items: center;
+//                     gap: 4px;
 //                 }
 
 //                 /* ==================== SOCIAL GRID ==================== */
@@ -2536,6 +2634,107 @@
 //                     font-size: 0.875rem;
 //                 }
 
+//                 /* ==================== RADIO GROUP ==================== */
+//                 .radio-group {
+//                     display: flex;
+//                     flex-direction: column;
+//                     gap: 16px;
+//                     margin-top: 8px;
+//                     margin-bottom: 16px;
+//                 }
+
+//                 .radio-label {
+//                     display: flex;
+//                     align-items: flex-start;
+//                     gap: 16px;
+//                     padding: 20px;
+//                     background: #f8fafc;
+//                     border: 2px solid #e2e8f0;
+//                     border-radius: 12px;
+//                     cursor: pointer;
+//                     transition: all 0.2s ease;
+//                     position: relative;
+//                 }
+
+//                 .radio-label:hover {
+//                     background: #f1f5f9;
+//                     border-color: #94a3b8;
+//                 }
+
+//                 .radio-label.selected {
+//                     background: #eff6ff;
+//                     border-color: #3b82f6;
+//                     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+//                 }
+
+//                 .radio-label input[type="radio"] {
+//                     margin-top: 4px;
+//                     width: 20px;
+//                     height: 20px;
+//                     cursor: pointer;
+//                     accent-color: #3b82f6;
+//                     flex-shrink: 0;
+//                 }
+
+//                 .radio-content {
+//                     flex: 1;
+//                 }
+
+//                 .radio-header {
+//                     display: flex;
+//                     align-items: center;
+//                     justify-content: space-between;
+//                     margin-bottom: 8px;
+//                 }
+
+//                 .radio-header strong {
+//                     font-size: 1rem;
+//                     color: #0f172a;
+//                 }
+
+//                 .active-badge {
+//                     background: #3b82f6;
+//                     color: white;
+//                     padding: 4px 12px;
+//                     border-radius: 30px;
+//                     font-size: 0.688rem;
+//                     font-weight: 600;
+//                 }
+
+//                 .radio-description {
+//                     margin: 0 0 12px 0;
+//                     color: #475569;
+//                     font-size: 0.875rem;
+//                     line-height: 1.6;
+//                 }
+
+//                 .flow-preview {
+//                     background: #ffffff;
+//                     padding: 12px;
+//                     border-radius: 8px;
+//                     border: 1px solid #e2e8f0;
+//                 }
+
+//                 .preview-label {
+//                     display: block;
+//                     font-size: 0.688rem;
+//                     color: #64748b;
+//                     margin-bottom: 4px;
+//                     text-transform: uppercase;
+//                     letter-spacing: 0.5px;
+//                 }
+
+//                 .flow-preview code {
+//                     font-size: 0.75rem;
+//                     color: #3b82f6;
+//                     background: #eff6ff;
+//                     padding: 4px 8px;
+//                     border-radius: 4px;
+//                     display: inline-block;
+//                     white-space: normal;
+//                     word-break: break-word;
+//                 }
+
 //                 /* ==================== MOBILE SAVE ==================== */
 //                 .mobile-save {
 //                     display: none;
@@ -2657,6 +2856,26 @@
 //                     .assets-grid {
 //                         grid-template-columns: 1fr;
 //                     }
+
+//                     .radio-label {
+//                         flex-direction: column;
+//                         gap: 12px;
+//                     }
+
+//                     .radio-label input[type="radio"] {
+//                         align-self: flex-start;
+//                     }
+
+//                     .radio-header {
+//                         flex-direction: column;
+//                         align-items: flex-start;
+//                         gap: 8px;
+//                     }
+
+//                     .flow-preview code {
+//                         white-space: normal;
+//                         word-break: break-word;
+//                     }
 //                 }
 
 //                 @media (max-width: 480px) {
@@ -2713,6 +2932,50 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -2742,8 +3005,8 @@ import {
     Server, Cloud, CloudOff, Download as DownloadIcon, Upload as UploadIcon,
     Repeat, Shuffle, Play, Pause, Square, Circle, Triangle,
     Hexagon, Octagon, Diamond, Gem, Crown, Sparkle,
-    // ✅ ADDED: Import Route icon for order flow
-    Route
+    // ✅ ADDED: Route icon for order flow and QR code icon
+    Route, QrCode, Smartphone, CreditCard as CardIcon
 } from 'lucide-react';
 
 // ==================== CONSTANTS ====================
@@ -2756,11 +3019,11 @@ const SECTIONS = [
         description: 'Company details and contact information'
     },
     { 
-        id: 'upi', 
-        title: 'UPI Payment IDs', 
+        id: 'payment_methods', 
+        title: 'Payment Methods', 
         icon: CreditCard, 
         color: '#8b5cf6',
-        description: 'Manage UPI addresses for payment verification'
+        description: 'UPI IDs, GPay, PhonePe, PayTM, QR codes, and bank accounts'
     },
     { 
         id: 'bank', 
@@ -2784,10 +3047,17 @@ const SECTIONS = [
         description: 'Configure support channels and availability'
     },
     { 
+        id: 'order_flow', 
+        title: 'Order Flow Configuration', 
+        icon: Route, 
+        color: '#6366f1',
+        description: 'WhatsApp bot order collection settings'
+    },
+    { 
         id: 'branding', 
         title: 'Branding & Theme', 
         icon: Palette, 
-        color: '#6366f1',
+        color: '#f43f5e',
         description: 'Customize your brand identity and visual appearance'
     }
 ];
@@ -2797,8 +3067,18 @@ const UPI_APPS = [
     { value: 'phonepe', label: 'PhonePe', color: '#5F259F', icon: '🟣' },
     { value: 'paytm', label: 'Paytm', color: '#00BAF2', icon: '🔵' },
     { value: 'bhim', label: 'BHIM', color: '#DD4B39', icon: '🔴' },
+    { value: 'amazonpay', label: 'Amazon Pay', color: '#FF9900', icon: '🟠' },
     { value: 'other', label: 'Other', color: '#6B7280', icon: '⚫' }
 ];
+
+const PAYMENT_METHOD_TYPES = {
+    upi: { label: 'UPI ID', icon: CreditCard, color: '#8b5cf6' },
+    gpay: { label: 'GPay Number', icon: Smartphone, color: '#4285F4' },
+    phonepe: { label: 'PhonePe Number', icon: Smartphone, color: '#5F259F' },
+    paytm: { label: 'PayTM Number', icon: Smartphone, color: '#00BAF2' },
+    qr: { label: 'QR Code', icon: QrCode, color: '#10b981' },
+    bank: { label: 'Bank Account', icon: Landmark, color: '#ec4899' }
+};
 
 const BUSINESS_HOURS_DEFAULT = {
     monday: '9:00 AM - 8:00 PM',
@@ -2809,6 +3089,8 @@ const BUSINESS_HOURS_DEFAULT = {
     saturday: '9:00 AM - 6:00 PM',
     sunday: 'Closed'
 };
+
+const ACCOUNT_TYPES = ['Current', 'Savings', 'Business'];
 
 // ==================== MAIN COMPONENT ====================
 export default function CompanyProfilePage() {
@@ -2840,9 +3122,45 @@ export default function CompanyProfilePage() {
         gstin: '',
         pan: '',
         cin: '',
-        // ✅ ADDED: Order flow mode field
-        orderFlowMode: 'long', // 'long' for step-by-step, 'short' for combined address
+        
+        // ===== PAYMENT METHODS =====
         upiIds: [],
+        gpayNumbers: [],
+        phonePeNumbers: [],
+        paytmNumbers: [],
+        qrCode: {
+            imageUrl: '',
+            name: 'Payment QR Code',
+            description: '',
+            isActive: true
+        },
+        bankAccounts: [],
+        
+        // Payment settings
+        paymentSettings: {
+            preferredMethod: 'any',
+            allowPartialPayments: false,
+            autoVerifyEnabled: true,
+            minConfidenceForAuto: 85,
+            paymentTimeout: 30,
+            requireTransactionId: true,
+            allowMultiplePaymentMethods: true,
+            displayOrder: ['upi', 'gpay', 'phonepe', 'paytm', 'qr', 'bank'],
+            autoVerifyThresholds: {
+                amountTolerance: 2,
+                timeWindow: 15,
+                minConfidencePerField: {
+                    amount: 80,
+                    upi: 80,
+                    transactionId: 70
+                }
+            }
+        },
+        
+        // Order flow mode
+        orderFlowMode: 'long',
+        
+        // Legacy bank
         bank: {
             name: '',
             account: '',
@@ -2850,6 +3168,8 @@ export default function CompanyProfilePage() {
             branch: '',
             accountType: 'Current Account'
         },
+        
+        // Invoice settings
         invoiceSettings: {
             prefix: 'INV',
             separator: '-',
@@ -2867,6 +3187,8 @@ export default function CompanyProfilePage() {
             footerNote: 'This is a computer generated invoice, no signature required.',
             showBankDetails: true
         },
+        
+        // Support settings
         support: {
             email: '',
             phone: '',
@@ -2874,6 +3196,8 @@ export default function CompanyProfilePage() {
             whatsapp: '',
             responseTime: 'Within 30 minutes'
         },
+        
+        // Social media
         social: {
             facebook: '',
             instagram: '',
@@ -2881,11 +3205,17 @@ export default function CompanyProfilePage() {
             youtube: '',
             linkedin: ''
         },
+        
+        // Business hours
         businessHours: { ...BUSINESS_HOURS_DEFAULT },
+        
+        // Branding
         logo: null,
         favicon: null,
         signature: null,
         stamp: null,
+        
+        // Theme
         theme: {
             primary: '#2563eb',
             secondary: '#4f46e5',
@@ -2893,7 +3223,7 @@ export default function CompanyProfilePage() {
         }
     });
 
-    // UPI form state
+    // ===== UPI Form State =====
     const [upiForm, setUpiForm] = useState({
         id: '',
         name: '',
@@ -2903,6 +3233,64 @@ export default function CompanyProfilePage() {
     });
     const [editingUpiIndex, setEditingUpiIndex] = useState(-1);
     const [showUpiForm, setShowUpiForm] = useState(false);
+
+    // ===== GPay Form State =====
+    const [gpayForm, setGpayForm] = useState({
+        phoneNumber: '',
+        name: '',
+        isActive: true,
+        description: ''
+    });
+    const [editingGpayIndex, setEditingGpayIndex] = useState(-1);
+    const [showGpayForm, setShowGpayForm] = useState(false);
+
+    // ===== PhonePe Form State =====
+    const [phonePeForm, setPhonePeForm] = useState({
+        phoneNumber: '',
+        name: '',
+        isActive: true,
+        description: ''
+    });
+    const [editingPhonePeIndex, setEditingPhonePeIndex] = useState(-1);
+    const [showPhonePeForm, setShowPhonePeForm] = useState(false);
+
+    // ===== PayTM Form State =====
+    const [paytmForm, setPaytmForm] = useState({
+        phoneNumber: '',
+        name: '',
+        isActive: true,
+        description: ''
+    });
+    const [editingPaytmIndex, setEditingPaytmIndex] = useState(-1);
+    const [showPaytmForm, setShowPaytmForm] = useState(false);
+
+    // ===== QR Code Form State =====
+    const [qrForm, setQrForm] = useState({
+        imageUrl: '',
+        name: 'Payment QR Code',
+        description: '',
+        isActive: true
+    });
+    const [showQrForm, setShowQrForm] = useState(false);
+    const [qrFile, setQrFile] = useState(null);
+
+    // ===== Bank Account Form State =====
+    const [bankAccountForm, setBankAccountForm] = useState({
+        accountName: '',
+        accountNumber: '',
+        bankName: '',
+        ifscCode: '',
+        branch: '',
+        accountType: 'Current',
+        isActive: true,
+        isDefault: false,
+        description: ''
+    });
+    const [editingBankIndex, setEditingBankIndex] = useState(-1);
+    const [showBankForm, setShowBankForm] = useState(false);
+
+    // ===== Payment Settings Form State =====
+    const [showPaymentSettings, setShowPaymentSettings] = useState(false);
 
     // Fetch company settings
     useEffect(() => {
@@ -2924,7 +3312,12 @@ export default function CompanyProfilePage() {
     const fetchSettings = async () => {
         try {
             setLoading(true);
-            const res = await fetch('/api/company-settings');
+            const res = await fetch('/api/company-settings', {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-company-id': session?.user?.companyId
+                }
+            });
             const data = await res.json();
             
             if (data.success) {
@@ -2932,7 +3325,22 @@ export default function CompanyProfilePage() {
                 setFormData(prev => ({
                     ...prev,
                     ...data.data,
-                    // ✅ Ensure orderFlowMode has a default
+                    // Ensure arrays exist
+                    upiIds: data.data.upiIds || [],
+                    gpayNumbers: data.data.gpayNumbers || [],
+                    phonePeNumbers: data.data.phonePeNumbers || [],
+                    paytmNumbers: data.data.paytmNumbers || [],
+                    bankAccounts: data.data.bankAccounts || [],
+                    qrCode: data.data.qrCode || { 
+                        imageUrl: '', 
+                        name: 'Payment QR Code', 
+                        description: '', 
+                        isActive: true 
+                    },
+                    paymentSettings: {
+                        ...prev.paymentSettings,
+                        ...(data.data.paymentSettings || {})
+                    },
                     orderFlowMode: data.data.orderFlowMode || 'long',
                     businessHours: { ...BUSINESS_HOURS_DEFAULT, ...(data.data.businessHours || {}) },
                     support: { ...prev.support, ...(data.data.support || {}) },
@@ -2957,19 +3365,59 @@ export default function CompanyProfilePage() {
         setErrors({});
         
         try {
-            const res = await fetch('/api/company-settings', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
-            });
-            
-            const data = await res.json();
-            
-            if (data.success) {
-                setSettings(data.data);
-                showToast('success', 'Settings saved successfully!');
+            // If we have QR file, use FormData
+            if (qrFile) {
+                const formDataToSend = new FormData();
+                
+                // Append all form data
+                Object.keys(formData).forEach(key => {
+                    if (key === 'qrFile') return;
+                    if (typeof formData[key] === 'object') {
+                        formDataToSend.append(key, JSON.stringify(formData[key]));
+                    } else {
+                        formDataToSend.append(key, formData[key]);
+                    }
+                });
+                
+                // Append QR file
+                formDataToSend.append('qrCode', qrFile);
+                
+                const res = await fetch('/api/company-settings', {
+                    method: 'PUT',
+                    headers: {
+                        'x-company-id': session?.user?.companyId
+                    },
+                    body: formDataToSend
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    setSettings(data.data);
+                    setQrFile(null);
+                    showToast('success', 'Settings saved successfully!');
+                } else {
+                    showToast('error', data.error || 'Failed to save settings');
+                }
             } else {
-                showToast('error', data.error || 'Failed to save settings');
+                // Regular JSON request
+                const res = await fetch('/api/company-settings', {
+                    method: 'PUT',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'x-company-id': session?.user?.companyId
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    setSettings(data.data);
+                    showToast('success', 'Settings saved successfully!');
+                } else {
+                    showToast('error', data.error || 'Failed to save settings');
+                }
             }
         } catch (error) {
             console.error('Error saving settings:', error);
@@ -3027,9 +3475,23 @@ export default function CompanyProfilePage() {
             newErrors.bankIfsc = 'Enter a valid IFSC code';
         }
         
-        // ✅ ADDED: Validate orderFlowMode
+        // Validate orderFlowMode
         if (formData.orderFlowMode && !['long', 'short'].includes(formData.orderFlowMode)) {
             newErrors.orderFlowMode = 'Order flow mode must be either "long" or "short"';
+        }
+        
+        // Validate payment settings
+        if (formData.paymentSettings) {
+            if (formData.paymentSettings.minConfidenceForAuto && 
+                (formData.paymentSettings.minConfidenceForAuto < 50 || 
+                 formData.paymentSettings.minConfidenceForAuto > 100)) {
+                newErrors.minConfidence = 'Confidence threshold must be between 50 and 100';
+            }
+            if (formData.paymentSettings.paymentTimeout && 
+                (formData.paymentSettings.paymentTimeout < 5 || 
+                 formData.paymentSettings.paymentTimeout > 60)) {
+                newErrors.paymentTimeout = 'Payment timeout must be between 5 and 60 minutes';
+            }
         }
         
         setErrors(newErrors);
@@ -3072,7 +3534,8 @@ export default function CompanyProfilePage() {
             name: upiForm.name,
             appType: upiForm.appType,
             isActive: upiForm.isActive,
-            description: upiForm.description
+            description: upiForm.description,
+            createdAt: new Date().toISOString()
         };
         
         if (editingUpiIndex >= 0) {
@@ -3116,6 +3579,399 @@ export default function CompanyProfilePage() {
         showToast('success', `UPI ID ${updated[index].isActive ? 'activated' : 'deactivated'}`);
     };
 
+    // ==================== GPAY FUNCTIONS ====================
+    
+    const validateGpayForm = () => {
+        if (!gpayForm.phoneNumber.trim()) {
+            showToast('error', 'Phone number is required');
+            return false;
+        }
+        const digits = gpayForm.phoneNumber.replace(/\D/g, '');
+        if (digits.length !== 10) {
+            showToast('error', 'Phone number must be exactly 10 digits');
+            return false;
+        }
+        if (!gpayForm.name.trim()) {
+            showToast('error', 'Display name is required');
+            return false;
+        }
+        
+        const exists = formData.gpayNumbers.some((g, index) => 
+            g.phoneNumber.replace(/\D/g, '') === digits && index !== editingGpayIndex
+        );
+        
+        if (exists) {
+            showToast('error', 'This GPay number already exists');
+            return false;
+        }
+        
+        return true;
+    };
+
+    const addGpayNumber = () => {
+        if (!validateGpayForm()) return;
+        
+        const digits = gpayForm.phoneNumber.replace(/\D/g, '');
+        const newGpay = {
+            phoneNumber: digits,
+            name: gpayForm.name,
+            upiId: `${digits}@okhdfcbank`,
+            isActive: gpayForm.isActive,
+            description: gpayForm.description,
+            createdAt: new Date().toISOString()
+        };
+        
+        if (editingGpayIndex >= 0) {
+            const updated = [...formData.gpayNumbers];
+            updated[editingGpayIndex] = newGpay;
+            setFormData({ ...formData, gpayNumbers: updated });
+            showToast('success', 'GPay number updated successfully');
+        } else {
+            setFormData({ ...formData, gpayNumbers: [...formData.gpayNumbers, newGpay] });
+            showToast('success', 'GPay number added successfully');
+        }
+        
+        setGpayForm({ phoneNumber: '', name: '', isActive: true, description: '' });
+        setEditingGpayIndex(-1);
+        setShowGpayForm(false);
+    };
+
+    const editGpay = (index) => {
+        const gpay = formData.gpayNumbers[index];
+        setGpayForm({
+            phoneNumber: gpay.phoneNumber,
+            name: gpay.name,
+            isActive: gpay.isActive !== false,
+            description: gpay.description || ''
+        });
+        setEditingGpayIndex(index);
+        setShowGpayForm(true);
+    };
+
+    const deleteGpay = (index) => {
+        const updated = formData.gpayNumbers.filter((_, i) => i !== index);
+        setFormData({ ...formData, gpayNumbers: updated });
+        showToast('success', 'GPay number deleted successfully');
+    };
+
+    const toggleGpayStatus = (index) => {
+        const updated = [...formData.gpayNumbers];
+        updated[index].isActive = !updated[index].isActive;
+        setFormData({ ...formData, gpayNumbers: updated });
+        showToast('success', `GPay number ${updated[index].isActive ? 'activated' : 'deactivated'}`);
+    };
+
+    // ==================== PHONEPE FUNCTIONS ====================
+    
+    const validatePhonePeForm = () => {
+        if (!phonePeForm.phoneNumber.trim()) {
+            showToast('error', 'Phone number is required');
+            return false;
+        }
+        const digits = phonePeForm.phoneNumber.replace(/\D/g, '');
+        if (digits.length !== 10) {
+            showToast('error', 'Phone number must be exactly 10 digits');
+            return false;
+        }
+        if (!phonePeForm.name.trim()) {
+            showToast('error', 'Display name is required');
+            return false;
+        }
+        
+        const exists = formData.phonePeNumbers.some((p, index) => 
+            p.phoneNumber.replace(/\D/g, '') === digits && index !== editingPhonePeIndex
+        );
+        
+        if (exists) {
+            showToast('error', 'This PhonePe number already exists');
+            return false;
+        }
+        
+        return true;
+    };
+
+    const addPhonePeNumber = () => {
+        if (!validatePhonePeForm()) return;
+        
+        const digits = phonePeForm.phoneNumber.replace(/\D/g, '');
+        const newPhonePe = {
+            phoneNumber: digits,
+            name: phonePeForm.name,
+            upiId: `${digits}@ybl`,
+            isActive: phonePeForm.isActive,
+            description: phonePeForm.description,
+            createdAt: new Date().toISOString()
+        };
+        
+        if (editingPhonePeIndex >= 0) {
+            const updated = [...formData.phonePeNumbers];
+            updated[editingPhonePeIndex] = newPhonePe;
+            setFormData({ ...formData, phonePeNumbers: updated });
+            showToast('success', 'PhonePe number updated successfully');
+        } else {
+            setFormData({ ...formData, phonePeNumbers: [...formData.phonePeNumbers, newPhonePe] });
+            showToast('success', 'PhonePe number added successfully');
+        }
+        
+        setPhonePeForm({ phoneNumber: '', name: '', isActive: true, description: '' });
+        setEditingPhonePeIndex(-1);
+        setShowPhonePeForm(false);
+    };
+
+    const editPhonePe = (index) => {
+        const phonepe = formData.phonePeNumbers[index];
+        setPhonePeForm({
+            phoneNumber: phonepe.phoneNumber,
+            name: phonepe.name,
+            isActive: phonepe.isActive !== false,
+            description: phonepe.description || ''
+        });
+        setEditingPhonePeIndex(index);
+        setShowPhonePeForm(true);
+    };
+
+    const deletePhonePe = (index) => {
+        const updated = formData.phonePeNumbers.filter((_, i) => i !== index);
+        setFormData({ ...formData, phonePeNumbers: updated });
+        showToast('success', 'PhonePe number deleted successfully');
+    };
+
+    const togglePhonePeStatus = (index) => {
+        const updated = [...formData.phonePeNumbers];
+        updated[index].isActive = !updated[index].isActive;
+        setFormData({ ...formData, phonePeNumbers: updated });
+        showToast('success', `PhonePe number ${updated[index].isActive ? 'activated' : 'deactivated'}`);
+    };
+
+    // ==================== PAYTM FUNCTIONS ====================
+    
+    const validatePaytmForm = () => {
+        if (!paytmForm.phoneNumber.trim()) {
+            showToast('error', 'Phone number is required');
+            return false;
+        }
+        const digits = paytmForm.phoneNumber.replace(/\D/g, '');
+        if (digits.length !== 10) {
+            showToast('error', 'Phone number must be exactly 10 digits');
+            return false;
+        }
+        if (!paytmForm.name.trim()) {
+            showToast('error', 'Display name is required');
+            return false;
+        }
+        
+        const exists = formData.paytmNumbers.some((p, index) => 
+            p.phoneNumber.replace(/\D/g, '') === digits && index !== editingPaytmIndex
+        );
+        
+        if (exists) {
+            showToast('error', 'This PayTM number already exists');
+            return false;
+        }
+        
+        return true;
+    };
+
+    const addPaytmNumber = () => {
+        if (!validatePaytmForm()) return;
+        
+        const digits = paytmForm.phoneNumber.replace(/\D/g, '');
+        const newPaytm = {
+            phoneNumber: digits,
+            name: paytmForm.name,
+            upiId: `${digits}@paytm`,
+            isActive: paytmForm.isActive,
+            description: paytmForm.description,
+            createdAt: new Date().toISOString()
+        };
+        
+        if (editingPaytmIndex >= 0) {
+            const updated = [...formData.paytmNumbers];
+            updated[editingPaytmIndex] = newPaytm;
+            setFormData({ ...formData, paytmNumbers: updated });
+            showToast('success', 'PayTM number updated successfully');
+        } else {
+            setFormData({ ...formData, paytmNumbers: [...formData.paytmNumbers, newPaytm] });
+            showToast('success', 'PayTM number added successfully');
+        }
+        
+        setPaytmForm({ phoneNumber: '', name: '', isActive: true, description: '' });
+        setEditingPaytmIndex(-1);
+        setShowPaytmForm(false);
+    };
+
+    const editPaytm = (index) => {
+        const paytm = formData.paytmNumbers[index];
+        setPaytmForm({
+            phoneNumber: paytm.phoneNumber,
+            name: paytm.name,
+            isActive: paytm.isActive !== false,
+            description: paytm.description || ''
+        });
+        setEditingPaytmIndex(index);
+        setShowPaytmForm(true);
+    };
+
+    const deletePaytm = (index) => {
+        const updated = formData.paytmNumbers.filter((_, i) => i !== index);
+        setFormData({ ...formData, paytmNumbers: updated });
+        showToast('success', 'PayTM number deleted successfully');
+    };
+
+    const togglePaytmStatus = (index) => {
+        const updated = [...formData.paytmNumbers];
+        updated[index].isActive = !updated[index].isActive;
+        setFormData({ ...formData, paytmNumbers: updated });
+        showToast('success', `PayTM number ${updated[index].isActive ? 'activated' : 'deactivated'}`);
+    };
+
+    // ==================== QR CODE FUNCTIONS ====================
+    
+    const handleQrFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setQrFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setQrForm({ ...qrForm, imageUrl: reader.result });
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const saveQrCode = () => {
+        setFormData({ ...formData, qrCode: { ...qrForm } });
+        setShowQrForm(false);
+        showToast('success', 'QR code updated successfully');
+    };
+
+    const toggleQrStatus = () => {
+        setFormData({
+            ...formData,
+            qrCode: { ...formData.qrCode, isActive: !formData.qrCode?.isActive }
+        });
+        showToast('success', `QR code ${!formData.qrCode?.isActive ? 'activated' : 'deactivated'}`);
+    };
+
+    const deleteQrCode = () => {
+        if (confirm('Are you sure you want to delete the QR code?')) {
+            setFormData({
+                ...formData,
+                qrCode: { imageUrl: '', name: 'Payment QR Code', description: '', isActive: false }
+            });
+            setQrFile(null);
+            showToast('success', 'QR code deleted successfully');
+        }
+    };
+
+    // ==================== BANK ACCOUNT FUNCTIONS ====================
+    
+    const validateBankAccountForm = () => {
+        if (!bankAccountForm.accountName.trim()) {
+            showToast('error', 'Account holder name is required');
+            return false;
+        }
+        if (!bankAccountForm.accountNumber.trim()) {
+            showToast('error', 'Account number is required');
+            return false;
+        }
+        if (!bankAccountForm.bankName.trim()) {
+            showToast('error', 'Bank name is required');
+            return false;
+        }
+        if (!bankAccountForm.ifscCode.trim()) {
+            showToast('error', 'IFSC code is required');
+            return false;
+        }
+        if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bankAccountForm.ifscCode)) {
+            showToast('error', 'Invalid IFSC code format');
+            return false;
+        }
+        return true;
+    };
+
+    const addBankAccount = () => {
+        if (!validateBankAccountForm()) return;
+        
+        const newBank = {
+            ...bankAccountForm,
+            createdAt: new Date().toISOString()
+        };
+        
+        // If this is default, unset others
+        if (newBank.isDefault) {
+            formData.bankAccounts.forEach(acc => acc.isDefault = false);
+        }
+        
+        if (editingBankIndex >= 0) {
+            const updated = [...formData.bankAccounts];
+            updated[editingBankIndex] = newBank;
+            setFormData({ ...formData, bankAccounts: updated });
+            showToast('success', 'Bank account updated successfully');
+        } else {
+            setFormData({ ...formData, bankAccounts: [...formData.bankAccounts, newBank] });
+            showToast('success', 'Bank account added successfully');
+        }
+        
+        setBankAccountForm({
+            accountName: '',
+            accountNumber: '',
+            bankName: '',
+            ifscCode: '',
+            branch: '',
+            accountType: 'Current',
+            isActive: true,
+            isDefault: false,
+            description: ''
+        });
+        setEditingBankIndex(-1);
+        setShowBankForm(false);
+    };
+
+    const editBankAccount = (index) => {
+        const bank = formData.bankAccounts[index];
+        setBankAccountForm({
+            accountName: bank.accountName,
+            accountNumber: bank.accountNumber,
+            bankName: bank.bankName,
+            ifscCode: bank.ifscCode,
+            branch: bank.branch || '',
+            accountType: bank.accountType || 'Current',
+            isActive: bank.isActive !== false,
+            isDefault: bank.isDefault || false,
+            description: bank.description || ''
+        });
+        setEditingBankIndex(index);
+        setShowBankForm(true);
+    };
+
+    const deleteBankAccount = (index) => {
+        const bank = formData.bankAccounts[index];
+        if (bank.isDefault) {
+            showToast('error', 'Cannot delete default bank account');
+            return;
+        }
+        const updated = formData.bankAccounts.filter((_, i) => i !== index);
+        setFormData({ ...formData, bankAccounts: updated });
+        showToast('success', 'Bank account deleted successfully');
+    };
+
+    const toggleBankStatus = (index) => {
+        const updated = [...formData.bankAccounts];
+        updated[index].isActive = !updated[index].isActive;
+        setFormData({ ...formData, bankAccounts: updated });
+        showToast('success', `Bank account ${updated[index].isActive ? 'activated' : 'deactivated'}`);
+    };
+
+    const setDefaultBank = (index) => {
+        const updated = formData.bankAccounts.map((acc, i) => ({
+            ...acc,
+            isDefault: i === index
+        }));
+        setFormData({ ...formData, bankAccounts: updated });
+        showToast('success', 'Default bank account updated');
+    };
+
     // ==================== HANDLERS ====================
     
     const handleInputChange = (e) => {
@@ -3137,6 +3993,16 @@ export default function CompanyProfilePage() {
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: '' }));
         }
+    };
+
+    const handlePaymentSettingsChange = (field, value) => {
+        setFormData(prev => ({
+            ...prev,
+            paymentSettings: {
+                ...prev.paymentSettings,
+                [field]: value
+            }
+        }));
     };
 
     const handleThemeChange = (colorKey, value) => {
@@ -3189,6 +4055,15 @@ export default function CompanyProfilePage() {
         return isActive ? 
             <CheckCircle size={16} className="status-icon active" /> : 
             <XCircle size={16} className="status-icon inactive" />;
+    };
+
+    const formatPhoneNumber = (phone) => {
+        if (!phone) return '';
+        const digits = phone.replace(/\D/g, '');
+        if (digits.length === 10) {
+            return `${digits.slice(0, 5)} ${digits.slice(5)}`;
+        }
+        return phone;
     };
 
     // ==================== LOADING STATE ====================
@@ -3597,83 +4472,6 @@ export default function CompanyProfilePage() {
                                                         </div>
                                                     </div>
 
-                                                    {/* ✅ ADDED: Order Flow Configuration */}
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Route size={16} />
-                                                            WhatsApp Order Flow Configuration
-                                                        </h3>
-                                                        <div className="form-grid">
-                                                            <div className="form-field span-2">
-                                                                <label>Order Collection Mode</label>
-                                                                <div className="radio-group">
-                                                                    <label className={`radio-label ${formData.orderFlowMode === 'long' ? 'selected' : ''}`}>
-                                                                        <input
-                                                                            type="radio"
-                                                                            name="orderFlowMode"
-                                                                            value="long"
-                                                                            checked={formData.orderFlowMode === 'long'}
-                                                                            onChange={handleInputChange}
-                                                                        />
-                                                                        <div className="radio-content">
-                                                                            <div className="radio-header">
-                                                                                <strong>Long Version (Step by Step) - Default</strong>
-                                                                                {formData.orderFlowMode === 'long' && (
-                                                                                    <span className="active-badge">Active</span>
-                                                                                )}
-                                                                            </div>
-                                                                            <p className="radio-description">
-                                                                                • Collect address one field at a time (Door No → Street → Area → City → State → Pincode)<br/>
-                                                                                • Product confirmation step before address<br/>
-                                                                                • Final confirmation before place order<br/>
-                                                                                • More detailed, guided process for customers
-                                                                            </p>
-                                                                            <div className="flow-preview">
-                                                                                <span className="preview-label">Flow Preview:</span>
-                                                                                <code>Order → Product → Confirm → Door No → Street → Area → City → State → Pincode → Final → Payment</code>
-                                                                            </div>
-                                                                        </div>
-                                                                    </label>
-                                                                    
-                                                                    <label className={`radio-label ${formData.orderFlowMode === 'short' ? 'selected' : ''}`}>
-                                                                        <input
-                                                                            type="radio"
-                                                                            name="orderFlowMode"
-                                                                            value="short"
-                                                                            checked={formData.orderFlowMode === 'short'}
-                                                                            onChange={handleInputChange}
-                                                                        />
-                                                                        <div className="radio-content">
-                                                                            <div className="radio-header">
-                                                                                <strong>Short Version (Quick Order)</strong>
-                                                                                {formData.orderFlowMode === 'short' && (
-                                                                                    <span className="active-badge">Active</span>
-                                                                                )}
-                                                                            </div>
-                                                                            <p className="radio-description">
-                                                                                • Collect full address in one message<br/>
-                                                                                • Format: Door No, Street, Area, City, State<br/>
-                                                                                • Skip product confirmation step<br/>
-                                                                                • Direct to place order after address<br/>
-                                                                                • Faster checkout experience
-                                                                            </p>
-                                                                            <div className="flow-preview">
-                                                                                <span className="preview-label">Flow Preview:</span>
-                                                                                <code>Order → Product → Full Address → Final → Payment</code>
-                                                                            </div>
-                                                                        </div>
-                                                                    </label>
-                                                                </div>
-                                                                {errors.orderFlowMode && <span className="error-text">{errors.orderFlowMode}</span>}
-                                                                <span className="hint">
-                                                                    <Info size={14} /> 
-                                                                    Choose how customers enter their shipping address during WhatsApp checkout. 
-                                                                    Long version provides step-by-step guidance, short version is faster for experienced customers.
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
                                                     {/* Social Media */}
                                                     <div className="form-block">
                                                         <h3>
@@ -3740,195 +4538,1104 @@ export default function CompanyProfilePage() {
                                                 </>
                                             )}
 
-                                            {/* UPI Section */}
-                                            {section.id === 'upi' && (
+                                            {/* Payment Methods Section */}
+                                            {section.id === 'payment_methods' && (
                                                 <>
-                                                    {/* Add UPI Button */}
-                                                    {!showUpiForm && (
-                                                        <button
-                                                            onClick={() => {
-                                                                setUpiForm({ id: '', name: '', appType: 'other', isActive: true, description: '' });
-                                                                setEditingUpiIndex(-1);
-                                                                setShowUpiForm(true);
-                                                            }}
-                                                            className="add-button"
-                                                        >
-                                                            <Plus size={18} />
-                                                            <span>Add New UPI ID</span>
-                                                        </button>
-                                                    )}
+                                                    {/* UPI IDs */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <CreditCard size={16} />
+                                                            UPI IDs
+                                                        </h3>
+                                                        
+                                                        {/* Add UPI Button */}
+                                                        {!showUpiForm && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setUpiForm({ id: '', name: '', appType: 'other', isActive: true, description: '' });
+                                                                    setEditingUpiIndex(-1);
+                                                                    setShowUpiForm(true);
+                                                                }}
+                                                                className="add-button"
+                                                            >
+                                                                <Plus size={18} />
+                                                                <span>Add New UPI ID</span>
+                                                            </button>
+                                                        )}
 
-                                                    {/* UPI Form */}
-                                                    {showUpiForm && (
-                                                        <div className="form-card">
-                                                            <div className="form-card-header">
-                                                                <h4>{editingUpiIndex >= 0 ? 'Edit UPI ID' : 'Add New UPI ID'}</h4>
-                                                                <button
-                                                                    onClick={() => setShowUpiForm(false)}
-                                                                    className="close-btn"
-                                                                >
-                                                                    <X size={18} />
-                                                                </button>
-                                                            </div>
-
-                                                            <div className="form-card-body">
-                                                                <div className="form-field">
-                                                                    <label>UPI ID <span className="required">*</span></label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={upiForm.id}
-                                                                        onChange={(e) => setUpiForm({ ...upiForm, id: e.target.value })}
-                                                                        placeholder="e.g., company@oksbi"
-                                                                    />
-                                                                    <span className="hint">Must include @ (e.g., name@oksbi)</span>
-                                                                </div>
-
-                                                                <div className="form-field">
-                                                                    <label>Display Name <span className="required">*</span></label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={upiForm.name}
-                                                                        onChange={(e) => setUpiForm({ ...upiForm, name: e.target.value })}
-                                                                        placeholder="e.g., Primary UPI"
-                                                                    />
-                                                                </div>
-
-                                                                <div className="form-field">
-                                                                    <label>App Type</label>
-                                                                    <select
-                                                                        value={upiForm.appType}
-                                                                        onChange={(e) => setUpiForm({ ...upiForm, appType: e.target.value })}
+                                                        {/* UPI Form */}
+                                                        {showUpiForm && (
+                                                            <div className="form-card">
+                                                                <div className="form-card-header">
+                                                                    <h4>{editingUpiIndex >= 0 ? 'Edit UPI ID' : 'Add New UPI ID'}</h4>
+                                                                    <button
+                                                                        onClick={() => setShowUpiForm(false)}
+                                                                        className="close-btn"
                                                                     >
-                                                                        {UPI_APPS.map(app => (
-                                                                            <option key={app.value} value={app.value}>
-                                                                                {app.icon} {app.label}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
+                                                                        <X size={18} />
+                                                                    </button>
+                                                                </div>
+
+                                                                <div className="form-card-body">
+                                                                    <div className="form-field">
+                                                                        <label>UPI ID <span className="required">*</span></label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={upiForm.id}
+                                                                            onChange={(e) => setUpiForm({ ...upiForm, id: e.target.value })}
+                                                                            placeholder="e.g., company@oksbi"
+                                                                        />
+                                                                        <span className="hint">Must include @ (e.g., name@oksbi)</span>
+                                                                    </div>
+
+                                                                    <div className="form-field">
+                                                                        <label>Display Name <span className="required">*</span></label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={upiForm.name}
+                                                                            onChange={(e) => setUpiForm({ ...upiForm, name: e.target.value })}
+                                                                            placeholder="e.g., Primary UPI"
+                                                                        />
+                                                                    </div>
+
+                                                                    <div className="form-field">
+                                                                        <label>App Type</label>
+                                                                        <select
+                                                                            value={upiForm.appType}
+                                                                            onChange={(e) => setUpiForm({ ...upiForm, appType: e.target.value })}
+                                                                        >
+                                                                            {UPI_APPS.map(app => (
+                                                                                <option key={app.value} value={app.value}>
+                                                                                    {app.icon} {app.label}
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+
+                                                                    <div className="form-field">
+                                                                        <label>Description (Optional)</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={upiForm.description}
+                                                                            onChange={(e) => setUpiForm({ ...upiForm, description: e.target.value })}
+                                                                            placeholder="e.g., For business payments only"
+                                                                        />
+                                                                    </div>
+
+                                                                    <div className="toggle-field">
+                                                                        <label className="toggle">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={upiForm.isActive}
+                                                                                onChange={(e) => setUpiForm({ ...upiForm, isActive: e.target.checked })}
+                                                                            />
+                                                                            <span className="toggle-slider"></span>
+                                                                            <span className="toggle-label">
+                                                                                {upiForm.isActive ? 'Active' : 'Inactive'}
+                                                                            </span>
+                                                                        </label>
+                                                                    </div>
+
+                                                                    <div className="form-actions">
+                                                                        <button
+                                                                            onClick={() => setShowUpiForm(false)}
+                                                                            className="btn-secondary"
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={addUpiId}
+                                                                            className="btn-primary"
+                                                                        >
+                                                                            {editingUpiIndex >= 0 ? 'Update' : 'Add'} UPI ID
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* UPI List */}
+                                                        <div className="items-list">
+                                                            {formData.upiIds?.length === 0 ? (
+                                                                <div className="empty-state">
+                                                                    <CreditCard size={48} />
+                                                                    <h4>No UPI IDs added</h4>
+                                                                    <p>Add your first UPI ID to start accepting payments</p>
+                                                                </div>
+                                                            ) : (
+                                                                formData.upiIds.map((upi, index) => {
+                                                                    const app = UPI_APPS.find(a => a.value === upi.appType) || UPI_APPS[5];
+                                                                    return (
+                                                                        <div key={index} className="item-card">
+                                                                            <div className="item-status">
+                                                                                {getStatusIcon(upi.isActive)}
+                                                                            </div>
+                                                                            <div className="item-details">
+                                                                                <div className="item-title">
+                                                                                    <span className="item-id">{upi.id}</span>
+                                                                                    <span className="item-name">{upi.name}</span>
+                                                                                </div>
+                                                                                {upi.description && (
+                                                                                    <p className="item-description">{upi.description}</p>
+                                                                                )}
+                                                                                <span 
+                                                                                    className="item-badge"
+                                                                                    style={{ 
+                                                                                        background: `${app.color}15`,
+                                                                                        color: app.color,
+                                                                                    }}
+                                                                                >
+                                                                                    {app.icon} {app.label}
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="item-actions">
+                                                                                <button
+                                                                                    onClick={() => toggleUpiStatus(index)}
+                                                                                    className="action-btn"
+                                                                                    title={upi.isActive ? 'Deactivate' : 'Activate'}
+                                                                                >
+                                                                                    {upi.isActive ? <Eye size={16} /> : <EyeOff size={16} />}
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => editUpi(index)}
+                                                                                    className="action-btn"
+                                                                                    title="Edit"
+                                                                                >
+                                                                                    <Edit2 size={16} />
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => deleteUpi(index)}
+                                                                                    className="action-btn delete"
+                                                                                    title="Delete"
+                                                                                >
+                                                                                    <Trash2 size={16} />
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* GPay Numbers */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <Smartphone size={16} />
+                                                            GPay Numbers
+                                                        </h3>
+                                                        
+                                                        {!showGpayForm && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setGpayForm({ phoneNumber: '', name: '', isActive: true, description: '' });
+                                                                    setEditingGpayIndex(-1);
+                                                                    setShowGpayForm(true);
+                                                                }}
+                                                                className="add-button"
+                                                            >
+                                                                <Plus size={18} />
+                                                                <span>Add New GPay Number</span>
+                                                            </button>
+                                                        )}
+
+                                                        {showGpayForm && (
+                                                            <div className="form-card">
+                                                                <div className="form-card-header">
+                                                                    <h4>{editingGpayIndex >= 0 ? 'Edit GPay Number' : 'Add New GPay Number'}</h4>
+                                                                    <button
+                                                                        onClick={() => setShowGpayForm(false)}
+                                                                        className="close-btn"
+                                                                    >
+                                                                        <X size={18} />
+                                                                    </button>
+                                                                </div>
+                                                                <div className="form-card-body">
+                                                                    <div className="form-field">
+                                                                        <label>Phone Number <span className="required">*</span></label>
+                                                                        <input
+                                                                            type="tel"
+                                                                            value={gpayForm.phoneNumber}
+                                                                            onChange={(e) => setGpayForm({ ...gpayForm, phoneNumber: e.target.value })}
+                                                                            placeholder="9876543210"
+                                                                            maxLength="10"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="form-field">
+                                                                        <label>Display Name <span className="required">*</span></label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={gpayForm.name}
+                                                                            onChange={(e) => setGpayForm({ ...gpayForm, name: e.target.value })}
+                                                                            placeholder="e.g., Primary GPay"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="form-field">
+                                                                        <label>Description (Optional)</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={gpayForm.description}
+                                                                            onChange={(e) => setGpayForm({ ...gpayForm, description: e.target.value })}
+                                                                            placeholder="e.g., For UPI payments"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="toggle-field">
+                                                                        <label className="toggle">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={gpayForm.isActive}
+                                                                                onChange={(e) => setGpayForm({ ...gpayForm, isActive: e.target.checked })}
+                                                                            />
+                                                                            <span className="toggle-slider"></span>
+                                                                            <span className="toggle-label">
+                                                                                {gpayForm.isActive ? 'Active' : 'Inactive'}
+                                                                            </span>
+                                                                        </label>
+                                                                    </div>
+                                                                    <div className="form-actions">
+                                                                        <button
+                                                                            onClick={() => setShowGpayForm(false)}
+                                                                            className="btn-secondary"
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={addGpayNumber}
+                                                                            className="btn-primary"
+                                                                        >
+                                                                            {editingGpayIndex >= 0 ? 'Update' : 'Add'} GPay Number
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        <div className="items-list">
+                                                            {formData.gpayNumbers?.length === 0 ? (
+                                                                <div className="empty-state">
+                                                                    <Smartphone size={48} />
+                                                                    <h4>No GPay numbers added</h4>
+                                                                    <p>Add GPay numbers for phone-based payments</p>
+                                                                </div>
+                                                            ) : (
+                                                                formData.gpayNumbers.map((gpay, index) => (
+                                                                    <div key={index} className="item-card">
+                                                                        <div className="item-status">
+                                                                            {getStatusIcon(gpay.isActive)}
+                                                                        </div>
+                                                                        <div className="item-details">
+                                                                            <div className="item-title">
+                                                                                <span className="item-id">📞 {formatPhoneNumber(gpay.phoneNumber)}</span>
+                                                                                <span className="item-name">{gpay.name}</span>
+                                                                            </div>
+                                                                            {gpay.description && (
+                                                                                <p className="item-description">{gpay.description}</p>
+                                                                            )}
+                                                                            <span className="item-badge" style={{ background: '#4285F415', color: '#4285F4' }}>
+                                                                                💚 GPay (UPI: {gpay.upiId})
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="item-actions">
+                                                                            <button
+                                                                                onClick={() => toggleGpayStatus(index)}
+                                                                                className="action-btn"
+                                                                            >
+                                                                                {gpay.isActive ? <Eye size={16} /> : <EyeOff size={16} />}
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => editGpay(index)}
+                                                                                className="action-btn"
+                                                                            >
+                                                                                <Edit2 size={16} />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => deleteGpay(index)}
+                                                                                className="action-btn delete"
+                                                                            >
+                                                                                <Trash2 size={16} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* PhonePe Numbers */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <Smartphone size={16} />
+                                                            PhonePe Numbers
+                                                        </h3>
+                                                        
+                                                        {!showPhonePeForm && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setPhonePeForm({ phoneNumber: '', name: '', isActive: true, description: '' });
+                                                                    setEditingPhonePeIndex(-1);
+                                                                    setShowPhonePeForm(true);
+                                                                }}
+                                                                className="add-button"
+                                                            >
+                                                                <Plus size={18} />
+                                                                <span>Add New PhonePe Number</span>
+                                                            </button>
+                                                        )}
+
+                                                        {showPhonePeForm && (
+                                                            <div className="form-card">
+                                                                <div className="form-card-header">
+                                                                    <h4>{editingPhonePeIndex >= 0 ? 'Edit PhonePe Number' : 'Add New PhonePe Number'}</h4>
+                                                                    <button
+                                                                        onClick={() => setShowPhonePeForm(false)}
+                                                                        className="close-btn"
+                                                                    >
+                                                                        <X size={18} />
+                                                                    </button>
+                                                                </div>
+                                                                <div className="form-card-body">
+                                                                    <div className="form-field">
+                                                                        <label>Phone Number <span className="required">*</span></label>
+                                                                        <input
+                                                                            type="tel"
+                                                                            value={phonePeForm.phoneNumber}
+                                                                            onChange={(e) => setPhonePeForm({ ...phonePeForm, phoneNumber: e.target.value })}
+                                                                            placeholder="9876543210"
+                                                                            maxLength="10"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="form-field">
+                                                                        <label>Display Name <span className="required">*</span></label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={phonePeForm.name}
+                                                                            onChange={(e) => setPhonePeForm({ ...phonePeForm, name: e.target.value })}
+                                                                            placeholder="e.g., Primary PhonePe"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="form-field">
+                                                                        <label>Description (Optional)</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={phonePeForm.description}
+                                                                            onChange={(e) => setPhonePeForm({ ...phonePeForm, description: e.target.value })}
+                                                                            placeholder="e.g., For business payments"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="toggle-field">
+                                                                        <label className="toggle">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={phonePeForm.isActive}
+                                                                                onChange={(e) => setPhonePeForm({ ...phonePeForm, isActive: e.target.checked })}
+                                                                            />
+                                                                            <span className="toggle-slider"></span>
+                                                                            <span className="toggle-label">
+                                                                                {phonePeForm.isActive ? 'Active' : 'Inactive'}
+                                                                            </span>
+                                                                        </label>
+                                                                    </div>
+                                                                    <div className="form-actions">
+                                                                        <button
+                                                                            onClick={() => setShowPhonePeForm(false)}
+                                                                            className="btn-secondary"
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={addPhonePeNumber}
+                                                                            className="btn-primary"
+                                                                        >
+                                                                            {editingPhonePeIndex >= 0 ? 'Update' : 'Add'} PhonePe Number
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        <div className="items-list">
+                                                            {formData.phonePeNumbers?.length === 0 ? (
+                                                                <div className="empty-state">
+                                                                    <Smartphone size={48} />
+                                                                    <h4>No PhonePe numbers added</h4>
+                                                                    <p>Add PhonePe numbers for UPI payments</p>
+                                                                </div>
+                                                            ) : (
+                                                                formData.phonePeNumbers.map((phonepe, index) => (
+                                                                    <div key={index} className="item-card">
+                                                                        <div className="item-status">
+                                                                            {getStatusIcon(phonepe.isActive)}
+                                                                        </div>
+                                                                        <div className="item-details">
+                                                                            <div className="item-title">
+                                                                                <span className="item-id">📞 {formatPhoneNumber(phonepe.phoneNumber)}</span>
+                                                                                <span className="item-name">{phonepe.name}</span>
+                                                                            </div>
+                                                                            {phonepe.description && (
+                                                                                <p className="item-description">{phonepe.description}</p>
+                                                                            )}
+                                                                            <span className="item-badge" style={{ background: '#5F259F15', color: '#5F259F' }}>
+                                                                                🟣 PhonePe (UPI: {phonepe.upiId})
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="item-actions">
+                                                                            <button
+                                                                                onClick={() => togglePhonePeStatus(index)}
+                                                                                className="action-btn"
+                                                                            >
+                                                                                {phonepe.isActive ? <Eye size={16} /> : <EyeOff size={16} />}
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => editPhonePe(index)}
+                                                                                className="action-btn"
+                                                                            >
+                                                                                <Edit2 size={16} />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => deletePhonePe(index)}
+                                                                                className="action-btn delete"
+                                                                            >
+                                                                                <Trash2 size={16} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* PayTM Numbers */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <Smartphone size={16} />
+                                                            PayTM Numbers
+                                                        </h3>
+                                                        
+                                                        {!showPaytmForm && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setPaytmForm({ phoneNumber: '', name: '', isActive: true, description: '' });
+                                                                    setEditingPaytmIndex(-1);
+                                                                    setShowPaytmForm(true);
+                                                                }}
+                                                                className="add-button"
+                                                            >
+                                                                <Plus size={18} />
+                                                                <span>Add New PayTM Number</span>
+                                                            </button>
+                                                        )}
+
+                                                        {showPaytmForm && (
+                                                            <div className="form-card">
+                                                                <div className="form-card-header">
+                                                                    <h4>{editingPaytmIndex >= 0 ? 'Edit PayTM Number' : 'Add New PayTM Number'}</h4>
+                                                                    <button
+                                                                        onClick={() => setShowPaytmForm(false)}
+                                                                        className="close-btn"
+                                                                    >
+                                                                        <X size={18} />
+                                                                    </button>
+                                                                </div>
+                                                                <div className="form-card-body">
+                                                                    <div className="form-field">
+                                                                        <label>Phone Number <span className="required">*</span></label>
+                                                                        <input
+                                                                            type="tel"
+                                                                            value={paytmForm.phoneNumber}
+                                                                            onChange={(e) => setPaytmForm({ ...paytmForm, phoneNumber: e.target.value })}
+                                                                            placeholder="9876543210"
+                                                                            maxLength="10"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="form-field">
+                                                                        <label>Display Name <span className="required">*</span></label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={paytmForm.name}
+                                                                            onChange={(e) => setPaytmForm({ ...paytmForm, name: e.target.value })}
+                                                                            placeholder="e.g., Primary PayTM"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="form-field">
+                                                                        <label>Description (Optional)</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={paytmForm.description}
+                                                                            onChange={(e) => setPaytmForm({ ...paytmForm, description: e.target.value })}
+                                                                            placeholder="e.g., For UPI payments"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="toggle-field">
+                                                                        <label className="toggle">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={paytmForm.isActive}
+                                                                                onChange={(e) => setPaytmForm({ ...paytmForm, isActive: e.target.checked })}
+                                                                            />
+                                                                            <span className="toggle-slider"></span>
+                                                                            <span className="toggle-label">
+                                                                                {paytmForm.isActive ? 'Active' : 'Inactive'}
+                                                                            </span>
+                                                                        </label>
+                                                                    </div>
+                                                                    <div className="form-actions">
+                                                                        <button
+                                                                            onClick={() => setShowPaytmForm(false)}
+                                                                            className="btn-secondary"
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={addPaytmNumber}
+                                                                            className="btn-primary"
+                                                                        >
+                                                                            {editingPaytmIndex >= 0 ? 'Update' : 'Add'} PayTM Number
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        <div className="items-list">
+                                                            {formData.paytmNumbers?.length === 0 ? (
+                                                                <div className="empty-state">
+                                                                    <Smartphone size={48} />
+                                                                    <h4>No PayTM numbers added</h4>
+                                                                    <p>Add PayTM numbers for payments</p>
+                                                                </div>
+                                                            ) : (
+                                                                formData.paytmNumbers.map((paytm, index) => (
+                                                                    <div key={index} className="item-card">
+                                                                        <div className="item-status">
+                                                                            {getStatusIcon(paytm.isActive)}
+                                                                        </div>
+                                                                        <div className="item-details">
+                                                                            <div className="item-title">
+                                                                                <span className="item-id">📞 {formatPhoneNumber(paytm.phoneNumber)}</span>
+                                                                                <span className="item-name">{paytm.name}</span>
+                                                                            </div>
+                                                                            {paytm.description && (
+                                                                                <p className="item-description">{paytm.description}</p>
+                                                                            )}
+                                                                            <span className="item-badge" style={{ background: '#00BAF215', color: '#00BAF2' }}>
+                                                                                🔵 PayTM (UPI: {paytm.upiId})
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="item-actions">
+                                                                            <button
+                                                                                onClick={() => togglePaytmStatus(index)}
+                                                                                className="action-btn"
+                                                                            >
+                                                                                {paytm.isActive ? <Eye size={16} /> : <EyeOff size={16} />}
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => editPaytm(index)}
+                                                                                className="action-btn"
+                                                                            >
+                                                                                <Edit2 size={16} />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => deletePaytm(index)}
+                                                                                className="action-btn delete"
+                                                                            >
+                                                                                <Trash2 size={16} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* QR Code */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <QrCode size={16} />
+                                                            QR Code
+                                                        </h3>
+                                                        
+                                                        <div className="qr-section">
+                                                            {formData.qrCode?.imageUrl ? (
+                                                                <div className="qr-preview">
+                                                                    <img src={formData.qrCode.imageUrl} alt="Payment QR Code" />
+                                                                    <div className="qr-info">
+                                                                        <p><strong>Name:</strong> {formData.qrCode.name}</p>
+                                                                        {formData.qrCode.description && (
+                                                                            <p><strong>Description:</strong> {formData.qrCode.description}</p>
+                                                                        )}
+                                                                        <p><strong>Status:</strong> 
+                                                                            <span className={formData.qrCode.isActive ? 'active' : 'inactive'}>
+                                                                                {formData.qrCode.isActive ? 'Active' : 'Inactive'}
+                                                                            </span>
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="qr-actions">
+                                                                        <button
+                                                                            onClick={toggleQrStatus}
+                                                                            className="qr-action-btn"
+                                                                        >
+                                                                            {formData.qrCode.isActive ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                                            {formData.qrCode.isActive ? 'Deactivate' : 'Activate'}
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => setShowQrForm(true)}
+                                                                            className="qr-action-btn"
+                                                                        >
+                                                                            <Edit2 size={16} />
+                                                                            Edit
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={deleteQrCode}
+                                                                            className="qr-action-btn delete"
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                            Delete
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => setShowQrForm(true)}
+                                                                    className="add-qr-btn"
+                                                                >
+                                                                    <QrCode size={32} />
+                                                                    <span>Upload QR Code</span>
+                                                                    <small>Customers can scan this QR to pay</small>
+                                                                </button>
+                                                            )}
+                                                        </div>
+
+                                                        {/* QR Code Form Modal */}
+                                                        {showQrForm && (
+                                                            <div className="modal-overlay" onClick={() => setShowQrForm(false)}>
+                                                                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                                                                    <div className="modal-header">
+                                                                        <h4>{formData.qrCode?.imageUrl ? 'Edit QR Code' : 'Upload QR Code'}</h4>
+                                                                        <button onClick={() => setShowQrForm(false)} className="close-btn">
+                                                                            <X size={20} />
+                                                                        </button>
+                                                                    </div>
+                                                                    <div className="modal-body">
+                                                                        <div className="form-field">
+                                                                            <label>QR Code Image</label>
+                                                                            <div className="file-upload">
+                                                                                <input
+                                                                                    type="file"
+                                                                                    accept="image/*"
+                                                                                    onChange={handleQrFileChange}
+                                                                                    id="qr-upload"
+                                                                                />
+                                                                                <label htmlFor="qr-upload" className="file-label">
+                                                                                    <Upload size={20} />
+                                                                                    <span>Choose Image</span>
+                                                                                </label>
+                                                                            </div>
+                                                                            {qrForm.imageUrl && (
+                                                                                <div className="upload-preview">
+                                                                                    <img src={qrForm.imageUrl} alt="QR Preview" />
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="form-field">
+                                                                            <label>Name</label>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={qrForm.name}
+                                                                                onChange={(e) => setQrForm({ ...qrForm, name: e.target.value })}
+                                                                                placeholder="e.g., Payment QR Code"
+                                                                            />
+                                                                        </div>
+                                                                        <div className="form-field">
+                                                                            <label>Description (Optional)</label>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={qrForm.description}
+                                                                                onChange={(e) => setQrForm({ ...qrForm, description: e.target.value })}
+                                                                                placeholder="Brief description"
+                                                                            />
+                                                                        </div>
+                                                                        <div className="toggle-field">
+                                                                            <label className="toggle">
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    checked={qrForm.isActive}
+                                                                                    onChange={(e) => setQrForm({ ...qrForm, isActive: e.target.checked })}
+                                                                                />
+                                                                                <span className="toggle-slider"></span>
+                                                                                <span className="toggle-label">
+                                                                                    {qrForm.isActive ? 'Active' : 'Inactive'}
+                                                                                </span>
+                                                                            </label>
+                                                                        </div>
+                                                                        <div className="form-actions">
+                                                                            <button
+                                                                                onClick={() => setShowQrForm(false)}
+                                                                                className="btn-secondary"
+                                                                            >
+                                                                                Cancel
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={saveQrCode}
+                                                                                className="btn-primary"
+                                                                            >
+                                                                                Save QR Code
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Bank Accounts */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <Landmark size={16} />
+                                                            Bank Accounts
+                                                        </h3>
+                                                        
+                                                        {!showBankForm && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setBankAccountForm({
+                                                                        accountName: '',
+                                                                        accountNumber: '',
+                                                                        bankName: '',
+                                                                        ifscCode: '',
+                                                                        branch: '',
+                                                                        accountType: 'Current',
+                                                                        isActive: true,
+                                                                        isDefault: false,
+                                                                        description: ''
+                                                                    });
+                                                                    setEditingBankIndex(-1);
+                                                                    setShowBankForm(true);
+                                                                }}
+                                                                className="add-button"
+                                                            >
+                                                                <Plus size={18} />
+                                                                <span>Add New Bank Account</span>
+                                                            </button>
+                                                        )}
+
+                                                        {showBankForm && (
+                                                            <div className="form-card">
+                                                                <div className="form-card-header">
+                                                                    <h4>{editingBankIndex >= 0 ? 'Edit Bank Account' : 'Add New Bank Account'}</h4>
+                                                                    <button
+                                                                        onClick={() => setShowBankForm(false)}
+                                                                        className="close-btn"
+                                                                    >
+                                                                        <X size={18} />
+                                                                    </button>
+                                                                </div>
+                                                                <div className="form-card-body">
+                                                                    <div className="form-field">
+                                                                        <label>Account Holder Name <span className="required">*</span></label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={bankAccountForm.accountName}
+                                                                            onChange={(e) => setBankAccountForm({ ...bankAccountForm, accountName: e.target.value })}
+                                                                            placeholder="As per bank records"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="form-field">
+                                                                        <label>Account Number <span className="required">*</span></label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={bankAccountForm.accountNumber}
+                                                                            onChange={(e) => setBankAccountForm({ ...bankAccountForm, accountNumber: e.target.value })}
+                                                                            placeholder="Enter account number"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="form-field">
+                                                                        <label>Bank Name <span className="required">*</span></label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={bankAccountForm.bankName}
+                                                                            onChange={(e) => setBankAccountForm({ ...bankAccountForm, bankName: e.target.value })}
+                                                                            placeholder="e.g., State Bank of India"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="form-field">
+                                                                        <label>IFSC Code <span className="required">*</span></label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={bankAccountForm.ifscCode}
+                                                                            onChange={(e) => setBankAccountForm({ ...bankAccountForm, ifscCode: e.target.value.toUpperCase() })}
+                                                                            placeholder="SBIN0001234"
+                                                                            maxLength="11"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="form-field">
+                                                                        <label>Branch (Optional)</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={bankAccountForm.branch}
+                                                                            onChange={(e) => setBankAccountForm({ ...bankAccountForm, branch: e.target.value })}
+                                                                            placeholder="Branch name"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="form-field">
+                                                                        <label>Account Type</label>
+                                                                        <select
+                                                                            value={bankAccountForm.accountType}
+                                                                            onChange={(e) => setBankAccountForm({ ...bankAccountForm, accountType: e.target.value })}
+                                                                        >
+                                                                            {ACCOUNT_TYPES.map(type => (
+                                                                                <option key={type} value={type}>{type}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                    <div className="form-field">
+                                                                        <label>Description (Optional)</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={bankAccountForm.description}
+                                                                            onChange={(e) => setBankAccountForm({ ...bankAccountForm, description: e.target.value })}
+                                                                            placeholder="e.g., Main business account"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="toggle-field">
+                                                                        <label className="toggle">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={bankAccountForm.isActive}
+                                                                                onChange={(e) => setBankAccountForm({ ...bankAccountForm, isActive: e.target.checked })}
+                                                                            />
+                                                                            <span className="toggle-slider"></span>
+                                                                            <span className="toggle-label">
+                                                                                {bankAccountForm.isActive ? 'Active' : 'Inactive'}
+                                                                            </span>
+                                                                        </label>
+                                                                    </div>
+                                                                    <div className="toggle-field">
+                                                                        <label className="toggle">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={bankAccountForm.isDefault}
+                                                                                onChange={(e) => setBankAccountForm({ ...bankAccountForm, isDefault: e.target.checked })}
+                                                                            />
+                                                                            <span className="toggle-slider"></span>
+                                                                            <span className="toggle-label">
+                                                                                Set as Default Account
+                                                                            </span>
+                                                                        </label>
+                                                                    </div>
+                                                                    <div className="form-actions">
+                                                                        <button
+                                                                            onClick={() => setShowBankForm(false)}
+                                                                            className="btn-secondary"
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={addBankAccount}
+                                                                            className="btn-primary"
+                                                                        >
+                                                                            {editingBankIndex >= 0 ? 'Update' : 'Add'} Bank Account
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        <div className="items-list">
+                                                            {formData.bankAccounts?.length === 0 ? (
+                                                                <div className="empty-state">
+                                                                    <Landmark size={48} />
+                                                                    <h4>No bank accounts added</h4>
+                                                                    <p>Add bank accounts for traditional transfers</p>
+                                                                </div>
+                                                            ) : (
+                                                                formData.bankAccounts.map((bank, index) => (
+                                                                    <div key={index} className="item-card">
+                                                                        <div className="item-status">
+                                                                            {getStatusIcon(bank.isActive)}
+                                                                            {bank.isDefault && (
+                                                                                <span className="default-badge" title="Default Account">⭐</span>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="item-details">
+                                                                            <div className="item-title">
+                                                                                <span className="item-id">{bank.accountName}</span>
+                                                                                <span className="item-name">{bank.bankName}</span>
+                                                                            </div>
+                                                                            <p className="item-description">
+                                                                                A/C: {bank.accountNumber.slice(-4)} • IFSC: {bank.ifscCode}
+                                                                            </p>
+                                                                            {bank.description && (
+                                                                                <p className="item-description">{bank.description}</p>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="item-actions">
+                                                                            {!bank.isDefault && (
+                                                                                <button
+                                                                                    onClick={() => setDefaultBank(index)}
+                                                                                    className="action-btn"
+                                                                                    title="Set as Default"
+                                                                                >
+                                                                                    <Star size={16} />
+                                                                                </button>
+                                                                            )}
+                                                                            <button
+                                                                                onClick={() => toggleBankStatus(index)}
+                                                                                className="action-btn"
+                                                                            >
+                                                                                {bank.isActive ? <Eye size={16} /> : <EyeOff size={16} />}
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => editBankAccount(index)}
+                                                                                className="action-btn"
+                                                                            >
+                                                                                <Edit2 size={16} />
+                                                                            </button>
+                                                                            {!bank.isDefault && (
+                                                                                <button
+                                                                                    onClick={() => deleteBankAccount(index)}
+                                                                                    className="action-btn delete"
+                                                                                >
+                                                                                    <Trash2 size={16} />
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Payment Settings */}
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <Settings size={16} />
+                                                            Payment Settings
+                                                        </h3>
+                                                        
+                                                        <button
+                                                            onClick={() => setShowPaymentSettings(!showPaymentSettings)}
+                                                            className="settings-toggle"
+                                                        >
+                                                            <span>Configure Payment Settings</span>
+                                                            <ChevronRight size={18} className={`chevron ${showPaymentSettings ? 'expanded' : ''}`} />
+                                                        </button>
+
+                                                        {showPaymentSettings && (
+                                                            <div className="payment-settings">
+                                                                <div className="toggle-field">
+                                                                    <label className="toggle">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={formData.paymentSettings?.autoVerifyEnabled}
+                                                                            onChange={(e) => handlePaymentSettingsChange('autoVerifyEnabled', e.target.checked)}
+                                                                        />
+                                                                        <span className="toggle-slider"></span>
+                                                                        <span className="toggle-label">Enable Auto-Verification</span>
+                                                                    </label>
                                                                 </div>
 
                                                                 <div className="form-field">
-                                                                    <label>Description (Optional)</label>
+                                                                    <label>Minimum Confidence for Auto-Verify (%)</label>
                                                                     <input
-                                                                        type="text"
-                                                                        value={upiForm.description}
-                                                                        onChange={(e) => setUpiForm({ ...upiForm, description: e.target.value })}
-                                                                        placeholder="e.g., For business payments only"
+                                                                        type="number"
+                                                                        value={formData.paymentSettings?.minConfidenceForAuto}
+                                                                        onChange={(e) => handlePaymentSettingsChange('minConfidenceForAuto', parseInt(e.target.value))}
+                                                                        min="50"
+                                                                        max="100"
                                                                     />
+                                                                    <span className="hint">Recommended: 85%</span>
+                                                                </div>
+
+                                                                <div className="form-field">
+                                                                    <label>Payment Timeout (minutes)</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={formData.paymentSettings?.paymentTimeout}
+                                                                        onChange={(e) => handlePaymentSettingsChange('paymentTimeout', parseInt(e.target.value))}
+                                                                        min="5"
+                                                                        max="60"
+                                                                    />
+                                                                    <span className="hint">How long customers have to complete payment</span>
+                                                                </div>
+
+                                                                <div className="form-field">
+                                                                    <label>Amount Tolerance (₹)</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={formData.paymentSettings?.autoVerifyThresholds?.amountTolerance}
+                                                                        onChange={(e) => setFormData({
+                                                                            ...formData,
+                                                                            paymentSettings: {
+                                                                                ...formData.paymentSettings,
+                                                                                autoVerifyThresholds: {
+                                                                                    ...formData.paymentSettings?.autoVerifyThresholds,
+                                                                                    amountTolerance: parseInt(e.target.value)
+                                                                                }
+                                                                            }
+                                                                        })}
+                                                                        min="0"
+                                                                        max="10"
+                                                                    />
+                                                                    <span className="hint">Allowed difference between detected and expected amount</span>
+                                                                </div>
+
+                                                                <div className="form-field">
+                                                                    <label>Time Window (minutes)</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={formData.paymentSettings?.autoVerifyThresholds?.timeWindow}
+                                                                        onChange={(e) => setFormData({
+                                                                            ...formData,
+                                                                            paymentSettings: {
+                                                                                ...formData.paymentSettings,
+                                                                                autoVerifyThresholds: {
+                                                                                    ...formData.paymentSettings?.autoVerifyThresholds,
+                                                                                    timeWindow: parseInt(e.target.value)
+                                                                                }
+                                                                            }
+                                                                        })}
+                                                                        min="5"
+                                                                        max="60"
+                                                                    />
+                                                                    <span className="hint">Maximum age of payment screenshot</span>
                                                                 </div>
 
                                                                 <div className="toggle-field">
                                                                     <label className="toggle">
                                                                         <input
                                                                             type="checkbox"
-                                                                            checked={upiForm.isActive}
-                                                                            onChange={(e) => setUpiForm({ ...upiForm, isActive: e.target.checked })}
+                                                                            checked={formData.paymentSettings?.requireTransactionId}
+                                                                            onChange={(e) => handlePaymentSettingsChange('requireTransactionId', e.target.checked)}
                                                                         />
                                                                         <span className="toggle-slider"></span>
-                                                                        <span className="toggle-label">
-                                                                            {upiForm.isActive ? 'Active' : 'Inactive'}
-                                                                        </span>
+                                                                        <span className="toggle-label">Require Transaction ID</span>
                                                                     </label>
                                                                 </div>
 
-                                                                <div className="form-actions">
-                                                                    <button
-                                                                        onClick={() => setShowUpiForm(false)}
-                                                                        className="btn-secondary"
-                                                                    >
-                                                                        Cancel
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={addUpiId}
-                                                                        className="btn-primary"
-                                                                    >
-                                                                        {editingUpiIndex >= 0 ? 'Update' : 'Add'} UPI ID
-                                                                    </button>
+                                                                <div className="toggle-field">
+                                                                    <label className="toggle">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={formData.paymentSettings?.allowMultiplePaymentMethods}
+                                                                            onChange={(e) => handlePaymentSettingsChange('allowMultiplePaymentMethods', e.target.checked)}
+                                                                        />
+                                                                        <span className="toggle-slider"></span>
+                                                                        <span className="toggle-label">Allow Multiple Payment Methods</span>
+                                                                    </label>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    )}
-
-                                                    {/* UPI List */}
-                                                    <div className="items-list">
-                                                        {formData.upiIds?.length === 0 ? (
-                                                            <div className="empty-state">
-                                                                <CreditCard size={48} />
-                                                                <h4>No UPI IDs added</h4>
-                                                                <p>Add your first UPI ID to start accepting payments</p>
-                                                            </div>
-                                                        ) : (
-                                                            formData.upiIds.map((upi, index) => {
-                                                                const app = UPI_APPS.find(a => a.value === upi.appType) || UPI_APPS[4];
-                                                                return (
-                                                                    <div key={index} className="item-card">
-                                                                        <div className="item-status">
-                                                                            {getStatusIcon(upi.isActive)}
-                                                                        </div>
-                                                                        <div className="item-details">
-                                                                            <div className="item-title">
-                                                                                <span className="item-id">{upi.id}</span>
-                                                                                <span className="item-name">{upi.name}</span>
-                                                                            </div>
-                                                                            {upi.description && (
-                                                                                <p className="item-description">{upi.description}</p>
-                                                                            )}
-                                                                            <span 
-                                                                                className="item-badge"
-                                                                                style={{ 
-                                                                                    background: `${app.color}15`,
-                                                                                    color: app.color,
-                                                                                }}
-                                                                            >
-                                                                                {app.icon} {app.label}
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className="item-actions">
-                                                                            <button
-                                                                                onClick={() => toggleUpiStatus(index)}
-                                                                                className="action-btn"
-                                                                                title={upi.isActive ? 'Deactivate' : 'Activate'}
-                                                                            >
-                                                                                {upi.isActive ? <Eye size={16} /> : <EyeOff size={16} />}
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => editUpi(index)}
-                                                                                className="action-btn"
-                                                                                title="Edit"
-                                                                            >
-                                                                                <Edit2 size={16} />
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => deleteUpi(index)}
-                                                                                className="action-btn delete"
-                                                                                title="Delete"
-                                                                            >
-                                                                                <Trash2 size={16} />
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })
                                                         )}
-                                                    </div>
-
-                                                    {/* Info Box */}
-                                                    <div className="info-box">
-                                                        <Info size={20} />
-                                                        <p>
-                                                            <strong>Important:</strong> Payment verification system will check screenshots against all active UPI IDs above.
-                                                        </p>
                                                     </div>
                                                 </>
                                             )}
 
-                                            {/* Bank Section */}
+                                            {/* Bank Section (Legacy) */}
                                             {section.id === 'bank' && (
                                                 <>
                                                     <div className="form-block">
                                                         <h3>
                                                             <Landmark size={16} />
-                                                            Account Information
+                                                            Bank Information (Legacy)
                                                         </h3>
                                                         <div className="form-grid">
                                                             <div className="form-field span-2">
@@ -3997,7 +5704,7 @@ export default function CompanyProfilePage() {
                                                     <div className="info-box">
                                                         <ShieldCheck size={20} />
                                                         <p>
-                                                            <strong>Note:</strong> These details are for reference only and will appear on invoices.
+                                                            <strong>Note:</strong> These details are for legacy support. Use Bank Accounts in Payment Methods for multiple accounts.
                                                         </p>
                                                     </div>
                                                 </>
@@ -4276,6 +5983,94 @@ export default function CompanyProfilePage() {
                                                                 </div>
                                                             ))}
                                                         </div>
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            {/* Order Flow Section */}
+                                            {section.id === 'order_flow' && (
+                                                <>
+                                                    <div className="form-block">
+                                                        <h3>
+                                                            <Route size={16} />
+                                                            WhatsApp Order Flow Configuration
+                                                        </h3>
+                                                        <div className="form-grid">
+                                                            <div className="form-field span-2">
+                                                                <label>Order Collection Mode</label>
+                                                                <div className="radio-group">
+                                                                    <label className={`radio-label ${formData.orderFlowMode === 'long' ? 'selected' : ''}`}>
+                                                                        <input
+                                                                            type="radio"
+                                                                            name="orderFlowMode"
+                                                                            value="long"
+                                                                            checked={formData.orderFlowMode === 'long'}
+                                                                            onChange={handleInputChange}
+                                                                        />
+                                                                        <div className="radio-content">
+                                                                            <div className="radio-header">
+                                                                                <strong>Long Version (Step by Step) - Default</strong>
+                                                                                {formData.orderFlowMode === 'long' && (
+                                                                                    <span className="active-badge">Active</span>
+                                                                                )}
+                                                                            </div>
+                                                                            <p className="radio-description">
+                                                                                • Collect address one field at a time (Door No → Street → Area → City → State → Pincode)<br/>
+                                                                                • Product confirmation step before address<br/>
+                                                                                • Final confirmation before place order<br/>
+                                                                                • More detailed, guided process for customers
+                                                                            </p>
+                                                                            <div className="flow-preview">
+                                                                                <span className="preview-label">Flow Preview:</span>
+                                                                                <code>Order → Product → Confirm → Door No → Street → Area → City → State → Pincode → Final → Payment</code>
+                                                                            </div>
+                                                                        </div>
+                                                                    </label>
+                                                                    
+                                                                    <label className={`radio-label ${formData.orderFlowMode === 'short' ? 'selected' : ''}`}>
+                                                                        <input
+                                                                            type="radio"
+                                                                            name="orderFlowMode"
+                                                                            value="short"
+                                                                            checked={formData.orderFlowMode === 'short'}
+                                                                            onChange={handleInputChange}
+                                                                        />
+                                                                        <div className="radio-content">
+                                                                            <div className="radio-header">
+                                                                                <strong>Short Version (Quick Order)</strong>
+                                                                                {formData.orderFlowMode === 'short' && (
+                                                                                    <span className="active-badge">Active</span>
+                                                                                )}
+                                                                            </div>
+                                                                            <p className="radio-description">
+                                                                                • Collect full address in one message<br/>
+                                                                                • Format: Door No, Street, Area, City, State<br/>
+                                                                                • Skip product confirmation step<br/>
+                                                                                • Direct to place order after address<br/>
+                                                                                • Faster checkout experience
+                                                                            </p>
+                                                                            <div className="flow-preview">
+                                                                                <span className="preview-label">Flow Preview:</span>
+                                                                                <code>Order → Product → Full Address → Final → Payment</code>
+                                                                            </div>
+                                                                        </div>
+                                                                    </label>
+                                                                </div>
+                                                                {errors.orderFlowMode && <span className="error-text">{errors.orderFlowMode}</span>}
+                                                                <span className="hint">
+                                                                    <Info size={14} /> 
+                                                                    Choose how customers enter their shipping address during WhatsApp checkout. 
+                                                                    Long version provides step-by-step guidance, short version is faster for experienced customers.
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="info-box">
+                                                        <Info size={20} />
+                                                        <p>
+                                                            <strong>Note:</strong> Changes to order flow mode will affect how new orders are collected via WhatsApp. Existing orders continue with their original flow.
+                                                        </p>
                                                     </div>
                                                 </>
                                             )}
@@ -4615,75 +6410,74 @@ export default function CompanyProfilePage() {
                 }
 
                 /* ==================== DESKTOP TABS ==================== */
-               /* ==================== DESKTOP TABS ==================== */
-.desktop-tabs {
-    max-width: 1200px;
-    margin: 0 auto 24px auto;
-    padding: 0 24px;
-    display: none;
-    background: white;
-    border-bottom: 2px solid #e2e8f0;
-}
+                .desktop-tabs {
+                    max-width: 1200px;
+                    margin: 0 auto 24px auto;
+                    padding: 0 24px;
+                    display: none;
+                    background: white;
+                    border-bottom: 2px solid #e2e8f0;
+                }
 
-@media (min-width: 1024px) {
-    .desktop-tabs {
-        display: flex;
-        padding: 0 24px;
-        margin: 0 auto 24px auto;
-    }
-}
+                @media (min-width: 1024px) {
+                    .desktop-tabs {
+                        display: flex;
+                        padding: 0 24px;
+                        margin: 0 auto 24px auto;
+                    }
+                }
 
-.tab-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 16px 12px;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-    font-size: 0.875rem;
-    position: relative;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -2px;
-    flex: 1;
-    min-width: 0;
-}
+                .tab-button {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    padding: 16px 12px;
+                    background: transparent;
+                    border: none;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    white-space: nowrap;
+                    font-size: 0.875rem;
+                    position: relative;
+                    border-bottom: 2px solid transparent;
+                    margin-bottom: -2px;
+                    flex: 1;
+                    min-width: 0;
+                }
 
-.tab-button:hover {
-    background: #f8fafc;
-}
+                .tab-button:hover {
+                    background: #f8fafc;
+                }
 
-.tab-button.active {
-    background: #f8fafc;
-    border-bottom: 2px solid;
-}
+                .tab-button.active {
+                    background: #f8fafc;
+                    border-bottom: 2px solid;
+                }
 
-.tab-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 6px;
-    border-radius: 8px;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-}
+                .tab-icon {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 6px;
+                    border-radius: 8px;
+                    transition: all 0.2s ease;
+                    flex-shrink: 0;
+                }
 
-.tab-title {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
+                .tab-title {
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
 
-.active-indicator {
-    position: absolute;
-    bottom: -2px;
-    left: 0;
-    right: 0;
-    height: 2px;
-}
+                .active-indicator {
+                    position: absolute;
+                    bottom: -2px;
+                    left: 0;
+                    right: 0;
+                    height: 2px;
+                }
 
                 /* ==================== MAIN CONTENT ==================== */
                 .main-content {
@@ -5050,11 +6844,10 @@ export default function CompanyProfilePage() {
                 }
 
                 .item-status {
-                    width: 28px;
-                    height: 28px;
                     display: flex;
                     align-items: center;
-                    justify-content: center;
+                    gap: 4px;
+                    min-width: 40px;
                 }
 
                 .status-icon.active {
@@ -5063,6 +6856,10 @@ export default function CompanyProfilePage() {
 
                 .status-icon.inactive {
                     color: #94a3b8;
+                }
+
+                .default-badge {
+                    font-size: 14px;
                 }
 
                 .item-details {
@@ -5081,7 +6878,6 @@ export default function CompanyProfilePage() {
                     font-weight: 600;
                     font-size: 0.938rem;
                     color: #0f172a;
-                    font-family: monospace;
                 }
 
                 .item-name {
@@ -5119,10 +6915,207 @@ export default function CompanyProfilePage() {
                     border-radius: 8px;
                     color: #64748b;
                     cursor: pointer;
+                    transition: all 0.2s ease;
                 }
 
-                .action-btn.delete {
+                .action-btn:hover {
+                    background: #f1f5f9;
+                    border-color: #3b82f6;
+                    color: #3b82f6;
+                }
+
+                .action-btn.delete:hover {
+                    background: #fee2e2;
+                    border-color: #ef4444;
                     color: #ef4444;
+                }
+
+                /* ==================== QR SECTION ==================== */
+                .qr-section {
+                    margin: 20px 0;
+                }
+
+                .qr-preview {
+                    display: flex;
+                    align-items: center;
+                    gap: 24px;
+                    padding: 20px;
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                }
+
+                .qr-preview img {
+                    width: 120px;
+                    height: 120px;
+                    object-fit: contain;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    background: white;
+                }
+
+                .qr-info {
+                    flex: 1;
+                }
+
+                .qr-info p {
+                    margin: 4px 0;
+                    font-size: 0.875rem;
+                }
+
+                .qr-info .active {
+                    color: #10b981;
+                    font-weight: 600;
+                    margin-left: 4px;
+                }
+
+                .qr-info .inactive {
+                    color: #ef4444;
+                    font-weight: 600;
+                    margin-left: 4px;
+                }
+
+                .qr-actions {
+                    display: flex;
+                    gap: 8px;
+                }
+
+                .qr-action-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    padding: 8px 12px;
+                    background: white;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    font-size: 0.75rem;
+                    cursor: pointer;
+                }
+
+                .qr-action-btn.delete {
+                    color: #ef4444;
+                }
+
+                .add-qr-btn {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 8px;
+                    width: 100%;
+                    padding: 40px;
+                    background: #f8fafc;
+                    border: 2px dashed #3b82f6;
+                    border-radius: 8px;
+                    color: #3b82f6;
+                    cursor: pointer;
+                }
+
+                .add-qr-btn small {
+                    color: #64748b;
+                }
+
+                /* ==================== MODAL ==================== */
+                .modal-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.5);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 1000;
+                    padding: 16px;
+                }
+
+                .modal-content {
+                    background: white;
+                    border-radius: 12px;
+                    max-width: 500px;
+                    width: 100%;
+                    max-height: 90vh;
+                    overflow-y: auto;
+                }
+
+                .modal-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 16px 20px;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+
+                .modal-header h4 {
+                    font-size: 1rem;
+                    font-weight: 600;
+                    margin: 0;
+                }
+
+                .modal-body {
+                    padding: 20px;
+                }
+
+                .file-upload {
+                    margin-bottom: 16px;
+                }
+
+                .file-upload input {
+                    display: none;
+                }
+
+                .file-label {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    padding: 12px;
+                    background: #f8fafc;
+                    border: 2px dashed #3b82f6;
+                    border-radius: 8px;
+                    color: #3b82f6;
+                    cursor: pointer;
+                }
+
+                .upload-preview {
+                    margin-top: 16px;
+                    text-align: center;
+                }
+
+                .upload-preview img {
+                    max-width: 200px;
+                    max-height: 200px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                }
+
+                /* ==================== PAYMENT SETTINGS ==================== */
+                .settings-toggle {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    width: 100%;
+                    padding: 12px;
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    cursor: pointer;
+                }
+
+                .settings-toggle .chevron {
+                    transition: transform 0.3s ease;
+                }
+
+                .settings-toggle .chevron.expanded {
+                    transform: rotate(90deg);
+                }
+
+                .payment-settings {
+                    padding: 20px;
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    margin-top: 12px;
                 }
 
                 /* ==================== EMPTY STATE ==================== */
@@ -5565,6 +7558,16 @@ export default function CompanyProfilePage() {
                         grid-template-columns: 1fr;
                     }
 
+                    .qr-preview {
+                        flex-direction: column;
+                        text-align: center;
+                    }
+
+                    .qr-actions {
+                        flex-wrap: wrap;
+                        justify-content: center;
+                    }
+
                     .radio-label {
                         flex-direction: column;
                         gap: 12px;
@@ -5626,6 +7629,20 @@ export default function CompanyProfilePage() {
 
                     .hours-item input {
                         padding: 8px 10px;
+                    }
+
+                    .item-title {
+                        flex-direction: column;
+                        align-items: flex-start;
+                    }
+
+                    .item-actions {
+                        flex-wrap: wrap;
+                    }
+
+                    .action-btn {
+                        width: 40px;
+                        height: 40px;
                     }
                 }
             `}</style>
