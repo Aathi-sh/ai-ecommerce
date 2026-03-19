@@ -1,25 +1,1853 @@
+// // // "use client";
+
+// // // import { io } from 'socket.io-client';
+
+// // // /**
+// // //  * Production-grade Socket.IO Client for Admin Notifications
+// // //  * Fixed to work with your backend server.js on port 3001
+// // //  */
+
+// // // // ========== GLOBAL CONNECTION LOCK ==========
+// // // let globalConnectionInProgress = false;
+// // // // ============================================
+
+// // // // ========== CONFIGURATION ==========
+// // // const CONFIG = {
+// // //   // Backend Socket.IO server URL (Port 3001)
+// // //   SERVER_URL: process.env.NEXT_PUBLIC_SOCKET_SERVER || 'http://localhost:3001',
+  
+// // //   // Socket.IO options - FIXED FOR YOUR BACKEND
+// // //   SOCKET_OPTIONS: {
+// // //     path: '/socket.io/',
+// // //     transports: ['polling', 'websocket'],  // Polling first for handshake
+// // //     reconnection: true,
+// // //     reconnectionAttempts: 5,
+// // //     reconnectionDelay: 1000,
+// // //     reconnectionDelayMax: 5000,
+// // //     timeout: 20000,
+// // //     autoConnect: false,
+// // //     forceNew: true,
+// // //     withCredentials: true,
+// // //     // Add compatibility options
+// // //     allowEIO3: true,
+// // //     allowEIO4: true,
+// // //     upgrade: true,
+// // //     rememberUpgrade: true,
+// // //     // Localhost settings
+// // //     secure: false,
+// // //     rejectUnauthorized: false
+// // //   },
+  
+// // //   // Authentication - Must match your server.js ADMIN_TOKEN
+// // //   AUTH_TOKEN: process.env.NEXT_PUBLIC_NOTIFICATION_API_KEY || 'dev-key-2024',
+  
+// // //   // Heartbeat settings
+// // //   HEARTBEAT_INTERVAL: 30000,
+// // //   HEARTBEAT_TIMEOUT: 60000,
+  
+// // //   // Debug
+// // //   DEBUG: process.env.NODE_ENV === 'development',
+// // //   LOG_PREFIX: '[Socket.IO]'
+// // // };
+
+// // // // ========== EVENT TYPES ==========
+// // // const EventTypes = {
+// // //   // Connection events
+// // //   CONNECT: 'connect',
+// // //   CONNECT_ERROR: 'connect_error',
+// // //   DISCONNECT: 'disconnect',
+// // //   ERROR: 'error',
+  
+// // //   // Authentication events (MUST MATCH YOUR SERVER.JS!)
+// // //   AUTHENTICATE: 'authenticate',
+// // //   AUTHENTICATED: 'authenticated',
+// // //   UNAUTHORIZED: 'unauthorized',
+  
+// // //   // Notification events (MUST MATCH YOUR SERVER.JS!)
+// // //   NEW_ORDER: 'NEW_ORDER',
+// // //   PAYMENT_RECEIVED: 'PAYMENT_RECEIVED',
+// // //   ORDER_STATUS_CHANGED: 'ORDER_STATUS_CHANGED',
+// // //   LOW_STOCK_ALERT: 'LOW_STOCK_ALERT',
+  
+// // //   // System events
+// // //   PING: 'ping',
+// // //   PONG: 'pong',
+  
+// // //   // Custom events (MUST MATCH YOUR SERVER.JS!)
+// // //   REGISTER_FCM_TOKEN: 'register-fcm-token',
+// // //   FCM_TOKEN_REGISTERED: 'fcm-token-registered',
+  
+// // //   // Custom dashboard events (MUST MATCH YOUR SERVER.JS!)
+// // //   DASHBOARD_UPDATE: 'dashboard-update'
+// // // };
+
+// // // class SocketIOClient {
+// // //   constructor() {
+// // //     // Socket instance
+// // //     this.socket = null;
+    
+// // //     // Connection state
+// // //     this.state = 'disconnected';
+// // //     this.connectionId = null;
+// // //     this.isAuthenticated = false;
+    
+// // //     // User context
+// // //     this.userId = null;
+// // //     this.userRole = null;
+// // //     this.userData = null;
+    
+// // //     // Timers
+// // //     this.heartbeatInterval = null;
+// // //     this.heartbeatTimeout = null;
+// // //     this.reconnectTimer = null;
+    
+// // //     // Event listeners
+// // //     this.eventListeners = new Map();
+// // //     this.connectionListeners = [];
+// // //     this.stateListeners = [];
+    
+// // //     // Stats
+// // //     this.stats = {
+// // //       totalConnections: 0,
+// // //       successfulConnections: 0,
+// // //       failedConnections: 0,
+// // //       totalEventsReceived: 0,
+// // //       totalEventsSent: 0,
+// // //       reconnectionAttempts: 0,
+// // //       lastConnectedAt: null,
+// // //       lastDisconnectedAt: null,
+// // //       pingLatency: null
+// // //     };
+    
+// // //     // Queue for offline messages
+// // //     this.messageQueue = [];
+    
+// // //     this._log('Client initialized');
+// // //   }
+
+// // //   // ========== PUBLIC API ==========
+
+// // //   /**
+// // //    * Connect to Socket.IO server - FIXED FOR YOUR BACKEND
+// // //    */
+// // //   connect(user = {}) {
+// // //     // ========== GLOBAL CONNECTION LOCK ==========
+// // //     if (globalConnectionInProgress) {
+// // //       this._log('❌ Connection already in progress globally, skipping...');
+// // //       return;
+// // //     }
+    
+// // //     // Prevent duplicate connections
+// // //     if (this.state === 'connected' || this.state === 'connecting') {
+// // //       this._log('Already connected or connecting');
+// // //       return;
+// // //     }
+    
+// // //     // Set global lock
+// // //     globalConnectionInProgress = true;
+// // //     // ============================================
+    
+// // //     // Clear any existing connection
+// // //     this._cleanup();
+    
+// // //     // Set user context
+// // //     this.userId = user.id || user._id || 'admin';
+// // //     this.userRole = user.role || 'admin';
+// // //     this.userData = user;
+// // //     this.connectionId = `socket_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+// // //     // Update state
+// // //     this._setState('connecting');
+// // //     this.stats.totalConnections++;
+    
+// // //     try {
+// // //       // ✅ FIXED: Connect to /notifications namespace (MUST match your backend!)
+// // //       const namespace = '/notifications'; // Your backend uses this namespace
+// // //       const url = `${CONFIG.SERVER_URL}${namespace}`; // Full URL with namespace
+      
+// // //       this._log(`Connecting to ${url} (/notifications namespace)`);
+      
+// // //       // Create socket with initial query parameters
+// // //       this.socket = io(url, {
+// // //         ...CONFIG.SOCKET_OPTIONS,
+// // //         query: {
+// // //           userId: this.userId,
+// // //           userRole: this.userRole,
+// // //           connectionId: this.connectionId,
+// // //           timestamp: Date.now().toString()
+// // //         }
+// // //       });
+      
+// // //       // Setup event listeners
+// // //       this._setupEventListeners();
+      
+// // //       // ========== SET UP CONNECTION FLAG RESET ==========
+// // //       const resetConnectionFlag = () => {
+// // //         if (globalConnectionInProgress) {
+// // //           globalConnectionInProgress = false;
+// // //           this._log('✅ Global connection flag reset');
+// // //         }
+// // //       };
+      
+// // //       // Override connection handlers to reset flag
+// // //       const originalHandleConnect = this._handleConnect.bind(this);
+// // //       const originalHandleConnectError = this._handleConnectError.bind(this);
+// // //       const originalHandleDisconnect = this._handleDisconnect.bind(this);
+      
+// // //       // Replace handlers to include flag reset
+// // //       this.socket.on('connect', () => {
+// // //         resetConnectionFlag();
+// // //         originalHandleConnect();
+// // //       });
+      
+// // //       this.socket.on('connect_error', (error) => {
+// // //         resetConnectionFlag();
+// // //         originalHandleConnectError(error);
+// // //       });
+      
+// // //       this.socket.on('disconnect', (reason) => {
+// // //         resetConnectionFlag();
+// // //         originalHandleDisconnect(reason);
+// // //       });
+      
+// // //       // Connect
+// // //       this.socket.connect();
+      
+// // //     } catch (error) {
+// // //       // Reset flag on error
+// // //       globalConnectionInProgress = false;
+// // //       this._logError('Connection initialization failed:', error);
+// // //       this._setState('error');
+// // //       this._scheduleReconnect();
+// // //     }
+// // //   }
+
+// // //   /**
+// // //    * Disconnect from server
+// // //    */
+// // //   disconnect(reason = 'Client requested disconnect') {
+// // //     this._log(`Disconnecting: ${reason}`);
+    
+// // //     this._cleanupTimers();
+// // //     this._setState('disconnecting');
+    
+// // //     if (this.socket) {
+// // //       this.socket.disconnect();
+// // //       this.socket = null;
+// // //     }
+    
+// // //     this._setState('disconnected');
+// // //     this.isAuthenticated = false;
+// // //     this.stats.lastDisconnectedAt = new Date();
+    
+// // //     // Reset global connection flag
+// // //     if (globalConnectionInProgress) {
+// // //       globalConnectionInProgress = false;
+// // //     }
+    
+// // //     this._log('Disconnected successfully');
+// // //   }
+
+// // //   /**
+// // //    * Emit event to server - FIXED
+// // //    */
+// // //   emit(event, data = {}) {
+// // //     if (!this.socket || !this.socket.connected || !this.isAuthenticated) {
+// // //       this._log(`Queueing event ${event} - socket not ready`);
+// // //       this._queueMessage(event, data);
+// // //       return false;
+// // //     }
+    
+// // //     try {
+// // //       const payload = {
+// // //         ...data,
+// // //         userId: this.userId,
+// // //         userRole: this.userRole,
+// // //         connectionId: this.connectionId,
+// // //         timestamp: new Date().toISOString()
+// // //       };
+      
+// // //       this.socket.emit(event, payload);
+// // //       this.stats.totalEventsSent++;
+      
+// // //       if (CONFIG.DEBUG) {
+// // //         this._log(`Emitted: ${event}`, {
+// // //           event: event,
+// // //           userId: this.userId,
+// // //           dataSize: JSON.stringify(payload).length
+// // //         });
+// // //       }
+      
+// // //       return true;
+// // //     } catch (error) {
+// // //       this._logError(`Failed to emit ${event}:`, error);
+// // //       this._queueMessage(event, data);
+// // //       return false;
+// // //     }
+// // //   }
+
+// // //   /**
+// // //    * Register FCM token with server
+// // //    */
+// // //   registerFCMToken(fcmToken) {
+// // //     if (!fcmToken || typeof fcmToken !== 'string') {
+// // //       this._logError('Invalid FCM token');
+// // //       return false;
+// // //     }
+    
+// // //     return this.emit(EventTypes.REGISTER_FCM_TOKEN, {
+// // //       token: fcmToken,
+// // //       deviceInfo: this._getDeviceInfo(),
+// // //       timestamp: new Date().toISOString()
+// // //     });
+// // //   }
+
+// // //   /**
+// // //    * Send authentication request - FIXED FOR YOUR BACKEND
+// // //    */
+// // //   authenticate() {
+// // //     if (!this.socket || !this.socket.connected) {
+// // //       this._logError('Cannot authenticate - socket not connected');
+// // //       return false;
+// // //     }
+    
+// // //     // Your backend expects this exact format (matches server.js line 96-99)
+// // //     return this.emit(EventTypes.AUTHENTICATE, {
+// // //       token: CONFIG.AUTH_TOKEN,
+// // //       userId: this.userId,
+// // //       userRole: this.userRole,
+// // //       name: this.userData?.name || `Admin-${this.userId.substring(0, 8)}`,
+// // //       connectionId: this.connectionId,
+// // //       timestamp: new Date().toISOString()
+// // //     });
+// // //   }
+
+// // //   /**
+// // //    * Send heartbeat/ping
+// // //    */
+// // //   sendHeartbeat() {
+// // //     if (this.socket?.connected && this.isAuthenticated) {
+// // //       const pingTime = Date.now();
+      
+// // //       this.emit(EventTypes.PING, { 
+// // //         timestamp: pingTime,
+// // //         userId: this.userId 
+// // //       });
+      
+// // //       // Set timeout for pong response
+// // //       if (this.heartbeatTimeout) {
+// // //         clearTimeout(this.heartbeatTimeout);
+// // //       }
+      
+// // //       this.heartbeatTimeout = setTimeout(() => {
+// // //         if (this.socket?.connected) {
+// // //           this._logError('Heartbeat timeout - reconnecting...');
+// // //           this.disconnect('Heartbeat timeout');
+// // //           this._scheduleReconnect();
+// // //         }
+// // //       }, CONFIG.HEARTBEAT_TIMEOUT);
+// // //     }
+// // //   }
+
+// // //   // ========== EVENT LISTENER SETUP ==========
+
+// // //   _setupEventListeners() {
+// // //     if (!this.socket) return;
+    
+// // //     // Authentication events (from your server.js)
+// // //     this.socket.on(EventTypes.AUTHENTICATED, (data) => this._handleAuthenticated(data));
+// // //     this.socket.on(EventTypes.UNAUTHORIZED, (data) => this._handleUnauthorized(data));
+    
+// // //     // System events
+// // //     this.socket.on(EventTypes.PONG, (data) => this._handlePong(data));
+    
+// // //     // ✅ FIXED: Listen for events your backend emits
+// // //     this.socket.on(EventTypes.NEW_ORDER, (data) => this._handleNewOrder(data));
+// // //     this.socket.on(EventTypes.PAYMENT_RECEIVED, (data) => this._handlePaymentReceived(data));
+// // //     this.socket.on(EventTypes.ORDER_STATUS_CHANGED, (data) => this._handleOrderStatusChanged(data));
+// // //     this.socket.on(EventTypes.LOW_STOCK_ALERT, (data) => this._handleLowStockAlert(data));
+// // //     this.socket.on(EventTypes.DASHBOARD_UPDATE, (data) => this._handleDashboardUpdate(data));
+    
+// // //     // Custom events
+// // //     this.socket.on(EventTypes.FCM_TOKEN_REGISTERED, (data) => this._handleFCMTokenRegistered(data));
+// // //   }
+
+// // //   // ========== EVENT HANDLERS ==========
+
+// // //   _handleConnect() {
+// // //     this._log('Socket.IO connected to /notifications namespace');
+// // //     this._setState('connected');
+// // //     this.stats.successfulConnections++;
+// // //     this.stats.lastConnectedAt = new Date();
+    
+// // //     // Start heartbeat
+// // //     this._startHeartbeat();
+    
+// // //     // Send authentication after connection - REQUIRED FOR YOUR BACKEND
+// // //     setTimeout(() => {
+// // //       if (this.socket?.connected) {
+// // //         this.authenticate();
+// // //       }
+// // //     }, 500);
+    
+// // //     // Flush queued messages
+// // //     this._flushMessageQueue();
+    
+// // //     // Notify connection listeners
+// // //     this._notifyConnectionChange(true);
+// // //   }
+
+// // //   _handleConnectError(error) {
+// // //     const errorMessage = error?.message || error?.toString() || 'Unknown connection error';
+    
+// // //     if (CONFIG.DEBUG) {
+// // //       console.log(`${CONFIG.LOG_PREFIX} ❌ Connection error: ${errorMessage}`);
+// // //     }
+    
+// // //     this._setState('error');
+// // //     this.stats.failedConnections++;
+    
+// // //     // Schedule reconnection
+// // //     this._scheduleReconnect();
+// // //   }
+
+// // //   _handleDisconnect(reason) {
+// // //     this._log(`Disconnected: ${reason}`);
+// // //     this._setState('disconnected');
+// // //     this.isAuthenticated = false;
+// // //     this.stats.lastDisconnectedAt = new Date();
+    
+// // //     this._cleanupTimers();
+    
+// // //     // Notify connection listeners
+// // //     this._notifyConnectionChange(false);
+    
+// // //     // Schedule reconnection unless intentionally disconnected
+// // //     if (reason !== 'io client disconnect' && reason !== 'transport close') {
+// // //       this._scheduleReconnect();
+// // //     }
+// // //   }
+
+// // //   _handleError(error) {
+// // //     const errorMessage = error?.message || error?.toString() || 'Unknown error';
+// // //     this._logError('Socket error:', errorMessage);
+// // //     this._setState('error');
+// // //   }
+
+// // //   _handleAuthenticated(data) {
+// // //     this._log('Authentication successful');
+// // //     this.isAuthenticated = true;
+    
+// // //     if (CONFIG.DEBUG) {
+// // //       console.log(`${CONFIG.LOG_PREFIX} ✅ Authenticated as ${data.user?.name || this.userId}`);
+// // //     }
+    
+// // //     // Register any pending FCM tokens
+// // //     this._registerPendingFCMTokens();
+// // //   }
+
+// // //   _handleUnauthorized(data) {
+// // //     const message = data?.message || 'Invalid credentials';
+// // //     this._logError('Authentication failed:', message);
+// // //     this.isAuthenticated = false;
+    
+// // //     // Disconnect on authentication failure
+// // //     this.disconnect('Authentication failed');
+// // //   }
+
+// // //   _handlePong(data) {
+// // //     if (this.heartbeatTimeout) {
+// // //       clearTimeout(this.heartbeatTimeout);
+// // //       this.heartbeatTimeout = null;
+// // //     }
+    
+// // //     if (data?.timestamp) {
+// // //       const latency = Date.now() - data.timestamp;
+// // //       this.stats.pingLatency = latency;
+// // //     }
+// // //   }
+
+// // //   // ========== NOTIFICATION HANDLERS ==========
+
+// // //   _handleNewOrder(data) {
+// // //     this._log(`New order: ${data.order?.orderNumber || 'Unknown'}`);
+// // //     this._dispatchNotification('NEW_ORDER', {
+// // //       title: '🛍️ New Order Received',
+// // //       message: `Order #${data.order?.orderNumber} from ${data.order?.customerName || 'Customer'}`,
+// // //       data: data.order,
+// // //       priority: 'high',
+// // //       timestamp: new Date().toISOString()
+// // //     });
+    
+// // //     // Also dispatch custom event for dashboard
+// // //     this._dispatchCustomEvent('NEW_ORDER', data);
+    
+// // //     // Dispatch window event for other components
+// // //     if (typeof window !== 'undefined') {
+// // //       window.dispatchEvent(new CustomEvent('new-order-received', {
+// // //         detail: data.order || data
+// // //       }));
+// // //     }
+// // //   }
+
+// // //   _handlePaymentReceived(data) {
+// // //     this._log(`Payment received for order: ${data.orderNumber || 'Unknown'}`);
+// // //     this._dispatchNotification('PAYMENT_RECEIVED', {
+// // //       title: '💰 Payment Received',
+// // //       message: `Payment of ₹${data.amount} for order #${data.orderNumber}`,
+// // //       data: data,
+// // //       priority: 'high',
+// // //       timestamp: new Date().toISOString()
+// // //     });
+    
+// // //     this._dispatchCustomEvent('PAYMENT_RECEIVED', data);
+    
+// // //     // Dispatch window event
+// // //     if (typeof window !== 'undefined') {
+// // //       window.dispatchEvent(new CustomEvent('payment-updated', {
+// // //         detail: data
+// // //       }));
+// // //     }
+// // //   }
+
+// // //   _handleOrderStatusChanged(data) {
+// // //     this._log(`Order status updated: ${data.orderNumber} (${data.oldStatus} → ${data.newStatus})`);
+// // //     this._dispatchNotification('ORDER_STATUS_CHANGED', {
+// // //       title: '📦 Order Status Updated',
+// // //       message: `Order #${data.orderNumber} is now ${data.newStatus}`,
+// // //       data: data,
+// // //       priority: 'normal',
+// // //       timestamp: new Date().toISOString()
+// // //     });
+    
+// // //     this._dispatchCustomEvent('ORDER_STATUS_CHANGED', data);
+    
+// // //     // Dispatch window event
+// // //     if (typeof window !== 'undefined') {
+// // //       window.dispatchEvent(new CustomEvent('order-status-updated', {
+// // //         detail: data
+// // //       }));
+// // //     }
+// // //   }
+
+// // //   _handleLowStockAlert(data) {
+// // //     this._log(`Low stock alert: ${data.product?.productName || 'Product'}`);
+// // //     this._dispatchNotification('LOW_STOCK_ALERT', {
+// // //       title: '📦 Low Stock Alert',
+// // //       message: `${data.product?.productName} is running low (${data.product?.stock} left)`,
+// // //       data: data.product,
+// // //       priority: 'normal',
+// // //       timestamp: new Date().toISOString()
+// // //     });
+    
+// // //     this._dispatchCustomEvent('LOW_STOCK_ALERT', data);
+// // //   }
+
+// // //   _handleDashboardUpdate(data) {
+// // //     this._log(`Dashboard update: ${data.type || 'update'}`);
+// // //     this._dispatchCustomEvent('DASHBOARD_UPDATE', data);
+// // //   }
+
+// // //   _handleFCMTokenRegistered(data) {
+// // //     this._log('FCM token registered with server');
+// // //     this._dispatchCustomEvent('FCM_TOKEN_REGISTERED', data);
+// // //   }
+
+// // //   // ========== QUEUE MANAGEMENT ==========
+
+// // //   _queueMessage(event, data) {
+// // //     if (this.messageQueue.length >= 50) {
+// // //       // Remove oldest message
+// // //       this.messageQueue.shift();
+// // //     }
+    
+// // //     this.messageQueue.push({
+// // //       event,
+// // //       data,
+// // //       timestamp: new Date().toISOString(),
+// // //       retryCount: 0
+// // //     });
+    
+// // //     this._log(`Queued: ${event} (queue size: ${this.messageQueue.length})`);
+// // //   }
+
+// // //   _flushMessageQueue() {
+// // //     if (this.messageQueue.length === 0 || !this.isAuthenticated) {
+// // //       return;
+// // //     }
+    
+// // //     const failedMessages = [];
+    
+// // //     this.messageQueue.forEach((message) => {
+// // //       const success = this.emit(message.event, message.data);
+      
+// // //       if (!success && message.retryCount < 3) {
+// // //         message.retryCount++;
+// // //         failedMessages.push(message);
+// // //       }
+// // //     });
+    
+// // //     this.messageQueue = failedMessages;
+    
+// // //     if (failedMessages.length > 0) {
+// // //       this._log(`${failedMessages.length} messages failed to send, will retry`);
+// // //     }
+// // //   }
+
+// // //   // ========== TIMER MANAGEMENT ==========
+
+// // //   _startHeartbeat() {
+// // //     this._cleanupHeartbeat();
+    
+// // //     this.heartbeatInterval = setInterval(() => {
+// // //       this.sendHeartbeat();
+// // //     }, CONFIG.HEARTBEAT_INTERVAL);
+    
+// // //     this._log('Heartbeat started');
+// // //   }
+
+// // //   _scheduleReconnect() {
+// // //     if (this.reconnectTimer || this.state === 'connected') {
+// // //       return;
+// // //     }
+    
+// // //     this.stats.reconnectionAttempts++;
+    
+// // //     const delay = Math.min(1000 * Math.pow(1.5, this.stats.reconnectionAttempts), 30000);
+    
+// // //     this._log(`Scheduling reconnect in ${delay}ms (attempt ${this.stats.reconnectionAttempts})`);
+    
+// // //     this.reconnectTimer = setTimeout(() => {
+// // //       this.reconnectTimer = null;
+// // //       if (this.userId) {
+// // //         this._log('Attempting reconnection...');
+// // //         this.connect(this.userData);
+// // //       }
+// // //     }, delay);
+// // //   }
+
+// // //   // ========== EVENT DISPATCHING ==========
+
+// // //   _dispatchNotification(type, payload) {
+// // //     const event = new CustomEvent('admin-notification', {
+// // //       detail: {
+// // //         id: `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+// // //         type,
+// // //         title: payload.title,
+// // //         message: payload.message,
+// // //         data: payload.data,
+// // //         priority: payload.priority || 'normal',
+// // //         timestamp: payload.timestamp,
+// // //         duration: 5000
+// // //       }
+// // //     });
+    
+// // //     if (typeof window !== 'undefined') {
+// // //       window.dispatchEvent(event);
+// // //     }
+// // //   }
+
+// // //   _dispatchCustomEvent(eventName, data) {
+// // //     const listeners = this.eventListeners.get(eventName) || [];
+// // //     listeners.forEach(listener => {
+// // //       try {
+// // //         listener(data);
+// // //       } catch (error) {
+// // //         this._logError(`Error in event listener for ${eventName}:`, error);
+// // //       }
+// // //     });
+// // //   }
+
+// // //   // ========== UTILITY METHODS ==========
+
+// // //   _getDeviceInfo() {
+// // //     if (typeof window === 'undefined') return {};
+    
+// // //     return {
+// // //       userAgent: navigator.userAgent,
+// // //       platform: navigator.platform,
+// // //       language: navigator.language,
+// // //       screenSize: `${window.screen.width}x${window.screen.height}`,
+// // //       timestamp: new Date().toISOString()
+// // //     };
+// // //   }
+
+// // //   _registerPendingFCMTokens() {
+// // //     if (typeof window === 'undefined') return;
+    
+// // //     try {
+// // //       const pendingTokens = JSON.parse(localStorage.getItem('pending_fcm_tokens') || '[]');
+      
+// // //       pendingTokens.forEach(tokenData => {
+// // //         if (tokenData.token) {
+// // //           this.registerFCMToken(tokenData.token);
+// // //         }
+// // //       });
+      
+// // //     } catch (error) {
+// // //       this._logError('Error registering pending tokens:', error);
+// // //     }
+// // //   }
+
+// // //   _setState(newState) {
+// // //     const oldState = this.state;
+// // //     this.state = newState;
+    
+// // //     if (oldState !== newState) {
+// // //       this._log(`State: ${oldState} → ${newState}`);
+      
+// // //       if (this.stateListeners && this.stateListeners.length > 0) {
+// // //         this.stateListeners.forEach(listener => {
+// // //           try {
+// // //             listener(newState);
+// // //           } catch (error) {}
+// // //         });
+// // //       }
+// // //     }
+// // //   }
+
+// // //   _notifyConnectionChange(connected) {
+// // //     if (this.connectionListeners && this.connectionListeners.length > 0) {
+// // //       this.connectionListeners.forEach(listener => {
+// // //         try {
+// // //           listener(connected);
+// // //         } catch (error) {}
+// // //       });
+// // //     }
+// // //   }
+
+// // //   // ========== CLEANUP ==========
+
+// // //   _cleanup() {
+// // //     // Reset global connection flag
+// // //     if (globalConnectionInProgress) {
+// // //       globalConnectionInProgress = false;
+// // //     }
+    
+// // //     this._cleanupTimers();
+    
+// // //     if (this.socket) {
+// // //       this.socket.removeAllListeners();
+// // //       this.socket.disconnect();
+// // //       this.socket = null;
+// // //     }
+    
+// // //     this.isAuthenticated = false;
+// // //   }
+
+// // //   _cleanupTimers() {
+// // //     if (this.heartbeatInterval) {
+// // //       clearInterval(this.heartbeatInterval);
+// // //       this.heartbeatInterval = null;
+// // //     }
+    
+// // //     if (this.heartbeatTimeout) {
+// // //       clearTimeout(this.heartbeatTimeout);
+// // //       this.heartbeatTimeout = null;
+// // //     }
+    
+// // //     if (this.reconnectTimer) {
+// // //       clearTimeout(this.reconnectTimer);
+// // //       this.reconnectTimer = null;
+// // //     }
+// // //   }
+
+// // //   _cleanupHeartbeat() {
+// // //     if (this.heartbeatInterval) {
+// // //       clearInterval(this.heartbeatInterval);
+// // //       this.heartbeatInterval = null;
+// // //     }
+    
+// // //     if (this.heartbeatTimeout) {
+// // //       clearTimeout(this.heartbeatTimeout);
+// // //       this.heartbeatTimeout = null;
+// // //     }
+// // //   }
+
+// // //   // ========== LOGGING ==========
+
+// // //   _log(message, data = null) {
+// // //     if (!CONFIG.DEBUG) return;
+    
+// // //     console.log(`${CONFIG.LOG_PREFIX} ${message}`);
+// // //     if (data) {
+// // //       console.log(`${CONFIG.LOG_PREFIX} Data:`, data);
+// // //     }
+// // //   }
+
+// // //   _logError(message, error = null) {
+// // //     if (CONFIG.DEBUG) {
+// // //       const errorMessage = error?.message || error?.toString() || error;
+// // //       console.log(`${CONFIG.LOG_PREFIX} ❌ ${message} ${errorMessage ? `- ${errorMessage}` : ''}`);
+// // //     }
+// // //   }
+// // //   _handleNewOrder = async (data) => {
+// // //   this._log(`New order: ${data.order?.orderNumber || 'Unknown'}`);
+  
+// // //   // Save to local state immediately
+// // //   this._dispatchNotification('NEW_ORDER', {
+// // //     title: '🛍️ New Order Received',
+// // //     message: `Order #${data.order?.orderNumber} from ${data.order?.customerName || 'Customer'}`,
+// // //     data: data.order,
+// // //     priority: 'high',
+// // //     timestamp: new Date().toISOString()
+// // //   });
+  
+// // //   // ✅ IMPORTANT: Also save to your notifications collection via API
+// // //   try {
+// // //     await fetch('/api/notifications', {
+// // //       method: 'POST',
+// // //       headers: {
+// // //         'Content-Type': 'application/json',
+// // //         'Authorization': `Bearer ${localStorage.getItem('token')}` // If using auth
+// // //       },
+// // //       body: JSON.stringify({
+// // //         type: 'NEW_ORDER',
+// // //         data: data.order,
+// // //         priority: 'high',
+// // //         source: 'socketio'
+// // //       })
+// // //     });
+    
+// // //     console.log('✅ Notification saved to database via API');
+// // //   } catch (error) {
+// // //     console.error('❌ Failed to save notification to database:', error);
+// // //   }
+  
+// // //   // Dispatch window event for other components
+// // //   window.dispatchEvent(new CustomEvent('new-order-received', {
+// // //     detail: data.order || data
+// // //   }));
+// // // };
+
+// // //   // ========== GETTERS ==========
+
+// // //   getStatus() {
+// // //     return {
+// // //       state: this.state,
+// // //       isConnected: this.state === 'connected',
+// // //       isAuthenticated: this.isAuthenticated,
+// // //       connectionId: this.connectionId,
+// // //       userId: this.userId,
+// // //       userRole: this.userRole,
+// // //       socketId: this.socket?.id,
+// // //       socketConnected: this.socket?.connected || false,
+// // //       stats: {
+// // //         ...this.stats,
+// // //         queueSize: this.messageQueue.length,
+// // //         currentTime: new Date().toISOString()
+// // //       }
+// // //     };
+// // //   }
+
+// // //   // ========== EVENT LISTENER REGISTRATION ==========
+
+// // //   on(eventName, callback) {
+// // //     if (!this.eventListeners.has(eventName)) {
+// // //       this.eventListeners.set(eventName, []);
+// // //     }
+// // //     this.eventListeners.get(eventName).push(callback);
+    
+// // //     // Also listen on socket if connected
+// // //     if (this.socket) {
+// // //       this.socket.on(eventName, callback);
+// // //     }
+// // //   }
+
+// // //   off(eventName, callback) {
+// // //     const listeners = this.eventListeners.get(eventName);
+// // //     if (listeners) {
+// // //       const index = listeners.indexOf(callback);
+// // //       if (index > -1) {
+// // //         listeners.splice(index, 1);
+// // //       }
+// // //     }
+    
+// // //     if (this.socket) {
+// // //       this.socket.off(eventName, callback);
+// // //     }
+// // //   }
+
+// // //   addConnectionListener(callback) {
+// // //     if (!this.connectionListeners.includes(callback)) {
+// // //       this.connectionListeners.push(callback);
+// // //     }
+// // //   }
+
+// // //   removeConnectionListener(callback) {
+// // //     const index = this.connectionListeners.indexOf(callback);
+// // //     if (index > -1) {
+// // //       this.connectionListeners.splice(index, 1);
+// // //     }
+// // //   }
+
+// // //   addStateListener(callback) {
+// // //     if (!this.stateListeners.includes(callback)) {
+// // //       this.stateListeners.push(callback);
+// // //     }
+// // //   }
+
+// // //   removeStateListener(callback) {
+// // //     const index = this.stateListeners.indexOf(callback);
+// // //     if (index > -1) {
+// // //       this.stateListeners.splice(index, 1);
+// // //     }
+// // //   }
+
+// // //   /**
+// // //    * Test connection by sending a ping
+// // //    */
+// // //   async testConnection() {
+// // //     if (!this.socket || !this.socket.connected) {
+// // //       return { success: false, message: 'Socket not connected' };
+// // //     }
+    
+// // //     return new Promise((resolve) => {
+// // //       const pingTime = Date.now();
+// // //       let responded = false;
+      
+// // //       const timeout = setTimeout(() => {
+// // //         if (!responded) {
+// // //           resolve({ success: false, message: 'Test timeout', latency: null });
+// // //         }
+// // //       }, 5000);
+      
+// // //       this.socket.emit(EventTypes.PING, { timestamp: pingTime, test: true });
+      
+// // //       this.socket.once(EventTypes.PONG, (data) => {
+// // //         responded = true;
+// // //         clearTimeout(timeout);
+// // //         const latency = Date.now() - pingTime;
+// // //         resolve({ 
+// // //           success: true, 
+// // //           message: 'Connection test successful', 
+// // //           latency,
+// // //           serverTime: data.serverTime 
+// // //         });
+// // //       });
+// // //     });
+// // //   }
+// // // }
+
+// // // // ========== SINGLETON EXPORT ==========
+// // // let instance = null;
+
+// // // export function getSocketIOClient() {
+// // //   if (!instance) {
+// // //     instance = new SocketIOClient();
+    
+// // //     if (typeof window !== 'undefined') {
+// // //       const cleanup = () => {
+// // //         if (instance) {
+// // //           instance.disconnect('Page unload');
+// // //         }
+// // //       };
+      
+// // //       window.addEventListener('beforeunload', cleanup);
+// // //       window.addEventListener('pagehide', cleanup);
+// // //       window.addEventListener('unload', cleanup);
+// // //     }
+// // //   }
+  
+// // //   return instance;
+// // // }
+
+// // // export default getSocketIOClient;
+
+
+
+
+
+
+
+// // // lib/websocket/socket-client.js
+// // "use client";
+
+// // import { io } from 'socket.io-client';
+
+// // /**
+// //  * Production-grade Socket.IO Client for Admin Notifications
+// //  * FIXED: Now connects to the correct endpoint (port 3001 with /notifications namespace)
+// //  */
+
+// // // ========== CONFIGURATION ==========
+// // const CONFIG = {
+// //   // ✅ FIXED: Connect to your backend server on port 3001 with /notifications namespace
+// //   SERVER_URL: process.env.NEXT_PUBLIC_SOCKET_SERVER || 'http://localhost:3001',
+// //   NAMESPACE: '/notifications', // Must match your server.js
+  
+// //   // Socket.IO options
+// //   SOCKET_OPTIONS: {
+// //     path: '/socket.io/', // Standard Socket.IO path
+// //     transports: ['polling', 'websocket'], // Polling first for compatibility
+// //     reconnection: true,
+// //     reconnectionAttempts: 5,
+// //     reconnectionDelay: 1000,
+// //     reconnectionDelayMax: 5000,
+// //     timeout: 20000,
+// //     autoConnect: false,
+// //     forceNew: true,
+// //     withCredentials: true,
+// //     // Compatibility options
+// //     allowEIO3: true,
+// //     allowEIO4: true,
+// //     upgrade: true,
+// //     rememberUpgrade: true,
+// //     // Development settings
+// //     secure: false,
+// //     rejectUnauthorized: false
+// //   },
+  
+// //   // Authentication token (must match your server.js)
+// //   AUTH_TOKEN: process.env.NEXT_PUBLIC_NOTIFICATION_API_KEY || 'dev-key-2024',
+  
+// //   // Heartbeat settings
+// //   HEARTBEAT_INTERVAL: 30000,
+// //   HEARTBEAT_TIMEOUT: 60000,
+  
+// //   // Debug
+// //   DEBUG: process.env.NODE_ENV === 'development',
+// //   LOG_PREFIX: '[Socket.IO]'
+// // };
+
+// // // ========== EVENT TYPES ==========
+// // const EventTypes = {
+// //   // Connection events
+// //   CONNECT: 'connect',
+// //   CONNECT_ERROR: 'connect_error',
+// //   DISCONNECT: 'disconnect',
+// //   ERROR: 'error',
+  
+// //   // Authentication events
+// //   AUTHENTICATE: 'authenticate',
+// //   AUTHENTICATED: 'authenticated',
+// //   UNAUTHORIZED: 'unauthorized',
+  
+// //   // Notification events
+// //   NEW_ORDER: 'NEW_ORDER',
+// //   PAYMENT_RECEIVED: 'PAYMENT_RECEIVED',
+// //   ORDER_STATUS_CHANGED: 'ORDER_STATUS_CHANGED',
+// //   LOW_STOCK_ALERT: 'LOW_STOCK_ALERT',
+  
+// //   // System events
+// //   PING: 'ping',
+// //   PONG: 'pong',
+  
+// //   // Custom events
+// //   REGISTER_FCM_TOKEN: 'register-fcm-token',
+// //   FCM_TOKEN_REGISTERED: 'fcm-token-registered',
+// //   DASHBOARD_UPDATE: 'dashboard-update'
+// // };
+
+// // class SocketIOClient {
+// //   constructor() {
+// //     // Socket instance
+// //     this.socket = null;
+    
+// //     // Connection state
+// //     this.state = 'disconnected';
+// //     this.connectionId = null;
+// //     this.isAuthenticated = false;
+    
+// //     // User context
+// //     this.userId = null;
+// //     this.userRole = null;
+// //     this.userData = null;
+    
+// //     // Timers
+// //     this.heartbeatInterval = null;
+// //     this.heartbeatTimeout = null;
+// //     this.reconnectTimer = null;
+    
+// //     // Event listeners
+// //     this.eventListeners = new Map();
+// //     this.connectionListeners = [];
+// //     this.stateListeners = [];
+    
+// //     // Stats
+// //     this.stats = {
+// //       totalConnections: 0,
+// //       successfulConnections: 0,
+// //       failedConnections: 0,
+// //       totalEventsReceived: 0,
+// //       totalEventsSent: 0,
+// //       reconnectionAttempts: 0,
+// //       lastConnectedAt: null,
+// //       lastDisconnectedAt: null,
+// //       pingLatency: null
+// //     };
+    
+// //     // Queue for offline messages
+// //     this.messageQueue = [];
+    
+// //     this._log('Socket.IO Client initialized');
+// //   }
+
+// //   // ========== PUBLIC API ==========
+
+// //   /**
+// //    * Connect to Socket.IO server
+// //    * ✅ FIXED: Now connects to the correct endpoint
+// //    */
+// //   connect(user = {}) {
+// //     // Prevent duplicate connections
+// //     if (this.state === 'connected' || this.state === 'connecting') {
+// //       this._log('Already connected or connecting');
+// //       return this.socket;
+// //     }
+    
+// //     // Clear any existing connection
+// //     this._cleanup();
+    
+// //     // Set user context
+// //     this.userId = user.id || user._id || 'unknown';
+// //     this.userRole = user.role || 'user';
+// //     this.userData = user;
+// //     this.connectionId = `socket_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+// //     // Update state
+// //     this._setState('connecting');
+// //     this.stats.totalConnections++;
+    
+// //     try {
+// //       // ✅ FIXED: Connect to the correct URL with namespace
+// //       const fullUrl = `${CONFIG.SERVER_URL}${CONFIG.NAMESPACE}`;
+      
+// //       this._log(`Connecting to ${fullUrl}`);
+// //       this._log(`Connection ID: ${this.connectionId}`);
+// //       this._log(`User ID: ${this.userId}, Role: ${this.userRole}`);
+      
+// //       // Create socket with query parameters
+// //       this.socket = io(fullUrl, {
+// //         ...CONFIG.SOCKET_OPTIONS,
+// //         query: {
+// //           userId: this.userId,
+// //           userRole: this.userRole,
+// //           connectionId: this.connectionId,
+// //           timestamp: Date.now().toString()
+// //         }
+// //       });
+      
+// //       // Setup all event listeners
+// //       this._setupEventListeners();
+      
+// //       // Connect
+// //       this.socket.connect();
+      
+// //       return this.socket;
+      
+// //     } catch (error) {
+// //       this._logError('Connection initialization failed:', error);
+// //       this._setState('error');
+// //       this._scheduleReconnect();
+// //       return null;
+// //     }
+// //   }
+
+// //   /**
+// //    * Disconnect from server
+// //    */
+// //   disconnect(reason = 'Client requested disconnect') {
+// //     this._log(`Disconnecting: ${reason}`);
+    
+// //     this._cleanupTimers();
+// //     this._setState('disconnecting');
+    
+// //     if (this.socket) {
+// //       this.socket.removeAllListeners();
+// //       this.socket.disconnect();
+// //       this.socket = null;
+// //     }
+    
+// //     this._setState('disconnected');
+// //     this.isAuthenticated = false;
+// //     this.stats.lastDisconnectedAt = new Date();
+    
+// //     this._log('Disconnected successfully');
+// //   }
+
+// //   /**
+// //    * Emit event to server
+// //    */
+// //   emit(event, data = {}) {
+// //     if (!this.socket || !this.socket.connected || !this.isAuthenticated) {
+// //       this._log(`Queueing event ${event} - socket not ready`);
+// //       this._queueMessage(event, data);
+// //       return false;
+// //     }
+    
+// //     try {
+// //       const payload = {
+// //         ...data,
+// //         userId: this.userId,
+// //         userRole: this.userRole,
+// //         connectionId: this.connectionId,
+// //         timestamp: new Date().toISOString()
+// //       };
+      
+// //       this.socket.emit(event, payload);
+// //       this.stats.totalEventsSent++;
+      
+// //       if (CONFIG.DEBUG) {
+// //         this._log(`Emitted: ${event}`);
+// //       }
+      
+// //       return true;
+// //     } catch (error) {
+// //       this._logError(`Failed to emit ${event}:`, error);
+// //       this._queueMessage(event, data);
+// //       return false;
+// //     }
+// //   }
+
+// //   /**
+// //    * Register FCM token with server
+// //    */
+// //   registerFCMToken(fcmToken) {
+// //     if (!fcmToken || typeof fcmToken !== 'string') {
+// //       this._logError('Invalid FCM token');
+// //       return false;
+// //     }
+    
+// //     return this.emit(EventTypes.REGISTER_FCM_TOKEN, {
+// //       token: fcmToken,
+// //       deviceInfo: this._getDeviceInfo()
+// //     });
+// //   }
+
+// //   /**
+// //    * Send authentication request
+// //    */
+// //   authenticate() {
+// //     if (!this.socket || !this.socket.connected) {
+// //       this._logError('Cannot authenticate - socket not connected');
+// //       return false;
+// //     }
+    
+// //     return this.emit(EventTypes.AUTHENTICATE, {
+// //       token: CONFIG.AUTH_TOKEN,
+// //       userId: this.userId,
+// //       userRole: this.userRole,
+// //       name: this.userData?.name || `User-${this.userId.substring(0, 8)}`,
+// //       connectionId: this.connectionId
+// //     });
+// //   }
+
+// //   /**
+// //    * Send heartbeat/ping
+// //    */
+// //   sendHeartbeat() {
+// //     if (this.socket?.connected && this.isAuthenticated) {
+// //       const pingTime = Date.now();
+      
+// //       this.emit(EventTypes.PING, { timestamp: pingTime });
+      
+// //       // Set timeout for pong response
+// //       if (this.heartbeatTimeout) {
+// //         clearTimeout(this.heartbeatTimeout);
+// //       }
+      
+// //       this.heartbeatTimeout = setTimeout(() => {
+// //         if (this.socket?.connected) {
+// //           this._logError('Heartbeat timeout - reconnecting...');
+// //           this.disconnect('Heartbeat timeout');
+// //           this._scheduleReconnect();
+// //         }
+// //       }, CONFIG.HEARTBEAT_TIMEOUT);
+// //     }
+// //   }
+
+// //   // ========== EVENT LISTENER SETUP ==========
+
+// //   _setupEventListeners() {
+// //     if (!this.socket) return;
+    
+// //     // Connection events
+// //     this.socket.on(EventTypes.CONNECT, () => this._handleConnect());
+// //     this.socket.on(EventTypes.CONNECT_ERROR, (error) => this._handleConnectError(error));
+// //     this.socket.on(EventTypes.DISCONNECT, (reason) => this._handleDisconnect(reason));
+// //     this.socket.on(EventTypes.ERROR, (error) => this._handleError(error));
+    
+// //     // Authentication events
+// //     this.socket.on(EventTypes.AUTHENTICATED, (data) => this._handleAuthenticated(data));
+// //     this.socket.on(EventTypes.UNAUTHORIZED, (data) => this._handleUnauthorized(data));
+    
+// //     // System events
+// //     this.socket.on(EventTypes.PONG, (data) => this._handlePong(data));
+    
+// //     // Notification events
+// //     this.socket.on(EventTypes.NEW_ORDER, (data) => this._handleNewOrder(data));
+// //     this.socket.on(EventTypes.PAYMENT_RECEIVED, (data) => this._handlePaymentReceived(data));
+// //     this.socket.on(EventTypes.ORDER_STATUS_CHANGED, (data) => this._handleOrderStatusChanged(data));
+// //     this.socket.on(EventTypes.LOW_STOCK_ALERT, (data) => this._handleLowStockAlert(data));
+// //     this.socket.on(EventTypes.DASHBOARD_UPDATE, (data) => this._handleDashboardUpdate(data));
+    
+// //     // Custom events
+// //     this.socket.on(EventTypes.FCM_TOKEN_REGISTERED, (data) => this._handleFCMTokenRegistered(data));
+// //   }
+
+// //   // ========== EVENT HANDLERS ==========
+
+// //   _handleConnect() {
+// //     this._log(`✅ Connected to ${CONFIG.SERVER_URL}${CONFIG.NAMESPACE}`);
+// //     this._log(`Socket ID: ${this.socket?.id}`);
+// //     this._setState('connected');
+// //     this.stats.successfulConnections++;
+// //     this.stats.lastConnectedAt = new Date();
+    
+// //     // Start heartbeat
+// //     this._startHeartbeat();
+    
+// //     // Send authentication after connection
+// //     setTimeout(() => {
+// //       if (this.socket?.connected) {
+// //         this.authenticate();
+// //       }
+// //     }, 500);
+    
+// //     // Flush queued messages
+// //     this._flushMessageQueue();
+    
+// //     // Notify connection listeners
+// //     this._notifyConnectionChange(true);
+// //   }
+
+// //   _handleConnectError(error) {
+// //     this._logError('Connection error:', error.message);
+// //     this._setState('error');
+// //     this.stats.failedConnections++;
+    
+// //     // Schedule reconnection
+// //     this._scheduleReconnect();
+// //   }
+
+// //   _handleDisconnect(reason) {
+// //     this._log(`Disconnected: ${reason}`);
+// //     this._setState('disconnected');
+// //     this.isAuthenticated = false;
+// //     this.stats.lastDisconnectedAt = new Date();
+    
+// //     this._cleanupTimers();
+    
+// //     // Notify connection listeners
+// //     this._notifyConnectionChange(false);
+    
+// //     // Schedule reconnection unless intentionally disconnected
+// //     if (reason !== 'io client disconnect') {
+// //       this._scheduleReconnect();
+// //     }
+// //   }
+
+// //   _handleError(error) {
+// //     this._logError('Socket error:', error);
+// //     this._setState('error');
+// //   }
+
+// //   _handleAuthenticated(data) {
+// //     this._log('✅ Authentication successful');
+// //     this.isAuthenticated = true;
+    
+// //     // Register any pending FCM tokens
+// //     this._registerPendingFCMTokens();
+// //   }
+
+// //   _handleUnauthorized(data) {
+// //     this._logError('Authentication failed:', data?.message);
+// //     this.isAuthenticated = false;
+// //     this.disconnect('Authentication failed');
+// //   }
+
+// //   _handlePong(data) {
+// //     if (this.heartbeatTimeout) {
+// //       clearTimeout(this.heartbeatTimeout);
+// //       this.heartbeatTimeout = null;
+// //     }
+    
+// //     if (data?.timestamp) {
+// //       const latency = Date.now() - data.timestamp;
+// //       this.stats.pingLatency = latency;
+// //       this._log(`Heartbeat latency: ${latency}ms`);
+// //     }
+// //   }
+
+// //   // ========== NOTIFICATION HANDLERS ==========
+
+// //   _handleNewOrder(data) {
+// //     this._log(`📦 New order: ${data.order?.orderNumber || 'Unknown'}`);
+    
+// //     // Dispatch notification event
+// //     this._dispatchNotification('NEW_ORDER', {
+// //       title: '🛍️ New Order Received',
+// //       message: `Order #${data.order?.orderNumber} from ${data.order?.customerName || 'Customer'}`,
+// //       data: data.order,
+// //       priority: 'high'
+// //     });
+    
+// //     // Save to API
+// //     this._saveNotificationToAPI('NEW_ORDER', data.order);
+    
+// //     // Dispatch window event
+// //     if (typeof window !== 'undefined') {
+// //       window.dispatchEvent(new CustomEvent('new-order-received', {
+// //         detail: data.order || data
+// //       }));
+// //     }
+    
+// //     this._dispatchCustomEvent('NEW_ORDER', data);
+// //   }
+
+// //   _handlePaymentReceived(data) {
+// //     this._log(`💰 Payment received: ${data.orderNumber}`);
+    
+// //     this._dispatchNotification('PAYMENT_RECEIVED', {
+// //       title: '💰 Payment Received',
+// //       message: `Payment of ₹${data.amount} for order #${data.orderNumber}`,
+// //       data: data
+// //     });
+    
+// //     if (typeof window !== 'undefined') {
+// //       window.dispatchEvent(new CustomEvent('payment-updated', { detail: data }));
+// //     }
+    
+// //     this._dispatchCustomEvent('PAYMENT_RECEIVED', data);
+// //   }
+
+// //   _handleOrderStatusChanged(data) {
+// //     this._log(`📦 Order status changed: ${data.orderNumber}`);
+    
+// //     this._dispatchNotification('ORDER_STATUS_CHANGED', {
+// //       title: '📦 Order Status Updated',
+// //       message: `Order #${data.orderNumber} is now ${data.newStatus}`,
+// //       data: data
+// //     });
+    
+// //     if (typeof window !== 'undefined') {
+// //       window.dispatchEvent(new CustomEvent('order-status-updated', { detail: data }));
+// //     }
+    
+// //     this._dispatchCustomEvent('ORDER_STATUS_CHANGED', data);
+// //   }
+
+// //   _handleLowStockAlert(data) {
+// //     this._log(`⚠️ Low stock alert: ${data.product?.productName}`);
+    
+// //     this._dispatchNotification('LOW_STOCK_ALERT', {
+// //       title: '📦 Low Stock Alert',
+// //       message: `${data.product?.productName} is running low (${data.product?.stock} left)`,
+// //       data: data.product
+// //     });
+    
+// //     this._dispatchCustomEvent('LOW_STOCK_ALERT', data);
+// //   }
+
+// //   _handleDashboardUpdate(data) {
+// //     this._log(`📊 Dashboard update: ${data.type}`);
+// //     this._dispatchCustomEvent('DASHBOARD_UPDATE', data);
+// //   }
+
+// //   _handleFCMTokenRegistered(data) {
+// //     this._log('✅ FCM token registered');
+// //     this._dispatchCustomEvent('FCM_TOKEN_REGISTERED', data);
+// //   }
+
+// //   // ========== HELPER METHODS ==========
+
+// //   async _saveNotificationToAPI(type, data) {
+// //     try {
+// //       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      
+// //       await fetch('/api/notifications', {
+// //         method: 'POST',
+// //         headers: {
+// //           'Content-Type': 'application/json',
+// //           ...(token && { 'Authorization': `Bearer ${token}` })
+// //         },
+// //         body: JSON.stringify({
+// //           type,
+// //           data,
+// //           source: 'socketio',
+// //           timestamp: new Date().toISOString()
+// //         })
+// //       });
+// //     } catch (error) {
+// //       console.error('Failed to save notification:', error);
+// //     }
+// //   }
+
+// //   _queueMessage(event, data) {
+// //     if (this.messageQueue.length >= 50) {
+// //       this.messageQueue.shift();
+// //     }
+    
+// //     this.messageQueue.push({
+// //       event,
+// //       data,
+// //       timestamp: new Date().toISOString(),
+// //       retryCount: 0
+// //     });
+// //   }
+
+// //   _flushMessageQueue() {
+// //     if (this.messageQueue.length === 0 || !this.isAuthenticated) return;
+    
+// //     const failedMessages = [];
+    
+// //     this.messageQueue.forEach((message) => {
+// //       const success = this.emit(message.event, message.data);
+// //       if (!success && message.retryCount < 3) {
+// //         message.retryCount++;
+// //         failedMessages.push(message);
+// //       }
+// //     });
+    
+// //     this.messageQueue = failedMessages;
+// //   }
+
+// //   _startHeartbeat() {
+// //     this._cleanupHeartbeat();
+    
+// //     this.heartbeatInterval = setInterval(() => {
+// //       this.sendHeartbeat();
+// //     }, CONFIG.HEARTBEAT_INTERVAL);
+// //   }
+
+// //   _scheduleReconnect() {
+// //     if (this.reconnectTimer || this.state === 'connected') return;
+    
+// //     this.stats.reconnectionAttempts++;
+// //     const delay = Math.min(1000 * Math.pow(1.5, this.stats.reconnectionAttempts), 30000);
+    
+// //     this.reconnectTimer = setTimeout(() => {
+// //       this.reconnectTimer = null;
+// //       if (this.userId) {
+// //         this._log('Attempting reconnection...');
+// //         this.connect(this.userData);
+// //       }
+// //     }, delay);
+// //   }
+
+// //   _dispatchNotification(type, payload) {
+// //     const event = new CustomEvent('admin-notification', {
+// //       detail: {
+// //         id: `notification_${Date.now()}`,
+// //         type,
+// //         ...payload,
+// //         timestamp: new Date().toISOString()
+// //       }
+// //     });
+    
+// //     if (typeof window !== 'undefined') {
+// //       window.dispatchEvent(event);
+// //     }
+// //   }
+
+// //   _dispatchCustomEvent(eventName, data) {
+// //     const listeners = this.eventListeners.get(eventName) || [];
+// //     listeners.forEach(listener => {
+// //       try {
+// //         listener(data);
+// //       } catch (error) {
+// //         this._logError(`Error in event listener for ${eventName}:`, error);
+// //       }
+// //     });
+// //   }
+
+// //   _getDeviceInfo() {
+// //     if (typeof window === 'undefined') return {};
+    
+// //     return {
+// //       userAgent: navigator.userAgent,
+// //       platform: navigator.platform,
+// //       language: navigator.language,
+// //       screenSize: `${window.screen.width}x${window.screen.height}`
+// //     };
+// //   }
+
+// //   _registerPendingFCMTokens() {
+// //     if (typeof window === 'undefined') return;
+    
+// //     try {
+// //       const pendingTokens = JSON.parse(localStorage.getItem('pending_fcm_tokens') || '[]');
+// //       pendingTokens.forEach(tokenData => {
+// //         if (tokenData.token) {
+// //           this.registerFCMToken(tokenData.token);
+// //         }
+// //       });
+// //     } catch (error) {
+// //       this._logError('Error registering pending tokens:', error);
+// //     }
+// //   }
+
+// //   _setState(newState) {
+// //     const oldState = this.state;
+// //     this.state = newState;
+    
+// //     if (oldState !== newState) {
+// //       this._log(`State: ${oldState} → ${newState}`);
+      
+// //       this.stateListeners.forEach(listener => {
+// //         try {
+// //           listener(newState);
+// //         } catch (error) {}
+// //       });
+// //     }
+// //   }
+
+// //   _notifyConnectionChange(connected) {
+// //     this.connectionListeners.forEach(listener => {
+// //       try {
+// //         listener(connected);
+// //       } catch (error) {}
+// //     });
+// //   }
+
+// //   _cleanup() {
+// //     this._cleanupTimers();
+    
+// //     if (this.socket) {
+// //       this.socket.removeAllListeners();
+// //       this.socket.disconnect();
+// //       this.socket = null;
+// //     }
+    
+// //     this.isAuthenticated = false;
+// //   }
+
+// //   _cleanupTimers() {
+// //     if (this.heartbeatInterval) {
+// //       clearInterval(this.heartbeatInterval);
+// //       this.heartbeatInterval = null;
+// //     }
+    
+// //     if (this.heartbeatTimeout) {
+// //       clearTimeout(this.heartbeatTimeout);
+// //       this.heartbeatTimeout = null;
+// //     }
+    
+// //     if (this.reconnectTimer) {
+// //       clearTimeout(this.reconnectTimer);
+// //       this.reconnectTimer = null;
+// //     }
+// //   }
+
+// //   _cleanupHeartbeat() {
+// //     if (this.heartbeatInterval) {
+// //       clearInterval(this.heartbeatInterval);
+// //       this.heartbeatInterval = null;
+// //     }
+    
+// //     if (this.heartbeatTimeout) {
+// //       clearTimeout(this.heartbeatTimeout);
+// //       this.heartbeatTimeout = null;
+// //     }
+// //   }
+
+// //   _log(message, data = null) {
+// //     if (!CONFIG.DEBUG) return;
+// //     console.log(`${CONFIG.LOG_PREFIX} ${message}`);
+// //     if (data) console.log(`${CONFIG.LOG_PREFIX} Data:`, data);
+// //   }
+
+// //   _logError(message, error = null) {
+// //     if (CONFIG.DEBUG) {
+// //       const errorMessage = error?.message || error?.toString() || error;
+// //       console.log(`${CONFIG.LOG_PREFIX} ❌ ${message} ${errorMessage ? `- ${errorMessage}` : ''}`);
+// //     }
+// //   }
+
+// //   // ========== GETTERS ==========
+
+// //   getStatus() {
+// //     return {
+// //       state: this.state,
+// //       isConnected: this.state === 'connected',
+// //       isAuthenticated: this.isAuthenticated,
+// //       connectionId: this.connectionId,
+// //       userId: this.userId,
+// //       userRole: this.userRole,
+// //       socketId: this.socket?.id,
+// //       stats: {
+// //         ...this.stats,
+// //         queueSize: this.messageQueue.length
+// //       }
+// //     };
+// //   }
+
+// //   // ========== EVENT LISTENER REGISTRATION ==========
+
+// //   on(eventName, callback) {
+// //     if (!this.eventListeners.has(eventName)) {
+// //       this.eventListeners.set(eventName, []);
+// //     }
+// //     this.eventListeners.get(eventName).push(callback);
+    
+// //     if (this.socket) {
+// //       this.socket.on(eventName, callback);
+// //     }
+// //   }
+
+// //   off(eventName, callback) {
+// //     const listeners = this.eventListeners.get(eventName);
+// //     if (listeners) {
+// //       const index = listeners.indexOf(callback);
+// //       if (index > -1) {
+// //         listeners.splice(index, 1);
+// //       }
+// //     }
+    
+// //     if (this.socket) {
+// //       this.socket.off(eventName, callback);
+// //     }
+// //   }
+
+// //   addConnectionListener(callback) {
+// //     if (!this.connectionListeners.includes(callback)) {
+// //       this.connectionListeners.push(callback);
+// //     }
+// //   }
+
+// //   addStateListener(callback) {
+// //     if (!this.stateListeners.includes(callback)) {
+// //       this.stateListeners.push(callback);
+// //     }
+// //   }
+
+// //   /**
+// //    * Test connection
+// //    */
+// //   async testConnection() {
+// //     if (!this.socket || !this.socket.connected) {
+// //       return { success: false, message: 'Socket not connected' };
+// //     }
+    
+// //     return new Promise((resolve) => {
+// //       const pingTime = Date.now();
+// //       let responded = false;
+      
+// //       const timeout = setTimeout(() => {
+// //         if (!responded) {
+// //           resolve({ success: false, message: 'Timeout' });
+// //         }
+// //       }, 5000);
+      
+// //       this.socket.emit(EventTypes.PING, { timestamp: pingTime, test: true });
+      
+// //       this.socket.once(EventTypes.PONG, (data) => {
+// //         responded = true;
+// //         clearTimeout(timeout);
+// //         const latency = Date.now() - pingTime;
+// //         resolve({ success: true, latency });
+// //       });
+// //     });
+// //   }
+// // }
+
+// // // ========== SINGLETON EXPORT ==========
+// // let instance = null;
+
+// // export function getSocketIOClient() {
+// //   if (!instance) {
+// //     instance = new SocketIOClient();
+    
+// //     if (typeof window !== 'undefined') {
+// //       window.addEventListener('beforeunload', () => {
+// //         if (instance) {
+// //           instance.disconnect('Page unload');
+// //         }
+// //       });
+// //     }
+// //   }
+  
+// //   return instance;
+// // }
+
+// // export default getSocketIOClient;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// // lib/websocket/socket-client.js
 // "use client";
 
 // import { io } from 'socket.io-client';
 
 // /**
 //  * Production-grade Socket.IO Client for Admin Notifications
-//  * Fixed to work with your backend server.js on port 3001
+//  * PROFESSIONAL FIXED VERSION - With proper connection handling and company context
 //  */
-
-// // ========== GLOBAL CONNECTION LOCK ==========
-// let globalConnectionInProgress = false;
-// // ============================================
 
 // // ========== CONFIGURATION ==========
 // const CONFIG = {
-//   // Backend Socket.IO server URL (Port 3001)
+//   // Connect to your backend server on port 3001 with /notifications namespace
 //   SERVER_URL: process.env.NEXT_PUBLIC_SOCKET_SERVER || 'http://localhost:3001',
+//   NAMESPACE: '/notifications', // Must match your server.js
   
-//   // Socket.IO options - FIXED FOR YOUR BACKEND
+//   // Socket.IO options
 //   SOCKET_OPTIONS: {
-//     path: '/socket.io/',
-//     transports: ['polling', 'websocket'],  // Polling first for handshake
+//     path: '/socket.io/', // Standard Socket.IO path
+//     transports: ['polling', 'websocket'], // Polling first for compatibility
 //     reconnection: true,
 //     reconnectionAttempts: 5,
 //     reconnectionDelay: 1000,
@@ -28,17 +1856,17 @@
 //     autoConnect: false,
 //     forceNew: true,
 //     withCredentials: true,
-//     // Add compatibility options
+//     // Compatibility options
 //     allowEIO3: true,
 //     allowEIO4: true,
 //     upgrade: true,
 //     rememberUpgrade: true,
-//     // Localhost settings
+//     // Development settings
 //     secure: false,
 //     rejectUnauthorized: false
 //   },
   
-//   // Authentication - Must match your server.js ADMIN_TOKEN
+//   // Authentication token (must match your server.js)
 //   AUTH_TOKEN: process.env.NEXT_PUBLIC_NOTIFICATION_API_KEY || 'dev-key-2024',
   
 //   // Heartbeat settings
@@ -58,12 +1886,12 @@
 //   DISCONNECT: 'disconnect',
 //   ERROR: 'error',
   
-//   // Authentication events (MUST MATCH YOUR SERVER.JS!)
+//   // Authentication events
 //   AUTHENTICATE: 'authenticate',
 //   AUTHENTICATED: 'authenticated',
 //   UNAUTHORIZED: 'unauthorized',
   
-//   // Notification events (MUST MATCH YOUR SERVER.JS!)
+//   // Notification events
 //   NEW_ORDER: 'NEW_ORDER',
 //   PAYMENT_RECEIVED: 'PAYMENT_RECEIVED',
 //   ORDER_STATUS_CHANGED: 'ORDER_STATUS_CHANGED',
@@ -73,11 +1901,9 @@
 //   PING: 'ping',
 //   PONG: 'pong',
   
-//   // Custom events (MUST MATCH YOUR SERVER.JS!)
+//   // Custom events
 //   REGISTER_FCM_TOKEN: 'register-fcm-token',
 //   FCM_TOKEN_REGISTERED: 'fcm-token-registered',
-  
-//   // Custom dashboard events (MUST MATCH YOUR SERVER.JS!)
 //   DASHBOARD_UPDATE: 'dashboard-update'
 // };
 
@@ -95,6 +1921,7 @@
 //     this.userId = null;
 //     this.userRole = null;
 //     this.userData = null;
+//     this.companyId = null; // ✅ ADDED: Company ID for multi-tenant
     
 //     // Timers
 //     this.heartbeatInterval = null;
@@ -122,38 +1949,42 @@
 //     // Queue for offline messages
 //     this.messageQueue = [];
     
-//     this._log('Client initialized');
+//     // ✅ ADDED: Auto-reconnect flag
+//     this.autoReconnect = true;
+    
+//     this._log('Socket.IO Client initialized');
 //   }
 
 //   // ========== PUBLIC API ==========
 
 //   /**
-//    * Connect to Socket.IO server - FIXED FOR YOUR BACKEND
+//    * Connect to Socket.IO server
+//    * PROFESSIONAL FIX: Added company context and better error handling
 //    */
 //   connect(user = {}) {
-//     // ========== GLOBAL CONNECTION LOCK ==========
-//     if (globalConnectionInProgress) {
-//       this._log('❌ Connection already in progress globally, skipping...');
-//       return;
-//     }
-    
 //     // Prevent duplicate connections
 //     if (this.state === 'connected' || this.state === 'connecting') {
 //       this._log('Already connected or connecting');
-//       return;
+      
+//       // ✅ FIXED: If already connected but not authenticated, send authentication
+//       if (this.state === 'connected' && !this.isAuthenticated && this.socket) {
+//         this._log('Already connected but not authenticated - sending auth');
+//         setTimeout(() => this.authenticate(), 500);
+//       }
+      
+//       return this.socket;
 //     }
-    
-//     // Set global lock
-//     globalConnectionInProgress = true;
-//     // ============================================
     
 //     // Clear any existing connection
 //     this._cleanup();
     
-//     // Set user context
-//     this.userId = user.id || user._id || 'admin';
-//     this.userRole = user.role || 'admin';
+//     // Set user context with company ID
+//     this.userId = user.id || user._id || 'unknown';
+//     this.userRole = user.role || 'user';
 //     this.userData = user;
+//     this.companyId = user.companyId || null; // ✅ Store company ID
+//     this.autoReconnect = user.autoReconnect !== false;
+    
 //     this.connectionId = `socket_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
 //     // Update state
@@ -161,64 +1992,38 @@
 //     this.stats.totalConnections++;
     
 //     try {
-//       // ✅ FIXED: Connect to /notifications namespace (MUST match your backend!)
-//       const namespace = '/notifications'; // Your backend uses this namespace
-//       const url = `${CONFIG.SERVER_URL}${namespace}`; // Full URL with namespace
+//       // Connect to the correct URL with namespace
+//       const fullUrl = `${CONFIG.SERVER_URL}${CONFIG.NAMESPACE}`;
       
-//       this._log(`Connecting to ${url} (/notifications namespace)`);
+//       this._log(`Connecting to ${fullUrl}`);
+//       this._log(`Connection ID: ${this.connectionId}`);
+//       this._log(`User ID: ${this.userId}, Role: ${this.userRole}, Company: ${this.companyId || 'ALL'}`);
       
-//       // Create socket with initial query parameters
-//       this.socket = io(url, {
+//       // Create socket with query parameters including company ID
+//       this.socket = io(fullUrl, {
 //         ...CONFIG.SOCKET_OPTIONS,
 //         query: {
 //           userId: this.userId,
 //           userRole: this.userRole,
+//           companyId: this.companyId || '', // ✅ Pass company ID in query
 //           connectionId: this.connectionId,
 //           timestamp: Date.now().toString()
 //         }
 //       });
       
-//       // Setup event listeners
+//       // Setup all event listeners
 //       this._setupEventListeners();
-      
-//       // ========== SET UP CONNECTION FLAG RESET ==========
-//       const resetConnectionFlag = () => {
-//         if (globalConnectionInProgress) {
-//           globalConnectionInProgress = false;
-//           this._log('✅ Global connection flag reset');
-//         }
-//       };
-      
-//       // Override connection handlers to reset flag
-//       const originalHandleConnect = this._handleConnect.bind(this);
-//       const originalHandleConnectError = this._handleConnectError.bind(this);
-//       const originalHandleDisconnect = this._handleDisconnect.bind(this);
-      
-//       // Replace handlers to include flag reset
-//       this.socket.on('connect', () => {
-//         resetConnectionFlag();
-//         originalHandleConnect();
-//       });
-      
-//       this.socket.on('connect_error', (error) => {
-//         resetConnectionFlag();
-//         originalHandleConnectError(error);
-//       });
-      
-//       this.socket.on('disconnect', (reason) => {
-//         resetConnectionFlag();
-//         originalHandleDisconnect(reason);
-//       });
       
 //       // Connect
 //       this.socket.connect();
       
+//       return this.socket;
+      
 //     } catch (error) {
-//       // Reset flag on error
-//       globalConnectionInProgress = false;
 //       this._logError('Connection initialization failed:', error);
 //       this._setState('error');
 //       this._scheduleReconnect();
+//       return null;
 //     }
 //   }
 
@@ -232,6 +2037,7 @@
 //     this._setState('disconnecting');
     
 //     if (this.socket) {
+//       this.socket.removeAllListeners();
 //       this.socket.disconnect();
 //       this.socket = null;
 //     }
@@ -240,16 +2046,11 @@
 //     this.isAuthenticated = false;
 //     this.stats.lastDisconnectedAt = new Date();
     
-//     // Reset global connection flag
-//     if (globalConnectionInProgress) {
-//       globalConnectionInProgress = false;
-//     }
-    
 //     this._log('Disconnected successfully');
 //   }
 
 //   /**
-//    * Emit event to server - FIXED
+//    * Emit event to server
 //    */
 //   emit(event, data = {}) {
 //     if (!this.socket || !this.socket.connected || !this.isAuthenticated) {
@@ -263,6 +2064,7 @@
 //         ...data,
 //         userId: this.userId,
 //         userRole: this.userRole,
+//         companyId: this.companyId, // ✅ Include company ID in payload
 //         connectionId: this.connectionId,
 //         timestamp: new Date().toISOString()
 //       };
@@ -271,11 +2073,7 @@
 //       this.stats.totalEventsSent++;
       
 //       if (CONFIG.DEBUG) {
-//         this._log(`Emitted: ${event}`, {
-//           event: event,
-//           userId: this.userId,
-//           dataSize: JSON.stringify(payload).length
-//         });
+//         this._log(`Emitted: ${event}`);
 //       }
       
 //       return true;
@@ -298,12 +2096,12 @@
 //     return this.emit(EventTypes.REGISTER_FCM_TOKEN, {
 //       token: fcmToken,
 //       deviceInfo: this._getDeviceInfo(),
-//       timestamp: new Date().toISOString()
+//       companyId: this.companyId // ✅ Include company ID
 //     });
 //   }
 
 //   /**
-//    * Send authentication request - FIXED FOR YOUR BACKEND
+//    * Send authentication request
 //    */
 //   authenticate() {
 //     if (!this.socket || !this.socket.connected) {
@@ -311,14 +2109,13 @@
 //       return false;
 //     }
     
-//     // Your backend expects this exact format (matches server.js line 96-99)
 //     return this.emit(EventTypes.AUTHENTICATE, {
 //       token: CONFIG.AUTH_TOKEN,
 //       userId: this.userId,
 //       userRole: this.userRole,
-//       name: this.userData?.name || `Admin-${this.userId.substring(0, 8)}`,
-//       connectionId: this.connectionId,
-//       timestamp: new Date().toISOString()
+//       companyId: this.companyId, // ✅ Include company ID
+//       name: this.userData?.name || this.userData?.email || `User-${this.userId.substring(0, 8)}`,
+//       connectionId: this.connectionId
 //     });
 //   }
 
@@ -331,7 +2128,7 @@
       
 //       this.emit(EventTypes.PING, { 
 //         timestamp: pingTime,
-//         userId: this.userId 
+//         companyId: this.companyId // ✅ Include company ID
 //       });
       
 //       // Set timeout for pong response
@@ -354,14 +2151,20 @@
 //   _setupEventListeners() {
 //     if (!this.socket) return;
     
-//     // Authentication events (from your server.js)
+//     // Connection events
+//     this.socket.on(EventTypes.CONNECT, () => this._handleConnect());
+//     this.socket.on(EventTypes.CONNECT_ERROR, (error) => this._handleConnectError(error));
+//     this.socket.on(EventTypes.DISCONNECT, (reason) => this._handleDisconnect(reason));
+//     this.socket.on(EventTypes.ERROR, (error) => this._handleError(error));
+    
+//     // Authentication events
 //     this.socket.on(EventTypes.AUTHENTICATED, (data) => this._handleAuthenticated(data));
 //     this.socket.on(EventTypes.UNAUTHORIZED, (data) => this._handleUnauthorized(data));
     
 //     // System events
 //     this.socket.on(EventTypes.PONG, (data) => this._handlePong(data));
     
-//     // ✅ FIXED: Listen for events your backend emits
+//     // Notification events
 //     this.socket.on(EventTypes.NEW_ORDER, (data) => this._handleNewOrder(data));
 //     this.socket.on(EventTypes.PAYMENT_RECEIVED, (data) => this._handlePaymentReceived(data));
 //     this.socket.on(EventTypes.ORDER_STATUS_CHANGED, (data) => this._handleOrderStatusChanged(data));
@@ -375,7 +2178,8 @@
 //   // ========== EVENT HANDLERS ==========
 
 //   _handleConnect() {
-//     this._log('Socket.IO connected to /notifications namespace');
+//     this._log(`✅ Connected to ${CONFIG.SERVER_URL}${CONFIG.NAMESPACE}`);
+//     this._log(`Socket ID: ${this.socket?.id}`);
 //     this._setState('connected');
 //     this.stats.successfulConnections++;
 //     this.stats.lastConnectedAt = new Date();
@@ -383,7 +2187,7 @@
 //     // Start heartbeat
 //     this._startHeartbeat();
     
-//     // Send authentication after connection - REQUIRED FOR YOUR BACKEND
+//     // Send authentication after connection
 //     setTimeout(() => {
 //       if (this.socket?.connected) {
 //         this.authenticate();
@@ -398,12 +2202,7 @@
 //   }
 
 //   _handleConnectError(error) {
-//     const errorMessage = error?.message || error?.toString() || 'Unknown connection error';
-    
-//     if (CONFIG.DEBUG) {
-//       console.log(`${CONFIG.LOG_PREFIX} ❌ Connection error: ${errorMessage}`);
-//     }
-    
+//     this._logError('Connection error:', error.message);
 //     this._setState('error');
 //     this.stats.failedConnections++;
     
@@ -423,36 +2222,42 @@
 //     this._notifyConnectionChange(false);
     
 //     // Schedule reconnection unless intentionally disconnected
-//     if (reason !== 'io client disconnect' && reason !== 'transport close') {
+//     if (reason !== 'io client disconnect' && this.autoReconnect) {
 //       this._scheduleReconnect();
 //     }
 //   }
 
 //   _handleError(error) {
-//     const errorMessage = error?.message || error?.toString() || 'Unknown error';
-//     this._logError('Socket error:', errorMessage);
+//     this._logError('Socket error:', error);
 //     this._setState('error');
 //   }
 
 //   _handleAuthenticated(data) {
-//     this._log('Authentication successful');
+//     this._log('✅ Authentication successful');
 //     this.isAuthenticated = true;
     
-//     if (CONFIG.DEBUG) {
-//       console.log(`${CONFIG.LOG_PREFIX} ✅ Authenticated as ${data.user?.name || this.userId}`);
+//     // Store any company info from server
+//     if (data?.user?.companyId) {
+//       this.companyId = data.user.companyId;
 //     }
     
 //     // Register any pending FCM tokens
 //     this._registerPendingFCMTokens();
+    
+//     // Dispatch authenticated event
+//     this._dispatchCustomEvent('authenticated', data);
 //   }
 
 //   _handleUnauthorized(data) {
-//     const message = data?.message || 'Invalid credentials';
-//     this._logError('Authentication failed:', message);
+//     this._logError('Authentication failed:', data?.message);
 //     this.isAuthenticated = false;
     
-//     // Disconnect on authentication failure
+//     // Don't auto-reconnect on auth failure
+//     this.autoReconnect = false;
 //     this.disconnect('Authentication failed');
+    
+//     // Dispatch unauthorized event
+//     this._dispatchCustomEvent('unauthorized', data);
 //   }
 
 //   _handlePong(data) {
@@ -464,100 +2269,121 @@
 //     if (data?.timestamp) {
 //       const latency = Date.now() - data.timestamp;
 //       this.stats.pingLatency = latency;
+//       this._log(`Heartbeat latency: ${latency}ms`);
 //     }
 //   }
 
 //   // ========== NOTIFICATION HANDLERS ==========
 
 //   _handleNewOrder(data) {
-//     this._log(`New order: ${data.order?.orderNumber || 'Unknown'}`);
+//     this._log(`📦 New order: ${data.order?.orderNumber || 'Unknown'} for company: ${data.companyId || 'ALL'}`);
+    
+//     // Dispatch notification event
 //     this._dispatchNotification('NEW_ORDER', {
 //       title: '🛍️ New Order Received',
 //       message: `Order #${data.order?.orderNumber} from ${data.order?.customerName || 'Customer'}`,
 //       data: data.order,
 //       priority: 'high',
-//       timestamp: new Date().toISOString()
+//       companyId: data.companyId
 //     });
     
-//     // Also dispatch custom event for dashboard
-//     this._dispatchCustomEvent('NEW_ORDER', data);
+//     // Save to API
+//     this._saveNotificationToAPI('NEW_ORDER', data.order);
     
-//     // Dispatch window event for other components
+//     // Dispatch window event
 //     if (typeof window !== 'undefined') {
 //       window.dispatchEvent(new CustomEvent('new-order-received', {
 //         detail: data.order || data
 //       }));
 //     }
+    
+//     this._dispatchCustomEvent('NEW_ORDER', data);
 //   }
 
 //   _handlePaymentReceived(data) {
-//     this._log(`Payment received for order: ${data.orderNumber || 'Unknown'}`);
+//     this._log(`💰 Payment received: ${data.orderNumber} for company: ${data.companyId || 'ALL'}`);
+    
 //     this._dispatchNotification('PAYMENT_RECEIVED', {
 //       title: '💰 Payment Received',
 //       message: `Payment of ₹${data.amount} for order #${data.orderNumber}`,
 //       data: data,
-//       priority: 'high',
-//       timestamp: new Date().toISOString()
+//       companyId: data.companyId
 //     });
     
-//     this._dispatchCustomEvent('PAYMENT_RECEIVED', data);
-    
-//     // Dispatch window event
 //     if (typeof window !== 'undefined') {
-//       window.dispatchEvent(new CustomEvent('payment-updated', {
-//         detail: data
-//       }));
+//       window.dispatchEvent(new CustomEvent('payment-updated', { detail: data }));
 //     }
+    
+//     this._dispatchCustomEvent('PAYMENT_RECEIVED', data);
 //   }
 
 //   _handleOrderStatusChanged(data) {
-//     this._log(`Order status updated: ${data.orderNumber} (${data.oldStatus} → ${data.newStatus})`);
+//     this._log(`📦 Order status changed: ${data.orderNumber} to ${data.newStatus} for company: ${data.companyId || 'ALL'}`);
+    
 //     this._dispatchNotification('ORDER_STATUS_CHANGED', {
 //       title: '📦 Order Status Updated',
 //       message: `Order #${data.orderNumber} is now ${data.newStatus}`,
 //       data: data,
-//       priority: 'normal',
-//       timestamp: new Date().toISOString()
+//       companyId: data.companyId
 //     });
     
-//     this._dispatchCustomEvent('ORDER_STATUS_CHANGED', data);
-    
-//     // Dispatch window event
 //     if (typeof window !== 'undefined') {
-//       window.dispatchEvent(new CustomEvent('order-status-updated', {
-//         detail: data
-//       }));
+//       window.dispatchEvent(new CustomEvent('order-status-updated', { detail: data }));
 //     }
+    
+//     this._dispatchCustomEvent('ORDER_STATUS_CHANGED', data);
 //   }
 
 //   _handleLowStockAlert(data) {
-//     this._log(`Low stock alert: ${data.product?.productName || 'Product'}`);
+//     this._log(`⚠️ Low stock alert: ${data.product?.productName} for company: ${data.companyId || 'ALL'}`);
+    
 //     this._dispatchNotification('LOW_STOCK_ALERT', {
 //       title: '📦 Low Stock Alert',
 //       message: `${data.product?.productName} is running low (${data.product?.stock} left)`,
 //       data: data.product,
-//       priority: 'normal',
-//       timestamp: new Date().toISOString()
+//       companyId: data.companyId
 //     });
     
 //     this._dispatchCustomEvent('LOW_STOCK_ALERT', data);
 //   }
 
 //   _handleDashboardUpdate(data) {
-//     this._log(`Dashboard update: ${data.type || 'update'}`);
+//     this._log(`📊 Dashboard update: ${data.type} for company: ${data.companyId || 'ALL'}`);
 //     this._dispatchCustomEvent('DASHBOARD_UPDATE', data);
 //   }
 
 //   _handleFCMTokenRegistered(data) {
-//     this._log('FCM token registered with server');
+//     this._log('✅ FCM token registered');
 //     this._dispatchCustomEvent('FCM_TOKEN_REGISTERED', data);
 //   }
 
-//   // ========== QUEUE MANAGEMENT ==========
+//   // ========== HELPER METHODS ==========
+
+//   async _saveNotificationToAPI(type, data) {
+//     try {
+//       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      
+//       await fetch('/api/notifications', {
+//         method: 'POST',
+//         headers: {
+//           'Content-Type': 'application/json',
+//           ...(token && { 'Authorization': `Bearer ${token}` })
+//         },
+//         body: JSON.stringify({
+//           type,
+//           data,
+//           source: 'socketio',
+//           companyId: this.companyId,
+//           timestamp: new Date().toISOString()
+//         })
+//       });
+//     } catch (error) {
+//       console.error('Failed to save notification:', error);
+//     }
+//   }
 
 //   _queueMessage(event, data) {
 //     if (this.messageQueue.length >= 50) {
-//       // Remove oldest message
 //       this.messageQueue.shift();
 //     }
     
@@ -567,20 +2393,15 @@
 //       timestamp: new Date().toISOString(),
 //       retryCount: 0
 //     });
-    
-//     this._log(`Queued: ${event} (queue size: ${this.messageQueue.length})`);
 //   }
 
 //   _flushMessageQueue() {
-//     if (this.messageQueue.length === 0 || !this.isAuthenticated) {
-//       return;
-//     }
+//     if (this.messageQueue.length === 0 || !this.isAuthenticated) return;
     
 //     const failedMessages = [];
     
 //     this.messageQueue.forEach((message) => {
 //       const success = this.emit(message.event, message.data);
-      
 //       if (!success && message.retryCount < 3) {
 //         message.retryCount++;
 //         failedMessages.push(message);
@@ -588,13 +2409,7 @@
 //     });
     
 //     this.messageQueue = failedMessages;
-    
-//     if (failedMessages.length > 0) {
-//       this._log(`${failedMessages.length} messages failed to send, will retry`);
-//     }
 //   }
-
-//   // ========== TIMER MANAGEMENT ==========
 
 //   _startHeartbeat() {
 //     this._cleanupHeartbeat();
@@ -602,43 +2417,32 @@
 //     this.heartbeatInterval = setInterval(() => {
 //       this.sendHeartbeat();
 //     }, CONFIG.HEARTBEAT_INTERVAL);
-    
-//     this._log('Heartbeat started');
 //   }
 
 //   _scheduleReconnect() {
-//     if (this.reconnectTimer || this.state === 'connected') {
-//       return;
-//     }
+//     if (this.reconnectTimer || this.state === 'connected' || !this.autoReconnect) return;
     
 //     this.stats.reconnectionAttempts++;
-    
 //     const delay = Math.min(1000 * Math.pow(1.5, this.stats.reconnectionAttempts), 30000);
     
 //     this._log(`Scheduling reconnect in ${delay}ms (attempt ${this.stats.reconnectionAttempts})`);
     
 //     this.reconnectTimer = setTimeout(() => {
 //       this.reconnectTimer = null;
-//       if (this.userId) {
+//       if (this.userId && this.autoReconnect) {
 //         this._log('Attempting reconnection...');
 //         this.connect(this.userData);
 //       }
 //     }, delay);
 //   }
 
-//   // ========== EVENT DISPATCHING ==========
-
 //   _dispatchNotification(type, payload) {
 //     const event = new CustomEvent('admin-notification', {
 //       detail: {
-//         id: `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+//         id: `notification_${Date.now()}`,
 //         type,
-//         title: payload.title,
-//         message: payload.message,
-//         data: payload.data,
-//         priority: payload.priority || 'normal',
-//         timestamp: payload.timestamp,
-//         duration: 5000
+//         ...payload,
+//         timestamp: new Date().toISOString()
 //       }
 //     });
     
@@ -658,8 +2462,6 @@
 //     });
 //   }
 
-//   // ========== UTILITY METHODS ==========
-
 //   _getDeviceInfo() {
 //     if (typeof window === 'undefined') return {};
     
@@ -668,7 +2470,7 @@
 //       platform: navigator.platform,
 //       language: navigator.language,
 //       screenSize: `${window.screen.width}x${window.screen.height}`,
-//       timestamp: new Date().toISOString()
+//       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
 //     };
 //   }
 
@@ -677,13 +2479,16 @@
     
 //     try {
 //       const pendingTokens = JSON.parse(localStorage.getItem('pending_fcm_tokens') || '[]');
-      
 //       pendingTokens.forEach(tokenData => {
 //         if (tokenData.token) {
 //           this.registerFCMToken(tokenData.token);
 //         }
 //       });
       
+//       // Clear after registering
+//       if (pendingTokens.length > 0) {
+//         localStorage.removeItem('pending_fcm_tokens');
+//       }
 //     } catch (error) {
 //       this._logError('Error registering pending tokens:', error);
 //     }
@@ -696,34 +2501,28 @@
 //     if (oldState !== newState) {
 //       this._log(`State: ${oldState} → ${newState}`);
       
-//       if (this.stateListeners && this.stateListeners.length > 0) {
-//         this.stateListeners.forEach(listener => {
-//           try {
-//             listener(newState);
-//           } catch (error) {}
-//         });
-//       }
-//     }
-//   }
-
-//   _notifyConnectionChange(connected) {
-//     if (this.connectionListeners && this.connectionListeners.length > 0) {
-//       this.connectionListeners.forEach(listener => {
+//       this.stateListeners.forEach(listener => {
 //         try {
-//           listener(connected);
+//           listener(newState, oldState);
 //         } catch (error) {}
 //       });
 //     }
 //   }
 
-//   // ========== CLEANUP ==========
+//   _notifyConnectionChange(connected) {
+//     this.connectionListeners.forEach(listener => {
+//       try {
+//         listener(connected, {
+//           userId: this.userId,
+//           userRole: this.userRole,
+//           companyId: this.companyId,
+//           socketId: this.socket?.id
+//         });
+//       } catch (error) {}
+//     });
+//   }
 
 //   _cleanup() {
-//     // Reset global connection flag
-//     if (globalConnectionInProgress) {
-//       globalConnectionInProgress = false;
-//     }
-    
 //     this._cleanupTimers();
     
 //     if (this.socket) {
@@ -764,61 +2563,17 @@
 //     }
 //   }
 
-//   // ========== LOGGING ==========
-
 //   _log(message, data = null) {
 //     if (!CONFIG.DEBUG) return;
-    
-//     console.log(`${CONFIG.LOG_PREFIX} ${message}`);
-//     if (data) {
-//       console.log(`${CONFIG.LOG_PREFIX} Data:`, data);
-//     }
+//     console.log(`${CONFIG.LOG_PREFIX} ${message}`, data ? data : '');
 //   }
 
 //   _logError(message, error = null) {
 //     if (CONFIG.DEBUG) {
 //       const errorMessage = error?.message || error?.toString() || error;
-//       console.log(`${CONFIG.LOG_PREFIX} ❌ ${message} ${errorMessage ? `- ${errorMessage}` : ''}`);
+//       console.error(`${CONFIG.LOG_PREFIX} ❌ ${message}`, errorMessage ? errorMessage : '');
 //     }
 //   }
-//   _handleNewOrder = async (data) => {
-//   this._log(`New order: ${data.order?.orderNumber || 'Unknown'}`);
-  
-//   // Save to local state immediately
-//   this._dispatchNotification('NEW_ORDER', {
-//     title: '🛍️ New Order Received',
-//     message: `Order #${data.order?.orderNumber} from ${data.order?.customerName || 'Customer'}`,
-//     data: data.order,
-//     priority: 'high',
-//     timestamp: new Date().toISOString()
-//   });
-  
-//   // ✅ IMPORTANT: Also save to your notifications collection via API
-//   try {
-//     await fetch('/api/notifications', {
-//       method: 'POST',
-//       headers: {
-//         'Content-Type': 'application/json',
-//         'Authorization': `Bearer ${localStorage.getItem('token')}` // If using auth
-//       },
-//       body: JSON.stringify({
-//         type: 'NEW_ORDER',
-//         data: data.order,
-//         priority: 'high',
-//         source: 'socketio'
-//       })
-//     });
-    
-//     console.log('✅ Notification saved to database via API');
-//   } catch (error) {
-//     console.error('❌ Failed to save notification to database:', error);
-//   }
-  
-//   // Dispatch window event for other components
-//   window.dispatchEvent(new CustomEvent('new-order-received', {
-//     detail: data.order || data
-//   }));
-// };
 
 //   // ========== GETTERS ==========
 
@@ -830,13 +2585,29 @@
 //       connectionId: this.connectionId,
 //       userId: this.userId,
 //       userRole: this.userRole,
+//       companyId: this.companyId,
 //       socketId: this.socket?.id,
-//       socketConnected: this.socket?.connected || false,
 //       stats: {
 //         ...this.stats,
-//         queueSize: this.messageQueue.length,
-//         currentTime: new Date().toISOString()
+//         queueSize: this.messageQueue.length
 //       }
+//     };
+//   }
+
+//   /**
+//    * Get connection info for debugging
+//    */
+//   getConnectionInfo() {
+//     return {
+//       url: `${CONFIG.SERVER_URL}${CONFIG.NAMESPACE}`,
+//       state: this.state,
+//       socketId: this.socket?.id,
+//       userId: this.userId,
+//       companyId: this.companyId,
+//       isAuthenticated: this.isAuthenticated,
+//       transport: this.socket?.io?.engine?.transport?.name || 'unknown',
+//       reconnectionAttempts: this.stats.reconnectionAttempts,
+//       queueSize: this.messageQueue.length
 //     };
 //   }
 
@@ -848,10 +2619,11 @@
 //     }
 //     this.eventListeners.get(eventName).push(callback);
     
-//     // Also listen on socket if connected
 //     if (this.socket) {
 //       this.socket.on(eventName, callback);
 //     }
+    
+//     return this; // For chaining
 //   }
 
 //   off(eventName, callback) {
@@ -866,36 +2638,45 @@
 //     if (this.socket) {
 //       this.socket.off(eventName, callback);
 //     }
+    
+//     return this; // For chaining
+//   }
+
+//   /**
+//    * Remove all listeners for an event
+//    */
+//   removeAllListeners(eventName) {
+//     if (eventName) {
+//       this.eventListeners.delete(eventName);
+//       if (this.socket) {
+//         this.socket.removeAllListeners(eventName);
+//       }
+//     } else {
+//       this.eventListeners.clear();
+//       if (this.socket) {
+//         this.socket.removeAllListeners();
+//       }
+//     }
+    
+//     return this;
 //   }
 
 //   addConnectionListener(callback) {
 //     if (!this.connectionListeners.includes(callback)) {
 //       this.connectionListeners.push(callback);
 //     }
-//   }
-
-//   removeConnectionListener(callback) {
-//     const index = this.connectionListeners.indexOf(callback);
-//     if (index > -1) {
-//       this.connectionListeners.splice(index, 1);
-//     }
+//     return this;
 //   }
 
 //   addStateListener(callback) {
 //     if (!this.stateListeners.includes(callback)) {
 //       this.stateListeners.push(callback);
 //     }
-//   }
-
-//   removeStateListener(callback) {
-//     const index = this.stateListeners.indexOf(callback);
-//     if (index > -1) {
-//       this.stateListeners.splice(index, 1);
-//     }
+//     return this;
 //   }
 
 //   /**
-//    * Test connection by sending a ping
+//    * Test connection
 //    */
 //   async testConnection() {
 //     if (!this.socket || !this.socket.connected) {
@@ -908,24 +2689,43 @@
       
 //       const timeout = setTimeout(() => {
 //         if (!responded) {
-//           resolve({ success: false, message: 'Test timeout', latency: null });
+//           resolve({ success: false, message: 'Timeout' });
 //         }
 //       }, 5000);
       
-//       this.socket.emit(EventTypes.PING, { timestamp: pingTime, test: true });
+//       this.socket.emit(EventTypes.PING, { 
+//         timestamp: pingTime, 
+//         test: true,
+//         companyId: this.companyId
+//       });
       
 //       this.socket.once(EventTypes.PONG, (data) => {
 //         responded = true;
 //         clearTimeout(timeout);
 //         const latency = Date.now() - pingTime;
-//         resolve({ 
-//           success: true, 
-//           message: 'Connection test successful', 
-//           latency,
-//           serverTime: data.serverTime 
-//         });
+//         resolve({ success: true, latency, data });
 //       });
 //     });
+//   }
+
+//   /**
+//    * Force reconnect
+//    */
+//   reconnect() {
+//     this._log('Manual reconnect requested');
+//     this.disconnect('Manual reconnect');
+//     setTimeout(() => {
+//       this.connect(this.userData);
+//     }, 1000);
+//   }
+
+//   /**
+//    * Set auto-reconnect behavior
+//    */
+//   setAutoReconnect(enabled) {
+//     this.autoReconnect = enabled;
+//     this._log(`Auto-reconnect ${enabled ? 'enabled' : 'disabled'}`);
+//     return this;
 //   }
 // }
 
@@ -937,15 +2737,19 @@
 //     instance = new SocketIOClient();
     
 //     if (typeof window !== 'undefined') {
-//       const cleanup = () => {
+//       window.addEventListener('beforeunload', () => {
 //         if (instance) {
 //           instance.disconnect('Page unload');
 //         }
-//       };
+//       });
       
-//       window.addEventListener('beforeunload', cleanup);
-//       window.addEventListener('pagehide', cleanup);
-//       window.addEventListener('unload', cleanup);
+//       // ✅ ADDED: Reconnect on online event
+//       window.addEventListener('online', () => {
+//         if (instance && instance.userId && instance.autoReconnect) {
+//           instance._log('Network online - reconnecting');
+//           instance.connect(instance.userData);
+//         }
+//       });
 //     }
 //   }
   
@@ -960,20 +2764,51 @@
 
 
 
-// lib/socket-client.js
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// lib/websocket/socket-client.js
 "use client";
 
 import { io } from 'socket.io-client';
 
 /**
  * Production-grade Socket.IO Client for Admin Notifications
- * FIXED: Now connects to the correct endpoint (port 3001 with /notifications namespace)
+ * PROFESSIONAL VERSION - With multi-tenant support and proper connection handling
  */
 
 // ========== CONFIGURATION ==========
 const CONFIG = {
-  // ✅ FIXED: Connect to your backend server on port 3001 with /notifications namespace
-  SERVER_URL: process.env.NEXT_PUBLIC_SOCKET_SERVER || 'http://localhost:3000',
+  // Connect to your backend server on port 3001 with /notifications namespace
+  SERVER_URL: process.env.NEXT_PUBLIC_SOCKET_SERVER || 'http://localhost:3001',
   NAMESPACE: '/notifications', // Must match your server.js
   
   // Socket.IO options
@@ -1049,10 +2884,11 @@ class SocketIOClient {
     this.connectionId = null;
     this.isAuthenticated = false;
     
-    // User context
+    // User context - MULTI-TENANT SUPPORT
     this.userId = null;
     this.userRole = null;
     this.userData = null;
+    this.companyId = null; // ✅ Company ID for multi-tenant
     
     // Timers
     this.heartbeatInterval = null;
@@ -1080,29 +2916,41 @@ class SocketIOClient {
     // Queue for offline messages
     this.messageQueue = [];
     
+    // Auto-reconnect flag
+    this.autoReconnect = true;
+    
     this._log('Socket.IO Client initialized');
   }
 
   // ========== PUBLIC API ==========
 
   /**
-   * Connect to Socket.IO server
-   * ✅ FIXED: Now connects to the correct endpoint
+   * Connect to Socket.IO server with multi-tenant support
    */
   connect(user = {}) {
     // Prevent duplicate connections
     if (this.state === 'connected' || this.state === 'connecting') {
       this._log('Already connected or connecting');
+      
+      // If already connected but not authenticated, send authentication
+      if (this.state === 'connected' && !this.isAuthenticated && this.socket) {
+        this._log('Already connected but not authenticated - sending auth');
+        setTimeout(() => this.authenticate(), 500);
+      }
+      
       return this.socket;
     }
     
     // Clear any existing connection
     this._cleanup();
     
-    // Set user context
+    // Set user context with company ID for multi-tenant
     this.userId = user.id || user._id || 'unknown';
     this.userRole = user.role || 'user';
     this.userData = user;
+    this.companyId = user.companyId || null; // ✅ Store company ID
+    this.autoReconnect = user.autoReconnect !== false;
+    
     this.connectionId = `socket_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // Update state
@@ -1110,19 +2958,20 @@ class SocketIOClient {
     this.stats.totalConnections++;
     
     try {
-      // ✅ FIXED: Connect to the correct URL with namespace
+      // Connect to the correct URL with namespace
       const fullUrl = `${CONFIG.SERVER_URL}${CONFIG.NAMESPACE}`;
       
       this._log(`Connecting to ${fullUrl}`);
       this._log(`Connection ID: ${this.connectionId}`);
-      this._log(`User ID: ${this.userId}, Role: ${this.userRole}`);
+      this._log(`User ID: ${this.userId}, Role: ${this.userRole}, Company: ${this.companyId || 'ALL'}`);
       
-      // Create socket with query parameters
+      // Create socket with query parameters including company ID
       this.socket = io(fullUrl, {
         ...CONFIG.SOCKET_OPTIONS,
         query: {
           userId: this.userId,
           userRole: this.userRole,
+          companyId: this.companyId || '', // ✅ Pass company ID in query
           connectionId: this.connectionId,
           timestamp: Date.now().toString()
         }
@@ -1167,7 +3016,7 @@ class SocketIOClient {
   }
 
   /**
-   * Emit event to server
+   * Emit event to server with company context
    */
   emit(event, data = {}) {
     if (!this.socket || !this.socket.connected || !this.isAuthenticated) {
@@ -1181,6 +3030,7 @@ class SocketIOClient {
         ...data,
         userId: this.userId,
         userRole: this.userRole,
+        companyId: this.companyId, // ✅ Include company ID in payload
         connectionId: this.connectionId,
         timestamp: new Date().toISOString()
       };
@@ -1211,7 +3061,8 @@ class SocketIOClient {
     
     return this.emit(EventTypes.REGISTER_FCM_TOKEN, {
       token: fcmToken,
-      deviceInfo: this._getDeviceInfo()
+      deviceInfo: this._getDeviceInfo(),
+      companyId: this.companyId // ✅ Include company ID
     });
   }
 
@@ -1228,7 +3079,8 @@ class SocketIOClient {
       token: CONFIG.AUTH_TOKEN,
       userId: this.userId,
       userRole: this.userRole,
-      name: this.userData?.name || `User-${this.userId.substring(0, 8)}`,
+      companyId: this.companyId, // ✅ Include company ID
+      name: this.userData?.name || this.userData?.email || `User-${this.userId.substring(0, 8)}`,
       connectionId: this.connectionId
     });
   }
@@ -1240,7 +3092,10 @@ class SocketIOClient {
     if (this.socket?.connected && this.isAuthenticated) {
       const pingTime = Date.now();
       
-      this.emit(EventTypes.PING, { timestamp: pingTime });
+      this.emit(EventTypes.PING, { 
+        timestamp: pingTime,
+        companyId: this.companyId // ✅ Include company ID
+      });
       
       // Set timeout for pong response
       if (this.heartbeatTimeout) {
@@ -1333,7 +3188,7 @@ class SocketIOClient {
     this._notifyConnectionChange(false);
     
     // Schedule reconnection unless intentionally disconnected
-    if (reason !== 'io client disconnect') {
+    if (reason !== 'io client disconnect' && this.autoReconnect) {
       this._scheduleReconnect();
     }
   }
@@ -1347,14 +3202,28 @@ class SocketIOClient {
     this._log('✅ Authentication successful');
     this.isAuthenticated = true;
     
+    // Store any company info from server
+    if (data?.user?.companyId) {
+      this.companyId = data.user.companyId;
+    }
+    
     // Register any pending FCM tokens
     this._registerPendingFCMTokens();
+    
+    // Dispatch authenticated event
+    this._dispatchCustomEvent('authenticated', data);
   }
 
   _handleUnauthorized(data) {
     this._logError('Authentication failed:', data?.message);
     this.isAuthenticated = false;
+    
+    // Don't auto-reconnect on auth failure
+    this.autoReconnect = false;
     this.disconnect('Authentication failed');
+    
+    // Dispatch unauthorized event
+    this._dispatchCustomEvent('unauthorized', data);
   }
 
   _handlePong(data) {
@@ -1370,17 +3239,18 @@ class SocketIOClient {
     }
   }
 
-  // ========== NOTIFICATION HANDLERS ==========
+  // ========== NOTIFICATION HANDLERS WITH COMPANY CONTEXT ==========
 
   _handleNewOrder(data) {
-    this._log(`📦 New order: ${data.order?.orderNumber || 'Unknown'}`);
+    this._log(`📦 New order: ${data.order?.orderNumber || 'Unknown'} for company: ${data.companyId || 'ALL'}`);
     
     // Dispatch notification event
     this._dispatchNotification('NEW_ORDER', {
       title: '🛍️ New Order Received',
       message: `Order #${data.order?.orderNumber} from ${data.order?.customerName || 'Customer'}`,
       data: data.order,
-      priority: 'high'
+      priority: 'high',
+      companyId: data.companyId
     });
     
     // Save to API
@@ -1397,12 +3267,13 @@ class SocketIOClient {
   }
 
   _handlePaymentReceived(data) {
-    this._log(`💰 Payment received: ${data.orderNumber}`);
+    this._log(`💰 Payment received: ${data.orderNumber} for company: ${data.companyId || 'ALL'}`);
     
     this._dispatchNotification('PAYMENT_RECEIVED', {
       title: '💰 Payment Received',
       message: `Payment of ₹${data.amount} for order #${data.orderNumber}`,
-      data: data
+      data: data,
+      companyId: data.companyId
     });
     
     if (typeof window !== 'undefined') {
@@ -1413,12 +3284,13 @@ class SocketIOClient {
   }
 
   _handleOrderStatusChanged(data) {
-    this._log(`📦 Order status changed: ${data.orderNumber}`);
+    this._log(`📦 Order status changed: ${data.orderNumber} to ${data.newStatus} for company: ${data.companyId || 'ALL'}`);
     
     this._dispatchNotification('ORDER_STATUS_CHANGED', {
       title: '📦 Order Status Updated',
       message: `Order #${data.orderNumber} is now ${data.newStatus}`,
-      data: data
+      data: data,
+      companyId: data.companyId
     });
     
     if (typeof window !== 'undefined') {
@@ -1429,19 +3301,20 @@ class SocketIOClient {
   }
 
   _handleLowStockAlert(data) {
-    this._log(`⚠️ Low stock alert: ${data.product?.productName}`);
+    this._log(`⚠️ Low stock alert: ${data.product?.productName} for company: ${data.companyId || 'ALL'}`);
     
     this._dispatchNotification('LOW_STOCK_ALERT', {
       title: '📦 Low Stock Alert',
       message: `${data.product?.productName} is running low (${data.product?.stock} left)`,
-      data: data.product
+      data: data.product,
+      companyId: data.companyId
     });
     
     this._dispatchCustomEvent('LOW_STOCK_ALERT', data);
   }
 
   _handleDashboardUpdate(data) {
-    this._log(`📊 Dashboard update: ${data.type}`);
+    this._log(`📊 Dashboard update: ${data.type} for company: ${data.companyId || 'ALL'}`);
     this._dispatchCustomEvent('DASHBOARD_UPDATE', data);
   }
 
@@ -1466,6 +3339,7 @@ class SocketIOClient {
           type,
           data,
           source: 'socketio',
+          companyId: this.companyId,
           timestamp: new Date().toISOString()
         })
       });
@@ -1512,14 +3386,16 @@ class SocketIOClient {
   }
 
   _scheduleReconnect() {
-    if (this.reconnectTimer || this.state === 'connected') return;
+    if (this.reconnectTimer || this.state === 'connected' || !this.autoReconnect) return;
     
     this.stats.reconnectionAttempts++;
     const delay = Math.min(1000 * Math.pow(1.5, this.stats.reconnectionAttempts), 30000);
     
+    this._log(`Scheduling reconnect in ${delay}ms (attempt ${this.stats.reconnectionAttempts})`);
+    
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      if (this.userId) {
+      if (this.userId && this.autoReconnect) {
         this._log('Attempting reconnection...');
         this.connect(this.userData);
       }
@@ -1559,7 +3435,8 @@ class SocketIOClient {
       userAgent: navigator.userAgent,
       platform: navigator.platform,
       language: navigator.language,
-      screenSize: `${window.screen.width}x${window.screen.height}`
+      screenSize: `${window.screen.width}x${window.screen.height}`,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
     };
   }
 
@@ -1573,6 +3450,11 @@ class SocketIOClient {
           this.registerFCMToken(tokenData.token);
         }
       });
+      
+      // Clear after registering
+      if (pendingTokens.length > 0) {
+        localStorage.removeItem('pending_fcm_tokens');
+      }
     } catch (error) {
       this._logError('Error registering pending tokens:', error);
     }
@@ -1587,7 +3469,7 @@ class SocketIOClient {
       
       this.stateListeners.forEach(listener => {
         try {
-          listener(newState);
+          listener(newState, oldState);
         } catch (error) {}
       });
     }
@@ -1596,7 +3478,12 @@ class SocketIOClient {
   _notifyConnectionChange(connected) {
     this.connectionListeners.forEach(listener => {
       try {
-        listener(connected);
+        listener(connected, {
+          userId: this.userId,
+          userRole: this.userRole,
+          companyId: this.companyId,
+          socketId: this.socket?.id
+        });
       } catch (error) {}
     });
   }
@@ -1644,14 +3531,13 @@ class SocketIOClient {
 
   _log(message, data = null) {
     if (!CONFIG.DEBUG) return;
-    console.log(`${CONFIG.LOG_PREFIX} ${message}`);
-    if (data) console.log(`${CONFIG.LOG_PREFIX} Data:`, data);
+    console.log(`${CONFIG.LOG_PREFIX} ${message}`, data ? data : '');
   }
 
   _logError(message, error = null) {
     if (CONFIG.DEBUG) {
       const errorMessage = error?.message || error?.toString() || error;
-      console.log(`${CONFIG.LOG_PREFIX} ❌ ${message} ${errorMessage ? `- ${errorMessage}` : ''}`);
+      console.error(`${CONFIG.LOG_PREFIX} ❌ ${message}`, errorMessage ? errorMessage : '');
     }
   }
 
@@ -1665,11 +3551,29 @@ class SocketIOClient {
       connectionId: this.connectionId,
       userId: this.userId,
       userRole: this.userRole,
+      companyId: this.companyId,
       socketId: this.socket?.id,
       stats: {
         ...this.stats,
         queueSize: this.messageQueue.length
       }
+    };
+  }
+
+  /**
+   * Get connection info for debugging
+   */
+  getConnectionInfo() {
+    return {
+      url: `${CONFIG.SERVER_URL}${CONFIG.NAMESPACE}`,
+      state: this.state,
+      socketId: this.socket?.id,
+      userId: this.userId,
+      companyId: this.companyId,
+      isAuthenticated: this.isAuthenticated,
+      transport: this.socket?.io?.engine?.transport?.name || 'unknown',
+      reconnectionAttempts: this.stats.reconnectionAttempts,
+      queueSize: this.messageQueue.length
     };
   }
 
@@ -1684,6 +3588,8 @@ class SocketIOClient {
     if (this.socket) {
       this.socket.on(eventName, callback);
     }
+    
+    return this; // For chaining
   }
 
   off(eventName, callback) {
@@ -1698,18 +3604,41 @@ class SocketIOClient {
     if (this.socket) {
       this.socket.off(eventName, callback);
     }
+    
+    return this; // For chaining
+  }
+
+  /**
+   * Remove all listeners for an event
+   */
+  removeAllListeners(eventName) {
+    if (eventName) {
+      this.eventListeners.delete(eventName);
+      if (this.socket) {
+        this.socket.removeAllListeners(eventName);
+      }
+    } else {
+      this.eventListeners.clear();
+      if (this.socket) {
+        this.socket.removeAllListeners();
+      }
+    }
+    
+    return this;
   }
 
   addConnectionListener(callback) {
     if (!this.connectionListeners.includes(callback)) {
       this.connectionListeners.push(callback);
     }
+    return this;
   }
 
   addStateListener(callback) {
     if (!this.stateListeners.includes(callback)) {
       this.stateListeners.push(callback);
     }
+    return this;
   }
 
   /**
@@ -1730,15 +3659,39 @@ class SocketIOClient {
         }
       }, 5000);
       
-      this.socket.emit(EventTypes.PING, { timestamp: pingTime, test: true });
+      this.socket.emit(EventTypes.PING, { 
+        timestamp: pingTime, 
+        test: true,
+        companyId: this.companyId
+      });
       
       this.socket.once(EventTypes.PONG, (data) => {
         responded = true;
         clearTimeout(timeout);
         const latency = Date.now() - pingTime;
-        resolve({ success: true, latency });
+        resolve({ success: true, latency, data });
       });
     });
+  }
+
+  /**
+   * Force reconnect
+   */
+  reconnect() {
+    this._log('Manual reconnect requested');
+    this.disconnect('Manual reconnect');
+    setTimeout(() => {
+      this.connect(this.userData);
+    }, 1000);
+  }
+
+  /**
+   * Set auto-reconnect behavior
+   */
+  setAutoReconnect(enabled) {
+    this.autoReconnect = enabled;
+    this._log(`Auto-reconnect ${enabled ? 'enabled' : 'disabled'}`);
+    return this;
   }
 }
 
@@ -1753,6 +3706,14 @@ export function getSocketIOClient() {
       window.addEventListener('beforeunload', () => {
         if (instance) {
           instance.disconnect('Page unload');
+        }
+      });
+      
+      // Reconnect on online event
+      window.addEventListener('online', () => {
+        if (instance && instance.userId && instance.autoReconnect) {
+          instance._log('Network online - reconnecting');
+          instance.connect(instance.userData);
         }
       });
     }

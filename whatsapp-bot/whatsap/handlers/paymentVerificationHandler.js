@@ -4075,10 +4075,9 @@
 
 
 
-
-
-// handlers/paymentVerificationHandler.js - PROFESSIONAL 3-OCR VERSION
+// handlers/paymentVerificationHandler.js - PROFESSIONAL MULTI-TENANT 3-OCR VERSION
 // Industry standard: Supports UPI, QR codes, Phone numbers, and Screenshots with 3 OCR engines
+// COMPLETE with company isolation and proper customer identification
 
 import apiService from "../../services/apiService.js";
 import notificationManager from "../../services/notifications/notification-manager.js";
@@ -4086,13 +4085,16 @@ import pkg from 'whatsapp-web.js';
 import crypto from 'crypto';
 import CompanyConfig from '../../shared/companyConfig.js';
 import invoiceGenerator from './invoiceGenerator.js';
+import getCompanyMapper from '../../services/companyMapper.js';
+//import getSessionManager from '../sessionManager.js';
 
 // Import our professional OCR engines
-// ✅ CORRECT - CommonJS require
-import ocrEngine from'../../services/ocrEngine.js';
+import ocrEngine from '../../services/ocrEngine.js';
 import qrProcessor from '../../services/qrProcessor.js';
 
 const { MessageMedia } = pkg;
+const companyMapper = getCompanyMapper();
+//const sessionManager = getSessionManager();
 
 // ==================== CONFIGURATION ====================
 
@@ -4113,7 +4115,7 @@ const VALIDATION_CONFIG = {
 
 // ==================== CACHE MANAGEMENT ====================
 
-// Track verification state
+// Track verification state per user
 const verificationState = new Map();
 const userOrderState = new Map();
 
@@ -4129,55 +4131,58 @@ const companyUpiCache = new Map();
 // ==================== HELPER FUNCTIONS ====================
 
 /**
+ * Extract clean phone number from WhatsApp message
+ */
+function extractCustomerPhone(message) {
+    if (!message || !message.from) return 'Unknown';
+    
+    try {
+        const fullId = message.from;
+        const numberPart = fullId.split('@')[0];
+        const digitsOnly = numberPart.replace(/\D/g, '');
+        
+        console.log(`📞 [Phone Extraction] Original: ${fullId}, Digits: ${digitsOnly}`);
+        
+        // Malawi country code (265) followed by Indian number
+        if (digitsOnly.length === 13 && digitsOnly.startsWith('265')) {
+            const indianNumber = digitsOnly.substring(3);
+            console.log(`📱 Malawi format → Indian: ${indianNumber}`);
+            return indianNumber;
+        }
+        
+        // Indian format with country code
+        if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
+            const customerPhone = digitsOnly.substring(2);
+            console.log(`📱 Indian format → Customer: ${customerPhone}`);
+            return customerPhone;
+        }
+        
+        // Direct 10-digit number
+        if (digitsOnly.length === 10) {
+            console.log(`📱 Direct 10-digit → Customer: ${digitsOnly}`);
+            return digitsOnly;
+        }
+        
+        // Other country codes - take last 10 digits
+        if (digitsOnly.length > 10) {
+            const last10 = digitsOnly.slice(-10);
+            console.log(`📱 Foreign format → Last 10 digits: ${last10}`);
+            return last10;
+        }
+        
+        return digitsOnly || 'Unknown';
+        
+    } catch (error) {
+        console.error('❌ [Phone Extraction] Error:', error);
+        return 'Unknown';
+    }
+}
+
+/**
  * Generate hash from image data for duplicate detection
  */
 function generateImageHash(imageData) {
     return crypto.createHash('md5').update(imageData.substring(0, 1000)).digest('hex');
-}
-
-/**
- * Enhanced phone number cleaning for WhatsApp IDs
- */
-function cleanPhoneNumber(phoneNumber) {
-    if (!phoneNumber) return '';
-    
-    // Handle WhatsApp ID format (number@lid)
-    if (phoneNumber.includes('@')) {
-        const numberPart = phoneNumber.split('@')[0];
-        const digits = numberPart.replace(/\D/g, '');
-        
-        // Check for country codes
-        if (digits.startsWith('265') && digits.length === 13) {
-            return digits.slice(-10);
-        }
-        else if (digits.startsWith('91') && digits.length === 12) {
-            return digits.substring(2);
-        }
-        else if (digits.length === 10) {
-            return digits;
-        }
-        else if (digits.length > 10) {
-            return digits.slice(-10);
-        }
-    }
-    
-    // Handle raw number strings
-    const cleaned = phoneNumber.replace(/\D/g, '');
-    
-    if (cleaned.length === 12 && cleaned.startsWith('91')) {
-        return cleaned.substring(2);
-    }
-    else if (cleaned.length === 10) {
-        return cleaned;
-    }
-    else if (cleaned.length > 10) {
-        if (cleaned.startsWith('265') && cleaned.length === 13) {
-            return cleaned.slice(-10);
-        }
-        return cleaned.slice(-10);
-    }
-    
-    return cleaned;
 }
 
 /**
@@ -4209,6 +4214,21 @@ async function getCompanyUpiIds(companyId) {
 }
 
 /**
+ * Get company ID from customer phone using company mapper
+ */
+async function getCompanyIdFromPhone(phone) {
+    try {
+        // Use companyMapper to find which company this customer belongs to
+        // This is based on the WhatsApp number they messaged, not their phone number
+        const companyId = await companyMapper.getCompanyIdByPhone(phone);
+        return companyId;
+    } catch (error) {
+        console.error(`❌ Failed to get company ID for phone ${phone}:`, error);
+        return null;
+    }
+}
+
+/**
  * Validate image quality and format
  */
 function validateImage(media) {
@@ -4236,19 +4256,22 @@ function validateImage(media) {
 // ==================== MAIN HANDLER ====================
 
 /**
- * Main payment verification handler
+ * Main payment verification handler with company context
  */
 export async function handlePaymentVerification(message, client) {
     try {
         const from = message.from;
-        const userPhone = cleanPhoneNumber(from);
+        const userPhone = extractCustomerPhone(message);
         const userMessage = message.body.trim();
         
         console.log(`\n🔍 [PaymentVerification] Request from: ${userPhone} (original: ${from})`);
         console.log(`📝 Message: ${userMessage.substring(0, 100)}`);
 
+        // Get company ID from the number they messaged
+        const companyId = await getCompanyIdFromPhone(from);
+
         // Check for admin commands first
-        if (await handleAdminCommands(message, client, userMessage.toLowerCase())) {
+        if (await handleAdminCommands(message, client, userMessage.toLowerCase(), companyId)) {
             return;
         }
 
@@ -4261,17 +4284,17 @@ export async function handlePaymentVerification(message, client) {
 
         // Handle media (screenshot or QR code)
         if (message.hasMedia) {
-            return await handlePaymentMedia(message, client, userPhone);
+            return await handlePaymentMedia(message, client, userPhone, companyId);
         }
 
         // Handle text-based payment information
         if (userMessage.includes('@') || userMessage.includes('pay') || userMessage.includes('₹') || userMessage.includes('rs')) {
-            return await handleTextPayment(message, client, userPhone, userMessage);
+            return await handleTextPayment(message, client, userPhone, userMessage, companyId);
         }
 
         // Handle help requests
         if (userMessage.toLowerCase() === '!paymenthelp' || userMessage.toLowerCase() === 'payment help') {
-            return await showPaymentInstructions(message, client);
+            return await showPaymentInstructions(message, client, companyId);
         }
 
         // Handle menu or clear commands
@@ -4301,11 +4324,11 @@ export async function handlePaymentVerification(message, client) {
 // ==================== PAYMENT MEDIA HANDLING ====================
 
 /**
- * Handle payment media (screenshot or QR code)
+ * Handle payment media (screenshot or QR code) with company context
  */
-async function handlePaymentMedia(message, client, userPhone) {
+async function handlePaymentMedia(message, client, userPhone, companyId) {
     try {
-        console.log(`📸 Processing media from: ${userPhone}`);
+        console.log(`📸 Processing media from: ${userPhone} for company: ${companyId}`);
 
         // Check if already verified
         const existingState = verificationState.get(userPhone);
@@ -4345,16 +4368,14 @@ async function handlePaymentMedia(message, client, userPhone) {
             return await sendInvalidImageMessage(message, imageValidation.reason);
         }
 
-        // Get company ID from user phone
-        const companyId = await getCompanyIdFromPhone(userPhone);
         if (!companyId) {
             return await sendErrorMessage(message, '❌ Could not identify your company. Please contact support.');
         }
 
-        // Get pending orders
-        const pendingOrders = await getCustomerPendingOrders(userPhone);
+        // Get pending orders for this customer within this company
+        const pendingOrders = await getCustomerPendingOrders(userPhone, companyId);
         
-        console.log(`📦 Found ${pendingOrders.length} orders needing payment verification for ${userPhone}`);
+        console.log(`📦 Found ${pendingOrders.length} orders needing payment verification for ${userPhone} in company ${companyId}`);
 
         if (!pendingOrders || pendingOrders.length === 0) {
             return await sendNoPendingOrdersMessage(message, userPhone);
@@ -4378,7 +4399,8 @@ async function handlePaymentMedia(message, client, userPhone) {
             type: paymentResult.type,
             confidence: paymentResult.confidence,
             decision: paymentResult.decision?.action,
-            extracted: paymentResult.extractedFields
+            extracted: paymentResult.extractedFields,
+            companyId
         });
 
         // Handle based on result
@@ -4438,14 +4460,12 @@ async function handlePaymentMedia(message, client, userPhone) {
 }
 
 /**
- * Handle text-based payment information
+ * Handle text-based payment information with company context
  */
-async function handleTextPayment(message, client, userPhone, text) {
+async function handleTextPayment(message, client, userPhone, text, companyId) {
     try {
-        console.log(`📝 Processing text payment from: ${userPhone}`);
+        console.log(`📝 Processing text payment from: ${userPhone} for company: ${companyId}`);
 
-        // Get company ID
-        const companyId = await getCompanyIdFromPhone(userPhone);
         if (!companyId) {
             return await sendErrorMessage(message, '❌ Could not identify your company. Please contact support.');
         }
@@ -4488,13 +4508,13 @@ async function handleTextPayment(message, client, userPhone, text) {
 // ==================== ORDER MANAGEMENT ====================
 
 /**
- * Get customer pending orders
+ * Get customer pending orders with company filter
  */
-async function getCustomerPendingOrders(customerPhone) {
+async function getCustomerPendingOrders(customerPhone, companyId) {
     try {
-        console.log(`📞 Fetching orders for customer: ${customerPhone}`);
+        console.log(`📞 Fetching orders for customer: ${customerPhone} in company: ${companyId}`);
         
-        const allOrders = await apiService.getCustomerOrders(customerPhone);
+        const allOrders = await apiService.getCustomerOrders(customerPhone, companyId);
         
         if (!allOrders || allOrders.length === 0) {
             return [];
@@ -4520,16 +4540,6 @@ async function getCustomerPendingOrders(customerPhone) {
     }
 }
 
-/**
- * Get company ID from customer phone (implement with your logic)
- */
-async function getCompanyIdFromPhone(phone) {
-    // TODO: Implement your company identification logic
-    // This could be based on the WhatsApp number the customer is messaging
-    // For now, return a default or lookup from database
-    return 'default_company_id';
-}
-
 // ==================== VERIFICATION PROCESSING ====================
 
 /**
@@ -4548,8 +4558,8 @@ async function processSuccessfulVerification(
 ) {
     try {
         if (!order) {
-            // Try to find matching order by amount
-            const pendingOrders = await getCustomerPendingOrders(customerPhone);
+            // Try to find matching order by amount within company
+            const pendingOrders = await getCustomerPendingOrders(customerPhone, companyId);
             order = pendingOrders.find(o => 
                 Math.abs(o.totalPrice - verificationResult.extractedFields?.amount) <= VALIDATION_CONFIG.amountTolerance
             );
@@ -4561,7 +4571,7 @@ async function processSuccessfulVerification(
 
         const productNames = order.items?.map(item => item.productName).join(', ') || 'Product';
         
-        console.log(`✅ Processing successful verification for order: ${order.orderNumber}`);
+        console.log(`✅ Processing successful verification for order: ${order.orderNumber} in company: ${companyId}`);
 
         // Create payment verification record with ALL data
         const paymentVerification = await apiService.createPaymentVerification({
@@ -4663,17 +4673,18 @@ async function processSuccessfulVerification(
             timestamp: Date.now(),
             verificationId: paymentVerification._id,
             confidence: verificationResult.confidence,
-            engine: verificationResult.engineUsed || verificationResult.type
+            engine: verificationResult.engineUsed || verificationResult.type,
+            companyId: companyId
         });
 
         // Send success messages
         await sendSuccessMessages(order, verificationResult, originalMessage, productNames);
 
         // Send notification to admin
-        await sendAdminNotification(order, customerPhone, verificationResult.confidence);
+        await sendAdminNotification(order, customerPhone, verificationResult.confidence, companyId);
 
         // Generate and send invoice
-        await generateAndSendInvoice(order, originalMessage);
+        await generateAndSendInvoice(order, originalMessage, companyId);
 
         console.log(`🎉 Payment verification completed successfully for ${productNames}`);
 
@@ -4766,7 +4777,7 @@ async function sendSuccessMessages(order, verificationResult, message, productNa
     await message.reply(successMessage);
 }
 
-async function sendAdminNotification(order, customerPhone, confidence) {
+async function sendAdminNotification(order, customerPhone, confidence, companyId) {
     try {
         await notificationManager.sendNotification('PAYMENT_VERIFIED', {
             title: '✅ Payment Verified',
@@ -4778,7 +4789,8 @@ async function sendAdminNotification(order, customerPhone, confidence) {
                 amount: order.totalPrice,
                 product: order.items?.[0]?.productName,
                 confidence: confidence,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                companyId: companyId
             }
         });
     } catch (error) {
@@ -4786,12 +4798,12 @@ async function sendAdminNotification(order, customerPhone, confidence) {
     }
 }
 
-async function generateAndSendInvoice(order, message) {
+async function generateAndSendInvoice(order, message, companyId) {
     try {
-        console.log(`📄 Generating invoice for order: ${order.orderNumber}`);
+        console.log(`📄 Generating invoice for order: ${order.orderNumber} in company: ${companyId}`);
         
         try {
-            const pdfBuffer = await invoiceGenerator.generateInvoicePDF(order);
+            const pdfBuffer = await invoiceGenerator.generateInvoicePDF(order, companyId);
             
             const media = new MessageMedia(
                 'application/pdf',
@@ -4907,9 +4919,8 @@ async function sendInvalidImageMessage(message, reason) {
     );
 }
 
-async function showPaymentInstructions(message, client) {
+async function showPaymentInstructions(message, client, companyId) {
     // Get company UPI IDs for display
-    const companyId = await getCompanyIdFromPhone(message.from);
     const upiIds = await getCompanyUpiIds(companyId);
     const primaryUpi = upiIds.length > 0 ? upiIds[0] : 'your-company@okaxis';
 
@@ -4960,30 +4971,30 @@ async function showVerificationHelp(message, client) {
 
 // ==================== ADMIN COMMANDS ====================
 
-async function handleAdminCommands(message, client, userMessage) {
+async function handleAdminCommands(message, client, userMessage, companyId) {
     try {
         if (userMessage.startsWith('!verify ')) {
-            await verifyPaymentCommand(message, client);
+            await verifyPaymentCommand(message, client, companyId);
             return true;
         }
         else if (userMessage.startsWith('!reject ')) {
-            await rejectPaymentCommand(message, client);
+            await rejectPaymentCommand(message, client, companyId);
             return true;
         }
         else if (userMessage.startsWith('!pending')) {
-            await showPendingVerifications(message, client);
+            await showPendingVerifications(message, client, companyId);
             return true;
         }
         else if (userMessage.startsWith('!invoice ')) {
-            await generateInvoiceCommand(message, client);
+            await generateInvoiceCommand(message, client, companyId);
             return true;
         }
         else if (userMessage.startsWith('!fraud ')) {
-            await markAsFraudCommand(message, client);
+            await markAsFraudCommand(message, client, companyId);
             return true;
         }
         else if (userMessage === '!stats') {
-            await showVerificationStats(message, client);
+            await showVerificationStats(message, client, companyId);
             return true;
         }
         
@@ -4995,7 +5006,7 @@ async function handleAdminCommands(message, client, userMessage) {
     }
 }
 
-async function verifyPaymentCommand(message, client) {
+async function verifyPaymentCommand(message, client, companyId) {
     try {
         const parts = message.body.split(' ');
         if (parts.length < 2) {
@@ -5003,10 +5014,10 @@ async function verifyPaymentCommand(message, client) {
         }
 
         const orderNumber = parts[1];
-        const verification = await apiService.getPaymentVerificationByOrderNumber(orderNumber);
+        const verification = await apiService.getPaymentVerificationByOrderNumber(orderNumber, companyId);
         
         if (!verification) {
-            return await message.reply(`❌ No payment verification found for order: ${orderNumber}`);
+            return await message.reply(`❌ No payment verification found for order: ${orderNumber} in this company`);
         }
 
         await apiService.updatePaymentVerificationStatus(verification._id, {
@@ -5031,7 +5042,7 @@ async function verifyPaymentCommand(message, client) {
     }
 }
 
-async function rejectPaymentCommand(message, client) {
+async function rejectPaymentCommand(message, client, companyId) {
     try {
         const parts = message.body.split(' ');
         if (parts.length < 3) {
@@ -5040,10 +5051,10 @@ async function rejectPaymentCommand(message, client) {
 
         const orderNumber = parts[1];
         const reason = parts.slice(2).join(' ');
-        const verification = await apiService.getPaymentVerificationByOrderNumber(orderNumber);
+        const verification = await apiService.getPaymentVerificationByOrderNumber(orderNumber, companyId);
         
         if (!verification) {
-            return await message.reply(`❌ No payment verification found for order: ${orderNumber}`);
+            return await message.reply(`❌ No payment verification found for order: ${orderNumber} in this company`);
         }
 
         await apiService.rejectPaymentVerification(verification._id, reason, 'admin');
@@ -5056,7 +5067,7 @@ async function rejectPaymentCommand(message, client) {
     }
 }
 
-async function markAsFraudCommand(message, client) {
+async function markAsFraudCommand(message, client, companyId) {
     try {
         const parts = message.body.split(' ');
         if (parts.length < 3) {
@@ -5065,10 +5076,10 @@ async function markAsFraudCommand(message, client) {
 
         const orderNumber = parts[1];
         const reasons = parts.slice(2).join(' ');
-        const verification = await apiService.getPaymentVerificationByOrderNumber(orderNumber);
+        const verification = await apiService.getPaymentVerificationByOrderNumber(orderNumber, companyId);
         
         if (!verification) {
-            return await message.reply(`❌ No payment verification found for order: ${orderNumber}`);
+            return await message.reply(`❌ No payment verification found for order: ${orderNumber} in this company`);
         }
 
         await apiService.markPaymentAsFraud(verification._id, reasons.split(',').map(r => r.trim()), 'admin');
@@ -5081,12 +5092,12 @@ async function markAsFraudCommand(message, client) {
     }
 }
 
-async function showPendingVerifications(message, client) {
+async function showPendingVerifications(message, client, companyId) {
     try {
-        const pendingVerifications = await apiService.getPendingPaymentVerifications();
+        const pendingVerifications = await apiService.getPendingPaymentVerifications(companyId);
         
         if (pendingVerifications.length === 0) {
-            return await message.reply('✅ No pending payment verifications.');
+            return await message.reply('✅ No pending payment verifications for this company.');
         }
 
         let response = `📋 *PENDING PAYMENTS (${pendingVerifications.length})*\n\n`;
@@ -5111,7 +5122,7 @@ async function showPendingVerifications(message, client) {
     }
 }
 
-async function generateInvoiceCommand(message, client) {
+async function generateInvoiceCommand(message, client, companyId) {
     try {
         const parts = message.body.split(' ');
         if (parts.length < 2) {
@@ -5119,13 +5130,13 @@ async function generateInvoiceCommand(message, client) {
         }
 
         const orderNumber = parts[1];
-        const order = await apiService.getOrderByNumber(orderNumber);
+        const order = await apiService.getOrderByNumber(orderNumber, companyId);
         
         if (!order) {
-            return await message.reply(`❌ No order found with number: ${orderNumber}`);
+            return await message.reply(`❌ No order found with number: ${orderNumber} in this company`);
         }
 
-        await generateAndSendInvoice(order, message);
+        await generateAndSendInvoice(order, message, companyId);
 
     } catch (error) {
         console.error('Invoice command error:', error);
@@ -5133,9 +5144,9 @@ async function generateInvoiceCommand(message, client) {
     }
 }
 
-async function showVerificationStats(message, client) {
+async function showVerificationStats(message, client, companyId) {
     try {
-        const stats = await apiService.getPaymentVerificationStats('week');
+        const stats = await apiService.getPaymentVerificationStats('week', companyId);
         const engineStats = await ocrEngine.getStats?.() || {};
         
         const response = 

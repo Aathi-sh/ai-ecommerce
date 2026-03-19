@@ -705,6 +705,21 @@ const publicPaths = [
   '/company-inactive', // New page for inactive company
   '/company-suspended', // New page for suspended company
   '/subscription-expired', // New page for expired subscription
+
+
+  '/api/companies/with-whatsapp',
+  '/api/companies/by-whatsapp',
+  '/api/companies/session',
+  '/api/companies/session/(.*)',
+  '/api/company-settings',
+  '/api/company-settings/(.*)',
+  '/api/whatsapp/status',
+  '/api/whatsapp/qr',
+  '/api/whatsapp/stats',
+  '/api/health',
+  '/api/websocket-status',
+  '/api/company-settings/active',
+  '/api/company-settings/payment-methods',
 ];
 
 // Admin paths (accessible by super_admin and company_admin)

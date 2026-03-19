@@ -322,13 +322,12 @@
 
 
 
-
 // models/Order.js
 import mongoose from "mongoose";
 
 const OrderSchema = new mongoose.Schema(
   {
-    // ===== COMPANY CONTEXT (NEW) =====
+    // ===== COMPANY CONTEXT =====
     companyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Company',
@@ -336,22 +335,22 @@ const OrderSchema = new mongoose.Schema(
       index: true,
     },
     
-    // ===== AUDIT TRAIL FIELDS (UPDATED) =====
+    // ===== AUDIT TRAIL FIELDS - FIXED (removed ref: 'User') =====
     createdBy: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'User', 
-      required: [true, "Created by user is required"] 
+      type: String,  // Will store WhatsApp ID
+      required: [true, "Created by is required"],
+      index: true
     },
     updatedBy: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'User' 
+      type: String,  // Will store WhatsApp ID
+      index: true
     },
-    deletedBy: { // NEW
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'User' 
+    deletedBy: { 
+      type: String,  // Will store WhatsApp ID
+      index: true
     },
     
-    // ===== SOFT DELETE (NEW) =====
+    // ===== SOFT DELETE =====
     deletedAt: {
       type: Date,
       index: true,
@@ -445,7 +444,7 @@ const OrderSchema = new mongoose.Schema(
           type: Number,
           required: true,
         },
-        // Track inventory at time of order (NEW)
+        // Track inventory at time of order
         inventorySnapshot: {
           type: Number,
           required: true,
@@ -507,19 +506,19 @@ const OrderSchema = new mongoose.Schema(
       sparse: true,
       index: true,
     },
-    paymentDetails: [ // NEW: Track multiple payments
+    paymentDetails: [ // Track multiple payments
       {
         amount: { type: Number, required: true },
         method: { type: String, enum: ["cash", "card", "upi", "bank_transfer", "wallet"] },
         transactionId: String,
         paidAt: { type: Date, default: Date.now },
-        verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        verifiedBy: { type: String }, // ← FIXED: removed ref
         verifiedAt: Date,
         notes: String,
       }
     ],
     
-    // Order status
+    // Order status (updated by admin - keep as is)
     status: {
       type: String,
       enum: [
@@ -545,7 +544,7 @@ const OrderSchema = new mongoose.Schema(
           default: Date.now,
         },
         comment: String,
-        updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        updatedBy: { type: String, index: true }, // ← Already fixed
       },
     ],
     
@@ -596,15 +595,15 @@ const OrderSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    invoiceGeneratedAt: Date, // NEW
+    invoiceGeneratedAt: Date,
     gstType: {
       type: String,
       enum: ["intra-state", "inter-state"],
       required: true,
     },
-    placeOfSupply: String, // NEW: For interstate GST
+    placeOfSupply: String,
     
-    // WhatsApp bot tracking (NEW)
+    // WhatsApp bot tracking
     source: {
       type: String,
       enum: ["whatsapp", "admin", "website", "api"],
@@ -621,9 +620,9 @@ const OrderSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    refundDetails: { // NEW
+    refundDetails: {
       refundedAt: Date,
-      refundedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      refundedBy: { type: String }, // ← FIXED: removed ref
       refundMethod: String,
       refundTransactionId: String,
     },
@@ -632,7 +631,7 @@ const OrderSchema = new mongoose.Schema(
     trackingNumber: String,
     courierName: String,
     estimatedDelivery: Date,
-    actualDeliveryDate: Date, // NEW
+    actualDeliveryDate: Date,
     
     // Flags
     isActive: {
@@ -640,11 +639,11 @@ const OrderSchema = new mongoose.Schema(
       default: true,
       index: true,
     },
-    isUrgent: { // NEW
+    isUrgent: {
       type: Boolean,
       default: false,
     },
-    isWhatsappOrder: { // NEW
+    isWhatsappOrder: {
       type: Boolean,
       default: true,
     },
@@ -656,7 +655,7 @@ const OrderSchema = new mongoose.Schema(
   }
 );
 
-// ========== COMPOUND INDEXES FOR COMPANY ISOLATION (NEW) ==========
+// ========== COMPOUND INDEXES FOR COMPANY ISOLATION ==========
 OrderSchema.index({ companyId: 1, orderNumber: 1 }, { unique: true, name: 'company_orderNumber_idx' });
 OrderSchema.index({ companyId: 1, invoiceNumber: 1 }, { sparse: true, name: 'company_invoiceNumber_idx' });
 OrderSchema.index({ companyId: 1, customerName: 1 }, { name: 'company_customerName_idx' });
@@ -685,12 +684,11 @@ OrderSchema.index({
   }
 });
 
-// ========== VIRTUALS (NEW) ==========
+// ========== VIRTUALS ==========
 
 // Virtual for formatted order number
 OrderSchema.virtual('formattedOrderNumber').get(function() {
   if (!this.orderNumber) return '';
-  // Format as ORD-YYYYMMDD-XXXX
   return this.orderNumber;
 });
 
@@ -710,7 +708,7 @@ OrderSchema.virtual('paymentPercentage').get(function() {
   return Math.round((this.paidAmount / this.totalPrice) * 100);
 });
 
-// Virtual for isOverdue (if delivery date passed and not delivered)
+// Virtual for isOverdue
 OrderSchema.virtual('isOverdue').get(function() {
   if (!this.deliveryDate) return false;
   if (this.status === 'delivered' || this.status === 'cancelled') return false;
@@ -743,7 +741,7 @@ OrderSchema.virtual('companyContext').get(function() {
   };
 });
 
-// ========== PRE-SAVE MIDDLEWARE (UPDATED) ==========
+// ========== PRE-SAVE MIDDLEWARE ==========
 OrderSchema.pre('save', async function(next) {
   try {
     // Validate companyId exists
@@ -788,7 +786,7 @@ OrderSchema.pre('save', async function(next) {
         
         item.inventorySnapshot = product ? product.stock : 0;
         
-        // Update inventory (you might want to do this in a separate service)
+        // Update inventory
         if (product && product.trackInventory) {
           await Product.updateOne(
             { _id: item.productId, companyId: this.companyId },
@@ -855,15 +853,12 @@ OrderSchema.post('save', function(doc) {
   console.log(`✅ Order saved: ${doc.orderNumber} for company: ${doc.companyId}`);
 });
 
-// ========== STATIC METHODS (NEW) ==========
+// ========== STATIC METHODS ==========
 
 // Find orders by company
 OrderSchema.statics.findByCompany = function(companyId, filters = {}) {
   const query = { companyId, deletedAt: null, ...filters };
-  return this.find(query)
-    .populate('createdBy', 'fullName email')
-    .populate('updatedBy', 'fullName email')
-    .sort({ createdAt: -1 });
+  return this.find(query).sort({ createdAt: -1 });
 };
 
 // Find order by order number within company
@@ -965,7 +960,7 @@ OrderSchema.statics.getTodaysOrders = function(companyId) {
   }).sort({ createdAt: -1 });
 };
 
-// ========== INSTANCE METHODS (NEW) ==========
+// ========== INSTANCE METHODS ==========
 
 // Check if order belongs to company
 OrderSchema.methods.belongsToCompany = function(companyId) {
@@ -1019,7 +1014,7 @@ OrderSchema.methods.cancel = async function(reason, cancelledBy) {
   this.cancellationReason = reason;
   
   // Restore inventory if needed
-  if (this.isNew === false) { // Only if order was already saved
+  if (this.isNew === false) {
     const Product = mongoose.model('Product');
     for (let item of this.items) {
       await Product.updateOne(

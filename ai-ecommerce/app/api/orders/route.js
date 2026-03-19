@@ -2095,25 +2095,25 @@ export async function POST(request) {
       .populate("createdBy", "fullName email")
       .lean();
 
-    // Generate invoice number
-    if (!populatedOrder.invoiceNumber) {
-      const invoiceDate = new Date();
-      const invoiceYear = invoiceDate.getFullYear();
-      const invoiceMonth = (invoiceDate.getMonth() + 1).toString().padStart(2, '0');
-      const invoiceSequence = await Order.countDocuments({ 
-        companyId,
-        invoiceNumber: { $regex: `^INV-${invoiceYear}${invoiceMonth}` }
-      }) + 1;
+    // // Generate invoice number
+    // if (!populatedOrder.invoiceNumber) {
+    //   const invoiceDate = new Date();
+    //   const invoiceYear = invoiceDate.getFullYear();
+    //   const invoiceMonth = (invoiceDate.getMonth() + 1).toString().padStart(2, '0');
+    //   const invoiceSequence = await Order.countDocuments({ 
+    //     companyId,
+    //     invoiceNumber: { $regex: `^INV-${invoiceYear}${invoiceMonth}` }
+    //   }) + 1;
       
-      populatedOrder.invoiceNumber = `INV-${invoiceYear}${invoiceMonth}-${invoiceSequence.toString().padStart(4, '0')}`;
+    //   populatedOrder.invoiceNumber = `INV-${invoiceYear}${invoiceMonth}-${invoiceSequence.toString().padStart(4, '0')}`;
       
-      // Update the order with invoice number
-      await Order.findByIdAndUpdate(order._id, {
-        invoiceNumber: populatedOrder.invoiceNumber,
-        invoiceGenerated: true,
-        invoiceGeneratedAt: new Date()
-      });
-    }
+    //   // Update the order with invoice number
+    //   await Order.findByIdAndUpdate(order._id, {
+    //     invoiceNumber: populatedOrder.invoiceNumber,
+    //     invoiceGenerated: true,
+    //     invoiceGeneratedAt: new Date()
+    //   });
+    // }
 
     return NextResponse.json(
       { 

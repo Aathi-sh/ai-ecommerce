@@ -1,58 +1,20 @@
-// // handlers/invoiceGenerator.js - ENHANCED PROFESSIONAL VERSION
+
+
+// // handlers/invoiceGenerator.js - ENHANCED PROFESSIONAL VERSION WITH API INTEGRATION
 // import PDFDocument from 'pdfkit';
 // import fs from 'fs';
 // import path from 'path';
 // import { fileURLToPath } from 'url';
+// import CompanyConfig from '../../shared/companyConfig.js';
 
 // const __filename = fileURLToPath(import.meta.url);
 // const __dirname = path.dirname(__filename);
 
 // class InvoiceGenerator {
 //   constructor() {
-//     this.companyInfo = {
-//       name: "PosterPro Store",
-//       legalName: "PosterPro Entertainment Private Limited",
-//       tagline: "Premium Posters & Art Prints",
-//       address: "123 Business Street, Andheri East",
-//       city: "Mumbai, Maharashtra 400001",
-//       phone: "+91 98765 43210",
-//       email: "support@posterpro.store",
-//       website: "www.posterpro.store",
-//       gstin: "27ABCDE1234F1Z5",
-//       pan: "ABCDE1234F",
-//       cin: "U12345MH2023PTC123456", // Company Identification Number
-//       bank: {
-//         name: "State Bank of India",
-//         account: "12345678901",
-//         ifsc: "SBIN0001234",
-//         branch: "Andheri East Branch",
-//         accountType: "Current Account"
-//       },
-//       support: {
-//         email: "care@posterpro.store",
-//         phone: "+91 98765 43210",
-//         hours: "Mon-Sat, 10:00 AM - 7:00 PM"
-//       },
-//       logo: null, // Add path to logo if available
-//       signature: null, // Add path to signature if available
-//       stamp: null // Add path to stamp if available
-//     };
-
-//     this.invoiceSettings = {
-//       prefix: "INV",
-//       separator: "-",
-//       dateFormat: "dd/mm/yyyy",
-//       currency: "₹",
-//       taxSystem: "GST",
-//       gstBreakdown: true,
-//       showCGSTSGST: true,
-//       roundAmount: true,
-//       paymentTerms: "Due on receipt",
-//       deliveryTerms: "3-5 business days after payment confirmation",
-//       warrantyTerms: "7 days replacement for manufacturing defects",
-//       refundPolicy: "No refunds after order processing"
-//     };
-
+//     // Initialize with empty data - will be populated from API
+//     this.companyInfo = {};
+//     this.invoiceSettings = {};
 //     this.colors = {
 //       primary: '#2c3e50',
 //       secondary: '#34495e',
@@ -68,9 +30,138 @@
 //       white: '#ffffff',
 //       black: '#000000'
 //     };
+    
+//     // Initialize by fetching settings
+//     this.initializeSettings();
+//   }
+
+//   /**
+//    * Initialize settings from API
+//    */
+//   async initializeSettings() {
+//     try {
+//       const settings = await CompanyConfig.getSettings();
+//       const invoiceInfo = await CompanyConfig.getInvoiceInfo();
+      
+//       this.companyInfo = {
+//         name: settings.companyName || 'PosterPro Store',
+//         legalName: settings.legalName || 'PosterPro Entertainment Private Limited',
+//         tagline: settings.tagline || 'Premium Posters & Art Prints',
+//         address: settings.address || '123 Business Street, Andheri East',
+//         city: settings.city || 'Mumbai, Maharashtra 400001',
+//         phone: settings.phone || '+91 98765 43210',
+//         email: settings.email || 'support@posterpro.store',
+//         website: settings.website || 'www.posterpro.store',
+//         gstin: settings.gstin || '27ABCDE1234F1Z5',
+//         pan: settings.pan || 'ABCDE1234F',
+//         cin: settings.cin || 'U12345MH2023PTC123456',
+//         bank: settings.bank || {
+//           name: 'State Bank of India',
+//           account: '12345678901',
+//           ifsc: 'SBIN0001234',
+//           branch: 'Andheri East Branch',
+//           accountType: 'Current Account'
+//         },
+//         support: settings.support || {
+//           email: 'care@posterpro.store',
+//           phone: '+91 98765 43210',
+//           hours: 'Mon-Sat, 10:00 AM - 7:00 PM'
+//         },
+//         logo: settings.logo || null,
+//         signature: settings.signature || null,
+//         stamp: settings.stamp || null
+//       };
+
+//       this.invoiceSettings = settings.invoiceSettings || {
+//         prefix: 'INV',
+//         separator: '-',
+//         dateFormat: 'dd/mm/yyyy',
+//         currency: '₹',
+//         taxSystem: 'GST',
+//         gstBreakdown: true,
+//         showCGSTSGST: true,
+//         roundAmount: true,
+//         paymentTerms: 'Due on receipt',
+//         deliveryTerms: '3-5 business days after payment confirmation',
+//         warrantyTerms: '7 days replacement for manufacturing defects',
+//         refundPolicy: 'No refunds after order processing'
+//       };
+
+//       console.log('✅ [InvoiceGenerator] Settings initialized from API');
+//     } catch (error) {
+//       console.error('❌ [InvoiceGenerator] Failed to initialize settings:', error);
+//       this.setDefaultSettings();
+//     }
+//   }
+
+//   /**
+//    * Set default settings (fallback)
+//    */
+//   setDefaultSettings() {
+//     this.companyInfo = {
+//       name: 'PosterPro Store',
+//       legalName: 'PosterPro Entertainment Private Limited',
+//       tagline: 'Premium Posters & Art Prints',
+//       address: '123 Business Street, Andheri East',
+//       city: 'Mumbai, Maharashtra 400001',
+//       phone: '+91 98765 43210',
+//       email: 'support@posterpro.store',
+//       website: 'www.posterpro.store',
+//       gstin: '27ABCDE1234F1Z5',
+//       pan: 'ABCDE1234F',
+//       cin: 'U12345MH2023PTC123456',
+//       bank: {
+//         name: 'State Bank of India',
+//         account: '12345678901',
+//         ifsc: 'SBIN0001234',
+//         branch: 'Andheri East Branch',
+//         accountType: 'Current Account'
+//       },
+//       support: {
+//         email: 'care@posterpro.store',
+//         phone: '+91 98765 43210',
+//         hours: 'Mon-Sat, 10:00 AM - 7:00 PM'
+//       },
+//       logo: null,
+//       signature: null,
+//       stamp: null
+//     };
+
+//     this.invoiceSettings = {
+//       prefix: 'INV',
+//       separator: '-',
+//       dateFormat: 'dd/mm/yyyy',
+//       currency: '₹',
+//       taxSystem: 'GST',
+//       gstBreakdown: true,
+//       showCGSTSGST: true,
+//       roundAmount: true,
+//       paymentTerms: 'Due on receipt',
+//       deliveryTerms: '3-5 business days after payment confirmation',
+//       warrantyTerms: '7 days replacement for manufacturing defects',
+//       refundPolicy: 'No refunds after order processing'
+//     };
+//   }
+
+//   /**
+//    * Refresh settings from API
+//    */
+//   async refreshSettings() {
+//     try {
+//       await CompanyConfig.forceRefresh();
+//       await this.initializeSettings();
+//       console.log('✅ [InvoiceGenerator] Settings refreshed');
+//     } catch (error) {
+//       console.error('❌ [InvoiceGenerator] Failed to refresh settings:', error);
+//     }
 //   }
 
 //   async generateInvoicePDF(order, paymentVerification = null) {
+//     // Ensure settings are loaded
+//     if (!this.companyInfo.name) {
+//       await this.initializeSettings();
+//     }
+
 //     return new Promise((resolve, reject) => {
 //       try {
 //         const doc = new PDFDocument({ 
@@ -82,8 +173,8 @@
 //             Author: this.companyInfo.name,
 //             Subject: `Tax Invoice for Order ${order.orderNumber}`,
 //             Keywords: 'invoice, tax, gst, order',
-//             Creator: 'PosterPro Invoice System',
-//             Producer: 'PosterPro v1.0'
+//             Creator: `${this.companyInfo.name} Invoice System`,
+//             Producer: `${this.companyInfo.name} v1.0`
 //           }
 //         });
         
@@ -193,7 +284,7 @@
 //       .lineWidth(2)
 //       .strokeColor(this.colors.primary)
 //       .stroke();
-//   }
+//   } //https://jbfq57km-3000.inc1.devtunnels.ms/
 
 //   addInvoiceTitle(doc, order, paymentVerification) {
 //     const invoiceNumber = paymentVerification?.invoiceNumber || 
@@ -365,9 +456,9 @@
 //         .text(itemName, 90, yPosition, { width: 190 })
 //         .text(hsnCode, 290, yPosition)
 //         .text(quantity.toString(), 350, yPosition)
-//         .text(`₹${unitPrice.toFixed(2)}`, 390, yPosition)
-//         .text(discount > 0 ? `-₹${discount.toFixed(0)}` : '-', 450, yPosition)
-//         .text(`₹${amount.toFixed(2)}`, 490, yPosition, { align: 'right' });
+//         .text(`${this.invoiceSettings.currency}${unitPrice.toFixed(2)}`, 390, yPosition)
+//         .text(discount > 0 ? `-${this.invoiceSettings.currency}${discount.toFixed(0)}` : '-', 450, yPosition)
+//         .text(`${this.invoiceSettings.currency}${amount.toFixed(2)}`, 490, yPosition, { align: 'right' });
 
 //       yPosition += 20;
 //       totalAmount += amount;
@@ -408,22 +499,22 @@
 //     // Summary Items
 //     doc.fontSize(8).font('Helvetica');
     
-//     this.addSummaryRow(doc, 'Subtotal:', `₹${subtotal.toFixed(2)}`, 360, currentY);
+//     this.addSummaryRow(doc, 'Subtotal:', `${this.invoiceSettings.currency}${subtotal.toFixed(2)}`, 360, currentY);
 //     currentY += 15;
 
 //     if (totalDiscount > 0) {
-//       this.addSummaryRow(doc, 'Discount:', `-₹${totalDiscount.toFixed(2)}`, 360, currentY, this.colors.success);
+//       this.addSummaryRow(doc, 'Discount:', `-${this.invoiceSettings.currency}${totalDiscount.toFixed(2)}`, 360, currentY, this.colors.success);
 //       currentY += 15;
 //     }
 
 //     if (shippingCharge > 0) {
-//       this.addSummaryRow(doc, 'Shipping:', `₹${shippingCharge.toFixed(2)}`, 360, currentY);
+//       this.addSummaryRow(doc, 'Shipping:', `${this.invoiceSettings.currency}${shippingCharge.toFixed(2)}`, 360, currentY);
 //       currentY += 15;
 //     }
 
 //     // GST Breakdown
 //     if (totalGst > 0) {
-//       this.addSummaryRow(doc, 'GST Total:', `₹${totalGst.toFixed(2)}`, 360, currentY, this.colors.highlight);
+//       this.addSummaryRow(doc, 'GST Total:', `${this.invoiceSettings.currency}${totalGst.toFixed(2)}`, 360, currentY, this.colors.highlight);
 //       currentY += 15;
 
 //       if (order.gstType === 'intra-state' && this.invoiceSettings.showCGSTSGST) {
@@ -432,17 +523,17 @@
 //         doc
 //           .fillColor(this.colors.textLight)
 //           .text('  CGST (9%):', 370, currentY)
-//           .text(`₹${cgst.toFixed(2)}`, 500, currentY, { align: 'right', width: 40 });
+//           .text(`${this.invoiceSettings.currency}${cgst.toFixed(2)}`, 500, currentY, { align: 'right', width: 40 });
 //         currentY += 12;
 //         doc
 //           .text('  SGST (9%):', 370, currentY)
-//           .text(`₹${sgst.toFixed(2)}`, 500, currentY, { align: 'right', width: 40 });
+//           .text(`${this.invoiceSettings.currency}${sgst.toFixed(2)}`, 500, currentY, { align: 'right', width: 40 });
 //         currentY += 12;
 //       } else if (order.gstType === 'inter-state') {
 //         doc
 //           .fillColor(this.colors.textLight)
 //           .text('  IGST (18%):', 370, currentY)
-//           .text(`₹${totalGst.toFixed(2)}`, 500, currentY, { align: 'right', width: 40 });
+//           .text(`${this.invoiceSettings.currency}${totalGst.toFixed(2)}`, 500, currentY, { align: 'right', width: 40 });
 //         currentY += 12;
 //       }
 //     }
@@ -460,7 +551,7 @@
 //       .font('Helvetica-Bold')
 //       .fillColor(this.colors.accent)
 //       .text('GRAND TOTAL:', 360, currentY + 5)
-//       .text(`₹${total.toFixed(2)}`, 500, currentY + 5, { align: 'right' });
+//       .text(`${this.invoiceSettings.currency}${total.toFixed(2)}`, 500, currentY + 5, { align: 'right' });
 
 //     currentY += 20;
 
@@ -476,8 +567,8 @@
 //         .fontSize(8)
 //         .font('Helvetica')
 //         .fillColor(this.colors.warning)
-//         .text(`⏳ Partial Paid: ₹${paidAmount.toFixed(2)}`, 360, currentY)
-//         .text(`Balance Due: ₹${balanceAmount.toFixed(2)}`, 360, currentY + 12);
+//         .text(`⏳ Partial Paid: ${this.invoiceSettings.currency}${paidAmount.toFixed(2)}`, 360, currentY)
+//         .text(`Balance Due: ${this.invoiceSettings.currency}${balanceAmount.toFixed(2)}`, 360, currentY + 12);
 //     }
 
 //     // Payment Verification Details
@@ -521,7 +612,7 @@
 //       .text(`2. ${this.invoiceSettings.warrantyTerms}`, 50, startY + 27, { width: 250 })
 //       .text(`3. ${this.invoiceSettings.refundPolicy}`, 50, startY + 39, { width: 250 })
 //       .text('4. This is a computer generated invoice, no signature required.', 50, startY + 51, { width: 250 })
-//       .text('5. All disputes are subject to Mumbai jurisdiction only.', 50, startY + 63, { width: 250 });
+//       .text(`5. All disputes are subject to ${this.companyInfo.city.split(',')[0] || 'Mumbai'} jurisdiction only.`, 50, startY + 63, { width: 250 });
 
 //     // Support Information
 //     doc
@@ -568,7 +659,7 @@
 //           .fontSize(8)
 //           .font('Helvetica')
 //           .fillColor(this.colors.primary)
-//           .text('For PosterPro Store', 400, startY + 15)
+//           .text(`For ${this.companyInfo.name}`, 400, startY + 15)
 //           .text('(Authorized Signatory)', 400, startY + 30);
 //       }
 //     } else {
@@ -576,7 +667,7 @@
 //         .fontSize(8)
 //         .font('Helvetica')
 //         .fillColor(this.colors.primary)
-//         .text('For PosterPro Store', 400, startY + 15)
+//         .text(`For ${this.companyInfo.name}`, 400, startY + 15)
 //         .text('(Authorized Signatory)', 400, startY + 30);
 //     }
 
@@ -713,12 +804,12 @@
 //               <tr>
 //                 <td>${item.productName}</td>
 //                 <td>${item.quantity}</td>
-//                 <td>₹${item.price}</td>
-//                 <td>₹${item.quantity * item.price}</td>
+//                 <td>${this.invoiceSettings.currency}${item.price}</td>
+//                 <td>${this.invoiceSettings.currency}${item.quantity * item.price}</td>
 //               </tr>
 //             `).join('')}
 //           </table>
-//           <h3 class="total">Total: ₹${total}</h3>
+//           <h3 class="total">Total: ${this.invoiceSettings.currency}${total}</h3>
 //           <div class="footer">
 //             <p>Thank you for shopping with us!</p>
 //             <p>For any queries, contact: ${this.companyInfo.support.email}</p>
@@ -728,12 +819,68 @@
 //       </html>
 //     `;
 //   }
+
+//   /**
+//    * Get current settings status
+//    */
+//   getStatus() {
+//     return {
+//       companyName: this.companyInfo.name,
+//       hasLogo: !!this.companyInfo.logo,
+//       hasSignature: !!this.companyInfo.signature,
+//       hasStamp: !!this.companyInfo.stamp,
+//       invoicePrefix: this.invoiceSettings.prefix,
+//       currency: this.invoiceSettings.currency
+//     };
+//   }
 // }
 
-// export default new InvoiceGenerator();
+// // Create and export a single instance
+// const invoiceGenerator = new InvoiceGenerator();
+
+// // Initialize on creation
+// invoiceGenerator.initializeSettings().catch(console.error);
+
+// export default invoiceGenerator;
 
 
-// handlers/invoiceGenerator.js - ENHANCED PROFESSIONAL VERSION WITH API INTEGRATION
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// handlers/invoiceGenerator.js - PROFESSIONAL MULTI-TENANT VERSION
+// Generates PDF and text invoices with company-specific branding
+
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
@@ -745,7 +892,7 @@ const __dirname = path.dirname(__filename);
 
 class InvoiceGenerator {
   constructor() {
-    // Initialize with empty data - will be populated from API
+    // Initialize with empty data - will be populated from API per company
     this.companyInfo = {};
     this.invoiceSettings = {};
     this.colors = {
@@ -764,17 +911,31 @@ class InvoiceGenerator {
       black: '#000000'
     };
     
-    // Initialize by fetching settings
-    this.initializeSettings();
+    // Company-specific cache
+    this.companyCache = new Map();
   }
 
   /**
-   * Initialize settings from API
+   * Initialize settings from API for a specific company
+   * @param {string} companyId - Company ID for multi-tenant isolation
    */
-  async initializeSettings() {
+  async initializeSettings(companyId) {
     try {
-      const settings = await CompanyConfig.getSettings();
-      const invoiceInfo = await CompanyConfig.getInvoiceInfo();
+      // Check cache first
+      if (this.companyCache.has(companyId)) {
+        const cached = this.companyCache.get(companyId);
+        if (Date.now() - cached.timestamp < 300000) { // 5 minutes cache
+          this.companyInfo = cached.companyInfo;
+          this.invoiceSettings = cached.invoiceSettings;
+          console.log(`📦 [InvoiceGenerator] Using cached settings for company: ${companyId}`);
+          return;
+        }
+      }
+
+      console.log(`🔄 [InvoiceGenerator] Fetching settings for company: ${companyId}`);
+      
+      const settings = await CompanyConfig.getSettings(companyId);
+      const invoiceInfo = await CompanyConfig.getInvoiceInfo(companyId);
       
       this.companyInfo = {
         name: settings.companyName || 'PosterPro Store',
@@ -820,17 +981,25 @@ class InvoiceGenerator {
         refundPolicy: 'No refunds after order processing'
       };
 
-      console.log('✅ [InvoiceGenerator] Settings initialized from API');
+      // Cache the settings
+      this.companyCache.set(companyId, {
+        companyInfo: { ...this.companyInfo },
+        invoiceSettings: { ...this.invoiceSettings },
+        timestamp: Date.now()
+      });
+
+      console.log(`✅ [InvoiceGenerator] Settings initialized for company: ${companyId}`);
     } catch (error) {
-      console.error('❌ [InvoiceGenerator] Failed to initialize settings:', error);
-      this.setDefaultSettings();
+      console.error(`❌ [InvoiceGenerator] Failed to initialize settings for company ${companyId}:`, error);
+      this.setDefaultSettings(companyId);
     }
   }
 
   /**
-   * Set default settings (fallback)
+   * Set default settings (fallback) for a company
+   * @param {string} companyId - Company ID
    */
-  setDefaultSettings() {
+  setDefaultSettings(companyId) {
     this.companyInfo = {
       name: 'PosterPro Store',
       legalName: 'PosterPro Entertainment Private Limited',
@@ -874,26 +1043,40 @@ class InvoiceGenerator {
       warrantyTerms: '7 days replacement for manufacturing defects',
       refundPolicy: 'No refunds after order processing'
     };
+
+    // Cache the default settings
+    this.companyCache.set(companyId, {
+      companyInfo: { ...this.companyInfo },
+      invoiceSettings: { ...this.invoiceSettings },
+      timestamp: Date.now()
+    });
   }
 
   /**
-   * Refresh settings from API
+   * Refresh settings for a company
+   * @param {string} companyId - Company ID
    */
-  async refreshSettings() {
+  async refreshSettings(companyId) {
     try {
-      await CompanyConfig.forceRefresh();
-      await this.initializeSettings();
-      console.log('✅ [InvoiceGenerator] Settings refreshed');
+      // Clear cache for this company
+      this.companyCache.delete(companyId);
+      await this.initializeSettings(companyId);
+      console.log(`✅ [InvoiceGenerator] Settings refreshed for company: ${companyId}`);
     } catch (error) {
-      console.error('❌ [InvoiceGenerator] Failed to refresh settings:', error);
+      console.error(`❌ [InvoiceGenerator] Failed to refresh settings for company ${companyId}:`, error);
     }
   }
 
-  async generateInvoicePDF(order, paymentVerification = null) {
-    // Ensure settings are loaded
-    if (!this.companyInfo.name) {
-      await this.initializeSettings();
-    }
+  /**
+   * Generate PDF invoice for an order
+   * @param {Object} order - Order object
+   * @param {Object} paymentVerification - Payment verification object (optional)
+   * @param {string} companyId - Company ID for multi-tenant isolation
+   * @returns {Promise<Buffer>} PDF buffer
+   */
+  async generateInvoicePDF(order, paymentVerification = null, companyId = null) {
+    // Ensure settings are loaded for this company
+    await this.initializeSettings(companyId);
 
     return new Promise((resolve, reject) => {
       try {
@@ -957,6 +1140,149 @@ class InvoiceGenerator {
     });
   }
 
+  /**
+   * Generate text invoice (for WhatsApp fallback) - FIXED to be well-formatted
+   * @param {Object} order - Order object
+   * @param {string} companyId - Company ID for multi-tenant isolation
+   * @returns {string} Formatted text invoice
+   */
+  async generateTextInvoice(order, companyId = null) {
+    // Ensure settings are loaded for this company
+    await this.initializeSettings(companyId);
+
+    try {
+      const items = order.items?.map(item => ({
+        name: item.productName || 'Product',
+        quantity: item.quantity || 1,
+        price: item.price || 0,
+        total: (item.price || 0) * (item.quantity || 1)
+      })) || [];
+
+      const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+      const gst = order.totalGst || 0;
+      const shipping = order.shippingCharge || 0;
+      const total = order.totalPrice || subtotal + gst + shipping;
+
+      const invoiceNumber = this.generateInvoiceNumber(order.orderNumber);
+      const date = new Date().toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+
+      // FIXED: Properly formatted text invoice with boxes and alignment
+      let invoiceText = 
+        `╔════════════════════════════════════════════════════════════╗\n` +
+        `║                    ${this.companyInfo.name.padEnd(42)} ║\n` +
+        `╠════════════════════════════════════════════════════════════╣\n` +
+        `║ INVOICE #${invoiceNumber.padEnd(44)} ║\n` +
+        `║ Date: ${date.padEnd(49)} ║\n` +
+        `╠════════════════════════════════════════════════════════════╣\n` +
+        `║ Customer: ${order.customerName?.padEnd(46) || 'Valued Customer'.padEnd(46)} ║\n` +
+        `║ Phone: ${this.formatPhoneNumber(order.phoneNumber)?.padEnd(48) || 'N/A'.padEnd(48)} ║\n` +
+        `╠════════════════════════════════════════════════════════════╣\n` +
+        `║ ITEMS:                                                    ║\n`;
+
+      // Add each item
+      items.forEach((item, index) => {
+        const itemLine = `${index + 1}. ${item.name}`;
+        invoiceText += `║ ${itemLine.padEnd(57)} ║\n`;
+        invoiceText += `║    Qty: ${item.quantity} x ${this.invoiceSettings.currency}${item.price.toFixed(2)} = ${this.invoiceSettings.currency}${item.total.toFixed(2)}${''.padEnd(22)} ║\n`;
+      });
+
+      invoiceText += 
+        `╠════════════════════════════════════════════════════════════╣\n` +
+        `║ SUBTOTAL:${''.padEnd(20)} ${this.invoiceSettings.currency}${subtotal.toFixed(2).padStart(12)} ║\n`;
+
+      if (gst > 0) {
+        invoiceText += `║ GST:${''.padEnd(25)} ${this.invoiceSettings.currency}${gst.toFixed(2).padStart(12)} ║\n`;
+      }
+
+      if (shipping > 0) {
+        invoiceText += `║ SHIPPING:${''.padEnd(20)} ${this.invoiceSettings.currency}${shipping.toFixed(2).padStart(12)} ║\n`;
+      }
+
+      invoiceText += 
+        `╠════════════════════════════════════════════════════════════╣\n` +
+        `║ TOTAL:${''.padEnd(23)} ${this.invoiceSettings.currency}${total.toFixed(2).padStart(12)} ║\n` +
+        `╠════════════════════════════════════════════════════════════╣\n` +
+        `║ PAYMENT STATUS: PAID ✓                                     ║\n`;
+
+      if (order.transactionId) {
+        invoiceText += `║ Transaction ID: ${order.transactionId.padEnd(40)} ║\n`;
+      }
+
+      invoiceText += 
+        `╠════════════════════════════════════════════════════════════╣\n` +
+        `║ DELIVERY ADDRESS:                                          ║\n`;
+
+      // Format address
+      let addressStr = '';
+      if (order.shippingAddress) {
+        if (typeof order.shippingAddress === 'string') {
+          addressStr = order.shippingAddress;
+        } else {
+          const addr = order.shippingAddress;
+          addressStr = `${addr.street || ''}, ${addr.areaLocality || ''}, ${addr.cityDistrict || addr.city || ''}, ${addr.state || ''} - ${addr.pincode || ''}`.replace(/^, |, $/g, '');
+        }
+      }
+
+      // Split address into multiple lines if needed
+      const addressLines = this.wrapText(addressStr, 50);
+      addressLines.forEach(line => {
+        invoiceText += `║ ${line.padEnd(57)} ║\n`;
+      });
+
+      invoiceText += 
+        `╠════════════════════════════════════════════════════════════╣\n` +
+        `║ TERMS & CONDITIONS:                                        ║\n` +
+        `║ • ${this.invoiceSettings.deliveryTerms.substring(0, 50).padEnd(52)} ║\n` +
+        `║ • ${this.invoiceSettings.warrantyTerms.substring(0, 50).padEnd(52)} ║\n` +
+        `║ • ${this.invoiceSettings.refundPolicy.substring(0, 50).padEnd(52)} ║\n` +
+        `╠════════════════════════════════════════════════════════════╣\n` +
+        `║ Thank you for shopping with us!                            ║\n` +
+        `║ For queries: ${this.companyInfo.support.email.padEnd(36)} ║\n` +
+        `╚════════════════════════════════════════════════════════════╝`;
+
+      return invoiceText;
+
+    } catch (error) {
+      console.error('❌ Text invoice generation error:', error);
+      
+      // Fallback simple invoice
+      const total = order.totalPrice || 0;
+      return `🧾 *INVOICE - Order #${order.orderNumber}*\n\n` +
+             `Thank you for your purchase!\n` +
+             `Total Amount: ${this.invoiceSettings.currency}${total.toFixed(2)}\n\n` +
+             `For any queries, please contact support.`;
+    }
+  }
+
+  /**
+   * Helper function to wrap text into lines
+   * @param {string} text - Text to wrap
+   * @param {number} maxLength - Maximum line length
+   * @returns {Array} Array of lines
+   */
+  wrapText(text, maxLength) {
+    if (!text) return [''];
+    const words = text.split(' ');
+    const lines = [];
+    let currentLine = '';
+
+    words.forEach(word => {
+      if ((currentLine + ' ' + word).length <= maxLength) {
+        currentLine = currentLine ? currentLine + ' ' + word : word;
+      } else {
+        if (currentLine) lines.push(currentLine);
+        currentLine = word;
+      }
+    });
+    if (currentLine) lines.push(currentLine);
+
+    return lines;
+  }
+
   addBorder(doc) {
     // Add decorative border
     doc
@@ -1017,7 +1343,7 @@ class InvoiceGenerator {
       .lineWidth(2)
       .strokeColor(this.colors.primary)
       .stroke();
-  } //https://jbfq57km-3000.inc1.devtunnels.ms/
+  }
 
   addInvoiceTitle(doc, order, paymentVerification) {
     const invoiceNumber = paymentVerification?.invoiceNumber || 
@@ -1466,9 +1792,9 @@ class InvoiceGenerator {
     return phone;
   }
 
-  async saveInvoiceToFile(pdfBuffer, orderNumber) {
+  async saveInvoiceToFile(pdfBuffer, orderNumber, companyId = null) {
     try {
-      const invoicesDir = path.join(process.cwd(), 'invoices');
+      const invoicesDir = path.join(process.cwd(), 'invoices', companyId || 'default');
       
       if (!fs.existsSync(invoicesDir)) {
         fs.mkdirSync(invoicesDir, { recursive: true });
@@ -1483,7 +1809,7 @@ class InvoiceGenerator {
       return {
         path: filePath,
         fileName: fileName,
-        url: `/invoices/${fileName}` // If serving static files
+        url: `/invoices/${companyId || 'default'}/${fileName}` // If serving static files
       };
     } catch (error) {
       console.error('❌ Error saving invoice:', error);
@@ -1491,8 +1817,16 @@ class InvoiceGenerator {
     }
   }
 
-  // Generate invoice HTML for email (optional)
-  generateInvoiceHTML(order, paymentVerification) {
+  /**
+   * Generate invoice HTML for email (optional)
+   * @param {Object} order - Order object
+   * @param {Object} paymentVerification - Payment verification object
+   * @param {string} companyId - Company ID
+   * @returns {string} HTML invoice
+   */
+  async generateInvoiceHTML(order, paymentVerification = null, companyId = null) {
+    await this.initializeSettings(companyId);
+    
     const invoiceNumber = paymentVerification?.invoiceNumber || 
                          this.generateInvoiceNumber(order.orderNumber);
     const total = order.totalPrice || 0;
@@ -1505,13 +1839,13 @@ class InvoiceGenerator {
           body { font-family: Arial, sans-serif; }
           .invoice-box { max-width: 800px; margin: auto; padding: 30px; border: 1px solid #eee; }
           .header { text-align: center; margin-bottom: 20px; }
-          .company-name { color: #2c3e50; font-size: 24px; font-weight: bold; }
-          .invoice-title { color: #27ae60; font-size: 20px; margin: 20px 0; }
+          .company-name { color: ${this.colors.primary}; font-size: 24px; font-weight: bold; }
+          .invoice-title { color: ${this.colors.accent}; font-size: 20px; margin: 20px 0; }
           table { width: 100%; border-collapse: collapse; }
-          th { background: #2c3e50; color: white; padding: 10px; }
+          th { background: ${this.colors.primary}; color: white; padding: 10px; }
           td { padding: 10px; border-bottom: 1px solid #ddd; }
-          .total { font-weight: bold; color: #27ae60; }
-          .footer { margin-top: 30px; text-align: center; color: #7f8c8d; font-size: 12px; }
+          .total { font-weight: bold; color: ${this.colors.accent}; }
+          .footer { margin-top: 30px; text-align: center; color: ${this.colors.textLight}; font-size: 12px; }
         </style>
       </head>
       <body>
@@ -1542,7 +1876,7 @@ class InvoiceGenerator {
               </tr>
             `).join('')}
           </table>
-          <h3 class="total">Total: ${this.invoiceSettings.currency}${total}</h3>
+          <h3 class="total">Total: ${this.invoiceSettings.currency}${total.toFixed(2)}</h3>
           <div class="footer">
             <p>Thank you for shopping with us!</p>
             <p>For any queries, contact: ${this.companyInfo.support.email}</p>
@@ -1554,25 +1888,40 @@ class InvoiceGenerator {
   }
 
   /**
-   * Get current settings status
+   * Get current settings status for a company
+   * @param {string} companyId - Company ID
+   * @returns {Object} Status object
    */
-  getStatus() {
+  async getStatus(companyId = null) {
+    await this.initializeSettings(companyId);
+    
     return {
       companyName: this.companyInfo.name,
       hasLogo: !!this.companyInfo.logo,
       hasSignature: !!this.companyInfo.signature,
       hasStamp: !!this.companyInfo.stamp,
       invoicePrefix: this.invoiceSettings.prefix,
-      currency: this.invoiceSettings.currency
+      currency: this.invoiceSettings.currency,
+      companyId: companyId
     };
+  }
+
+  /**
+   * Clear cache for a company
+   * @param {string} companyId - Company ID
+   */
+  clearCache(companyId) {
+    if (companyId) {
+      this.companyCache.delete(companyId);
+      console.log(`🗑️ [InvoiceGenerator] Cleared cache for company: ${companyId}`);
+    } else {
+      this.companyCache.clear();
+      console.log(`🗑️ [InvoiceGenerator] Cleared all company caches`);
+    }
   }
 }
 
 // Create and export a single instance
 const invoiceGenerator = new InvoiceGenerator();
 
-// Initialize on creation
-invoiceGenerator.initializeSettings().catch(console.error);
-
 export default invoiceGenerator;
-

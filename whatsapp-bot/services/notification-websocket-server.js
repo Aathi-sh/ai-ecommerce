@@ -1,3 +1,6 @@
+
+
+
 // import WebSocket from 'ws';
 // import { v4 as uuidv4 } from 'uuid';
 // import http from 'http';
@@ -9,7 +12,7 @@
 
 // try {
 //     // Try to import Firebase if available
-//     const { messaging } = await import('../../firebase/firebase-admin.js');
+//     const { messaging } = await import('../services/firebase/firebase-admin.js');
 //     firebaseAdmin = { messaging };
 //     firebaseEnabled = process.env.FIREBASE_ENABLED !== 'false';
 //     console.log('🔥 Firebase notifications: ENABLED');
@@ -22,7 +25,7 @@
 //     constructor() {
 //         this.wss = null;
 //         this.server = null;
-//         this.port = process.env.NOTIFICATION_WS_PORT || 3002;
+//         this.port = process.env.NOTIFICATION_WS_PORT || 3000;
 //         this.nextjsApiUrl = process.env.NEXTJS_API_URL || 'http://localhost:3000';
         
 //         // Client management
@@ -43,7 +46,17 @@
 //         };
 //     }
 
-//     async start() {
+//     // ✅ ADDED: Method that accepts port parameter
+//     async start(port = null) {
+//         // Use provided port or default
+//         if (port) {
+//             this.port = port;
+//         }
+//         return await this._startInternal();
+//     }
+
+//     // ✅ ADDED: Internal start method
+//     async _startInternal() {
 //         return new Promise((resolve, reject) => {
 //             try {
 //                 // Create HTTP server
@@ -344,7 +357,7 @@
 
 //     async getAdminFCMTokensFromNextJS() {
 //         try {
-//             const response = await axios.get(`${this.nextjsApiUrl}/api/auth/fcm-tokens?role=admin`);
+//             const response = await axios.get(`${this.nextjsApiUrl}/api/auth/fcm-token?role=admin`);
 //             const tokens = response.data.tokens || response.data || [];
             
 //             // Update local cache
@@ -693,6 +706,32 @@
 // export default notificationWebSocketServer;
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// services/notifications/notificationWebSocketServer.js
+// PROFESSIONAL MULTI-TENANT VERSION
+// WebSocket server for real-time notifications with company isolation
+
 import WebSocket from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import http from 'http';
@@ -720,13 +759,21 @@ class NotificationWebSocketServer {
         this.port = process.env.NOTIFICATION_WS_PORT || 3000;
         this.nextjsApiUrl = process.env.NEXTJS_API_URL || 'http://localhost:3000';
         
-        // Client management
+        // Client management with company isolation
         this.clients = new Map(); // clientId -> { ws, metadata }
-        this.admins = new Set(); // admin clientIds
-        this.users = new Map(); // phone -> [clientIds]
+        
+        // ✅ Company-specific admin groups
+        this.companyAdmins = new Map(); // companyId -> Set<clientIds>
+        
+        // ✅ Company-specific user groups
+        this.companyUsers = new Map(); // companyId -> Map<phone, [clientIds]>
+        
+        // ✅ Company-specific FCM tokens
+        this.companyFCMTokens = new Map(); // companyId -> Set<tokens>
         
         // Simple token storage (memory only - for caching)
-        this.fcmTokens = new Set(); // Cache of active FCM tokens
+        this.fcmTokens = new Set(); // Legacy - for backward compatibility
+        
         this.firebaseEnabled = firebaseEnabled;
         
         this.stats = {
@@ -819,7 +866,8 @@ class NotificationWebSocketServer {
                 authenticated: false,
                 role: null,
                 userId: null,
-                phoneNumber: null
+                phoneNumber: null,
+                companyId: null // ✅ NEW: Company context
             }
         };
 
@@ -889,7 +937,7 @@ class NotificationWebSocketServer {
     }
 
     async handleAuthentication(clientId, data) {
-        const { token, userId, role, phoneNumber, fcmToken } = data;
+        const { token, userId, role, phoneNumber, fcmToken, companyId } = data;
         const client = this.clients.get(clientId);
         
         if (!client) return;
@@ -904,6 +952,7 @@ class NotificationWebSocketServer {
                 role,
                 userId,
                 phoneNumber,
+                companyId: companyId || 'default', // ✅ Store company context
                 fcmToken,
                 authenticatedAt: new Date().toISOString()
             };
@@ -911,23 +960,32 @@ class NotificationWebSocketServer {
             // Register FCM token if provided - SAVE TO NEXT.JS DB
             if (fcmToken && role === 'admin') {
                 try {
-                    await this.saveFCMTokenToNextJS(fcmToken, userId, client);
-                    console.log(`📱 Admin FCM token registered and saved to Next.js DB`);
+                    await this.saveFCMTokenToNextJS(fcmToken, userId, client, companyId);
+                    console.log(`📱 Admin FCM token registered and saved to Next.js DB for company: ${companyId || 'default'}`);
                 } catch (error) {
                     console.error('❌ Failed to save FCM token to Next.js:', error.message);
                 }
             }
 
-            // Register based on role
+            // ✅ Register based on role WITH COMPANY ISOLATION
             if (role === 'admin') {
-                this.admins.add(clientId);
-                console.log(`👑 Admin authenticated: ${userId || 'Unknown'} (${clientId.substring(0, 8)})`);
-            } else if (role === 'user' && phoneNumber) {
-                if (!this.users.has(phoneNumber)) {
-                    this.users.set(phoneNumber, []);
+                const compId = companyId || 'default';
+                if (!this.companyAdmins.has(compId)) {
+                    this.companyAdmins.set(compId, new Set());
                 }
-                this.users.get(phoneNumber).push(clientId);
-                console.log(`👤 User authenticated: ${phoneNumber} (${clientId.substring(0, 8)})`);
+                this.companyAdmins.get(compId).add(clientId);
+                console.log(`👑 Admin authenticated: ${userId || 'Unknown'} for company ${compId} (${clientId.substring(0, 8)})`);
+            } else if (role === 'user' && phoneNumber) {
+                const compId = companyId || 'default';
+                if (!this.companyUsers.has(compId)) {
+                    this.companyUsers.set(compId, new Map());
+                }
+                const userMap = this.companyUsers.get(compId);
+                if (!userMap.has(phoneNumber)) {
+                    userMap.set(phoneNumber, []);
+                }
+                userMap.get(phoneNumber).push(clientId);
+                console.log(`👤 User authenticated: ${phoneNumber} for company ${compId} (${clientId.substring(0, 8)})`);
             }
 
             this.sendToClient(clientId, {
@@ -936,6 +994,7 @@ class NotificationWebSocketServer {
                 role,
                 userId,
                 phoneNumber,
+                companyId: companyId || 'default',
                 timestamp: new Date().toISOString()
             });
 
@@ -953,7 +1012,7 @@ class NotificationWebSocketServer {
     }
 
     async handleFCMTokenRegistration(clientId, data) {
-        const { token, role } = data;
+        const { token, role, companyId } = data;
         const client = this.clients.get(clientId);
         
         if (!client || !client.metadata.authenticated) {
@@ -966,9 +1025,19 @@ class NotificationWebSocketServer {
 
         if (role === 'admin' && token) {
             try {
-                await this.saveFCMTokenToNextJS(token, client.metadata.userId, client);
+                await this.saveFCMTokenToNextJS(token, client.metadata.userId, client, companyId);
+                
+                // ✅ Store in company-specific token set
+                const compId = companyId || 'default';
+                if (!this.companyFCMTokens.has(compId)) {
+                    this.companyFCMTokens.set(compId, new Set());
+                }
+                this.companyFCMTokens.get(compId).add(token);
+                
+                // Legacy storage for backward compatibility
                 this.fcmTokens.add(token);
-                console.log(`📱 Admin FCM token registered: ${token.substring(0, 20)}...`);
+                
+                console.log(`📱 Admin FCM token registered for company ${compId}: ${token.substring(0, 20)}...`);
                 
                 this.sendToClient(clientId, {
                     type: 'FCM_TOKEN_REGISTERED',
@@ -1000,18 +1069,33 @@ class NotificationWebSocketServer {
             
             console.log(`🔌 Disconnected: ${clientId.substring(0, 8)}`);
 
-            // Clean up from collections
+            // Clean up from collections with company context
             if (client.metadata.authenticated) {
-                if (client.metadata.role === 'admin') {
-                    this.admins.delete(clientId);
-                } else if (client.metadata.role === 'user' && client.metadata.phoneNumber) {
-                    const userClients = this.users.get(client.metadata.phoneNumber);
-                    if (userClients) {
-                        const filtered = userClients.filter(id => id !== clientId);
-                        if (filtered.length === 0) {
-                            this.users.delete(client.metadata.phoneNumber);
-                        } else {
-                            this.users.set(client.metadata.phoneNumber, filtered);
+                const { role, phoneNumber, companyId } = client.metadata;
+                const compId = companyId || 'default';
+                
+                if (role === 'admin') {
+                    const adminSet = this.companyAdmins.get(compId);
+                    if (adminSet) {
+                        adminSet.delete(clientId);
+                        if (adminSet.size === 0) {
+                            this.companyAdmins.delete(compId);
+                        }
+                    }
+                } else if (role === 'user' && phoneNumber) {
+                    const userMap = this.companyUsers.get(compId);
+                    if (userMap) {
+                        const userClients = userMap.get(phoneNumber);
+                        if (userClients) {
+                            const filtered = userClients.filter(id => id !== clientId);
+                            if (filtered.length === 0) {
+                                userMap.delete(phoneNumber);
+                            } else {
+                                userMap.set(phoneNumber, filtered);
+                            }
+                        }
+                        if (userMap.size === 0) {
+                            this.companyUsers.delete(compId);
                         }
                     }
                 }
@@ -1023,11 +1107,12 @@ class NotificationWebSocketServer {
 
     // ========== FCM TOKEN MANAGEMENT ==========
 
-    async saveFCMTokenToNextJS(token, userId, client) {
+    async saveFCMTokenToNextJS(token, userId, client, companyId) {
         try {
             const response = await axios.post(`${this.nextjsApiUrl}/api/auth/fcm-token`, {
                 token,
                 userId,
+                companyId: companyId || 'default', // ✅ Include companyId
                 role: client.metadata.role || 'admin',
                 deviceInfo: {
                     userAgent: client.metadata.userAgent || '',
@@ -1047,30 +1132,42 @@ class NotificationWebSocketServer {
         }
     }
 
-    async getAdminFCMTokensFromNextJS() {
+    async getAdminFCMTokensFromNextJS(companyId = null) {
         try {
-            const response = await axios.get(`${this.nextjsApiUrl}/api/auth/fcm-token?role=admin`);
+            const url = companyId 
+                ? `${this.nextjsApiUrl}/api/auth/fcm-token?role=admin&companyId=${companyId}`
+                : `${this.nextjsApiUrl}/api/auth/fcm-token?role=admin`;
+                
+            const response = await axios.get(url);
             const tokens = response.data.tokens || response.data || [];
             
-            // Update local cache
-            if (Array.isArray(tokens)) {
+            // Update company-specific cache
+            if (companyId && Array.isArray(tokens)) {
+                if (!this.companyFCMTokens.has(companyId)) {
+                    this.companyFCMTokens.set(companyId, new Set());
+                }
+                const tokenSet = this.companyFCMTokens.get(companyId);
                 tokens.forEach(tokenObj => {
                     if (tokenObj.token) {
-                        this.fcmTokens.add(tokenObj.token);
+                        tokenSet.add(tokenObj.token);
                     }
                 });
             }
             
-            return Array.from(this.fcmTokens);
+            return companyId 
+                ? Array.from(this.companyFCMTokens.get(companyId) || [])
+                : Array.from(this.fcmTokens);
         } catch (error) {
             console.error('❌ Failed to fetch FCM tokens from Next.js:', error.message);
             // Return cached tokens as fallback
-            return Array.from(this.fcmTokens);
+            return companyId 
+                ? Array.from(this.companyFCMTokens.get(companyId) || [])
+                : Array.from(this.fcmTokens);
         }
     }
 
-    getAllAdminFCMTokens() {
-        return this.getAdminFCMTokensFromNextJS();
+    getAllAdminFCMTokens(companyId = null) {
+        return this.getAdminFCMTokensFromNextJS(companyId);
     }
 
     // ========== FIREBASE NOTIFICATION METHODS ==========
@@ -1089,6 +1186,7 @@ class NotificationWebSocketServer {
                 data: {
                     ...payload.data,
                     type: payload.type || 'notification',
+                    companyId: payload.companyId || 'default',
                     timestamp: new Date().toISOString(),
                     click_action: 'FLUTTER_NOTIFICATION_CLICK'
                 },
@@ -1129,6 +1227,14 @@ class NotificationWebSocketServer {
                 console.warn('Removing invalid FCM token');
                 this.fcmTokens.delete(payload.token);
                 
+                // Remove from company-specific cache
+                if (payload.companyId) {
+                    const tokenSet = this.companyFCMTokens.get(payload.companyId);
+                    if (tokenSet) {
+                        tokenSet.delete(payload.token);
+                    }
+                }
+                
                 // Also remove from Next.js DB
                 try {
                     await axios.delete(`${this.nextjsApiUrl}/api/auth/fcm-token`, {
@@ -1147,12 +1253,14 @@ class NotificationWebSocketServer {
         }
     }
 
-    // ========== COMBINED NOTIFICATION BROADCASTING ==========
+    // ========== COMBINED NOTIFICATION BROADCASTING WITH COMPANY ISOLATION ==========
 
     async broadcastNewOrder(order) {
         this.stats.notificationsSent++;
         
-        console.log(`📢 New order: ${order.orderNumber}`);
+        const companyId = order.companyId || 'default';
+        
+        console.log(`📢 New order: ${order.orderNumber} for company: ${companyId}`);
 
         const notification = {
             type: 'NEW_ORDER',
@@ -1168,40 +1276,38 @@ class NotificationWebSocketServer {
                 paymentStatus: order.paymentStatus,
                 createdAt: order.createdAt,
                 shippingAddress: order.shippingAddress,
-                source: order.orderSource || 'whatsapp_bot'
+                source: order.orderSource || 'whatsapp_bot',
+                companyId: companyId
             },
+            companyId: companyId,
             timestamp: new Date().toISOString(),
             priority: 'high'
         };
 
-        // 1. WEB SOCKET (Real-time to connected admin dashboards)
+        // 1. WEB SOCKET (Send only to admins of THIS company)
         let adminCount = 0;
-        this.admins.forEach(clientId => {
-            if (this.sendToClient(clientId, notification)) {
-                adminCount++;
-            }
-        });
+        const companyAdminSet = this.companyAdmins.get(companyId);
+        if (companyAdminSet) {
+            companyAdminSet.forEach(clientId => {
+                if (this.sendToClient(clientId, notification)) {
+                    adminCount++;
+                }
+            });
+        }
 
-        console.log(`📡 WebSocket: Sent to ${adminCount} admin(s)`);
+        console.log(`📡 WebSocket: Sent to ${adminCount} admin(s) for company ${companyId}`);
 
-        // 2. FIREBASE PUSH (For when app is closed)
+        // 2. FIREBASE PUSH (Send only to THIS company's admins)
         if (this.firebaseEnabled) {
             try {
-                // Get tokens from Next.js database (with local cache fallback)
-                const adminTokens = await this.getAdminFCMTokensFromNextJS();
+                // Get tokens for THIS company
+                const adminTokens = await this.getAdminFCMTokensFromNextJS(companyId);
                 
-                // Also get from environment as fallback (for testing)
-                const envTokens = process.env.ADMIN_FCM_TOKENS;
-                if (envTokens && adminTokens.length === 0) {
-                    envTokens.split(',').forEach(token => {
-                        const trimmedToken = token.trim();
-                        if (trimmedToken && !adminTokens.includes(trimmedToken)) {
-                            adminTokens.push(trimmedToken);
-                        }
-                    });
-                }
+                // Also check company-specific cache
+                const cachedTokens = this.companyFCMTokens.get(companyId) || new Set();
+                const allTokens = [...new Set([...adminTokens, ...cachedTokens])];
 
-                if (adminTokens.length > 0) {
+                if (allTokens.length > 0) {
                     const firebasePayload = {
                         title: '🛍️ New Order Received',
                         body: `${order.customerName} placed order #${order.orderNumber} for ₹${order.totalPrice}`,
@@ -1212,12 +1318,13 @@ class NotificationWebSocketServer {
                             action: 'view_order'
                         },
                         type: 'NEW_ORDER',
+                        companyId: companyId,
                         priority: 'high'
                     };
 
-                    // Send to all admin devices
+                    // Send to all admin devices for this company
                     const results = [];
-                    for (const token of adminTokens) {
+                    for (const token of allTokens) {
                         if (token && token.trim() !== '') {
                             const result = await this.sendFirebaseNotification({
                                 ...firebasePayload,
@@ -1228,17 +1335,17 @@ class NotificationWebSocketServer {
                     }
 
                     const successful = results.filter(r => r.success).length;
-                    console.log(`🔥 Firebase: Sent to ${successful}/${results.length} admin device(s)`);
+                    console.log(`🔥 Firebase: Sent to ${successful}/${results.length} admin device(s) for company ${companyId}`);
                     
                 } else {
-                    console.log('🔥 Firebase: No admin device tokens found');
+                    console.log(`🔥 Firebase: No admin device tokens found for company ${companyId}`);
                 }
             } catch (firebaseError) {
                 console.error('Firebase notification error:', firebaseError.message);
             }
         }
 
-        // 3. Send to user who placed the order
+        // 3. Send to user who placed the order (scoped to company)
         if (order.customerPhone) {
             const userNotification = {
                 ...notification,
@@ -1246,19 +1353,22 @@ class NotificationWebSocketServer {
                 message: `Your order #${order.orderNumber} has been received`
             };
             
-            const userClients = this.users.get(order.customerPhone) || [];
-            userClients.forEach(clientId => {
-                if (this.sendToClient(clientId, userNotification)) {
-                    adminCount++;
-                }
-            });
+            const userMap = this.companyUsers.get(companyId);
+            if (userMap) {
+                const userClients = userMap.get(order.customerPhone) || [];
+                userClients.forEach(clientId => {
+                    this.sendToClient(clientId, userNotification);
+                });
+            }
         }
 
         return adminCount;
     }
 
     broadcastPaymentStatus(order, oldStatus, newStatus) {
-        console.log(`💰 Payment update: ${order.orderNumber} (${oldStatus} → ${newStatus})`);
+        const companyId = order.companyId || 'default';
+        
+        console.log(`💰 Payment update: ${order.orderNumber} (${oldStatus} → ${newStatus}) for company ${companyId}`);
 
         const notification = {
             type: 'PAYMENT_STATUS_CHANGED',
@@ -1268,17 +1378,23 @@ class NotificationWebSocketServer {
             newStatus,
             customerName: order.customerName,
             amount: order.totalPrice,
+            companyId: companyId,
             timestamp: new Date().toISOString()
         };
 
-        // Send to admins
-        this.admins.forEach(clientId => {
-            this.sendToClient(clientId, notification);
-        });
+        // Send to admins of THIS company
+        const companyAdminSet = this.companyAdmins.get(companyId);
+        if (companyAdminSet) {
+            companyAdminSet.forEach(clientId => {
+                this.sendToClient(clientId, notification);
+            });
+        }
     }
 
     broadcastOrderStatus(order, oldStatus, newStatus) {
-        console.log(`📦 Order status: ${order.orderNumber} (${oldStatus} → ${newStatus})`);
+        const companyId = order.companyId || 'default';
+        
+        console.log(`📦 Order status: ${order.orderNumber} (${oldStatus} → ${newStatus}) for company ${companyId}`);
 
         const notification = {
             type: 'ORDER_STATUS_CHANGED',
@@ -1288,17 +1404,23 @@ class NotificationWebSocketServer {
             newStatus,
             customerName: order.customerName,
             customerPhone: order.customerPhone,
+            companyId: companyId,
             timestamp: new Date().toISOString()
         };
 
-        // Send to admins
-        this.admins.forEach(clientId => {
-            this.sendToClient(clientId, notification);
-        });
+        // Send to admins of THIS company
+        const companyAdminSet = this.companyAdmins.get(companyId);
+        if (companyAdminSet) {
+            companyAdminSet.forEach(clientId => {
+                this.sendToClient(clientId, notification);
+            });
+        }
     }
 
     broadcastLowStock(product, currentStock) {
-        console.log(`⚠️ Low stock: ${product.productName} (${currentStock} left)`);
+        const companyId = product.companyId || 'default';
+        
+        console.log(`⚠️ Low stock: ${product.productName} (${currentStock} left) for company ${companyId}`);
 
         const notification = {
             type: 'LOW_STOCK_ALERT',
@@ -1307,17 +1429,21 @@ class NotificationWebSocketServer {
             currentStock,
             threshold: 10,
             alertLevel: currentStock <= 5 ? 'critical' : 'warning',
+            companyId: companyId,
             timestamp: new Date().toISOString()
         };
 
-        // Send to admins
-        this.admins.forEach(clientId => {
-            this.sendToClient(clientId, notification);
-        });
+        // Send to admins of THIS company
+        const companyAdminSet = this.companyAdmins.get(companyId);
+        if (companyAdminSet) {
+            companyAdminSet.forEach(clientId => {
+                this.sendToClient(clientId, notification);
+            });
+        }
     }
 
-    broadcastSystemAlert(alert) {
-        console.log(`🚨 System alert: ${alert.title}`);
+    broadcastSystemAlert(alert, companyId = 'default') {
+        console.log(`🚨 System alert for company ${companyId}: ${alert.title}`);
 
         const notification = {
             type: 'SYSTEM_ALERT',
@@ -1325,13 +1451,17 @@ class NotificationWebSocketServer {
             title: alert.title,
             message: alert.message,
             data: alert.data || {},
+            companyId: companyId,
             timestamp: new Date().toISOString()
         };
 
-        // Send to admins
-        this.admins.forEach(clientId => {
-            this.sendToClient(clientId, notification);
-        });
+        // Send to admins of THIS company
+        const companyAdminSet = this.companyAdmins.get(companyId);
+        if (companyAdminSet) {
+            companyAdminSet.forEach(clientId => {
+                this.sendToClient(clientId, notification);
+            });
+        }
     }
 
     // ========== UTILITY METHODS ==========
@@ -1383,9 +1513,15 @@ class NotificationWebSocketServer {
     getStats() {
         return {
             clients: this.clients.size,
-            admins: this.admins.size,
-            users: this.users.size,
+            companies: {
+                total: this.companyAdmins.size,
+                adminCount: Array.from(this.companyAdmins.values()).reduce((sum, set) => sum + set.size, 0),
+                userCount: Array.from(this.companyUsers.values()).reduce((sum, map) => sum + map.size, 0)
+            },
+            admins: Array.from(this.companyAdmins.values()).reduce((sum, set) => sum + set.size, 0),
+            users: Array.from(this.companyUsers.values()).reduce((sum, map) => sum + map.size, 0),
             fcmTokens: this.fcmTokens.size,
+            companyFCMTokens: Array.from(this.companyFCMTokens.values()).reduce((sum, set) => sum + set.size, 0),
             notifications: this.stats.notificationsSent,
             firebaseNotifications: this.stats.firebaseNotifications,
             uptime: this.stats.startedAt ? Date.now() - this.stats.startedAt : 0

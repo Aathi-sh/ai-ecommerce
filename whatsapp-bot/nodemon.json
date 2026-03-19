@@ -1,0 +1,18 @@
+{
+  "watch": ["."],
+  "ext": "js,mjs,cjs,json",
+  "ignore": [
+    "node_modules/*",
+    "sessions/*",
+    "whatsap/sessions/*",
+    "logs/*",
+    "*.log",
+    "temp/*",
+    "uploads/*",
+    ".git/*",
+    "dist/*",
+    "build/*"
+  ],
+  "delay": "2000",
+  "verbose": true
+}

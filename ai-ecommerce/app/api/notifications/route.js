@@ -653,6 +653,7 @@ import { NextResponse } from 'next/server';
 import { connectDB } from '@/utils/db';
 import Notification from '@/models/Notification';
 import Company from '@/models/Company';
+import mongoose from 'mongoose'; 
 
 // ========== HELPER FUNCTIONS ==========
 
