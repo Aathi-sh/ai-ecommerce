@@ -1,3 +1,5 @@
+
+
 // // app/super-admin/companies/[id]/page.js
 // 'use client';
 
@@ -172,6 +174,32 @@
 //   Wind as WindIcon,
 //   Thermometer as ThermometerIcon,
 //   Droplets as DropletsIcon,
+//   MessageSquare,
+//   MessageCircle,
+//   MessageCircleDashed,
+//   MessageSquareDashed,
+//   MessagesSquare,
+//   Contact,
+//   Contact2,
+//   ContactRound,
+//   CircleUser,
+//   CircleUserRound,
+//   UsersRound,
+//   UserRound,
+//   UserRoundCheck,
+//   UserRoundCog,
+//   UserRoundMinus,
+//   UserRoundPlus,
+//   UserRoundX,
+//   UserRoundSearch,
+//   UserRoundPen,
+//   UserRoundCheck as UserRoundCheckIcon,
+//   UserRoundCog as UserRoundCogIcon,
+//   UserRoundMinus as UserRoundMinusIcon,
+//   UserRoundPlus as UserRoundPlusIcon,
+//   UserRoundX as UserRoundXIcon,
+//   UserRoundSearch as UserRoundSearchIcon,
+//   UserRoundPen as UserRoundPenIcon,
 // } from 'lucide-react';
 
 // export default function CompanyDetailsPage({ params }) {
@@ -188,6 +216,11 @@
 //   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 //   const [saveLoading, setSaveLoading] = useState(false);
 //   const [successMessage, setSuccessMessage] = useState('');
+//   const [whatsappNumbers, setWhatsappNumbers] = useState([]);
+//   const [showAddWhatsAppModal, setShowAddWhatsAppModal] = useState(false);
+//   const [newWhatsAppNumber, setNewWhatsAppNumber] = useState('');
+//   const [newWhatsAppDesc, setNewWhatsAppDesc] = useState('');
+//   const [newWhatsAppPrimary, setNewWhatsAppPrimary] = useState(false);
 
 //   // Form state for editing
 //   const [formData, setFormData] = useState({
@@ -226,6 +259,14 @@
 //       products: { current: 0, limit: 0, percentage: 0 },
 //       orders: { current: 0, limit: 0, percentage: 0 },
 //       bookings: { current: 0, limit: 0, percentage: 0 },
+//     },
+//     whatsapp: {
+//       totalMessages: 0,
+//       totalConversations: 0,
+//       totalCustomers: 0,
+//       messagesToday: 0,
+//       lastMessageAt: null,
+//       lastResetAt: null
 //     }
 //   });
 
@@ -267,6 +308,21 @@
 
 //       setCompany(data.data.company);
 //       setStats(data.data.stats || {});
+      
+//       // Extract WhatsApp numbers
+//       const numbers = [];
+//       if (data.data.company.whatsapp?.phoneNumber) {
+//         numbers.push({
+//           number: data.data.company.whatsapp.phoneNumber,
+//           type: 'primary',
+//           isConnected: data.data.company.whatsapp.isConnected || false,
+//           status: data.data.company.whatsapp.connectionStatus || 'disconnected'
+//         });
+//       }
+//       if (data.data.company.whatsappNumbers) {
+//         numbers.push(...data.data.company.whatsappNumbers);
+//       }
+//       setWhatsappNumbers(numbers);
       
 //       // Initialize form data
 //       setFormData({
@@ -372,6 +428,115 @@
 //     }
 //   };
 
+//   const handleWhatsAppAction = async (action, data = {}) => {
+//     setSaveLoading(true);
+    
+//     try {
+//       const response = await fetch(`/api/companies/${id}`, {
+//         method: 'PATCH',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify({
+//           action: 'whatsapp-status',
+//           status: action,
+//           data
+//         }),
+//       });
+
+//       const result = await response.json();
+
+//       if (!response.ok) {
+//         throw new Error(result.message || 'Failed to update WhatsApp status');
+//       }
+
+//       await fetchCompany();
+//       setSuccessMessage('WhatsApp status updated successfully');
+//       setTimeout(() => setSuccessMessage(''), 3000);
+//     } catch (err) {
+//       setError(err.message);
+//     } finally {
+//       setSaveLoading(false);
+//     }
+//   };
+
+//   const handleAddWhatsAppNumber = async () => {
+//     if (!newWhatsAppNumber.trim()) return;
+    
+//     const cleanNumber = newWhatsAppNumber.replace(/\D/g, '');
+//     if (cleanNumber.length < 10 || cleanNumber.length > 12) {
+//       alert('Please enter a valid 10-12 digit WhatsApp number');
+//       return;
+//     }
+
+//     setSaveLoading(true);
+    
+//     try {
+//       const response = await fetch(`/api/companies/${id}`, {
+//         method: 'PUT',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify({
+//           additionalWhatsAppNumbers: [
+//             ...(company.additionalWhatsAppNumbers || []),
+//             {
+//               number: cleanNumber,
+//               description: newWhatsAppDesc || 'Additional WhatsApp number',
+//               isPrimary: newWhatsAppPrimary
+//             }
+//           ]
+//         }),
+//       });
+
+//       const data = await response.json();
+
+//       if (!response.ok) {
+//         throw new Error(data.message || 'Failed to add WhatsApp number');
+//       }
+
+//       await fetchCompany();
+//       setShowAddWhatsAppModal(false);
+//       setNewWhatsAppNumber('');
+//       setNewWhatsAppDesc('');
+//       setNewWhatsAppPrimary(false);
+//       setSuccessMessage('WhatsApp number added successfully');
+//       setTimeout(() => setSuccessMessage(''), 3000);
+//     } catch (err) {
+//       setError(err.message);
+//     } finally {
+//       setSaveLoading(false);
+//     }
+//   };
+
+//   const handleRemoveWhatsAppNumber = async (number) => {
+//     if (!confirm('Are you sure you want to remove this WhatsApp number?')) return;
+
+//     setSaveLoading(true);
+    
+//     try {
+//       const response = await fetch(`/api/companies/${id}`, {
+//         method: 'PUT',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify({
+//           additionalWhatsAppNumbers: (company.additionalWhatsAppNumbers || []).filter(
+//             n => n.number !== number
+//           )
+//         }),
+//       });
+
+//       const data = await response.json();
+
+//       if (!response.ok) {
+//         throw new Error(data.message || 'Failed to remove WhatsApp number');
+//       }
+
+//       await fetchCompany();
+//       setSuccessMessage('WhatsApp number removed successfully');
+//       setTimeout(() => setSuccessMessage(''), 3000);
+//     } catch (err) {
+//       setError(err.message);
+//     } finally {
+//       setSaveLoading(false);
+//     }
+//   };
+
 //   const handleUserAction = async (userId, action) => {
 //     // Implement user actions (suspend, activate, delete, etc.)
 //     console.log('User action:', userId, action);
@@ -385,6 +550,24 @@
 //       inactive: { bg: 'bg-gray-100', text: 'text-gray-800', icon: Power, label: 'Inactive' },
 //     };
 //     const badge = badges[status] || badges.inactive;
+//     const Icon = badge.icon;
+    
+//     return (
+//       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
+//         <Icon className="w-3 h-3 mr-1" />
+//         {badge.label}
+//       </span>
+//     );
+//   };
+
+//   const getWhatsAppStatusBadge = (status) => {
+//     const badges = {
+//       connected: { bg: 'bg-green-100', text: 'text-green-800', icon: Wifi, label: 'Connected' },
+//       disconnected: { bg: 'bg-gray-100', text: 'text-gray-800', icon: WifiOff, label: 'Disconnected' },
+//       pending: { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: Clock, label: 'Pending' },
+//       error: { bg: 'bg-red-100', text: 'text-red-800', icon: AlertCircle, label: 'Error' },
+//     };
+//     const badge = badges[status] || badges.disconnected;
 //     const Icon = badge.icon;
     
 //     return (
@@ -459,6 +642,7 @@
 
 //   const tabs = [
 //     { id: 'overview', label: 'Overview', icon: Building2 },
+//     { id: 'whatsapp', label: 'WhatsApp', icon: Smartphone },
 //     { id: 'users', label: 'Users', icon: Users },
 //     { id: 'subscription', label: 'Subscription', icon: CreditCard },
 //     { id: 'settings', label: 'Settings', icon: Settings },
@@ -482,9 +666,15 @@
 //                   <Building2 className="w-8 h-8 mr-3 text-indigo-600" />
 //                   {company.companyName}
 //                 </h1>
-//                 <div className="mt-1 flex items-center gap-3">
+//                 <div className="mt-1 flex items-center gap-3 flex-wrap">
 //                   {getStatusBadge(company.status)}
 //                   {getPlanBadge(company.subscription?.plan)}
+//                   {company.whatsapp?.isConnected && (
+//                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+//                       <Wifi className="w-3 h-3 mr-1" />
+//                       WhatsApp Connected
+//                     </span>
+//                   )}
 //                   <span className="text-sm text-gray-500">
 //                     Created {formatDate(company.createdAt)}
 //                   </span>
@@ -698,6 +888,39 @@
 //                 </div>
 //               </div>
 //             </div>
+
+//             {/* WhatsApp Stats Card */}
+//             {company.whatsapp?.phoneNumber && (
+//               <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+//                 <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+//                   <Smartphone className="w-5 h-5 mr-2 text-indigo-600" />
+//                   WhatsApp Statistics
+//                 </h2>
+//                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+//                   <div>
+//                     <p className="text-sm text-gray-500">Total Messages</p>
+//                     <p className="text-xl font-semibold text-gray-900">{stats.whatsapp?.totalMessages || 0}</p>
+//                   </div>
+//                   <div>
+//                     <p className="text-sm text-gray-500">Conversations</p>
+//                     <p className="text-xl font-semibold text-gray-900">{stats.whatsapp?.totalConversations || 0}</p>
+//                   </div>
+//                   <div>
+//                     <p className="text-sm text-gray-500">Customers</p>
+//                     <p className="text-xl font-semibold text-gray-900">{stats.whatsapp?.totalCustomers || 0}</p>
+//                   </div>
+//                   <div>
+//                     <p className="text-sm text-gray-500">Messages Today</p>
+//                     <p className="text-xl font-semibold text-gray-900">{stats.whatsapp?.messagesToday || 0}</p>
+//                   </div>
+//                 </div>
+//                 {stats.whatsapp?.lastMessageAt && (
+//                   <p className="text-xs text-gray-500 mt-2">
+//                     Last message: {formatDistanceToNow(new Date(stats.whatsapp.lastMessageAt), { addSuffix: true })}
+//                   </p>
+//                 )}
+//               </div>
+//             )}
 
 //             {/* Company Details */}
 //             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -943,7 +1166,10 @@
 //                       </div>
 //                       <div className="text-right">
 //                         <p className="text-xs text-gray-500">
-//                           {user.lastSeen ? formatDistanceToNow(new Date(user.lastSeen), { addSuffix: true }) : 'Never'}
+//                           {user.lastSeen ? formatDistanceToNow(
+//   typeof user.lastSeen === 'string' ? new Date(user.lastSeen) : user.lastSeen, 
+//   { addSuffix: true }
+// ) : 'Never'}
 //                         </p>
 //                       </div>
 //                     </div>
@@ -963,7 +1189,10 @@
 //                           {formatCurrency(order.totalPrice)}
 //                         </p>
 //                         <p className="text-xs text-gray-500">
-//                           {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
+//                           {formatDistanceToNow(
+//   typeof order.createdAt === 'string' ? new Date(order.createdAt) : order.createdAt,
+//   { addSuffix: true }
+// )}
 //                         </p>
 //                       </div>
 //                     </div>
@@ -971,6 +1200,207 @@
 //                 </div>
 //               </div>
 //             </div>
+//           </div>
+//         )}
+
+//         {/* Tab: WhatsApp */}
+//         {activeTab === 'whatsapp' && (
+//           <div className="space-y-6">
+//             {/* WhatsApp Connection Status */}
+//             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+//               <div className="p-6">
+//                 <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+//                   <Smartphone className="w-5 h-5 mr-2 text-indigo-600" />
+//                   WhatsApp Integration
+//                 </h2>
+
+//                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+//                   <div className="space-y-4">
+//                     <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+//                       <div className="flex items-center">
+//                         <div className={`w-3 h-3 rounded-full mr-3 ${company.whatsapp?.isConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
+//                         <div>
+//                           <p className="text-sm font-medium text-gray-900">Connection Status</p>
+//                           <p className="text-xs text-gray-500">
+//                             {company.whatsapp?.isConnected ? 'Connected' : 'Not Connected'}
+//                           </p>
+//                         </div>
+//                       </div>
+//                       <button
+//                         onClick={() => handleWhatsAppAction(company.whatsapp?.isConnected ? 'disconnect' : 'connect')}
+//                         disabled={saveLoading}
+//                         className={`px-3 py-1 text-white text-sm rounded-lg transition-colors ${
+//                           company.whatsapp?.isConnected 
+//                             ? 'bg-red-600 hover:bg-red-700' 
+//                             : 'bg-green-600 hover:bg-green-700'
+//                         } disabled:opacity-50`}
+//                       >
+//                         {company.whatsapp?.isConnected ? 'Disconnect' : 'Connect'}
+//                       </button>
+//                     </div>
+
+//                     {company.whatsapp?.clientId && (
+//                       <div className="p-4 bg-gray-50 rounded-lg">
+//                         <p className="text-sm font-medium text-gray-900 mb-1">Client ID</p>
+//                         <p className="text-sm text-gray-600 font-mono">{company.whatsapp.clientId}</p>
+//                       </div>
+//                     )}
+
+//                     {company.whatsapp?.deviceInfo && (
+//                       <div className="p-4 bg-gray-50 rounded-lg">
+//                         <p className="text-sm font-medium text-gray-900 mb-2">Device Info</p>
+//                         <div className="space-y-1">
+//                           <p className="text-xs text-gray-600">Platform: {company.whatsapp.deviceInfo.platform || 'N/A'}</p>
+//                           <p className="text-xs text-gray-600">Browser: {company.whatsapp.deviceInfo.browser || 'N/A'}</p>
+//                           <p className="text-xs text-gray-600">Version: {company.whatsapp.deviceInfo.version || 'N/A'}</p>
+//                         </div>
+//                       </div>
+//                     )}
+//                   </div>
+
+//                   <div className="space-y-4">
+//                     {company.whatsapp?.connectedAt && (
+//                       <div className="p-4 bg-gray-50 rounded-lg">
+//                         <p className="text-sm font-medium text-gray-900 mb-1">Connected Since</p>
+//                         <p className="text-sm text-gray-600">{formatDate(company.whatsapp.connectedAt)}</p>
+//                       </div>
+//                     )}
+
+//                     {company.whatsapp?.lastMessageAt && (
+//                       <div className="p-4 bg-gray-50 rounded-lg">
+//                         <p className="text-sm font-medium text-gray-900 mb-1">Last Message</p>
+//                         <p className="text-sm text-gray-600">
+//                           {formatDistanceToNow(new Date(company.whatsapp.lastMessageAt), { addSuffix: true })}
+//                         </p>
+//                       </div>
+//                     )}
+
+//                     {company.whatsapp?.lastError && (
+//                       <div className="p-4 bg-red-50 rounded-lg">
+//                         <p className="text-sm font-medium text-red-900 mb-1">Last Error</p>
+//                         <p className="text-xs text-red-600">{company.whatsapp.lastError}</p>
+//                         <p className="text-xs text-gray-500 mt-1">
+//                           Attempts: {company.whatsapp.errorCount || 0}/{company.whatsapp.maxReconnectAttempts || 5}
+//                         </p>
+//                       </div>
+//                     )}
+//                   </div>
+//                 </div>
+//               </div>
+//             </div>
+
+//             {/* WhatsApp Numbers */}
+//             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+//               <div className="p-6">
+//                 <div className="flex items-center justify-between mb-4">
+//                   <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+//                     <MessageSquare className="w-5 h-5 mr-2 text-indigo-600" />
+//                     WhatsApp Numbers
+//                   </h2>
+//                   <button
+//                     onClick={() => setShowAddWhatsAppModal(true)}
+//                     className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center text-sm"
+//                   >
+//                     <Plus className="w-4 h-4 mr-1" />
+//                     Add Number
+//                   </button>
+//                 </div>
+
+//                 <div className="space-y-3">
+//                   {whatsappNumbers.map((num, index) => (
+//                     <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+//                       <div className="flex items-center">
+//                         <Smartphone className="w-5 h-5 text-gray-500 mr-3" />
+//                         <div>
+//                           <div className="flex items-center gap-2">
+//                             <p className="text-sm font-medium text-gray-900">{num.number}</p>
+//                             {num.type === 'primary' && (
+//                               <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-800 rounded-full">
+//                                 Primary
+//                               </span>
+//                             )}
+//                             {num.isConnected ? (
+//                               <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded-full flex items-center">
+//                                 <Wifi className="w-3 h-3 mr-1" />
+//                                 Connected
+//                               </span>
+//                             ) : (
+//                               <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-800 rounded-full flex items-center">
+//                                 <WifiOff className="w-3 h-3 mr-1" />
+//                                 Disconnected
+//                               </span>
+//                             )}
+//                           </div>
+//                           {num.description && (
+//                             <p className="text-xs text-gray-500 mt-1">{num.description}</p>
+//                           )}
+//                         </div>
+//                       </div>
+//                       <div className="flex gap-2">
+//                         {num.type !== 'primary' && (
+//                           <button
+//                             onClick={() => handleRemoveWhatsAppNumber(num.number)}
+//                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+//                           >
+//                             <Trash2 className="w-4 h-4" />
+//                           </button>
+//                         )}
+//                       </div>
+//                     </div>
+//                   ))}
+
+//                   {whatsappNumbers.length === 0 && (
+//                     <div className="text-center py-8">
+//                       <Smartphone className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+//                       <p className="text-sm text-gray-500">No WhatsApp numbers configured</p>
+//                       <button
+//                         onClick={() => setShowAddWhatsAppModal(true)}
+//                         className="mt-3 text-sm text-indigo-600 hover:text-indigo-800"
+//                       >
+//                         Add your first WhatsApp number
+//                       </button>
+//                     </div>
+//                   )}
+//                 </div>
+//               </div>
+//             </div>
+
+//             {/* WhatsApp Stats */}
+//             {stats.whatsapp && (
+//               <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+//                 <div className="p-6">
+//                   <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+//                     <BarChart3 className="w-5 h-5 mr-2 text-indigo-600" />
+//                     WhatsApp Statistics
+//                   </h2>
+
+//                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+//                     <div className="p-4 bg-gray-50 rounded-lg">
+//                       <p className="text-xs text-gray-500">Total Messages</p>
+//                       <p className="text-xl font-semibold text-gray-900">{stats.whatsapp.totalMessages || 0}</p>
+//                     </div>
+//                     <div className="p-4 bg-gray-50 rounded-lg">
+//                       <p className="text-xs text-gray-500">Conversations</p>
+//                       <p className="text-xl font-semibold text-gray-900">{stats.whatsapp.totalConversations || 0}</p>
+//                     </div>
+//                     <div className="p-4 bg-gray-50 rounded-lg">
+//                       <p className="text-xs text-gray-500">Customers</p>
+//                       <p className="text-xl font-semibold text-gray-900">{stats.whatsapp.totalCustomers || 0}</p>
+//                     </div>
+//                     <div className="p-4 bg-gray-50 rounded-lg">
+//                       <p className="text-xs text-gray-500">Messages Today</p>
+//                       <p className="text-xl font-semibold text-gray-900">{stats.whatsapp.messagesToday || 0}</p>
+//                     </div>
+//                   </div>
+
+//                   {stats.whatsapp.lastMessageAt && (
+//                     <p className="text-xs text-gray-500 mt-4">
+//                       Last message: {formatDistanceToNow(new Date(stats.whatsapp.lastMessageAt), { addSuffix: true })}
+//                     </p>
+//                   )}
+//                 </div>
+//               </div>
+//             )}
 //           </div>
 //         )}
 
@@ -1406,40 +1836,6 @@
 //               </div>
 //             </div>
 
-//             {/* WhatsApp Settings */}
-//             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-//               <div className="p-6">
-//                 <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-//                   <Smartphone className="w-5 h-5 mr-2 text-indigo-600" />
-//                   WhatsApp Integration
-//                 </h2>
-
-//                 <div className="space-y-4">
-//                   <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-//                     <div className="flex items-center">
-//                       <div className={`w-3 h-3 rounded-full mr-3 ${company.whatsapp?.isConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
-//                       <div>
-//                         <p className="text-sm font-medium text-gray-900">Connection Status</p>
-//                         <p className="text-xs text-gray-500">
-//                           {company.whatsapp?.isConnected ? 'Connected' : 'Not Connected'}
-//                         </p>
-//                       </div>
-//                     </div>
-//                     <button className="px-3 py-1 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
-//                       {company.whatsapp?.isConnected ? 'Reconnect' : 'Connect'}
-//                     </button>
-//                   </div>
-
-//                   {company.whatsapp?.businessId && (
-//                     <div className="p-4 bg-gray-50 rounded-lg">
-//                       <p className="text-sm font-medium text-gray-900 mb-1">Business ID</p>
-//                       <p className="text-sm text-gray-600">{company.whatsapp.businessId}</p>
-//                     </div>
-//                   )}
-//                 </div>
-//               </div>
-//             </div>
-
 //             {/* Danger Zone */}
 //             <div className="bg-white rounded-lg shadow-sm border border-red-200">
 //               <div className="p-6">
@@ -1522,6 +1918,81 @@
 //           </div>
 //         </div>
 //       )}
+
+//       {/* Add WhatsApp Number Modal */}
+//       {showAddWhatsAppModal && (
+//         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+//           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+//             <div className="p-6">
+//               <h3 className="text-lg font-semibold text-gray-900 mb-4">Add WhatsApp Number</h3>
+              
+//               <div className="space-y-4">
+//                 <div>
+//                   <label className="block text-sm font-medium text-gray-700 mb-1">
+//                     WhatsApp Number <span className="text-red-500">*</span>
+//                   </label>
+//                   <input
+//                     type="tel"
+//                     value={newWhatsAppNumber}
+//                     onChange={(e) => setNewWhatsAppNumber(e.target.value)}
+//                     placeholder="919876543210 (with country code)"
+//                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+//                   />
+//                   <p className="mt-1 text-xs text-gray-500">
+//                     Include country code (e.g., 91 for India)
+//                   </p>
+//                 </div>
+
+//                 <div>
+//                   <label className="block text-sm font-medium text-gray-700 mb-1">
+//                     Description (Optional)
+//                   </label>
+//                   <input
+//                     type="text"
+//                     value={newWhatsAppDesc}
+//                     onChange={(e) => setNewWhatsAppDesc(e.target.value)}
+//                     placeholder="e.g., Customer Support, Orders, etc."
+//                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+//                   />
+//                 </div>
+
+//                 <div className="flex items-center">
+//                   <input
+//                     type="checkbox"
+//                     id="makePrimary"
+//                     checked={newWhatsAppPrimary}
+//                     onChange={(e) => setNewWhatsAppPrimary(e.target.checked)}
+//                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+//                   />
+//                   <label htmlFor="makePrimary" className="ml-2 text-sm text-gray-700">
+//                     Make this the primary WhatsApp number
+//                   </label>
+//                 </div>
+//               </div>
+
+//               <div className="flex gap-3 mt-6">
+//                 <button
+//                   onClick={() => setShowAddWhatsAppModal(false)}
+//                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+//                 >
+//                   Cancel
+//                 </button>
+//                 <button
+//                   onClick={handleAddWhatsAppNumber}
+//                   disabled={saveLoading || !newWhatsAppNumber.trim()}
+//                   className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center"
+//                 >
+//                   {saveLoading ? (
+//                     <Loader2 className="w-4 h-4 animate-spin" />
+//                   ) : (
+//                     'Add Number'
+//                   )}
+//                 </button>
+//               </div>
+//             </div>
+//           </div>
+//         </div>
+//       )}
 //     </div>
 //   );
 // }
@@ -1567,12 +2038,6 @@
 
 
 
-
-
-
-
-
-// app/super-admin/companies/[id]/page.js
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -1765,13 +2230,10 @@ import {
   UserRoundX,
   UserRoundSearch,
   UserRoundPen,
-  UserRoundCheck as UserRoundCheckIcon,
-  UserRoundCog as UserRoundCogIcon,
-  UserRoundMinus as UserRoundMinusIcon,
-  UserRoundPlus as UserRoundPlusIcon,
-  UserRoundX as UserRoundXIcon,
-  UserRoundSearch as UserRoundSearchIcon,
-  UserRoundPen as UserRoundPenIcon,
+  Link as LinkIcon,
+  Tag,
+  Copy as CopyIcon,
+  Check as CheckIcon,
 } from 'lucide-react';
 
 export default function CompanyDetailsPage({ params }) {
@@ -1793,12 +2255,15 @@ export default function CompanyDetailsPage({ params }) {
   const [newWhatsAppNumber, setNewWhatsAppNumber] = useState('');
   const [newWhatsAppDesc, setNewWhatsAppDesc] = useState('');
   const [newWhatsAppPrimary, setNewWhatsAppPrimary] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Form state for editing
   const [formData, setFormData] = useState({
     companyName: '',
     companyEmail: '',
     companyPhone: '',
+    slug: '',
+    catalogWhatsapp: '',
     address: {
       street: '',
       city: '',
@@ -1896,11 +2361,13 @@ export default function CompanyDetailsPage({ params }) {
       }
       setWhatsappNumbers(numbers);
       
-      // Initialize form data
+      // Initialize form data with catalog fields
       setFormData({
         companyName: data.data.company.companyName || '',
         companyEmail: data.data.company.companyEmail || '',
         companyPhone: data.data.company.companyPhone || '',
+        slug: data.data.company.slug || '',
+        catalogWhatsapp: data.data.company.catalogWhatsapp || '',
         address: {
           street: data.data.company.address?.street || '',
           city: data.data.company.address?.city || '',
@@ -1946,6 +2413,43 @@ export default function CompanyDetailsPage({ params }) {
     }
   };
 
+  // Generate slug from company name
+  const generateSlug = (name) => {
+    if (!name) return '';
+    let slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    
+    if (!slug || slug.length === 0) {
+      slug = `company-${Date.now()}`;
+    }
+    
+    return slug;
+  };
+
+  const handleCompanyNameChange = (e) => {
+    const name = e.target.value;
+    setFormData({
+      ...formData,
+      companyName: name,
+      slug: generateSlug(name)
+    });
+  };
+
+  const handleSlugChange = (e) => {
+    let slug = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    setFormData({ ...formData, slug });
+  };
+
+  const copyCatalogLink = () => {
+    if (!formData.slug) return;
+    const catalogLink = `${window.location.origin}/catalogue/products?company=${formData.slug}`;
+    navigator.clipboard.writeText(catalogLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleSave = async () => {
     setSaveLoading(true);
     setError(null);
@@ -1955,7 +2459,16 @@ export default function CompanyDetailsPage({ params }) {
       const response = await fetch(`/api/companies/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          companyName: formData.companyName,
+          companyEmail: formData.companyEmail,
+          companyPhone: formData.companyPhone,
+          slug: formData.slug,
+          catalogWhatsapp: formData.catalogWhatsapp,
+          address: formData.address,
+          gstin: formData.gstin,
+          pan: formData.pan,
+        }),
       });
 
       const data = await response.json();
@@ -2110,7 +2623,6 @@ export default function CompanyDetailsPage({ params }) {
   };
 
   const handleUserAction = async (userId, action) => {
-    // Implement user actions (suspend, activate, delete, etc.)
     console.log('User action:', userId, action);
   };
 
@@ -2241,6 +2753,12 @@ export default function CompanyDetailsPage({ params }) {
                 <div className="mt-1 flex items-center gap-3 flex-wrap">
                   {getStatusBadge(company.status)}
                   {getPlanBadge(company.subscription?.plan)}
+                  {company.slug && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                      <Tag className="w-3 h-3 mr-1" />
+                      slug: {company.slug}
+                    </span>
+                  )}
                   {company.whatsapp?.isConnected && (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                       <Wifi className="w-3 h-3 mr-1" />
@@ -2494,7 +3012,7 @@ export default function CompanyDetailsPage({ params }) {
               </div>
             )}
 
-            {/* Company Details */}
+            {/* Company Details with Catalog Fields */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
               <div className="p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -2512,7 +3030,7 @@ export default function CompanyDetailsPage({ params }) {
                         <input
                           type="text"
                           value={formData.companyName}
-                          onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                          onChange={handleCompanyNameChange}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                         />
                       </div>
@@ -2537,6 +3055,42 @@ export default function CompanyDetailsPage({ params }) {
                           onChange={(e) => setFormData({ ...formData, companyPhone: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                         />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Catalog Slug
+                        </label>
+                        <div className="relative">
+                          <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            type="text"
+                            value={formData.slug}
+                            onChange={handleSlugChange}
+                            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                            placeholder="company-slug"
+                          />
+                        </div>
+                        <p className="mt-1 text-xs text-gray-500">
+                          URL: {window.location.origin}/catalogue/products?company={formData.slug || 'your-slug'}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Catalog WhatsApp (Optional)
+                        </label>
+                        <div className="relative">
+                          <Smartphone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            type="tel"
+                            value={formData.catalogWhatsapp}
+                            onChange={(e) => setFormData({ ...formData, catalogWhatsapp: e.target.value })}
+                            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                            placeholder="9876543210"
+                          />
+                        </div>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Separate WhatsApp for customer orders
+                        </p>
                       </div>
                     </div>
 
@@ -2686,6 +3240,40 @@ export default function CompanyDetailsPage({ params }) {
                           {company.companyPhone}
                         </p>
                       </div>
+                      <div className="mb-4">
+                        <p className="text-sm text-gray-500">Catalog Slug</p>
+                        <div className="flex items-center gap-2">
+                          <code className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
+                            {company.slug || 'Not set'}
+                          </code>
+                          {company.slug && (
+                            <button
+                              onClick={copyCatalogLink}
+                              className="p-1 text-gray-500 hover:text-indigo-600 transition-colors"
+                              title="Copy catalog link"
+                            >
+                              {copied ? (
+                                <CheckIcon className="w-4 h-4 text-green-500" />
+                              ) : (
+                                <CopyIcon className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        {company.slug && (
+                          <p className="text-xs text-blue-600 mt-1">
+                            <LinkIcon className="w-3 h-3 inline mr-1" />
+                            {window.location.origin}/catalogue/products?company={company.slug}
+                          </p>
+                        )}
+                      </div>
+                      <div className="mb-4">
+                        <p className="text-sm text-gray-500">Catalog WhatsApp</p>
+                        <p className="text-base font-medium text-gray-900 flex items-center">
+                          <Smartphone className="w-4 h-4 mr-2 text-gray-400" />
+                          {company.catalogWhatsapp || 'Not set (uses primary WhatsApp)'}
+                        </p>
+                      </div>
                     </div>
 
                     <div>
@@ -2739,9 +3327,9 @@ export default function CompanyDetailsPage({ params }) {
                       <div className="text-right">
                         <p className="text-xs text-gray-500">
                           {user.lastSeen ? formatDistanceToNow(
-  typeof user.lastSeen === 'string' ? new Date(user.lastSeen) : user.lastSeen, 
-  { addSuffix: true }
-) : 'Never'}
+                            typeof user.lastSeen === 'string' ? new Date(user.lastSeen) : user.lastSeen, 
+                            { addSuffix: true }
+                          ) : 'Never'}
                         </p>
                       </div>
                     </div>
@@ -2762,9 +3350,9 @@ export default function CompanyDetailsPage({ params }) {
                         </p>
                         <p className="text-xs text-gray-500">
                           {formatDistanceToNow(
-  typeof order.createdAt === 'string' ? new Date(order.createdAt) : order.createdAt,
-  { addSuffix: true }
-)}
+                            typeof order.createdAt === 'string' ? new Date(order.createdAt) : order.createdAt,
+                            { addSuffix: true }
+                          )}
                         </p>
                       </div>
                     </div>
@@ -2775,7 +3363,7 @@ export default function CompanyDetailsPage({ params }) {
           </div>
         )}
 
-        {/* Tab: WhatsApp */}
+        {/* Tab: WhatsApp (unchanged but add catalog note) */}
         {activeTab === 'whatsapp' && (
           <div className="space-y-6">
             {/* WhatsApp Connection Status */}
@@ -2934,6 +3522,20 @@ export default function CompanyDetailsPage({ params }) {
                     </div>
                   )}
                 </div>
+
+                {company.catalogWhatsapp && (
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="w-4 h-4 text-blue-600" />
+                      <p className="text-sm text-blue-800">
+                        <strong>Catalog WhatsApp:</strong> {company.catalogWhatsapp}
+                      </p>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-1">
+                      This number is used for customer orders from the catalog page.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -2976,7 +3578,7 @@ export default function CompanyDetailsPage({ params }) {
           </div>
         )}
 
-        {/* Tab: Users */}
+        {/* Tab: Users (unchanged) */}
         {activeTab === 'users' && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200">
             <div className="p-6">
@@ -3178,7 +3780,7 @@ export default function CompanyDetailsPage({ params }) {
           </div>
         )}
 
-        {/* Tab: Subscription */}
+        {/* Tab: Subscription (unchanged) */}
         {activeTab === 'subscription' && (
           <div className="space-y-6">
             {/* Current Plan */}
@@ -3341,7 +3943,7 @@ export default function CompanyDetailsPage({ params }) {
           </div>
         )}
 
-        {/* Tab: Settings */}
+        {/* Tab: Settings (unchanged) */}
         {activeTab === 'settings' && (
           <div className="space-y-6">
             {/* Company Settings */}

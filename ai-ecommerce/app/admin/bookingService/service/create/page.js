@@ -1,33 +1,17 @@
 
-
 // 'use client';
 // import { useState, useEffect, useRef } from 'react';
 // import { useRouter, useSearchParams } from 'next/navigation';
 // import Link from 'next/link';
 // import Head from 'next/head';
-// import { appTheme } from '../../../../../src/constants/theme';
+// import { useAuth } from '../../../../../context/AuthContext';
 // import {
 //     ArrowLeft, Save, Tag, DollarSign, Clock,
 //     Users, CheckCircle, XCircle, Plus, Minus, ChevronRight,
-//     ChevronDown, ChevronUp, Briefcase, Settings, Shield, AlertCircle,
+//     Briefcase, Settings, Shield, AlertCircle,
 //     Star, ThumbsUp, Calendar, Award, Zap, Layers, Layout, Info,
-//     AlertTriangle, Check, Loader2, Camera, Image as ImageIcon,
-//     Link2, AtSign, Hash, FileSignature, Palette, Brush, Sparkles,
-//     Crown, Gem, Diamond, Gift, MessageSquare, Send,
-//     Paperclip, Smile, Grid,  RefreshCw, Filter,
-//     Search, MoreVertical, Download, Printer, Share2, Bookmark,
-//     Eye, EyeOff, Lock, Unlock, Key, Wifi, WifiOff,
-//     Battery, BatteryCharging, Cpu, HardDrive, Server, Cloud, CloudOff,
-//     Repeat, Shuffle, Play, Pause, Square, Circle, Triangle,
-//     Hexagon, Octagon, Building2, CreditCard, Landmark,
-//     Receipt, HeadphonesIcon, PhoneCall, MailOpen,
-//     MapPinHouse, Building, Store, Globe2, Facebook,
-//     Instagram, Twitter, Youtube, Linkedin, TwitterIcon,
-//     Linkedin as LinkedinIcon, ShieldCheck, ShieldAlert,
-//     Activity, TrendingUp, Briefcase as BriefcaseIcon,
-//     Calendar as CalendarIcon, Clock as ClockIcon,
-//     Map as MapIcon, Truck as TruckIcon, Zap as ZapIcon,
-//     List, Trash2
+//     AlertTriangle, Check, Loader2, Trash2, Building2, Hash, List,
+//     Building, User, Mail, Phone, MapPin, Globe, FileText
 // } from 'lucide-react';
 
 // // ==================== CONSTANTS ====================
@@ -36,42 +20,42 @@
 //         id: 'basic', 
 //         title: 'Basic Information', 
 //         icon: Tag, 
-//         color: appTheme.colors.primary,
+//         color: '#3b82f6',
 //         description: 'Service name, category and description'
 //     },
 //     { 
 //         id: 'pricing', 
 //         title: 'Pricing & Duration', 
 //         icon: DollarSign, 
-//         color: appTheme.colors.secondary,
+//         color: '#10b981',
 //         description: 'Base price, currency and time settings'
 //     },
 //     { 
 //         id: 'variations', 
 //         title: 'Service Variations', 
 //         icon: Briefcase, 
-//         color: appTheme.colors.warning,
+//         color: '#f59e0b',
 //         description: 'Different versions of this service'
 //     },
 //     { 
 //         id: 'addons', 
 //         title: 'Add-ons', 
 //         icon: Plus, 
-//         color: appTheme.colors.success,
+//         color: '#8b5cf6',
 //         description: 'Optional extras customers can purchase'
 //     },
 //     { 
 //         id: 'requirements', 
 //         title: 'Requirements & Inclusions', 
 //         icon: CheckCircle, 
-//         color: appTheme.colors.info,
+//         color: '#06b6d4',
 //         description: 'What clients need and professionals provide'
 //     },
 //     { 
 //         id: 'restrictions', 
 //         title: 'Restrictions', 
 //         icon: Shield, 
-//         color: appTheme.colors.accent,
+//         color: '#ec4899',
 //         description: 'Age limits, gender preferences and booking rules'
 //     }
 // ];
@@ -120,6 +104,9 @@
 //     const serviceId = searchParams.get('id');
 //     const isEditing = !!serviceId;
     
+//     // Get auth context
+//     const { user, isCompanyAdmin, isSuperAdmin, getAuthHeaders } = useAuth();
+    
 //     // Refs for focus management
 //     const inputRefs = useRef({});
     
@@ -128,11 +115,11 @@
 //     const [expandedSections, setExpandedSections] = useState(['basic']);
 //     const [activeTab, setActiveTab] = useState('basic');
 //     const [toast, setToast] = useState({ show: false, type: '', message: '' });
-//     const [isMobile, setIsMobile] = useState(false);
     
 //     // State for professionals dropdown
 //     const [professionals, setProfessionals] = useState([]);
 //     const [loadingProfessionals, setLoadingProfessionals] = useState(true);
+//     const [professionalError, setProfessionalError] = useState('');
     
 //     const [formData, setFormData] = useState({
 //         professionalId: '',
@@ -167,29 +154,68 @@
 //     const [addonInput, setAddonInput] = useState({ name: '', price: 0, description: '' });
 //     const [errors, setErrors] = useState({});
 
+//     // Redirect if not authenticated
+//     useEffect(() => {
+//         if (!user) {
+//             router.push('/login');
+//         } else if (!isCompanyAdmin && !isSuperAdmin) {
+//             router.push('/dashboard');
+//         }
+//     }, [user, isCompanyAdmin, isSuperAdmin, router]);
+
 //     // Fetch professionals on mount
 //     useEffect(() => {
-//         fetchProfessionals();
-//     }, []);
+//         if (user?.companyId) {
+//             fetchProfessionals();
+//         }
+//     }, [user]);
 
 //     // Fetch service data if editing
 //     useEffect(() => {
-//         if (serviceId) {
+//         if (serviceId && user?.companyId) {
 //             fetchService();
 //         }
-//     }, [serviceId]);
+//     }, [serviceId, user]);
 
 //     const fetchProfessionals = async () => {
 //         try {
 //             setLoadingProfessionals(true);
-//             const res = await fetch('/api/bookingService/bookingmng?isActive=true');
+//             setProfessionalError('');
+            
+//             if (!user?.companyId) {
+//                 throw new Error('No company ID found');
+//             }
+            
+//             // Build query with company context
+//             const query = new URLSearchParams({
+//                 companyId: user.companyId,
+//                 isActive: 'true',
+//                 limit: '100'
+//             }).toString();
+            
+//             console.log('Fetching professionals from:', `/api/bookingService/bookingmng?${query}`);
+            
+//             const res = await fetch(`/api/bookingService/bookingmng?${query}`, {
+//                 headers: getAuthHeaders()
+//             });
+            
+//             if (!res.ok) {
+//                 throw new Error(`HTTP error! status: ${res.status}`);
+//             }
+            
 //             const data = await res.json();
+            
 //             if (data.success) {
 //                 setProfessionals(data.data || []);
+//                 console.log('Fetched professionals:', data.data.length);
+//             } else {
+//                 setProfessionalError(data.error || 'Failed to fetch professionals');
+//                 showToast('error', 'Failed to load professionals');
 //             }
 //         } catch (error) {
 //             console.error('Error fetching professionals:', error);
-//             showToast('error', 'Failed to load professionals');
+//             setProfessionalError(error.message);
+//             showToast('error', 'Failed to load professionals: ' + error.message);
 //         } finally {
 //             setLoadingProfessionals(false);
 //         }
@@ -198,7 +224,16 @@
 //     const fetchService = async () => {
 //         try {
 //             setLoading(true);
-//             const res = await fetch(`/api/bookingService/service?id=${serviceId}`);
+            
+//             const query = new URLSearchParams({
+//                 id: serviceId,
+//                 companyId: user.companyId
+//             }).toString();
+            
+//             const res = await fetch(`/api/bookingService/service?${query}`, {
+//                 headers: getAuthHeaders()
+//             });
+            
 //             const data = await res.json();
             
 //             if (data.success) {
@@ -241,27 +276,6 @@
 //             setLoading(false);
 //         }
 //     };
-
-//     // Mobile detection
-//     useEffect(() => {
-//         const checkMobile = () => {
-//             setIsMobile(window.innerWidth < 768);
-//         };
-        
-//         checkMobile();
-        
-//         let resizeTimeout;
-//         const handleResize = () => {
-//             clearTimeout(resizeTimeout);
-//             resizeTimeout = setTimeout(checkMobile, 150);
-//         };
-        
-//         window.addEventListener('resize', handleResize);
-//         return () => {
-//             window.removeEventListener('resize', handleResize);
-//             clearTimeout(resizeTimeout);
-//         };
-//     }, []);
 
 //     // Toast auto-hide
 //     useEffect(() => {
@@ -501,6 +515,8 @@
 //                 ...formData,
 //                 clientRequirements: filteredRequirements,
 //                 professionalProvides: filteredProvides,
+//                 companyId: user.companyId,
+//                 userId: user.id,
 //                 totalBookings: isEditing ? undefined : 0,
 //                 popularity: isEditing ? undefined : 0
 //             };
@@ -509,14 +525,17 @@
 //             Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
 
 //             const url = isEditing 
-//                 ? `/api/bookingService/service?id=${serviceId}`
+//                 ? `/api/bookingService/service?id=${serviceId}&companyId=${user.companyId}`
 //                 : '/api/bookingService/service';
             
 //             const method = isEditing ? 'PUT' : 'POST';
 
 //             const res = await fetch(url, {
 //                 method,
-//                 headers: { 'Content-Type': 'application/json' },
+//                 headers: {
+//                     'Content-Type': 'application/json',
+//                     ...getAuthHeaders()
+//                 },
 //                 body: JSON.stringify(payload)
 //             });
 
@@ -567,6 +586,20 @@
 //         const currency = CURRENCIES.find(c => c.value === formData.currency);
 //         return currency?.symbol || '₹';
 //     };
+
+//     // Loading state
+//     if (!user) {
+//         return (
+//             <div className="loading-container">
+//                 <div className="loading-grid">
+//                     <div className="loading-card"></div>
+//                     <div className="loading-card"></div>
+//                     <div className="loading-card"></div>
+//                 </div>
+//                 <p className="loading-text">Checking authentication...</p>
+//             </div>
+//         );
+//     }
 
 //     if (loading || loadingProfessionals) {
 //         return (
@@ -640,6 +673,36 @@
 //                          toast.type === 'error' ? <AlertCircle size={20} /> : 
 //                          <AlertTriangle size={20} />}
 //                         <span>{toast.message}</span>
+//                     </div>
+//                 )}
+
+//                 {/* Company Context Banner */}
+//                 <div className="company-banner">
+//                     <div className="company-banner-content">
+//                         <div className="company-banner-left">
+//                             <Building2 size={20} className="company-icon" />
+//                             <span className="company-banner-text">
+//                                 {isSuperAdmin ? 'Super Admin View' : 'Company Admin View'} - 
+//                                 {user?.companyName || 'Your Company'}
+//                             </span>
+//                         </div>
+//                         {isSuperAdmin && (
+//                             <div className="super-admin-badge">
+//                                 <Shield size={16} />
+//                                 Super Admin
+//                             </div>
+//                         )}
+//                     </div>
+//                 </div>
+
+//                 {/* Professional Error Message */}
+//                 {professionalError && (
+//                     <div className="api-error">
+//                         <AlertCircle size={20} />
+//                         <p>{professionalError}</p>
+//                         <button onClick={fetchProfessionals} className="retry-icon">
+//                             <RefreshCw size={16} />
+//                         </button>
 //                     </div>
 //                 )}
 
@@ -794,11 +857,16 @@
 //                                                                     <option value="">Choose a professional</option>
 //                                                                     {professionals.map(pro => (
 //                                                                         <option key={pro._id} value={pro._id}>
-//                                                                             {pro.businessName} - {pro.category}
+//                                                                             {pro.businessName} - {pro.category} {pro.isVerified ? '✓' : ''}
 //                                                                         </option>
 //                                                                     ))}
 //                                                                 </select>
 //                                                                 {errors.professionalId && <span className="error-text">{errors.professionalId}</span>}
+//                                                                 {professionals.length === 0 && !loadingProfessionals && (
+//                                                                     <span className="hint error">
+//                                                                         No professionals found. Please add professionals first.
+//                                                                     </span>
+//                                                                 )}
 //                                                             </div>
 //                                                         </div>
 //                                                     </div>
@@ -857,7 +925,7 @@
 //                                                                             key={cat.value} 
 //                                                                             className={`category-card ${formData.category === cat.value ? 'selected' : ''}`}
 //                                                                             style={{ 
-//                                                                                 borderColor: formData.category === cat.value ? cat.color : appTheme.colors.border,
+//                                                                                 borderColor: formData.category === cat.value ? cat.color : '#e2e8f0',
 //                                                                                 background: formData.category === cat.value ? `${cat.color}10` : 'white'
 //                                                                             }}
 //                                                                         >
@@ -896,7 +964,7 @@
 //                                                                             key={type.value} 
 //                                                                             className={`type-card ${formData.type === type.value ? 'selected' : ''}`}
 //                                                                             style={{ 
-//                                                                                 borderColor: formData.type === type.value ? type.color : appTheme.colors.border,
+//                                                                                 borderColor: formData.type === type.value ? type.color : '#e2e8f0',
 //                                                                                 background: formData.type === type.value ? `${type.color}10` : 'white'
 //                                                                             }}
 //                                                                         >
@@ -1089,7 +1157,7 @@
 //                                                                     type="button" 
 //                                                                     onClick={handleAddVariation} 
 //                                                                     className="add-variation-btn"
-//                                                                     style={{ background: appTheme.colors.primary }}
+//                                                                     style={{ background: '#3b82f6' }}
 //                                                                 >
 //                                                                     <Plus size={16} />
 //                                                                     Add
@@ -1170,7 +1238,7 @@
 //                                                                     type="button" 
 //                                                                     onClick={handleAddAddon} 
 //                                                                     className="add-addon-btn"
-//                                                                     style={{ background: appTheme.colors.secondary }}
+//                                                                     style={{ background: '#10b981' }}
 //                                                                 >
 //                                                                     <Plus size={16} />
 //                                                                     Add
@@ -1366,7 +1434,7 @@
 //                                                                             key={pref.value} 
 //                                                                             className={`gender-option ${formData.genderPreference === pref.value ? 'selected' : ''}`}
 //                                                                             style={{ 
-//                                                                                 borderColor: formData.genderPreference === pref.value ? pref.color : appTheme.colors.border,
+//                                                                                 borderColor: formData.genderPreference === pref.value ? pref.color : '#e2e8f0',
 //                                                                                 background: formData.genderPreference === pref.value ? `${pref.color}10` : 'white'
 //                                                                             }}
 //                                                                         >
@@ -1461,7 +1529,89 @@
 //                 .create-service-page {
 //                     min-height: 100vh;
 //                     background: linear-gradient(135deg, #f6f9fc 0%, #f1f5f9 100%);
-//                     font-family: ${appTheme.fonts.primary};
+//                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+//                 }
+
+//                 /* ==================== COMPANY BANNER ==================== */
+//                 .company-banner {
+//                     max-width: 1200px;
+//                     margin: 0 auto 16px auto;
+//                     padding: 0 24px;
+//                 }
+
+//                 .company-banner-content {
+//                     background: white;
+//                     border: 1px solid #e5e7eb;
+//                     border-radius: 8px;
+//                     padding: 12px 16px;
+//                     display: flex;
+//                     align-items: center;
+//                     justify-content: space-between;
+//                 }
+
+//                 .company-banner-left {
+//                     display: flex;
+//                     align-items: center;
+//                     gap: 8px;
+//                 }
+
+//                 .company-icon {
+//                     color: #3b82f6;
+//                 }
+
+//                 .company-banner-text {
+//                     font-size: 0.95rem;
+//                     font-weight: 500;
+//                     color: #1f2937;
+//                 }
+
+//                 .super-admin-badge {
+//                     display: flex;
+//                     align-items: center;
+//                     gap: 6px;
+//                     padding: 4px 10px;
+//                     background: #fef3c7;
+//                     border: 1px solid #fde68a;
+//                     border-radius: 20px;
+//                     color: #92400e;
+//                     font-size: 0.75rem;
+//                     font-weight: 600;
+//                 }
+
+//                 /* ==================== API ERROR ==================== */
+//                 .api-error {
+//                     max-width: 1200px;
+//                     margin: 0 auto 16px auto;
+//                     padding: 0 24px;
+//                     background: #fee2e2;
+//                     border: 1px solid #fecaca;
+//                     border-radius: 8px;
+//                     padding: 12px 16px;
+//                     display: flex;
+//                     align-items: center;
+//                     gap: 8px;
+//                     color: #b91c1c;
+//                 }
+
+//                 .api-error p {
+//                     flex: 1;
+//                     margin: 0;
+//                 }
+
+//                 .retry-icon {
+//                     background: none;
+//                     border: none;
+//                     color: #b91c1c;
+//                     cursor: pointer;
+//                     padding: 4px;
+//                     display: flex;
+//                     align-items: center;
+//                     justify-content: center;
+//                     border-radius: 4px;
+//                 }
+
+//                 .retry-icon:hover {
+//                     background: rgba(185, 28, 28, 0.1);
 //                 }
 
 //                 /* ==================== TOAST NOTIFICATION ==================== */
@@ -1483,27 +1633,27 @@
 //                 }
 
 //                 .toast-notification.success {
-//                     border-left: 4px solid ${appTheme.colors.success};
+//                     border-left: 4px solid #10b981;
 //                 }
 
 //                 .toast-notification.error {
-//                     border-left: 4px solid ${appTheme.colors.error};
+//                     border-left: 4px solid #ef4444;
 //                 }
 
 //                 .toast-notification.warning {
-//                     border-left: 4px solid ${appTheme.colors.warning};
+//                     border-left: 4px solid #f59e0b;
 //                 }
 
 //                 .toast-notification.success svg {
-//                     color: ${appTheme.colors.success};
+//                     color: #10b981;
 //                 }
 
 //                 .toast-notification.error svg {
-//                     color: ${appTheme.colors.error};
+//                     color: #ef4444;
 //                 }
 
 //                 .toast-notification.warning svg {
-//                     color: ${appTheme.colors.warning};
+//                     color: #f59e0b;
 //                 }
 
 //                 @keyframes slideInRight {
@@ -1520,7 +1670,7 @@
 //                 /* ==================== HEADER ==================== */
 //                 .page-header {
 //                     background: white;
-//                     border-bottom: 1px solid ${appTheme.colors.border};
+//                     border-bottom: 1px solid #e2e8f0;
 //                     padding: 20px 24px;
 //                     position: sticky;
 //                     top: 0;
@@ -1549,7 +1699,7 @@
 //                     gap: 8px;
 //                     background: none;
 //                     border: none;
-//                     color: ${appTheme.colors.primary};
+//                     color: #3b82f6;
 //                     font-size: 0.875rem;
 //                     font-weight: 500;
 //                     cursor: pointer;
@@ -1574,7 +1724,7 @@
 //                 }
 
 //                 .title-icon {
-//                     color: ${appTheme.colors.primary};
+//                     color: #3b82f6;
 //                 }
 
 //                 .page-description {
@@ -1596,7 +1746,7 @@
 //                     align-items: center;
 //                     justify-content: center;
 //                     background: #f8fafc;
-//                     border: 1px solid ${appTheme.colors.border};
+//                     border: 1px solid #e2e8f0;
 //                     border-radius: 8px;
 //                     color: #64748b;
 //                     cursor: pointer;
@@ -1605,8 +1755,8 @@
 
 //                 .header-action-btn:hover {
 //                     background: #f1f5f9;
-//                     color: ${appTheme.colors.primary};
-//                     border-color: ${appTheme.colors.primary};
+//                     color: #3b82f6;
+//                     border-color: #3b82f6;
 //                 }
 
 //                 .status-badge {
@@ -1638,7 +1788,7 @@
 //                     align-items: center;
 //                     gap: 8px;
 //                     padding: 10px 20px;
-//                     background: ${appTheme.colors.primary};
+//                     background: #3b82f6;
 //                     color: white;
 //                     border: none;
 //                     border-radius: 8px;
@@ -1646,13 +1796,13 @@
 //                     font-weight: 500;
 //                     cursor: pointer;
 //                     transition: all 0.2s ease;
-//                     box-shadow: 0 4px 12px ${appTheme.colors.primary}30;
+//                     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 //                 }
 
 //                 .save-button:hover {
 //                     background: #2563eb;
 //                     transform: translateY(-1px);
-//                     box-shadow: 0 6px 16px ${appTheme.colors.primary}40;
+//                     box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
 //                 }
 
 //                 .save-button:disabled {
@@ -1819,7 +1969,7 @@
 
 //                 .section-content {
 //                     padding: 0 24px 24px 24px;
-//                     border-top: 1px solid ${appTheme.colors.border};
+//                     border-top: 1px solid #e2e8f0;
 //                     animation: slideDown 0.3s ease;
 //                 }
 
@@ -1852,11 +2002,11 @@
 //                     color: #334155;
 //                     margin: 0 0 16px 0;
 //                     padding-bottom: 8px;
-//                     border-bottom: 1px dashed ${appTheme.colors.border};
+//                     border-bottom: 1px dashed #e2e8f0;
 //                 }
 
 //                 .form-block h3 svg {
-//                     color: ${appTheme.colors.primary};
+//                     color: #3b82f6;
 //                 }
 
 //                 .form-grid {
@@ -1894,40 +2044,43 @@
 //                 .form-field textarea {
 //                     width: 100%;
 //                     padding: 10px 14px;
-//                     border: 1px solid ${appTheme.colors.border};
+//                     border: 1px solid #e2e8f0;
 //                     border-radius: 8px;
 //                     font-size: 0.938rem;
 //                     transition: all 0.2s ease;
 //                     background: white;
-//                     font-family: ${appTheme.fonts.primary};
 //                 }
 
 //                 .form-field input:focus,
 //                 .form-field select:focus,
 //                 .form-field textarea:focus {
 //                     outline: none;
-//                     border-color: ${appTheme.colors.primary};
-//                     box-shadow: 0 0 0 3px ${appTheme.colors.primary}20;
+//                     border-color: #3b82f6;
+//                     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 //                 }
 
 //                 .form-field input.error,
 //                 .form-field select.error,
 //                 .form-field textarea.error {
-//                     border-color: ${appTheme.colors.error};
+//                     border-color: #ef4444;
 //                 }
 
 //                 .error-text {
 //                     font-size: 0.688rem;
-//                     color: ${appTheme.colors.error};
+//                     color: #ef4444;
 //                 }
 
 //                 .required {
-//                     color: ${appTheme.colors.error};
+//                     color: #ef4444;
 //                 }
 
 //                 .hint {
 //                     font-size: 0.688rem;
 //                     color: #94a3b8;
+//                 }
+
+//                 .hint.error {
+//                     color: #ef4444;
 //                 }
 
 //                 /* ==================== CATEGORY CARDS ==================== */
@@ -1956,7 +2109,7 @@
 //                     gap: 6px;
 //                     padding: 12px;
 //                     background: white;
-//                     border: 2px solid ${appTheme.colors.border};
+//                     border: 2px solid #e2e8f0;
 //                     border-radius: 8px;
 //                     cursor: pointer;
 //                     transition: all 0.2s ease;
@@ -1968,7 +2121,7 @@
 //                 }
 
 //                 .category-card.selected {
-//                     background: ${appTheme.colors.primary}10;
+//                     background: rgba(59, 130, 246, 0.1);
 //                 }
 
 //                 .category-icon {
@@ -1996,7 +2149,7 @@
 //                     gap: 4px;
 //                     padding: 10px;
 //                     background: white;
-//                     border: 2px solid ${appTheme.colors.border};
+//                     border: 2px solid #e2e8f0;
 //                     border-radius: 8px;
 //                     cursor: pointer;
 //                 }
@@ -2007,7 +2160,7 @@
 //                 }
 
 //                 .type-card.selected {
-//                     background: ${appTheme.colors.primary}10;
+//                     background: rgba(59, 130, 246, 0.1);
 //                 }
 
 //                 .type-icon {
@@ -2031,10 +2184,10 @@
 //                     align-items: center;
 //                     gap: 4px;
 //                     padding: 0 16px;
-//                     background: ${appTheme.colors.primary}10;
-//                     border: 1px solid ${appTheme.colors.primary}30;
+//                     background: rgba(59, 130, 246, 0.1);
+//                     border: 1px solid rgba(59, 130, 246, 0.3);
 //                     border-radius: 8px;
-//                     color: ${appTheme.colors.primary};
+//                     color: #3b82f6;
 //                     font-size: 0.85rem;
 //                     white-space: nowrap;
 //                     cursor: pointer;
@@ -2052,17 +2205,17 @@
 //                     align-items: center;
 //                     gap: 4px;
 //                     padding: 4px 10px;
-//                     background: ${appTheme.colors.primary}10;
-//                     border: 1px solid ${appTheme.colors.primary}30;
+//                     background: rgba(59, 130, 246, 0.1);
+//                     border: 1px solid rgba(59, 130, 246, 0.3);
 //                     border-radius: 20px;
 //                     font-size: 0.75rem;
-//                     color: ${appTheme.colors.primary};
+//                     color: #3b82f6;
 //                 }
 
 //                 .tag button {
 //                     border: none;
 //                     background: transparent;
-//                     color: ${appTheme.colors.primary};
+//                     color: #3b82f6;
 //                     cursor: pointer;
 //                     font-size: 1rem;
 //                     padding: 0;
@@ -2095,7 +2248,7 @@
 //                 .pricing-card {
 //                     padding: 16px;
 //                     background: #f8fafc;
-//                     border: 1px solid ${appTheme.colors.border};
+//                     border: 1px solid #e2e8f0;
 //                     border-radius: 8px;
 //                 }
 
@@ -2123,7 +2276,7 @@
 //                 .pricing-input input {
 //                     width: 100%;
 //                     padding: 6px 8px;
-//                     border: 1px solid ${appTheme.colors.border};
+//                     border: 1px solid #e2e8f0;
 //                     border-radius: 8px;
 //                     font-size: 0.9rem;
 //                     text-align: right;
@@ -2132,7 +2285,7 @@
 //                 .currency-select {
 //                     width: 100%;
 //                     padding: 8px;
-//                     border: 1px solid ${appTheme.colors.border};
+//                     border: 1px solid #e2e8f0;
 //                     border-radius: 8px;
 //                     font-size: 0.85rem;
 //                 }
@@ -2146,7 +2299,7 @@
 //                 .buffer-input input {
 //                     width: 70px;
 //                     padding: 6px 8px;
-//                     border: 1px solid ${appTheme.colors.border};
+//                     border: 1px solid #e2e8f0;
 //                     border-radius: 8px;
 //                     text-align: center;
 //                 }
@@ -2202,7 +2355,7 @@
 //                     align-items: center;
 //                     padding: 12px;
 //                     background: white;
-//                     border: 1px solid ${appTheme.colors.border};
+//                     border: 1px solid #e2e8f0;
 //                     border-radius: 8px;
 //                 }
 
@@ -2220,7 +2373,7 @@
 
 //                 .variation-price {
 //                     font-size: 0.875rem;
-//                     color: ${appTheme.colors.success};
+//                     color: #10b981;
 //                     font-weight: 600;
 //                 }
 
@@ -2275,7 +2428,7 @@
 //                     align-items: center;
 //                     padding: 12px;
 //                     background: white;
-//                     border: 1px solid ${appTheme.colors.border};
+//                     border: 1px solid #e2e8f0;
 //                     border-radius: 8px;
 //                 }
 
@@ -2298,7 +2451,7 @@
 //                 .addon-price {
 //                     font-size: 0.875rem;
 //                     font-weight: 600;
-//                     color: ${appTheme.colors.success};
+//                     color: #10b981;
 //                 }
 
 //                 /* ==================== REQUIREMENTS ==================== */
@@ -2318,10 +2471,10 @@
 //                     align-items: center;
 //                     justify-content: center;
 //                     padding: 0 10px;
-//                     background: ${appTheme.colors.error}10;
-//                     border: 1px solid ${appTheme.colors.error}30;
+//                     background: rgba(239, 68, 68, 0.1);
+//                     border: 1px solid rgba(239, 68, 68, 0.3);
 //                     border-radius: 8px;
-//                     color: ${appTheme.colors.error};
+//                     color: #ef4444;
 //                     cursor: pointer;
 //                 }
 
@@ -2332,7 +2485,7 @@
 //                     gap: 4px;
 //                     padding: 8px;
 //                     background: white;
-//                     border: 1px dashed ${appTheme.colors.border};
+//                     border: 1px dashed #e2e8f0;
 //                     border-radius: 8px;
 //                     color: #64748b;
 //                     font-size: 0.85rem;
@@ -2355,7 +2508,7 @@
 //                 .restriction-card {
 //                     padding: 16px;
 //                     background: #f8fafc;
-//                     border: 1px solid ${appTheme.colors.border};
+//                     border: 1px solid #e2e8f0;
 //                     border-radius: 8px;
 //                 }
 
@@ -2376,7 +2529,7 @@
 //                 .restriction-input input {
 //                     width: 80px;
 //                     padding: 6px 8px;
-//                     border: 1px solid ${appTheme.colors.border};
+//                     border: 1px solid #e2e8f0;
 //                     border-radius: 8px;
 //                     text-align: center;
 //                 }
@@ -2395,7 +2548,7 @@
 //                 .age-inputs input {
 //                     width: 70px;
 //                     padding: 6px 8px;
-//                     border: 1px solid ${appTheme.colors.border};
+//                     border: 1px solid #e2e8f0;
 //                     border-radius: 8px;
 //                     text-align: center;
 //                 }
@@ -2417,7 +2570,7 @@
 //                     gap: 4px;
 //                     padding: 8px 4px;
 //                     background: white;
-//                     border: 2px solid ${appTheme.colors.border};
+//                     border: 2px solid #e2e8f0;
 //                     border-radius: 8px;
 //                     cursor: pointer;
 //                 }
@@ -2428,7 +2581,7 @@
 //                 }
 
 //                 .gender-option.selected {
-//                     background: ${appTheme.colors.primary}10;
+//                     background: rgba(59, 130, 246, 0.1);
 //                 }
 
 //                 .gender-icon {
@@ -2458,7 +2611,7 @@
 //                 }
 
 //                 .status-header svg {
-//                     color: ${appTheme.colors.primary};
+//                     color: #3b82f6;
 //                 }
 
 //                 .status-header h3 {
@@ -2486,7 +2639,7 @@
 //                     gap: 8px;
 //                     padding: 12px;
 //                     background: #f8fafc;
-//                     border: 1px solid ${appTheme.colors.border};
+//                     border: 1px solid #e2e8f0;
 //                     border-radius: 8px;
 //                     cursor: pointer;
 //                 }
@@ -2540,7 +2693,7 @@
 //                 .mobile-save-btn {
 //                     width: 100%;
 //                     padding: 16px;
-//                     background: ${appTheme.colors.primary};
+//                     background: #3b82f6;
 //                     color: white;
 //                     border: none;
 //                     border-radius: 8px;
@@ -2550,7 +2703,7 @@
 //                     align-items: center;
 //                     justify-content: center;
 //                     gap: 8px;
-//                     box-shadow: 0 4px 20px ${appTheme.colors.primary}40;
+//                     box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
 //                 }
 
 //                 .mobile-save-btn:disabled {
@@ -2565,13 +2718,13 @@
 //                     padding: 6px;
 //                     background: transparent;
 //                     border: none;
-//                     color: ${appTheme.colors.error};
+//                     color: #ef4444;
 //                     cursor: pointer;
 //                     border-radius: 6px;
 //                 }
 
 //                 .remove-btn:hover {
-//                     background: ${appTheme.colors.error}10;
+//                     background: rgba(239, 68, 68, 0.1);
 //                 }
 
 //                 /* ==================== RESPONSIVE ==================== */
@@ -2614,10 +2767,6 @@
 //                     }
 
 //                     .desktop-tabs {
-//                         display: none;
-//                     }
-
-//                     .stats-grid {
 //                         display: none;
 //                     }
 
@@ -2700,10 +2849,6 @@
 //                         padding: 16px 16px 90px 16px;
 //                     }
 
-//                     .stats-grid {
-//                         display: none;
-//                     }
-
 //                     .tag-input-group {
 //                         flex-direction: column;
 //                     }
@@ -2757,19 +2902,48 @@
 
 
 
-'use client';
-import { useState, useEffect, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+
+
+
+
+
+
+// app/admin/bookingService/service/create/page.js
+"use client";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Head from 'next/head';
+import { appTheme } from "../../../../../src/constants/theme";
 import { useAuth } from '../../../../../context/AuthContext';
 import {
-    ArrowLeft, Save, Tag, DollarSign, Clock,
-    Users, CheckCircle, XCircle, Plus, Minus, ChevronRight,
-    Briefcase, Settings, Shield, AlertCircle,
-    Star, ThumbsUp, Calendar, Award, Zap, Layers, Layout, Info,
-    AlertTriangle, Check, Loader2, Trash2, Building2, Hash, List,
-    Building, User, Mail, Phone, MapPin, Globe, FileText
+    Save, X, ChevronRight, Layers, Layout, Info,
+    CheckCircle, AlertCircle, AlertTriangle, XCircle,
+    Package, DollarSign, Percent, Calendar, Tag, Box,
+    Truck, Globe, Settings, Shield, Zap, Star, Heart,
+    Award, ShoppingCart, Clock, MapPin, Phone, Mail,
+    FileText, Edit2, Trash2, Plus, Minus, Copy,
+    Check, Loader2, Camera, Video, Link2, Hash,
+    AtSign, FileSignature, Palette, Brush, Sparkles,
+    Crown, Gem, Diamond, Gift, ThumbsUp, ThumbsDown,
+    MessageSquare, Send, Paperclip, Smile, Home,
+    ArrowLeft, ArrowRight, Grid, List, RefreshCw,
+    Filter, Search, MoreVertical, Download, Printer,
+    Share2, Bookmark, Eye, EyeOff, Lock, Unlock,
+    Key, Wifi, WifiOff, Battery, BatteryCharging,
+    Cpu, HardDrive, Server, Cloud, CloudOff, Repeat,
+    Shuffle, Play, Pause, Square, Circle, Triangle,
+    Hexagon, Octagon, Building2, CreditCard, Landmark,
+    Receipt, HeadphonesIcon, PhoneCall, MailOpen,
+    MapPinHouse, Building, Store, Globe2, Facebook,
+    Instagram, Twitter, Youtube, Linkedin, TwitterIcon,
+    Linkedin as LinkedinIcon, ShieldCheck, ShieldAlert,
+    Activity, TrendingUp, Users, Briefcase, Calendar as CalendarIcon,
+    User, Mail as MailIcon, Phone as PhoneIcon, Map,
+    CreditCard as CreditCardIcon, Wallet, Banknote,
+    Receipt as ReceiptIcon, Package as PackageIcon,
+    Truck as TruckIcon, Clock as ClockIcon, ChevronDown,
+    Copy as CopyIcon, Briefcase as BriefcaseIcon,
+    Tag as TagIcon, DollarSign as DollarSignIcon
 } from 'lucide-react';
 
 // ==================== CONSTANTS ====================
@@ -2777,43 +2951,43 @@ const SECTIONS = [
     { 
         id: 'basic', 
         title: 'Basic Information', 
-        icon: Tag, 
-        color: '#3b82f6',
+        icon: TagIcon, 
+        color: appTheme.colors.primary,
         description: 'Service name, category and description'
     },
     { 
         id: 'pricing', 
         title: 'Pricing & Duration', 
-        icon: DollarSign, 
-        color: '#10b981',
+        icon: DollarSignIcon, 
+        color: appTheme.colors.success,
         description: 'Base price, currency and time settings'
     },
     { 
         id: 'variations', 
         title: 'Service Variations', 
-        icon: Briefcase, 
-        color: '#f59e0b',
+        icon: BriefcaseIcon, 
+        color: appTheme.colors.warning,
         description: 'Different versions of this service'
     },
     { 
         id: 'addons', 
         title: 'Add-ons', 
         icon: Plus, 
-        color: '#8b5cf6',
+        color: appTheme.colors.secondary,
         description: 'Optional extras customers can purchase'
     },
     { 
         id: 'requirements', 
         title: 'Requirements & Inclusions', 
         icon: CheckCircle, 
-        color: '#06b6d4',
+        color: appTheme.colors.info,
         description: 'What clients need and professionals provide'
     },
     { 
         id: 'restrictions', 
         title: 'Restrictions', 
         icon: Shield, 
-        color: '#ec4899',
+        color: appTheme.colors.accent,
         description: 'Age limits, gender preferences and booking rules'
     }
 ];
@@ -2859,26 +3033,33 @@ const isValidObjectId = (id) => {
 export default function CreateServicePage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const serviceId = searchParams.get('id');
-    const isEditing = !!serviceId;
+    const serviceId = searchParams.get("id");
     
-    // Get auth context
-    const { user, isCompanyAdmin, isSuperAdmin, getAuthHeaders } = useAuth();
+    // Refs for scrolling to error fields
+    const fieldRefs = useRef({});
     
-    // Refs for focus management
-    const inputRefs = useRef({});
-    
-    const [loading, setLoading] = useState(isEditing);
+    const { user, isAuthenticated, isCompanyAdmin, isSuperAdmin, getAuthHeaders } = useAuth();
+
+    // Redirect if not authenticated or not company admin
+    useEffect(() => {
+        if (!isAuthenticated) {
+            router.push('/login');
+        } else if (!isCompanyAdmin && !isSuperAdmin) {
+            router.push('/dashboard');
+        }
+    }, [isAuthenticated, isCompanyAdmin, isSuperAdmin, router]);
+
+    // State management
+    const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [expandedSections, setExpandedSections] = useState(['basic']);
-    const [activeTab, setActiveTab] = useState('basic');
+    const [errors, setErrors] = useState({});
     const [toast, setToast] = useState({ show: false, type: '', message: '' });
     
     // State for professionals dropdown
     const [professionals, setProfessionals] = useState([]);
-    const [loadingProfessionals, setLoadingProfessionals] = useState(true);
-    const [professionalError, setProfessionalError] = useState('');
-    
+    const [loadingProfessionals, setLoadingProfessionals] = useState(false);
+    const [companyInfo, setCompanyInfo] = useState(null);
+
     const [formData, setFormData] = useState({
         professionalId: '',
         name: '',
@@ -2886,7 +3067,7 @@ export default function CreateServicePage() {
         category: 'beauty',
         type: 'physical',
         subcategory: '',
-        basePrice: 0,
+        basePrice: '',
         duration: 60,
         currency: 'INR',
         
@@ -2899,8 +3080,8 @@ export default function CreateServicePage() {
         
         bufferTime: 0,
         advanceBooking: 30,
-        minAge: null,
-        maxAge: null,
+        minAge: '',
+        maxAge: '',
         genderPreference: 'any',
         isActive: true,
         isPopular: false,
@@ -2908,72 +3089,117 @@ export default function CreateServicePage() {
     });
 
     const [tagInput, setTagInput] = useState('');
-    const [variationInput, setVariationInput] = useState({ name: '', price: 0, duration: 0 });
-    const [addonInput, setAddonInput] = useState({ name: '', price: 0, description: '' });
-    const [errors, setErrors] = useState({});
+    const [variationInput, setVariationInput] = useState({ name: '', price: '', duration: '' });
+    const [addonInput, setAddonInput] = useState({ name: '', price: '', description: '' });
+    
+    const [isEditing, setIsEditing] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [apiError, setApiError] = useState(null);
 
-    // Redirect if not authenticated
+    // Mobile detection
     useEffect(() => {
-        if (!user) {
-            router.push('/login');
-        } else if (!isCompanyAdmin && !isSuperAdmin) {
-            router.push('/dashboard');
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 768);
+        };
+        
+        checkMobile();
+        
+        let resizeTimeout;
+        const handleResize = () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(checkMobile, 150);
+        };
+        
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            clearTimeout(resizeTimeout);
+        };
+    }, []);
+
+    // Toast auto-hide
+    useEffect(() => {
+        if (toast.show) {
+            const timer = setTimeout(() => {
+                setToast({ show: false, type: '', message: '' });
+            }, 3000);
+            return () => clearTimeout(timer);
         }
-    }, [user, isCompanyAdmin, isSuperAdmin, router]);
+    }, [toast]);
 
     // Fetch professionals on mount
     useEffect(() => {
         if (user?.companyId) {
             fetchProfessionals();
+            fetchCompanyInfo();
         }
     }, [user]);
 
     // Fetch service data if editing
     useEffect(() => {
         if (serviceId && user?.companyId) {
+            setIsEditing(true);
             fetchService();
         }
     }, [serviceId, user]);
 
-    const fetchProfessionals = async () => {
-        try {
-            setLoadingProfessionals(true);
-            setProfessionalError('');
-            
-            if (!user?.companyId) {
-                throw new Error('No company ID found');
+    // Scroll to first error field
+    useEffect(() => {
+        if (Object.keys(errors).length > 0) {
+            const firstErrorField = Object.keys(errors)[0];
+            if (fieldRefs.current[firstErrorField]) {
+                fieldRefs.current[firstErrorField].scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
             }
-            
-            // Build query with company context
-            const query = new URLSearchParams({
+        }
+    }, [errors]);
+
+    const showToast = (type, message) => {
+        setToast({ show: true, type, message });
+    };
+
+    // Fetch company info
+    const fetchCompanyInfo = async () => {
+        try {
+            const res = await fetch(`/api/companies/me`, {
+                headers: getAuthHeaders()
+            });
+            const data = await res.json();
+            if (data.success) {
+                setCompanyInfo(data.data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch company info:', error);
+        }
+    };
+
+    // Fetch professionals
+    const fetchProfessionals = async () => {
+        setLoadingProfessionals(true);
+        try {
+            const params = new URLSearchParams({
                 companyId: user.companyId,
                 isActive: 'true',
                 limit: '100'
             }).toString();
             
-            console.log('Fetching professionals from:', `/api/bookingService/bookingmng?${query}`);
-            
-            const res = await fetch(`/api/bookingService/bookingmng?${query}`, {
+            const res = await fetch(`/api/bookingService/bookingmng?${params}`, {
                 headers: getAuthHeaders()
             });
-            
-            if (!res.ok) {
-                throw new Error(`HTTP error! status: ${res.status}`);
-            }
             
             const data = await res.json();
             
             if (data.success) {
                 setProfessionals(data.data || []);
-                console.log('Fetched professionals:', data.data.length);
             } else {
-                setProfessionalError(data.error || 'Failed to fetch professionals');
-                showToast('error', 'Failed to load professionals');
+                showToast('error', 'Failed to load professionals: ' + (data.message || data.error));
             }
         } catch (error) {
             console.error('Error fetching professionals:', error);
-            setProfessionalError(error.message);
-            showToast('error', 'Failed to load professionals: ' + error.message);
+            showToast('error', 'Failed to load professionals');
         } finally {
             setLoadingProfessionals(false);
         }
@@ -2982,13 +3208,14 @@ export default function CreateServicePage() {
     const fetchService = async () => {
         try {
             setLoading(true);
+            setApiError(null);
             
-            const query = new URLSearchParams({
+            const params = new URLSearchParams({
                 id: serviceId,
                 companyId: user.companyId
             }).toString();
             
-            const res = await fetch(`/api/bookingService/service?${query}`, {
+            const res = await fetch(`/api/bookingService/service?${params}`, {
                 headers: getAuthHeaders()
             });
             
@@ -3003,7 +3230,7 @@ export default function CreateServicePage() {
                     category: service.category || 'beauty',
                     type: service.type || 'physical',
                     subcategory: service.subcategory || '',
-                    basePrice: service.basePrice || 0,
+                    basePrice: service.basePrice?.toString() || '',
                     duration: service.duration || 60,
                     currency: service.currency || 'INR',
                     
@@ -3016,8 +3243,8 @@ export default function CreateServicePage() {
                     
                     bufferTime: service.bufferTime || 0,
                     advanceBooking: service.advanceBooking || 30,
-                    minAge: service.minAge || null,
-                    maxAge: service.maxAge || null,
+                    minAge: service.minAge?.toString() || '',
+                    maxAge: service.maxAge?.toString() || '',
                     genderPreference: service.genderPreference || 'any',
                     isActive: service.isActive !== false,
                     isPopular: service.isPopular || false,
@@ -3025,86 +3252,80 @@ export default function CreateServicePage() {
                 });
                 showToast('success', 'Service loaded successfully');
             } else {
-                showToast('error', 'Failed to load service');
+                showToast('error', 'Failed to fetch service: ' + data.message);
+                setTimeout(() => router.push("/admin/bookingService/service"), 2000);
             }
         } catch (error) {
             console.error('Error fetching service:', error);
-            showToast('error', 'Failed to load service');
+            setApiError(error.message);
+            showToast('error', error.message || 'Failed to load service data');
         } finally {
             setLoading(false);
         }
     };
 
-    // Toast auto-hide
-    useEffect(() => {
-        if (toast.show) {
-            const timer = setTimeout(() => {
-                setToast({ show: false, type: '', message: '' });
-            }, 3000);
-            return () => clearTimeout(timer);
+    const validateForm = () => {
+        const newErrors = {};
+
+        // Professional validation
+        if (!formData.professionalId) {
+            newErrors.professionalId = "Please select a professional/business";
+        } else if (!isValidObjectId(formData.professionalId)) {
+            newErrors.professionalId = "Invalid professional ID format";
         }
-    }, [toast]);
 
-    const showToast = (type, message) => {
-        setToast({ show: true, type, message });
-    };
-
-    // Toggle section expansion
-    const toggleSection = (sectionId) => {
-        setExpandedSections(prev => {
-            if (prev.includes(sectionId)) {
-                return prev.filter(id => id !== sectionId);
-            } else {
-                return [...prev, sectionId];
-            }
-        });
-    };
-
-    const handleTabClick = (tabId) => {
-        setActiveTab(tabId);
-        if (!expandedSections.includes(tabId)) {
-            setExpandedSections(prev => [...prev, tabId]);
+        // Service name validation
+        if (!formData.name.trim()) {
+            newErrors.name = "Service name is required";
         }
+
+        // Description validation
+        if (!formData.description.trim()) {
+            newErrors.description = "Description is required";
+        } else if (formData.description.length < 50) {
+            newErrors.description = "Description should be at least 50 characters";
+        }
+
+        // Base price validation
+        if (!formData.basePrice || parseFloat(formData.basePrice) <= 0) {
+            newErrors.basePrice = "Base price must be greater than 0";
+        }
+
+        // Duration validation
+        if (!formData.duration || formData.duration < 15) {
+            newErrors.duration = "Duration must be at least 15 minutes";
+        }
+
+        // Client requirements validation
+        const hasValidRequirement = formData.clientRequirements.some(req => req && req.trim() !== "");
+        if (!hasValidRequirement) {
+            newErrors.clientRequirements = "At least one client requirement is needed";
+        }
+
+        // Professional provides validation
+        const hasValidProvide = formData.professionalProvides.some(prov => prov && prov.trim() !== "");
+        if (!hasValidProvide) {
+            newErrors.professionalProvides = "At least one professional provide item is needed";
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
     };
 
-    const expandAll = () => {
-        setExpandedSections(SECTIONS.map(s => s.id));
-    };
-
-    const collapseAll = () => {
-        setExpandedSections([]);
-    };
-
-    // Handle form input changes
-    const handleChange = (e) => {
+    const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
+        
         setFormData(prev => ({
             ...prev,
             [name]: type === 'checkbox' ? checked : value
         }));
         
+        // Clear error when user starts typing
         if (errors[name]) {
             setErrors(prev => ({
                 ...prev,
-                [name]: ''
+                [name]: ""
             }));
-        }
-    };
-
-    // Handle Enter key navigation
-    const handleKeyDown = (e, fieldName, nextFieldName) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            if (nextFieldName && inputRefs.current[nextFieldName]) {
-                inputRefs.current[nextFieldName].focus();
-            }
-        }
-    };
-
-    // Register ref for input
-    const setInputRef = (name, element) => {
-        if (element) {
-            inputRefs.current[name] = element;
         }
     };
 
@@ -3113,6 +3334,10 @@ export default function CreateServicePage() {
         const updatedArray = [...formData[field]];
         updatedArray[index] = value;
         setFormData(prev => ({ ...prev, [field]: updatedArray }));
+        
+        if (errors[field]) {
+            setErrors(prev => ({ ...prev, [field]: "" }));
+        }
     };
 
     const addArrayItem = (field) => {
@@ -3150,16 +3375,16 @@ export default function CreateServicePage() {
 
     // Handle variations
     const handleAddVariation = () => {
-        if (variationInput.name.trim() && variationInput.price >= 0) {
+        if (variationInput.name.trim() && variationInput.price && parseFloat(variationInput.price) >= 0) {
             setFormData(prev => ({
                 ...prev,
                 variations: [...prev.variations, { 
-                    ...variationInput, 
+                    name: variationInput.name.trim(),
                     price: parseFloat(variationInput.price) || 0,
-                    duration: parseInt(variationInput.duration) || 0
+                    duration: variationInput.duration ? parseInt(variationInput.duration) : 0
                 }]
             }));
-            setVariationInput({ name: '', price: 0, duration: 0 });
+            setVariationInput({ name: '', price: '', duration: '' });
             showToast('success', 'Variation added');
         }
     };
@@ -3174,15 +3399,16 @@ export default function CreateServicePage() {
 
     // Handle addons
     const handleAddAddon = () => {
-        if (addonInput.name.trim() && addonInput.price >= 0) {
+        if (addonInput.name.trim() && addonInput.price && parseFloat(addonInput.price) >= 0) {
             setFormData(prev => ({
                 ...prev,
                 addons: [...prev.addons, { 
-                    ...addonInput, 
-                    price: parseFloat(addonInput.price) || 0 
+                    name: addonInput.name.trim(),
+                    price: parseFloat(addonInput.price) || 0,
+                    description: addonInput.description.trim() || undefined
                 }]
             }));
-            setAddonInput({ name: '', price: 0, description: '' });
+            setAddonInput({ name: '', price: '', description: '' });
             showToast('success', 'Add-on added');
         }
     };
@@ -3195,103 +3421,72 @@ export default function CreateServicePage() {
         showToast('success', 'Add-on removed');
     };
 
-    // Validate form
-    const validateForm = () => {
-        const newErrors = {};
-
-        // Validate professionalId
-        if (!formData.professionalId) {
-            newErrors.professionalId = 'Please select a professional/business';
-        } else if (!isValidObjectId(formData.professionalId)) {
-            newErrors.professionalId = 'Invalid professional ID format';
-        }
-
-        if (!formData.name.trim()) {
-            newErrors.name = 'Service name is required';
-        }
-
-        if (!formData.description.trim()) {
-            newErrors.description = 'Description is required';
-        } else if (formData.description.length < 50) {
-            newErrors.description = 'Description should be at least 50 characters';
-        }
-
-        if (!formData.basePrice || formData.basePrice <= 0) {
-            newErrors.basePrice = 'Base price must be greater than 0';
-        }
-
-        if (!formData.duration || formData.duration < 15) {
-            newErrors.duration = 'Duration must be at least 15 minutes';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    // Get currency symbol
+    const getCurrencySymbol = () => {
+        const currency = CURRENCIES.find(c => c.value === formData.currency);
+        return currency?.symbol || '₹';
     };
 
-    // Handle form submission with scroll to error
     const handleSubmit = async (e) => {
         e.preventDefault();
         
         if (!validateForm()) {
-            showToast('error', 'Please fix the errors before submitting');
-            
-            // Get the first error field
-            const firstError = Object.keys(errors)[0];
-            
-            // Scroll to the error
-            if (firstError) {
-                const errorSection = getFieldSection(firstError);
-                if (errorSection && !expandedSections.includes(errorSection)) {
-                    setExpandedSections(prev => [...prev, errorSection]);
-                    setActiveTab(errorSection);
-                    
-                    setTimeout(() => {
-                        const element = document.getElementById(firstError);
-                        if (element) {
-                            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            element.focus();
-                        }
-                    }, 300);
-                } else {
-                    const element = document.getElementById(firstError);
-                    if (element) {
-                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        element.focus();
-                    }
-                }
-            }
+            showToast('error', "Please fix the errors before submitting.");
             return;
         }
 
+        if (isSubmitting) return;
+        
+        setIsSubmitting(true);
         setSaving(true);
+        setApiError(null);
 
         try {
-            const filteredRequirements = formData.clientRequirements.filter(req => req.trim() !== '');
-            const filteredProvides = formData.professionalProvides.filter(prov => prov.trim() !== '');
-            
+            const filteredRequirements = formData.clientRequirements.filter(req => req && req.trim() !== "");
+            const filteredProvides = formData.professionalProvides.filter(prov => prov && prov.trim() !== "");
+
             const payload = {
-                ...formData,
+                professionalId: formData.professionalId,
+                name: formData.name.trim(),
+                description: formData.description.trim(),
+                category: formData.category,
+                type: formData.type,
+                subcategory: formData.subcategory.trim() || undefined,
+                basePrice: parseFloat(formData.basePrice),
+                duration: parseInt(formData.duration),
+                currency: formData.currency,
+                
+                tags: formData.tags,
                 clientRequirements: filteredRequirements,
                 professionalProvides: filteredProvides,
+                variations: formData.variations,
+                addons: formData.addons,
+                
+                bufferTime: parseInt(formData.bufferTime) || 0,
+                advanceBooking: parseInt(formData.advanceBooking) || 30,
+                minAge: formData.minAge ? parseInt(formData.minAge) : undefined,
+                maxAge: formData.maxAge ? parseInt(formData.maxAge) : undefined,
+                genderPreference: formData.genderPreference,
+                isActive: formData.isActive,
+                isPopular: formData.isPopular,
+                isFeatured: formData.isFeatured,
+                
                 companyId: user.companyId,
-                userId: user.id,
-                totalBookings: isEditing ? undefined : 0,
-                popularity: isEditing ? undefined : 0
+                createdBy: user.id
             };
 
-            // Remove undefined fields
-            Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+            if (isEditing) {
+                payload._id = serviceId;
+                payload.updatedBy = user.id;
+            }
 
-            const url = isEditing 
-                ? `/api/bookingService/service?id=${serviceId}&companyId=${user.companyId}`
-                : '/api/bookingService/service';
-            
-            const method = isEditing ? 'PUT' : 'POST';
+            const url = "/api/bookingService/service";
+            const method = isEditing ? "PUT" : "POST";
 
             const res = await fetch(url, {
                 method,
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                     ...getAuthHeaders()
                 },
                 body: JSON.stringify(payload)
@@ -3300,130 +3495,61 @@ export default function CreateServicePage() {
             const data = await res.json();
 
             if (data.success) {
-                showToast('success', isEditing ? 'Service updated successfully!' : 'Service created successfully!');
-                setTimeout(() => router.push('/admin/bookingService/service'), 1500);
+                showToast('success', isEditing ? "✅ Service updated successfully!" : "🎉 Service created successfully!");
+                setTimeout(() => router.push("/admin/bookingService/service"), 1500);
             } else {
-                showToast('error', `Error: ${data.error || 'Failed to save service'}`);
+                if (res.status === 403) {
+                    throw new Error("You don't have permission to perform this action");
+                }
+                if (res.status === 409) {
+                    throw new Error(data.error || 'Service already exists');
+                }
+                throw new Error(data.error || data.message || "Failed to save service");
             }
         } catch (error) {
             console.error('Error saving service:', error);
-            showToast('error', 'Failed to save service. Please try again.');
+            setApiError(error.message);
+            showToast('error', `❌ Failed to save: ${error.message}`);
         } finally {
             setSaving(false);
+            setIsSubmitting(false);
         }
     };
 
-    // Helper to find which section a field belongs to
-    const getFieldSection = (fieldName) => {
-        const fieldToSection = {
-            professionalId: 'basic',
-            name: 'basic',
-            description: 'basic',
-            category: 'basic',
-            type: 'basic',
-            subcategory: 'basic',
-            tags: 'basic',
-            basePrice: 'pricing',
-            currency: 'pricing',
-            duration: 'pricing',
-            bufferTime: 'pricing',
-            variations: 'variations',
-            addons: 'addons',
-            clientRequirements: 'requirements',
-            professionalProvides: 'requirements',
-            advanceBooking: 'restrictions',
-            minAge: 'restrictions',
-            maxAge: 'restrictions',
-            genderPreference: 'restrictions'
-        };
-        return fieldToSection[fieldName] || 'basic';
+    const handleBack = useCallback(() => {
+        if (window.history.length > 1) {
+            router.back();
+        } else {
+            router.push("/admin/bookingService/service");
+        }
+    }, [router]);
+
+    const copyToClipboard = (text) => {
+        navigator.clipboard.writeText(text);
+        showToast('success', 'Copied to clipboard!');
     };
 
-    // Get currency symbol
-    const getCurrencySymbol = () => {
-        const currency = CURRENCIES.find(c => c.value === formData.currency);
-        return currency?.symbol || '₹';
-    };
-
-    // Loading state
-    if (!user) {
+    if (loading && isEditing) {
         return (
             <div className="loading-container">
-                <div className="loading-grid">
-                    <div className="loading-card"></div>
-                    <div className="loading-card"></div>
-                    <div className="loading-card"></div>
-                </div>
-                <p className="loading-text">Checking authentication...</p>
+                <div className="loading-spinner"></div>
+                <p className="loading-text">Loading service data...</p>
             </div>
         );
     }
 
-    if (loading || loadingProfessionals) {
-        return (
-            <div className="loading-container">
-                <div className="loading-grid">
-                    <div className="loading-card"></div>
-                    <div className="loading-card"></div>
-                    <div className="loading-card"></div>
-                </div>
-                <p className="loading-text">Loading...</p>
-                <style jsx>{`
-                    .loading-container {
-                        min-height: 100vh;
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        justify-content: center;
-                        background: linear-gradient(135deg, #f6f9fc 0%, #f1f5f9 100%);
-                    }
-                    .loading-grid {
-                        display: grid;
-                        grid-template-columns: repeat(3, 1fr);
-                        gap: 16px;
-                        margin-bottom: 24px;
-                    }
-                    .loading-card {
-                        width: 80px;
-                        height: 80px;
-                        background: white;
-                        border-radius: 8px;
-                        animation: pulse 1.5s ease-in-out infinite;
-                    }
-                    .loading-card:nth-child(2) {
-                        animation-delay: 0.2s;
-                    }
-                    .loading-card:nth-child(3) {
-                        animation-delay: 0.4s;
-                    }
-                    @keyframes pulse {
-                        0%, 100% {
-                            opacity: 0.6;
-                            transform: scale(1);
-                        }
-                        50% {
-                            opacity: 1;
-                            transform: scale(1.05);
-                        }
-                    }
-                    .loading-text {
-                        color: #64748b;
-                        font-size: 0.875rem;
-                        font-weight: 500;
-                    }
-                `}</style>
-            </div>
-        );
+    if (!isAuthenticated || !user) {
+        return null;
     }
 
     return (
         <>
             <Head>
-                <title>{isEditing ? 'Edit Service' : 'Add New Service'} | LFMS</title>
+                <title>{isEditing ? 'Edit Service' : 'Add Service'} | LFMS</title>
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
             </Head>
 
-            <div className="create-service-page">
+            <div className="service-form-page">
                 {/* Toast Notification */}
                 {toast.show && (
                     <div className={`toast-notification ${toast.type}`}>
@@ -3434,79 +3560,31 @@ export default function CreateServicePage() {
                     </div>
                 )}
 
-                {/* Company Context Banner */}
-                <div className="company-banner">
-                    <div className="company-banner-content">
-                        <div className="company-banner-left">
-                            <Building2 size={20} className="company-icon" />
-                            <span className="company-banner-text">
-                                {isSuperAdmin ? 'Super Admin View' : 'Company Admin View'} - 
-                                {user?.companyName || 'Your Company'}
-                            </span>
-                        </div>
-                        {isSuperAdmin && (
-                            <div className="super-admin-badge">
-                                <Shield size={16} />
-                                Super Admin
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Professional Error Message */}
-                {professionalError && (
-                    <div className="api-error">
-                        <AlertCircle size={20} />
-                        <p>{professionalError}</p>
-                        <button onClick={fetchProfessionals} className="retry-icon">
-                            <RefreshCw size={16} />
-                        </button>
-                    </div>
-                )}
-
                 {/* Header */}
                 <header className="page-header">
                     <div className="header-content">
                         <div className="header-left">
-                            <Link href="/admin/bookingService/service" className="back-button">
+                            <button
+                                onClick={handleBack}
+                                className="back-button"
+                            >
                                 <ArrowLeft size={20} />
                                 <span>Back to Services</span>
-                            </Link>
+                            </button>
                             <h1 className="page-title">
-                                <Tag size={28} className="title-icon" />
                                 {isEditing ? 'Edit Service' : 'Add New Service'}
                             </h1>
                             <p className="page-description">
-                                {isEditing ? 'Update your service information' : 'Create a new service offering with complete details'}
+                                {isEditing ? 'Update your service information' : 'Fill in the details to create a new service offering'}
                             </p>
                         </div>
                         <div className="header-actions">
                             <button
-                                onClick={expandAll}
-                                className="header-action-btn"
-                                title="Expand all sections"
-                            >
-                                <Layers size={18} />
-                            </button>
-                            <button
-                                onClick={collapseAll}
-                                className="header-action-btn"
-                                title="Collapse all sections"
-                            >
-                                <Layout size={18} />
-                            </button>
-                            {!isEditing && <span className="status-badge draft">Draft</span>}
-                            {isEditing && (
-                                <span className={`status-badge ${formData.isActive ? 'active' : 'inactive'}`}>
-                                    {formData.isActive ? 'Active' : 'Inactive'}
-                                </span>
-                            )}
-                            <button
                                 onClick={handleSubmit}
-                                disabled={saving}
+                                disabled={saving || isSubmitting}
                                 className="save-button"
                             >
-                                {saving ? (
+                                {saving || isSubmitting ? (
                                     <>
                                         <div className="button-spinner"></div>
                                         <span>Saving...</span>
@@ -3514,7 +3592,7 @@ export default function CreateServicePage() {
                                 ) : (
                                     <>
                                         <Save size={16} />
-                                        <span>{isEditing ? 'Update Service' : 'Create Service'}</span>
+                                        <span>{isEditing ? 'Update Service' : 'Save Service'}</span>
                                     </>
                                 )}
                             </button>
@@ -3522,743 +3600,671 @@ export default function CreateServicePage() {
                     </div>
                 </header>
 
-                {/* Desktop Horizontal Tabs */}
-                <div className="desktop-tabs">
-                    {SECTIONS.map(section => {
-                        const Icon = section.icon;
-                        return (
-                            <button
-                                key={section.id}
-                                className={`tab-button ${activeTab === section.id ? 'active' : ''}`}
-                                onClick={() => handleTabClick(section.id)}
-                            >
-                                <div className="tab-icon" style={{ 
-                                    backgroundColor: activeTab === section.id ? `${section.color}20` : 'transparent',
-                                    color: activeTab === section.id ? section.color : '#64748b'
-                                }}>
-                                    <Icon size={20} />
-                                </div>
-                                <span className="tab-title" style={{
-                                    color: activeTab === section.id ? '#0f172a' : '#64748b',
-                                    fontWeight: activeTab === section.id ? '600' : '500'
-                                }}>{section.title}</span>
-                                {activeTab === section.id && (
-                                    <div className="active-indicator" style={{ backgroundColor: section.color }}></div>
-                                )}
-                            </button>
-                        );
-                    })}
+                {/* Company Context Banner */}
+                <div className="company-banner">
+                    <div className="company-banner-content">
+                        <div className="company-banner-left">
+                            <Building2 size={18} />
+                            <span>
+                                {isSuperAdmin ? 'Super Admin' : 'Company Admin'} · 
+                                {companyInfo?.companyName || user?.companyName || 'Your Company'}
+                            </span>
+                        </div>
+                        {isSuperAdmin && (
+                            <div className="super-admin-badge">
+                                <Shield size={14} />
+                                Super Admin
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                {/* Main Content */}
+                {/* API Error Message */}
+                {apiError && (
+                    <div className="api-error">
+                        <AlertCircle size={18} />
+                        <span>{apiError}</span>
+                    </div>
+                )}
+
+                {/* Main Content - Single Scroll Page */}
                 <main className="main-content">
-                    {/* Sections */}
-                    <div className="sections-container">
-                        {SECTIONS.map(section => {
-                            const Icon = section.icon;
-                            const isExpanded = expandedSections.includes(section.id);
+                    {/* Form Sections - All Visible at Once */}
+                    <div className="form-sections">
+                        {/* ==================== BASIC INFORMATION SECTION ==================== */}
+                        <div className="form-section">
+                            <div className="section-header">
+                                <div className="section-header-left">
+                                    <div className="section-icon" style={{ background: `${appTheme.colors.primary}15`, color: appTheme.colors.primary }}>
+                                        <Tag size={20} />
+                                    </div>
+                                    <div>
+                                        <h2>Basic Information</h2>
+                                        <p>Service name, category and description</p>
+                                    </div>
+                                </div>
+                            </div>
                             
-                            return (
-                                <div key={section.id} className={`section-card ${activeTab === section.id ? 'active' : ''}`}>
-                                    {/* Section Header */}
-                                    <div 
-                                        className="section-header"
-                                        onClick={() => toggleSection(section.id)}
-                                    >
-                                        <div className="section-header-left">
-                                            <div 
-                                                className="section-icon"
-                                                style={{ background: `${section.color}15`, color: section.color }}
-                                            >
-                                                <Icon size={20} />
-                                            </div>
-                                            <div className="section-title">
-                                                <h2>{section.title}</h2>
-                                                <p>{section.description}</p>
-                                            </div>
-                                        </div>
-                                        <div className="section-header-right">
-                                            <ChevronRight 
-                                                size={20} 
-                                                className={`chevron-icon ${isExpanded ? 'expanded' : ''}`}
-                                                style={{
-                                                    transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                                                    transition: 'transform 0.3s ease'
-                                                }}
-                                            />
-                                        </div>
+                            <div className="section-content">
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>
+                                            Select Professional/Business <span className="required">*</span>
+                                        </label>
+                                        <select
+                                            name="professionalId"
+                                            value={formData.professionalId}
+                                            onChange={handleInputChange}
+                                            className={errors.professionalId ? 'error' : ''}
+                                            disabled={loadingProfessionals}
+                                            ref={el => fieldRefs.current['professionalId'] = el}
+                                        >
+                                            <option value="">Choose a professional</option>
+                                            {professionals.map(pro => (
+                                                <option key={pro._id} value={pro._id}>
+                                                    {pro.businessName} - {pro.category} {pro.isVerified ? '✓' : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {errors.professionalId && <span className="error-text">{errors.professionalId}</span>}
+                                        {professionals.length === 0 && !loadingProfessionals && (
+                                            <span className="field-hint error">
+                                                No professionals found. Please add professionals first.
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>
+                                            Service Name <span className="required">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="name"
+                                            value={formData.name}
+                                            onChange={handleInputChange}
+                                            className={errors.name ? 'error' : ''}
+                                            placeholder="e.g., Professional Haircut"
+                                            ref={el => fieldRefs.current['name'] = el}
+                                        />
+                                        {errors.name && <span className="error-text">{errors.name}</span>}
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>
+                                            Description <span className="required">*</span>
+                                        </label>
+                                        <textarea
+                                            name="description"
+                                            rows="4"
+                                            value={formData.description}
+                                            onChange={handleInputChange}
+                                            className={errors.description ? 'error' : ''}
+                                            placeholder="Describe the service in detail..."
+                                            ref={el => fieldRefs.current['description'] = el}
+                                        />
+                                        {errors.description && <span className="error-text">{errors.description}</span>}
+                                        <span className="field-hint">Minimum 50 characters recommended</span>
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group span-2">
+                                        <label>Category <span className="required">*</span></label>
+                                        <select
+                                            name="category"
+                                            value={formData.category}
+                                            onChange={handleInputChange}
+                                        >
+                                            {CATEGORIES.map(cat => (
+                                                <option key={cat.value} value={cat.value}>
+                                                    {cat.icon} {cat.label}
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
 
-                                    {/* Section Content */}
-                                    {isExpanded && (
-                                        <div className="section-content">
-                                            {/* Basic Information */}
-                                            {section.id === 'basic' && (
-                                                <>
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Building2 size={16} />
-                                                            Professional Selection
-                                                        </h3>
-                                                        <div className="form-grid">
-                                                            <div className="form-field span-2">
-                                                                <label>Select Professional/Business <span className="required">*</span></label>
-                                                                <select
-                                                                    name="professionalId"
-                                                                    id="professionalId"
-                                                                    value={formData.professionalId}
-                                                                    onChange={handleChange}
-                                                                    className={errors.professionalId ? 'error' : ''}
-                                                                    ref={(el) => setInputRef('professionalId', el)}
-                                                                    onKeyDown={(e) => handleKeyDown(e, 'professionalId', 'name')}
-                                                                >
-                                                                    <option value="">Choose a professional</option>
-                                                                    {professionals.map(pro => (
-                                                                        <option key={pro._id} value={pro._id}>
-                                                                            {pro.businessName} - {pro.category} {pro.isVerified ? '✓' : ''}
-                                                                        </option>
-                                                                    ))}
-                                                                </select>
-                                                                {errors.professionalId && <span className="error-text">{errors.professionalId}</span>}
-                                                                {professionals.length === 0 && !loadingProfessionals && (
-                                                                    <span className="hint error">
-                                                                        No professionals found. Please add professionals first.
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Tag size={16} />
-                                                            Basic Details
-                                                        </h3>
-                                                        <div className="form-grid">
-                                                            <div className="form-field span-2">
-                                                                <label>Service Name <span className="required">*</span></label>
-                                                                <input
-                                                                    type="text"
-                                                                    name="name"
-                                                                    id="name"
-                                                                    value={formData.name}
-                                                                    onChange={handleChange}
-                                                                    className={errors.name ? 'error' : ''}
-                                                                    placeholder="e.g., Professional Haircut"
-                                                                    ref={(el) => setInputRef('name', el)}
-                                                                    onKeyDown={(e) => handleKeyDown(e, 'name', 'description')}
-                                                                />
-                                                                {errors.name && <span className="error-text">{errors.name}</span>}
-                                                            </div>
-
-                                                            <div className="form-field span-2">
-                                                                <label>Description <span className="required">*</span></label>
-                                                                <textarea
-                                                                    name="description"
-                                                                    id="description"
-                                                                    value={formData.description}
-                                                                    onChange={handleChange}
-                                                                    rows="4"
-                                                                    className={errors.description ? 'error' : ''}
-                                                                    placeholder="Describe the service in detail..."
-                                                                    ref={(el) => setInputRef('description', el)}
-                                                                />
-                                                                {errors.description && <span className="error-text">{errors.description}</span>}
-                                                                <span className="hint">Minimum 50 characters recommended</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Briefcase size={16} />
-                                                            Classification
-                                                        </h3>
-                                                        <div className="form-grid">
-                                                            <div className="form-field span-2">
-                                                                <label>Category <span className="required">*</span></label>
-                                                                <div className="category-cards">
-                                                                    {CATEGORIES.map(cat => (
-                                                                        <label 
-                                                                            key={cat.value} 
-                                                                            className={`category-card ${formData.category === cat.value ? 'selected' : ''}`}
-                                                                            style={{ 
-                                                                                borderColor: formData.category === cat.value ? cat.color : '#e2e8f0',
-                                                                                background: formData.category === cat.value ? `${cat.color}10` : 'white'
-                                                                            }}
-                                                                        >
-                                                                            <input
-                                                                                type="radio"
-                                                                                name="category"
-                                                                                value={cat.value}
-                                                                                checked={formData.category === cat.value}
-                                                                                onChange={handleChange}
-                                                                            />
-                                                                            <span className="category-icon">{cat.icon}</span>
-                                                                            <span className="category-label">{cat.label}</span>
-                                                                        </label>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="form-field">
-                                                                <label>Subcategory</label>
-                                                                <input
-                                                                    type="text"
-                                                                    name="subcategory"
-                                                                    value={formData.subcategory}
-                                                                    onChange={handleChange}
-                                                                    placeholder="e.g., Hair Styling"
-                                                                    ref={(el) => setInputRef('subcategory', el)}
-                                                                    onKeyDown={(e) => handleKeyDown(e, 'subcategory')}
-                                                                />
-                                                            </div>
-
-                                                            <div className="form-field">
-                                                                <label>Service Type</label>
-                                                                <div className="type-cards">
-                                                                    {SERVICE_TYPES.map(type => (
-                                                                        <label 
-                                                                            key={type.value} 
-                                                                            className={`type-card ${formData.type === type.value ? 'selected' : ''}`}
-                                                                            style={{ 
-                                                                                borderColor: formData.type === type.value ? type.color : '#e2e8f0',
-                                                                                background: formData.type === type.value ? `${type.color}10` : 'white'
-                                                                            }}
-                                                                        >
-                                                                            <input
-                                                                                type="radio"
-                                                                                name="type"
-                                                                                value={type.value}
-                                                                                checked={formData.type === type.value}
-                                                                                onChange={handleChange}
-                                                                            />
-                                                                            <span className="type-icon">{type.icon}</span>
-                                                                            <span className="type-label">{type.label}</span>
-                                                                        </label>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Hash size={16} />
-                                                            Tags
-                                                        </h3>
-                                                        <div className="form-field">
-                                                            <div className="tag-input-group">
-                                                                <input
-                                                                    type="text"
-                                                                    value={tagInput}
-                                                                    onChange={(e) => setTagInput(e.target.value)}
-                                                                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
-                                                                    placeholder="Add tags"
-                                                                />
-                                                                <button 
-                                                                    type="button" 
-                                                                    onClick={handleAddTag} 
-                                                                    className="add-btn"
-                                                                >
-                                                                    <Plus size={16} />
-                                                                    Add
-                                                                </button>
-                                                            </div>
-                                                            <div className="tags-list">
-                                                                {formData.tags.map((tag, index) => (
-                                                                    <span key={index} className="tag">
-                                                                        {tag}
-                                                                        <button type="button" onClick={() => handleRemoveTag(index)}>×</button>
-                                                                    </span>
-                                                                ))}
-                                                                {formData.tags.length === 0 && (
-                                                                    <span className="no-tags">No tags added</span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {/* Pricing & Duration */}
-                                            {section.id === 'pricing' && (
-                                                <>
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <DollarSign size={16} />
-                                                            Pricing
-                                                        </h3>
-                                                        <div className="pricing-grid">
-                                                            <div className="pricing-card">
-                                                                <div className="pricing-header">
-                                                                    <DollarSign size={14} />
-                                                                    <span>Base Price</span>
-                                                                </div>
-                                                                <div className="pricing-input">
-                                                                    <span className="currency-symbol">{getCurrencySymbol()}</span>
-                                                                    <input
-                                                                        type="number"
-                                                                        name="basePrice"
-                                                                        id="basePrice"
-                                                                        value={formData.basePrice}
-                                                                        onChange={handleChange}
-                                                                        min="0"
-                                                                        step="0.01"
-                                                                        className={errors.basePrice ? 'error' : ''}
-                                                                        ref={(el) => setInputRef('basePrice', el)}
-                                                                        onKeyDown={(e) => handleKeyDown(e, 'basePrice', 'duration')}
-                                                                    />
-                                                                </div>
-                                                                {errors.basePrice && <span className="error-text">{errors.basePrice}</span>}
-                                                            </div>
-
-                                                            <div className="pricing-card">
-                                                                <div className="pricing-header">
-                                                                    <Shield size={14} />
-                                                                    <span>Currency</span>
-                                                                </div>
-                                                                <select
-                                                                    name="currency"
-                                                                    value={formData.currency}
-                                                                    onChange={handleChange}
-                                                                    className="currency-select"
-                                                                    ref={(el) => setInputRef('currency', el)}
-                                                                >
-                                                                    {CURRENCIES.map(curr => (
-                                                                        <option key={curr.value} value={curr.value}>{curr.label}</option>
-                                                                    ))}
-                                                                </select>
-                                                            </div>
-
-                                                            <div className="pricing-card">
-                                                                <div className="pricing-header">
-                                                                    <Clock size={14} />
-                                                                    <span>Duration</span>
-                                                                </div>
-                                                                <select
-                                                                    name="duration"
-                                                                    id="duration"
-                                                                    value={formData.duration}
-                                                                    onChange={handleChange}
-                                                                    className={errors.duration ? 'error' : ''}
-                                                                    ref={(el) => setInputRef('duration', el)}
-                                                                >
-                                                                    {DURATION_OPTIONS.map(mins => (
-                                                                        <option key={mins} value={mins}>
-                                                                            {mins >= 60 
-                                                                                ? `${Math.floor(mins / 60)}h ${mins % 60}m` 
-                                                                                : `${mins} min`}
-                                                                        </option>
-                                                                    ))}
-                                                                </select>
-                                                                {errors.duration && <span className="error-text">{errors.duration}</span>}
-                                                            </div>
-
-                                                            <div className="pricing-card">
-                                                                <div className="pricing-header">
-                                                                    <Zap size={14} />
-                                                                    <span>Buffer Time</span>
-                                                                </div>
-                                                                <div className="buffer-input">
-                                                                    <input
-                                                                        type="number"
-                                                                        name="bufferTime"
-                                                                        value={formData.bufferTime}
-                                                                        onChange={handleChange}
-                                                                        min="0"
-                                                                        step="5"
-                                                                        ref={(el) => setInputRef('bufferTime', el)}
-                                                                    />
-                                                                    <span>min</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {/* Variations */}
-                                            {section.id === 'variations' && (
-                                                <>
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Briefcase size={16} />
-                                                            Add Variation
-                                                        </h3>
-                                                        <div className="variation-form">
-                                                            <div className="variation-inputs">
-                                                                <input
-                                                                    type="text"
-                                                                    value={variationInput.name}
-                                                                    onChange={(e) => setVariationInput(prev => ({ ...prev, name: e.target.value }))}
-                                                                    placeholder="Variation name"
-                                                                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddVariation())}
-                                                                />
-                                                                <input
-                                                                    type="number"
-                                                                    value={variationInput.price}
-                                                                    onChange={(e) => setVariationInput(prev => ({ ...prev, price: e.target.value }))}
-                                                                    placeholder={`Price (${getCurrencySymbol()})`}
-                                                                    step="0.01"
-                                                                    min="0"
-                                                                />
-                                                                <input
-                                                                    type="number"
-                                                                    value={variationInput.duration}
-                                                                    onChange={(e) => setVariationInput(prev => ({ ...prev, duration: e.target.value }))}
-                                                                    placeholder="Extra minutes"
-                                                                    min="0"
-                                                                    step="5"
-                                                                />
-                                                                <button 
-                                                                    type="button" 
-                                                                    onClick={handleAddVariation} 
-                                                                    className="add-variation-btn"
-                                                                    style={{ background: '#3b82f6' }}
-                                                                >
-                                                                    <Plus size={16} />
-                                                                    Add
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <List size={16} />
-                                                            Variations List
-                                                        </h3>
-                                                        <div className="variations-list">
-                                                            {formData.variations.length > 0 ? (
-                                                                formData.variations.map((variation, index) => (
-                                                                    <div key={index} className="variation-item">
-                                                                        <div className="variation-info">
-                                                                            <span className="variation-name">{variation.name}</span>
-                                                                            <span className="variation-price">+{getCurrencySymbol()}{variation.price}</span>
-                                                                            {variation.duration > 0 && (
-                                                                                <span className="variation-duration">+{variation.duration} min</span>
-                                                                            )}
-                                                                        </div>
-                                                                        <button 
-                                                                            type="button" 
-                                                                            onClick={() => handleRemoveVariation(index)} 
-                                                                            className="remove-btn"
-                                                                        >
-                                                                            <Trash2 size={14} />
-                                                                        </button>
-                                                                    </div>
-                                                                ))
-                                                            ) : (
-                                                                <div className="empty-state">
-                                                                    <Briefcase size={32} />
-                                                                    <p>No variations added</p>
-                                                                    <span>Add variations like "Premium Package" or "Express Service"</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {/* Addons */}
-                                            {section.id === 'addons' && (
-                                                <>
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Plus size={16} />
-                                                            Add Add-on
-                                                        </h3>
-                                                        <div className="addon-form">
-                                                            <div className="addon-inputs">
-                                                                <input
-                                                                    type="text"
-                                                                    value={addonInput.name}
-                                                                    onChange={(e) => setAddonInput(prev => ({ ...prev, name: e.target.value }))}
-                                                                    placeholder="Add-on name"
-                                                                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddAddon())}
-                                                                />
-                                                                <input
-                                                                    type="number"
-                                                                    value={addonInput.price}
-                                                                    onChange={(e) => setAddonInput(prev => ({ ...prev, price: e.target.value }))}
-                                                                    placeholder={`Price (${getCurrencySymbol()})`}
-                                                                    step="0.01"
-                                                                    min="0"
-                                                                />
-                                                                <input
-                                                                    type="text"
-                                                                    value={addonInput.description}
-                                                                    onChange={(e) => setAddonInput(prev => ({ ...prev, description: e.target.value }))}
-                                                                    placeholder="Description"
-                                                                />
-                                                                <button 
-                                                                    type="button" 
-                                                                    onClick={handleAddAddon} 
-                                                                    className="add-addon-btn"
-                                                                    style={{ background: '#10b981' }}
-                                                                >
-                                                                    <Plus size={16} />
-                                                                    Add
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <List size={16} />
-                                                            Add-ons List
-                                                        </h3>
-                                                        <div className="addons-list">
-                                                            {formData.addons.length > 0 ? (
-                                                                formData.addons.map((addon, index) => (
-                                                                    <div key={index} className="addon-item">
-                                                                        <div className="addon-info">
-                                                                            <span className="addon-name">{addon.name}</span>
-                                                                            {addon.description && (
-                                                                                <span className="addon-desc">{addon.description}</span>
-                                                                            )}
-                                                                        </div>
-                                                                        <div className="addon-price">
-                                                                            +{getCurrencySymbol()}{addon.price}
-                                                                        </div>
-                                                                        <button 
-                                                                            type="button" 
-                                                                            onClick={() => handleRemoveAddon(index)} 
-                                                                            className="remove-btn"
-                                                                        >
-                                                                            <Trash2 size={14} />
-                                                                        </button>
-                                                                    </div>
-                                                                ))
-                                                            ) : (
-                                                                <div className="empty-state">
-                                                                    <Plus size={32} />
-                                                                    <p>No add-ons added</p>
-                                                                    <span>Add optional extras customers can purchase</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {/* Requirements */}
-                                            {section.id === 'requirements' && (
-                                                <>
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <AlertCircle size={16} />
-                                                            Client Requirements
-                                                        </h3>
-                                                        <div className="requirements-list">
-                                                            {formData.clientRequirements.map((req, index) => (
-                                                                <div key={index} className="requirement-row">
-                                                                    <input
-                                                                        type="text"
-                                                                        value={req}
-                                                                        onChange={(e) => handleArrayChange('clientRequirements', index, e.target.value)}
-                                                                        placeholder="What client needs to bring"
-                                                                        onKeyPress={(e) => e.key === 'Enter' && e.preventDefault()}
-                                                                    />
-                                                                    {formData.clientRequirements.length > 1 && (
-                                                                        <button 
-                                                                            type="button" 
-                                                                            onClick={() => removeArrayItem('clientRequirements', index)} 
-                                                                            className="remove-row-btn"
-                                                                        >
-                                                                            <Minus size={14} />
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            ))}
-                                                            <button 
-                                                                type="button" 
-                                                                onClick={() => addArrayItem('clientRequirements')} 
-                                                                className="add-row-btn"
-                                                            >
-                                                                <Plus size={14} />
-                                                                Add Requirement
-                                                            </button>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <ThumbsUp size={16} />
-                                                            Professional Provides
-                                                        </h3>
-                                                        <div className="requirements-list">
-                                                            {formData.professionalProvides.map((prov, index) => (
-                                                                <div key={index} className="requirement-row">
-                                                                    <input
-                                                                        type="text"
-                                                                        value={prov}
-                                                                        onChange={(e) => handleArrayChange('professionalProvides', index, e.target.value)}
-                                                                        placeholder="What professional provides"
-                                                                        onKeyPress={(e) => e.key === 'Enter' && e.preventDefault()}
-                                                                    />
-                                                                    {formData.professionalProvides.length > 1 && (
-                                                                        <button 
-                                                                            type="button" 
-                                                                            onClick={() => removeArrayItem('professionalProvides', index)} 
-                                                                            className="remove-row-btn"
-                                                                        >
-                                                                            <Minus size={14} />
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            ))}
-                                                            <button 
-                                                                type="button" 
-                                                                onClick={() => addArrayItem('professionalProvides')} 
-                                                                className="add-row-btn"
-                                                            >
-                                                                <Plus size={14} />
-                                                                Add Item
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {/* Restrictions */}
-                                            {section.id === 'restrictions' && (
-                                                <>
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Calendar size={16} />
-                                                            Booking Rules
-                                                        </h3>
-                                                        <div className="restrictions-grid">
-                                                            <div className="restriction-card">
-                                                                <div className="restriction-header">
-                                                                    <Calendar size={14} />
-                                                                    <span>Advance Booking</span>
-                                                                </div>
-                                                                <div className="restriction-input">
-                                                                    <input
-                                                                        type="number"
-                                                                        name="advanceBooking"
-                                                                        value={formData.advanceBooking}
-                                                                        onChange={handleChange}
-                                                                        min="1"
-                                                                        max="365"
-                                                                        ref={(el) => setInputRef('advanceBooking', el)}
-                                                                    />
-                                                                    <span>days</span>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="restriction-card">
-                                                                <div className="restriction-header">
-                                                                    <Users size={14} />
-                                                                    <span>Age Restrictions</span>
-                                                                </div>
-                                                                <div className="age-inputs">
-                                                                    <input
-                                                                        type="number"
-                                                                        name="minAge"
-                                                                        value={formData.minAge || ''}
-                                                                        onChange={handleChange}
-                                                                        placeholder="Min"
-                                                                        min="0"
-                                                                        max="100"
-                                                                        ref={(el) => setInputRef('minAge', el)}
-                                                                    />
-                                                                    <span>to</span>
-                                                                    <input
-                                                                        type="number"
-                                                                        name="maxAge"
-                                                                        value={formData.maxAge || ''}
-                                                                        onChange={handleChange}
-                                                                        placeholder="Max"
-                                                                        min="0"
-                                                                        max="100"
-                                                                        ref={(el) => setInputRef('maxAge', el)}
-                                                                    />
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="restriction-card">
-                                                                <div className="restriction-header">
-                                                                    <Users size={14} />
-                                                                    <span>Gender Preference</span>
-                                                                </div>
-                                                                <div className="gender-options">
-                                                                    {GENDER_PREFERENCES.map(pref => (
-                                                                        <label 
-                                                                            key={pref.value} 
-                                                                            className={`gender-option ${formData.genderPreference === pref.value ? 'selected' : ''}`}
-                                                                            style={{ 
-                                                                                borderColor: formData.genderPreference === pref.value ? pref.color : '#e2e8f0',
-                                                                                background: formData.genderPreference === pref.value ? `${pref.color}10` : 'white'
-                                                                            }}
-                                                                        >
-                                                                            <input
-                                                                                type="radio"
-                                                                                name="genderPreference"
-                                                                                value={pref.value}
-                                                                                checked={formData.genderPreference === pref.value}
-                                                                                onChange={handleChange}
-                                                                            />
-                                                                            <span className="gender-icon">{pref.icon}</span>
-                                                                            <span className="gender-label">{pref.label}</span>
-                                                                        </label>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                    )}
+                                    <div className="form-group">
+                                        <label>Subcategory</label>
+                                        <input
+                                            type="text"
+                                            name="subcategory"
+                                            value={formData.subcategory}
+                                            onChange={handleInputChange}
+                                            placeholder="e.g., Hair Styling"
+                                        />
+                                    </div>
                                 </div>
-                            );
-                        })}
-                    </div>
 
-                    {/* Status Section */}
-                    <div className="status-section">
-                        <div className="status-header">
-                            <Settings size={20} />
-                            <h3>Service Status</h3>
+                                <div className="form-row">
+                                    <div className="form-group span-2">
+                                        <label>Service Type</label>
+                                        <select
+                                            name="type"
+                                            value={formData.type}
+                                            onChange={handleInputChange}
+                                        >
+                                            {SERVICE_TYPES.map(type => (
+                                                <option key={type.value} value={type.value}>
+                                                    {type.icon} {type.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>Tags</label>
+                                        <div className="input-group">
+                                            <input
+                                                type="text"
+                                                value={tagInput}
+                                                onChange={(e) => setTagInput(e.target.value)}
+                                                placeholder="Add tags"
+                                                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleAddTag}
+                                                className="icon-button"
+                                            >
+                                                <Plus size={16} />
+                                            </button>
+                                        </div>
+                                        
+                                        {formData.tags.length > 0 && (
+                                            <div className="tags-container">
+                                                {formData.tags.map((tag, index) => (
+                                                    <span key={index} className="tag">
+                                                        {tag}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveTag(index)}
+                                                            className="tag-remove"
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="status-grid">
-                            <label className="status-checkbox">
-                                <input
-                                    type="checkbox"
-                                    name="isActive"
-                                    checked={formData.isActive}
-                                    onChange={handleChange}
-                                />
-                                <CheckCircle size={18} />
-                                <span>Service is active</span>
-                            </label>
 
-                            <label className="status-checkbox">
-                                <input
-                                    type="checkbox"
-                                    name="isPopular"
-                                    checked={formData.isPopular}
-                                    onChange={handleChange}
-                                />
-                                <Star size={18} />
-                                <span>Mark as popular</span>
-                            </label>
+                        {/* ==================== PRICING & DURATION SECTION ==================== */}
+                        <div className="form-section">
+                            <div className="section-header">
+                                <div className="section-header-left">
+                                    <div className="section-icon" style={{ background: `${appTheme.colors.success}15`, color: appTheme.colors.success }}>
+                                        <DollarSign size={20} />
+                                    </div>
+                                    <div>
+                                        <h2>Pricing & Duration</h2>
+                                        <p>Base price, currency and time settings</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="section-content">
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>
+                                            Base Price <span className="required">*</span>
+                                        </label>
+                                        <div className="input-with-prefix">
+                                            <span className="prefix">{getCurrencySymbol()}</span>
+                                            <input
+                                                type="number"
+                                                name="basePrice"
+                                                min="0"
+                                                step="0.01"
+                                                value={formData.basePrice}
+                                                onChange={handleInputChange}
+                                                className={errors.basePrice ? 'error' : ''}
+                                                placeholder="0.00"
+                                                ref={el => fieldRefs.current['basePrice'] = el}
+                                            />
+                                        </div>
+                                        {errors.basePrice && <span className="error-text">{errors.basePrice}</span>}
+                                    </div>
 
-                            <label className="status-checkbox">
-                                <input
-                                    type="checkbox"
-                                    name="isFeatured"
-                                    checked={formData.isFeatured}
-                                    onChange={handleChange}
-                                />
-                                <Award size={18} />
-                                <span>Feature this service</span>
-                            </label>
+                                    <div className="form-group">
+                                        <label>Currency</label>
+                                        <select
+                                            name="currency"
+                                            value={formData.currency}
+                                            onChange={handleInputChange}
+                                        >
+                                            {CURRENCIES.map(curr => (
+                                                <option key={curr.value} value={curr.value}>
+                                                    {curr.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>
+                                            Duration (minutes) <span className="required">*</span>
+                                        </label>
+                                        <select
+                                            name="duration"
+                                            value={formData.duration}
+                                            onChange={handleInputChange}
+                                            className={errors.duration ? 'error' : ''}
+                                            ref={el => fieldRefs.current['duration'] = el}
+                                        >
+                                            {DURATION_OPTIONS.map(mins => (
+                                                <option key={mins} value={mins}>
+                                                    {mins >= 60 
+                                                        ? `${Math.floor(mins / 60)}h ${mins % 60}m` 
+                                                        : `${mins} min`}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {errors.duration && <span className="error-text">{errors.duration}</span>}
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Buffer Time (minutes)</label>
+                                        <input
+                                            type="number"
+                                            name="bufferTime"
+                                            min="0"
+                                            step="5"
+                                            value={formData.bufferTime}
+                                            onChange={handleInputChange}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ==================== SERVICE VARIATIONS SECTION ==================== */}
+                        <div className="form-section">
+                            <div className="section-header">
+                                <div className="section-header-left">
+                                    <div className="section-icon" style={{ background: `${appTheme.colors.warning}15`, color: appTheme.colors.warning }}>
+                                        <Briefcase size={20} />
+                                    </div>
+                                    <div>
+                                        <h2>Service Variations</h2>
+                                        <p>Different versions of this service</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="section-content">
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>Add Variation</label>
+                                        <div className="variation-input-group">
+                                            <input
+                                                type="text"
+                                                placeholder="Variation name"
+                                                value={variationInput.name}
+                                                onChange={(e) => setVariationInput(prev => ({ ...prev, name: e.target.value }))}
+                                            />
+                                            <div className="input-with-prefix">
+                                                <span className="prefix">{getCurrencySymbol()}</span>
+                                                <input
+                                                    type="number"
+                                                    placeholder="Price"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={variationInput.price}
+                                                    onChange={(e) => setVariationInput(prev => ({ ...prev, price: e.target.value }))}
+                                                />
+                                            </div>
+                                            <input
+                                                type="number"
+                                                placeholder="Extra minutes"
+                                                min="0"
+                                                step="5"
+                                                value={variationInput.duration}
+                                                onChange={(e) => setVariationInput(prev => ({ ...prev, duration: e.target.value }))}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleAddVariation}
+                                                className="add-button"
+                                            >
+                                                <Plus size={16} />
+                                                <span>Add</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {formData.variations.length > 0 && (
+                                    <div className="form-row">
+                                        <div className="form-group span-3">
+                                            <div className="variations-list">
+                                                {formData.variations.map((variation, index) => (
+                                                    <div key={index} className="variation-item">
+                                                        <div className="variation-info">
+                                                            <span className="variation-name">{variation.name}</span>
+                                                            <span className="variation-price">+{getCurrencySymbol()}{variation.price}</span>
+                                                            {variation.duration > 0 && (
+                                                                <span className="variation-duration">+{variation.duration} min</span>
+                                                            )}
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveVariation(index)}
+                                                            className="remove-button"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* ==================== ADD-ONS SECTION ==================== */}
+                        <div className="form-section">
+                            <div className="section-header">
+                                <div className="section-header-left">
+                                    <div className="section-icon" style={{ background: `${appTheme.colors.secondary}15`, color: appTheme.colors.secondary }}>
+                                        <Plus size={20} />
+                                    </div>
+                                    <div>
+                                        <h2>Add-ons</h2>
+                                        <p>Optional extras customers can purchase</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="section-content">
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>Add Add-on</label>
+                                        <div className="addon-input-group">
+                                            <input
+                                                type="text"
+                                                placeholder="Add-on name"
+                                                value={addonInput.name}
+                                                onChange={(e) => setAddonInput(prev => ({ ...prev, name: e.target.value }))}
+                                            />
+                                            <div className="input-with-prefix">
+                                                <span className="prefix">{getCurrencySymbol()}</span>
+                                                <input
+                                                    type="number"
+                                                    placeholder="Price"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={addonInput.price}
+                                                    onChange={(e) => setAddonInput(prev => ({ ...prev, price: e.target.value }))}
+                                                />
+                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="Description"
+                                                value={addonInput.description}
+                                                onChange={(e) => setAddonInput(prev => ({ ...prev, description: e.target.value }))}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleAddAddon}
+                                                className="add-button"
+                                                style={{ background: appTheme.colors.success }}
+                                            >
+                                                <Plus size={16} />
+                                                <span>Add</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {formData.addons.length > 0 && (
+                                    <div className="form-row">
+                                        <div className="form-group span-3">
+                                            <div className="addons-list">
+                                                {formData.addons.map((addon, index) => (
+                                                    <div key={index} className="addon-item">
+                                                        <div className="addon-info">
+                                                            <span className="addon-name">{addon.name}</span>
+                                                            {addon.description && (
+                                                                <span className="addon-desc">{addon.description}</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="addon-price">
+                                                            +{getCurrencySymbol()}{addon.price}
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveAddon(index)}
+                                                            className="remove-button"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* ==================== REQUIREMENTS SECTION ==================== */}
+                        <div className="form-section">
+                            <div className="section-header">
+                                <div className="section-header-left">
+                                    <div className="section-icon" style={{ background: `${appTheme.colors.info}15`, color: appTheme.colors.info }}>
+                                        <CheckCircle size={20} />
+                                    </div>
+                                    <div>
+                                        <h2>Requirements & Inclusions</h2>
+                                        <p>What clients need and professionals provide</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="section-content">
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>
+                                            Client Requirements <span className="required">*</span>
+                                        </label>
+                                        {errors.clientRequirements && <span className="error-text">{errors.clientRequirements}</span>}
+                                        
+                                        {formData.clientRequirements.map((req, index) => (
+                                            <div key={index} className="input-group" style={{ marginBottom: '8px' }}>
+                                                <input
+                                                    type="text"
+                                                    value={req}
+                                                    onChange={(e) => handleArrayChange('clientRequirements', index, e.target.value)}
+                                                    placeholder="What client needs to bring"
+                                                />
+                                                {formData.clientRequirements.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeArrayItem('clientRequirements', index)}
+                                                        className="icon-button error"
+                                                    >
+                                                        <Minus size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                        
+                                        <button
+                                            type="button"
+                                            onClick={() => addArrayItem('clientRequirements')}
+                                            className="add-button"
+                                        >
+                                            <Plus size={16} />
+                                            <span>Add Requirement</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="form-row" style={{ marginTop: '20px' }}>
+                                    <div className="form-group span-3">
+                                        <label>
+                                            Professional Provides <span className="required">*</span>
+                                        </label>
+                                        {errors.professionalProvides && <span className="error-text">{errors.professionalProvides}</span>}
+                                        
+                                        {formData.professionalProvides.map((prov, index) => (
+                                            <div key={index} className="input-group" style={{ marginBottom: '8px' }}>
+                                                <input
+                                                    type="text"
+                                                    value={prov}
+                                                    onChange={(e) => handleArrayChange('professionalProvides', index, e.target.value)}
+                                                    placeholder="What professional provides"
+                                                />
+                                                {formData.professionalProvides.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeArrayItem('professionalProvides', index)}
+                                                        className="icon-button error"
+                                                    >
+                                                        <Minus size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                        
+                                        <button
+                                            type="button"
+                                            onClick={() => addArrayItem('professionalProvides')}
+                                            className="add-button"
+                                        >
+                                            <Plus size={16} />
+                                            <span>Add Item</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ==================== RESTRICTIONS SECTION ==================== */}
+                        <div className="form-section">
+                            <div className="section-header">
+                                <div className="section-header-left">
+                                    <div className="section-icon" style={{ background: `${appTheme.colors.accent}15`, color: appTheme.colors.accent }}>
+                                        <Shield size={20} />
+                                    </div>
+                                    <div>
+                                        <h2>Restrictions</h2>
+                                        <p>Age limits, gender preferences and booking rules</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="section-content">
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Advance Booking (days)</label>
+                                        <input
+                                            type="number"
+                                            name="advanceBooking"
+                                            min="1"
+                                            max="365"
+                                            value={formData.advanceBooking}
+                                            onChange={handleInputChange}
+                                            placeholder="30"
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Min Age</label>
+                                        <input
+                                            type="number"
+                                            name="minAge"
+                                            min="0"
+                                            max="100"
+                                            value={formData.minAge}
+                                            onChange={handleInputChange}
+                                            placeholder="Min age"
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Max Age</label>
+                                        <input
+                                            type="number"
+                                            name="maxAge"
+                                            min="0"
+                                            max="100"
+                                            value={formData.maxAge}
+                                            onChange={handleInputChange}
+                                            placeholder="Max age"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group span-2">
+                                        <label>Gender Preference</label>
+                                        <select
+                                            name="genderPreference"
+                                            value={formData.genderPreference}
+                                            onChange={handleInputChange}
+                                        >
+                                            {GENDER_PREFERENCES.map(pref => (
+                                                <option key={pref.value} value={pref.value}>
+                                                    {pref.icon} {pref.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group checkbox-group">
+                                        <label className="checkbox-label">
+                                            <input
+                                                type="checkbox"
+                                                name="isActive"
+                                                checked={formData.isActive}
+                                                onChange={handleInputChange}
+                                            />
+                                            <span>Service is active</span>
+                                        </label>
+                                    </div>
+
+                                    <div className="form-group checkbox-group">
+                                        <label className="checkbox-label">
+                                            <input
+                                                type="checkbox"
+                                                name="isPopular"
+                                                checked={formData.isPopular}
+                                                onChange={handleInputChange}
+                                            />
+                                            <span>Mark as popular</span>
+                                        </label>
+                                    </div>
+
+                                    <div className="form-group checkbox-group">
+                                        <label className="checkbox-label">
+                                            <input
+                                                type="checkbox"
+                                                name="isFeatured"
+                                                checked={formData.isFeatured}
+                                                onChange={handleInputChange}
+                                            />
+                                            <span>Feature this service</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </main>
@@ -4267,10 +4273,10 @@ export default function CreateServicePage() {
                 <div className="mobile-save">
                     <button
                         onClick={handleSubmit}
-                        disabled={saving}
+                        disabled={saving || isSubmitting}
                         className="mobile-save-btn"
                     >
-                        {saving ? (
+                        {saving || isSubmitting ? (
                             <div className="button-spinner"></div>
                         ) : (
                             <>
@@ -4284,92 +4290,39 @@ export default function CreateServicePage() {
 
             <style jsx>{`
                 /* ==================== GLOBAL STYLES ==================== */
-                .create-service-page {
+                .service-form-page {
                     min-height: 100vh;
-                    background: linear-gradient(135deg, #f6f9fc 0%, #f1f5f9 100%);
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+                    background: ${appTheme.colors.backgroundLight};
+                    width: 100%;
                 }
 
-                /* ==================== COMPANY BANNER ==================== */
-                .company-banner {
-                    max-width: 1200px;
-                    margin: 0 auto 16px auto;
-                    padding: 0 24px;
-                }
-
-                .company-banner-content {
-                    background: white;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 8px;
-                    padding: 12px 16px;
+                /* ==================== LOADING ==================== */
+                .loading-container {
+                    min-height: 100vh;
                     display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                }
-
-                .company-banner-left {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-
-                .company-icon {
-                    color: #3b82f6;
-                }
-
-                .company-banner-text {
-                    font-size: 0.95rem;
-                    font-weight: 500;
-                    color: #1f2937;
-                }
-
-                .super-admin-badge {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    padding: 4px 10px;
-                    background: #fef3c7;
-                    border: 1px solid #fde68a;
-                    border-radius: 20px;
-                    color: #92400e;
-                    font-size: 0.75rem;
-                    font-weight: 600;
-                }
-
-                /* ==================== API ERROR ==================== */
-                .api-error {
-                    max-width: 1200px;
-                    margin: 0 auto 16px auto;
-                    padding: 0 24px;
-                    background: #fee2e2;
-                    border: 1px solid #fecaca;
-                    border-radius: 8px;
-                    padding: 12px 16px;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    color: #b91c1c;
-                }
-
-                .api-error p {
-                    flex: 1;
-                    margin: 0;
-                }
-
-                .retry-icon {
-                    background: none;
-                    border: none;
-                    color: #b91c1c;
-                    cursor: pointer;
-                    padding: 4px;
-                    display: flex;
+                    flex-direction: column;
                     align-items: center;
                     justify-content: center;
-                    border-radius: 4px;
+                    background: ${appTheme.colors.backgroundLight};
                 }
 
-                .retry-icon:hover {
-                    background: rgba(185, 28, 28, 0.1);
+                .loading-spinner {
+                    width: 40px;
+                    height: 40px;
+                    border: 3px solid ${appTheme.colors.primary}20;
+                    border-top-color: ${appTheme.colors.primary};
+                    border-radius: 50%;
+                    animation: spin 0.8s linear infinite;
+                    margin-bottom: 16px;
+                }
+
+                .loading-text {
+                    color: ${appTheme.colors.textSecondary};
+                    font-size: 0.875rem;
+                }
+
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
                 }
 
                 /* ==================== TOAST NOTIFICATION ==================== */
@@ -4382,36 +4335,37 @@ export default function CreateServicePage() {
                     align-items: center;
                     gap: 10px;
                     padding: 12px 20px;
-                    background: white;
-                    border-radius: 8px;
-                    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+                    background: ${appTheme.colors.backgroundCard};
+                    border-radius: ${appTheme.radius.md};
+                    box-shadow: ${appTheme.shadows.lg};
                     animation: slideInRight 0.3s ease;
                     font-size: 0.875rem;
                     max-width: 400px;
+                    border: 1px solid ${appTheme.colors.border};
                 }
 
                 .toast-notification.success {
-                    border-left: 4px solid #10b981;
+                    border-left: 4px solid ${appTheme.colors.success};
                 }
 
                 .toast-notification.error {
-                    border-left: 4px solid #ef4444;
+                    border-left: 4px solid ${appTheme.colors.error};
                 }
 
                 .toast-notification.warning {
-                    border-left: 4px solid #f59e0b;
+                    border-left: 4px solid ${appTheme.colors.warning};
                 }
 
                 .toast-notification.success svg {
-                    color: #10b981;
+                    color: ${appTheme.colors.success};
                 }
 
                 .toast-notification.error svg {
-                    color: #ef4444;
+                    color: ${appTheme.colors.error};
                 }
 
                 .toast-notification.warning svg {
-                    color: #f59e0b;
+                    color: ${appTheme.colors.warning};
                 }
 
                 @keyframes slideInRight {
@@ -4427,44 +4381,45 @@ export default function CreateServicePage() {
 
                 /* ==================== HEADER ==================== */
                 .page-header {
-                    background: white;
-                    border-bottom: 1px solid #e2e8f0;
+                    background: ${appTheme.colors.backgroundCard};
+                    border-bottom: 1px solid ${appTheme.colors.border};
                     padding: 20px 24px;
                     position: sticky;
                     top: 0;
                     z-index: 100;
                     backdrop-filter: blur(10px);
                     background: rgba(255, 255, 255, 0.95);
+                    width: 100%;
                 }
 
                 .header-content {
-                    max-width: 1200px;
+                    max-width: 100%;
                     margin: 0 auto;
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
+                    padding: 0 24px;
                 }
 
                 .header-left {
                     display: flex;
                     flex-direction: column;
-                    gap: 8px;
+                    gap: 4px;
                 }
 
                 .back-button {
-                    display: flex;
+                    display: inline-flex;
                     align-items: center;
-                    gap: 8px;
+                    gap: 6px;
                     background: none;
                     border: none;
-                    color: #3b82f6;
-                    font-size: 0.875rem;
+                    color: ${appTheme.colors.primary};
+                    font-size: 0.813rem;
                     font-weight: 500;
                     cursor: pointer;
                     padding: 4px 0;
                     transition: opacity 0.2s;
                     width: fit-content;
-                    text-decoration: none;
                 }
 
                 .back-button:hover {
@@ -4472,21 +4427,14 @@ export default function CreateServicePage() {
                 }
 
                 .page-title {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
                     font-size: 1.5rem;
                     font-weight: 600;
-                    color: #0f172a;
+                    color: ${appTheme.colors.textPrimary};
                     margin: 0;
                 }
 
-                .title-icon {
-                    color: #3b82f6;
-                }
-
                 .page-description {
-                    color: #64748b;
+                    color: ${appTheme.colors.textSecondary};
                     font-size: 0.875rem;
                     margin: 0;
                 }
@@ -4494,73 +4442,29 @@ export default function CreateServicePage() {
                 .header-actions {
                     display: flex;
                     align-items: center;
-                    gap: 8px;
-                }
-
-                .header-action-btn {
-                    width: 40px;
-                    height: 40px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    background: #f8fafc;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
-                    color: #64748b;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }
-
-                .header-action-btn:hover {
-                    background: #f1f5f9;
-                    color: #3b82f6;
-                    border-color: #3b82f6;
-                }
-
-                .status-badge {
-                    padding: 6px 12px;
-                    border-radius: 30px;
-                    font-size: 0.75rem;
-                    font-weight: 500;
-                    background: #f1f5f9;
-                    color: #475569;
-                }
-
-                .status-badge.draft {
-                    background: #dbeafe;
-                    color: #1e40af;
-                }
-
-                .status-badge.active {
-                    background: #f0fdf4;
-                    color: #22c55e;
-                }
-
-                .status-badge.inactive {
-                    background: #fef2f2;
-                    color: #ef4444;
+                    gap: 12px;
                 }
 
                 .save-button {
                     display: flex;
                     align-items: center;
                     gap: 8px;
-                    padding: 10px 20px;
-                    background: #3b82f6;
+                    padding: 12px 24px;
+                    background: ${appTheme.colors.primary};
                     color: white;
                     border: none;
-                    border-radius: 8px;
+                    border-radius: ${appTheme.radius.md};
                     font-size: 0.875rem;
                     font-weight: 500;
                     cursor: pointer;
                     transition: all 0.2s ease;
-                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+                    box-shadow: 0 4px 12px ${appTheme.colors.primary}30;
                 }
 
                 .save-button:hover {
-                    background: #2563eb;
+                    background: ${appTheme.colors.gradientStart};
                     transform: translateY(-1px);
-                    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+                    box-shadow: 0 6px 16px ${appTheme.colors.primary}40;
                 }
 
                 .save-button:disabled {
@@ -4578,118 +4482,93 @@ export default function CreateServicePage() {
                     animation: spin 0.8s linear infinite;
                 }
 
-                @keyframes spin {
-                    to { transform: rotate(360deg); }
-                }
-
-                /* ==================== DESKTOP TABS ==================== */
-                .desktop-tabs {
-                    max-width: 1200px;
-                    margin: 0 auto 24px auto;
+                /* ==================== COMPANY BANNER ==================== */
+                .company-banner {
+                    width: 100%;
+                    margin: 16px 0 0 0;
                     padding: 0 24px;
-                    display: none;
-                    background: white;
-                    border-bottom: 2px solid #e2e8f0;
                 }
 
-                @media (min-width: 1024px) {
-                    .desktop-tabs {
-                        display: flex;
-                        padding: 0 24px;
-                        margin: 0 auto 24px auto;
-                    }
-                }
-
-                .tab-button {
+                .company-banner-content {
+                    background: ${appTheme.colors.backgroundCard};
+                    border: 1px solid ${appTheme.colors.border};
+                    border-radius: ${appTheme.radius.md};
+                    padding: 12px 16px;
                     display: flex;
                     align-items: center;
-                    justify-content: center;
+                    justify-content: space-between;
+                    width: 100%;
+                }
+
+                .company-banner-left {
+                    display: flex;
+                    align-items: center;
                     gap: 8px;
-                    padding: 16px 12px;
-                    background: transparent;
-                    border: none;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                    white-space: nowrap;
+                    color: ${appTheme.colors.textPrimary};
                     font-size: 0.875rem;
-                    position: relative;
-                    border-bottom: 2px solid transparent;
-                    margin-bottom: -2px;
-                    flex: 1;
-                    min-width: 0;
                 }
 
-                .tab-button:hover {
-                    background: #f8fafc;
+                .company-banner-left svg {
+                    color: ${appTheme.colors.primary};
                 }
 
-                .tab-button.active {
-                    background: #f8fafc;
-                    border-bottom: 2px solid;
-                }
-
-                .tab-icon {
+                .super-admin-badge {
                     display: flex;
                     align-items: center;
-                    justify-content: center;
-                    padding: 6px;
-                    border-radius: 8px;
-                    transition: all 0.2s ease;
-                    flex-shrink: 0;
+                    gap: 6px;
+                    padding: 4px 10px;
+                    background: ${appTheme.colors.warning}15;
+                    border: 1px solid ${appTheme.colors.warning}30;
+                    border-radius: 20px;
+                    color: ${appTheme.colors.warning};
+                    font-size: 0.75rem;
+                    font-weight: 600;
                 }
 
-                .tab-title {
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
+                /* ==================== API ERROR ==================== */
+                .api-error {
+                    width: 100%;
+                    margin: 16px 0 0 0;
+                    padding: 0 24px;
                 }
 
-                .active-indicator {
-                    position: absolute;
-                    bottom: -2px;
-                    left: 0;
-                    right: 0;
-                    height: 2px;
+                .api-error {
+                    background: ${appTheme.colors.error}10;
+                    border: 1px solid ${appTheme.colors.error}30;
+                    border-radius: ${appTheme.radius.md};
+                    padding: 12px 16px;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    color: ${appTheme.colors.error};
+                    font-size: 0.875rem;
                 }
 
                 /* ==================== MAIN CONTENT ==================== */
                 .main-content {
-                    max-width: 1200px;
-                    margin: 24px auto;
-                    padding: 0 24px 100px 24px;
+                    width: 100%;
+                    margin: 24px 0;
+                    padding: 0 24px;
                 }
 
-                /* ==================== SECTIONS CONTAINER ==================== */
-                .sections-container {
+                /* ==================== FORM SECTIONS ==================== */
+                .form-sections {
                     display: flex;
                     flex-direction: column;
-                    gap: 16px;
+                    gap: 20px;
                 }
 
-                .section-card {
-                    background: white;
-                    border-radius: 8px;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+                .form-section {
+                    background: ${appTheme.colors.backgroundCard};
+                    border: 1px solid ${appTheme.colors.border};
+                    border-radius: ${appTheme.radius.lg};
                     overflow: hidden;
-                }
-
-                @media (min-width: 1024px) {
-                    .section-card:not(.active) {
-                        display: none;
-                    }
                 }
 
                 .section-header {
                     padding: 20px 24px;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }
-
-                .section-header:hover {
-                    background: #f8fafc;
+                    background: #fafbfc;
+                    border-bottom: 1px solid ${appTheme.colors.border};
                 }
 
                 .section-header-left {
@@ -4704,254 +4583,229 @@ export default function CreateServicePage() {
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    border-radius: 8px;
+                    border-radius: ${appTheme.radius.md};
                 }
 
-                .section-title h2 {
+                .section-header-left h2 {
                     font-size: 1rem;
                     font-weight: 600;
-                    color: #0f172a;
+                    color: ${appTheme.colors.textPrimary};
                     margin: 0 0 4px 0;
                 }
 
-                .section-title p {
+                .section-header-left p {
                     font-size: 0.75rem;
-                    color: #64748b;
+                    color: ${appTheme.colors.textSecondary};
                     margin: 0;
                 }
 
-                .chevron-icon {
-                    color: #94a3b8;
-                    transition: transform 0.3s ease;
-                }
-
                 .section-content {
-                    padding: 0 24px 24px 24px;
-                    border-top: 1px solid #e2e8f0;
-                    animation: slideDown 0.3s ease;
+                    padding: 24px;
                 }
 
-                @keyframes slideDown {
-                    from {
-                        opacity: 0;
-                        transform: translateY(-10px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
+                /* ==================== FORM LAYOUT ==================== */
+                .form-row {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 20px;
+                    margin-bottom: 20px;
                 }
 
-                /* ==================== FORM BLOCKS ==================== */
-                .form-block {
-                    margin-bottom: 28px;
-                }
-
-                .form-block:last-child {
+                .form-row:last-child {
                     margin-bottom: 0;
                 }
 
-                .form-block h3 {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    font-size: 0.875rem;
-                    font-weight: 600;
-                    color: #334155;
-                    margin: 0 0 16px 0;
-                    padding-bottom: 8px;
-                    border-bottom: 1px dashed #e2e8f0;
-                }
-
-                .form-block h3 svg {
-                    color: #3b82f6;
-                }
-
-                .form-grid {
-                    display: grid;
-                    grid-template-columns: repeat(1, 1fr);
-                    gap: 16px;
-                }
-
-                @media (min-width: 640px) {
-                    .form-grid {
-                        grid-template-columns: repeat(2, 1fr);
-                    }
-                }
-
-                .span-2 {
-                    grid-column: 1 / -1;
-                }
-
-                .form-field {
+                .form-group {
                     display: flex;
                     flex-direction: column;
                     gap: 6px;
                 }
 
-                .form-field label {
-                    font-size: 0.75rem;
-                    font-weight: 500;
-                    color: #475569;
-                    text-transform: uppercase;
-                    letter-spacing: 0.3px;
+                .form-group.span-2 {
+                    grid-column: span 2;
                 }
 
-                .form-field input,
-                .form-field select,
-                .form-field textarea {
+                .form-group.span-3 {
+                    grid-column: span 3;
+                }
+
+                .form-group.checkbox-group {
+                    justify-content: flex-end;
+                }
+
+                .form-group label {
+                    font-size: 0.813rem;
+                    font-weight: 500;
+                    color: ${appTheme.colors.textPrimary};
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                }
+
+                .field-hint {
+                    font-size: 0.688rem;
+                    color: ${appTheme.colors.textSecondary};
+                }
+
+                .field-hint.error {
+                    color: ${appTheme.colors.error};
+                }
+
+                .required {
+                    color: ${appTheme.colors.error};
+                    margin-left: 4px;
+                }
+
+                .form-group input,
+                .form-group select,
+                .form-group textarea {
                     width: 100%;
-                    padding: 10px 14px;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
+                    padding: 12px 14px;
+                    border: 1px solid ${appTheme.colors.border};
+                    border-radius: ${appTheme.radius.md};
                     font-size: 0.938rem;
                     transition: all 0.2s ease;
-                    background: white;
+                    background: ${appTheme.colors.backgroundCard};
+                    color: ${appTheme.colors.textPrimary};
                 }
 
-                .form-field input:focus,
-                .form-field select:focus,
-                .form-field textarea:focus {
+                .form-group input:focus,
+                .form-group select:focus,
+                .form-group textarea:focus {
                     outline: none;
-                    border-color: #3b82f6;
-                    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+                    border-color: ${appTheme.colors.primary};
+                    box-shadow: 0 0 0 4px ${appTheme.colors.primary}15;
                 }
 
-                .form-field input.error,
-                .form-field select.error,
-                .form-field textarea.error {
-                    border-color: #ef4444;
+                .form-group input.error,
+                .form-group select.error,
+                .form-group textarea.error {
+                    border-color: ${appTheme.colors.error};
                 }
 
                 .error-text {
                     font-size: 0.688rem;
-                    color: #ef4444;
+                    color: ${appTheme.colors.error};
                 }
 
-                .required {
-                    color: #ef4444;
+                .checkbox-label {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    cursor: pointer;
+                    padding: 8px 0;
+                    color: ${appTheme.colors.textPrimary};
                 }
 
-                .hint {
-                    font-size: 0.688rem;
-                    color: #94a3b8;
+                .checkbox-label input[type="checkbox"] {
+                    width: 18px;
+                    height: 18px;
+                    cursor: pointer;
+                    accent-color: ${appTheme.colors.primary};
                 }
 
-                .hint.error {
-                    color: #ef4444;
-                }
-
-                /* ==================== CATEGORY CARDS ==================== */
-                .category-cards {
-                    display: grid;
-                    grid-template-columns: repeat(4, 1fr);
+                /* ==================== INPUT GROUP ==================== */
+                .input-group {
+                    display: flex;
                     gap: 8px;
                 }
 
-                @media (max-width: 1024px) {
-                    .category-cards {
-                        grid-template-columns: repeat(3, 1fr);
-                    }
+                .input-group input {
+                    flex: 1;
                 }
 
-                @media (max-width: 640px) {
-                    .category-cards {
-                        grid-template-columns: repeat(2, 1fr);
-                    }
-                }
-
-                .category-card {
+                .icon-button {
+                    padding: 12px;
+                    border: 1px solid ${appTheme.colors.border};
+                    border-radius: ${appTheme.radius.md};
+                    background: ${appTheme.colors.backgroundLight};
+                    color: ${appTheme.colors.textSecondary};
+                    cursor: pointer;
+                    transition: all 0.2s ease;
                     display: flex;
-                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                .icon-button:hover {
+                    background: ${appTheme.colors.hover};
+                    color: ${appTheme.colors.primary};
+                    border-color: ${appTheme.colors.primary};
+                }
+
+                .icon-button.error:hover {
+                    color: ${appTheme.colors.error};
+                    border-color: ${appTheme.colors.error};
+                }
+
+                .add-button {
+                    display: inline-flex;
                     align-items: center;
                     gap: 6px;
-                    padding: 12px;
-                    background: white;
-                    border: 2px solid #e2e8f0;
-                    border-radius: 8px;
+                    padding: 8px 16px;
+                    background: ${appTheme.colors.primary};
+                    color: white;
+                    border: none;
+                    border-radius: ${appTheme.radius.md};
+                    font-size: 0.813rem;
+                    font-weight: 500;
                     cursor: pointer;
                     transition: all 0.2s ease;
                 }
 
-                .category-card input {
-                    position: absolute;
-                    opacity: 0;
+                .add-button:hover {
+                    background: ${appTheme.colors.gradientStart};
                 }
 
-                .category-card.selected {
-                    background: rgba(59, 130, 246, 0.1);
-                }
-
-                .category-icon {
-                    font-size: 1.5rem;
-                }
-
-                .category-label {
-                    font-size: 0.75rem;
-                    font-weight: 500;
-                    color: #1e293b;
-                    text-align: center;
-                }
-
-                /* ==================== TYPE CARDS ==================== */
-                .type-cards {
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 8px;
-                }
-
-                .type-card {
+                .remove-button {
                     display: flex;
-                    flex-direction: column;
                     align-items: center;
-                    gap: 4px;
-                    padding: 10px;
-                    background: white;
-                    border: 2px solid #e2e8f0;
-                    border-radius: 8px;
+                    justify-content: center;
+                    padding: 6px;
+                    background: transparent;
+                    border: none;
+                    color: ${appTheme.colors.error};
                     cursor: pointer;
+                    border-radius: ${appTheme.radius.sm};
                 }
 
-                .type-card input {
-                    position: absolute;
-                    opacity: 0;
+                .remove-button:hover {
+                    background: ${appTheme.colors.error}10;
                 }
 
-                .type-card.selected {
-                    background: rgba(59, 130, 246, 0.1);
+                /* ==================== INPUT WITH PREFIX ==================== */
+                .input-with-prefix {
+                    display: flex;
+                    align-items: center;
+                    border: 1px solid ${appTheme.colors.border};
+                    border-radius: ${appTheme.radius.md};
+                    background: ${appTheme.colors.backgroundCard};
                 }
 
-                .type-icon {
-                    font-size: 1.2rem;
+                .input-with-prefix:focus-within {
+                    border-color: ${appTheme.colors.primary};
+                    box-shadow: 0 0 0 4px ${appTheme.colors.primary}15;
                 }
 
-                .type-label {
-                    font-size: 0.7rem;
+                .prefix {
+                    padding: 0 10px;
+                    color: ${appTheme.colors.textSecondary};
                     font-weight: 500;
-                    color: #1e293b;
+                }
+
+                .input-with-prefix input {
+                    flex: 1;
+                    border: none;
+                    padding: 12px 12px 12px 0;
+                }
+
+                .input-with-prefix input:focus {
+                    outline: none;
+                    box-shadow: none;
                 }
 
                 /* ==================== TAGS ==================== */
-                .tag-input-group {
-                    display: flex;
-                    gap: 8px;
-                }
-
-                .add-btn {
-                    display: flex;
-                    align-items: center;
-                    gap: 4px;
-                    padding: 0 16px;
-                    background: rgba(59, 130, 246, 0.1);
-                    border: 1px solid rgba(59, 130, 246, 0.3);
-                    border-radius: 8px;
-                    color: #3b82f6;
-                    font-size: 0.85rem;
-                    white-space: nowrap;
-                    cursor: pointer;
-                }
-
-                .tags-list {
+                .tags-container {
                     display: flex;
                     flex-wrap: wrap;
                     gap: 8px;
@@ -4963,148 +4817,34 @@ export default function CreateServicePage() {
                     align-items: center;
                     gap: 4px;
                     padding: 4px 10px;
-                    background: rgba(59, 130, 246, 0.1);
-                    border: 1px solid rgba(59, 130, 246, 0.3);
+                    background: ${appTheme.colors.primary}10;
+                    border: 1px solid ${appTheme.colors.primary}30;
                     border-radius: 20px;
-                    font-size: 0.75rem;
-                    color: #3b82f6;
-                }
-
-                .tag button {
-                    border: none;
-                    background: transparent;
-                    color: #3b82f6;
-                    cursor: pointer;
-                    font-size: 1rem;
-                    padding: 0;
-                }
-
-                .no-tags {
-                    color: #94a3b8;
-                    font-size: 0.8rem;
-                }
-
-                /* ==================== PRICING ==================== */
-                .pricing-grid {
-                    display: grid;
-                    grid-template-columns: repeat(4, 1fr);
-                    gap: 12px;
-                }
-
-                @media (max-width: 1024px) {
-                    .pricing-grid {
-                        grid-template-columns: repeat(2, 1fr);
-                    }
-                }
-
-                @media (max-width: 640px) {
-                    .pricing-grid {
-                        grid-template-columns: 1fr;
-                    }
-                }
-
-                .pricing-card {
-                    padding: 16px;
-                    background: #f8fafc;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
-                }
-
-                .pricing-header {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    margin-bottom: 8px;
-                    color: #475569;
                     font-size: 0.813rem;
+                    color: ${appTheme.colors.primary};
                 }
 
-                .pricing-input {
-                    display: flex;
-                    align-items: center;
-                    gap: 4px;
-                }
-
-                .currency-symbol {
+                .tag-remove {
+                    background: none;
+                    border: none;
+                    color: ${appTheme.colors.primary};
                     font-size: 1rem;
-                    font-weight: 600;
-                    color: #475569;
-                }
-
-                .pricing-input input {
-                    width: 100%;
-                    padding: 6px 8px;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
-                    font-size: 0.9rem;
-                    text-align: right;
-                }
-
-                .currency-select {
-                    width: 100%;
-                    padding: 8px;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
-                    font-size: 0.85rem;
-                }
-
-                .buffer-input {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                }
-
-                .buffer-input input {
-                    width: 70px;
-                    padding: 6px 8px;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
-                    text-align: center;
-                }
-
-                .buffer-input span {
-                    color: #64748b;
-                    font-size: 0.8rem;
+                    cursor: pointer;
+                    padding: 0 2px;
                 }
 
                 /* ==================== VARIATIONS ==================== */
-                .variation-form {
-                    margin-bottom: 20px;
-                    padding: 16px;
-                    background: #f8fafc;
-                    border-radius: 8px;
-                }
-
-                .variation-inputs {
+                .variation-input-group {
                     display: grid;
                     grid-template-columns: 2fr 1fr 1fr auto;
                     gap: 8px;
-                }
-
-                @media (max-width: 640px) {
-                    .variation-inputs {
-                        grid-template-columns: 1fr;
-                    }
-                }
-
-                .add-variation-btn {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 4px;
-                    padding: 0 16px;
-                    border: none;
-                    border-radius: 8px;
-                    color: white;
-                    font-size: 0.85rem;
-                    cursor: pointer;
-                    white-space: nowrap;
                 }
 
                 .variations-list {
                     display: flex;
                     flex-direction: column;
                     gap: 8px;
+                    margin-top: 16px;
                 }
 
                 .variation-item {
@@ -5112,9 +4852,9 @@ export default function CreateServicePage() {
                     justify-content: space-between;
                     align-items: center;
                     padding: 12px;
-                    background: white;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
+                    background: ${appTheme.colors.backgroundLight};
+                    border: 1px solid ${appTheme.colors.border};
+                    border-radius: ${appTheme.radius.md};
                 }
 
                 .variation-info {
@@ -5131,53 +4871,27 @@ export default function CreateServicePage() {
 
                 .variation-price {
                     font-size: 0.875rem;
-                    color: #10b981;
+                    color: ${appTheme.colors.success};
                     font-weight: 600;
                 }
 
                 .variation-duration {
                     font-size: 0.75rem;
-                    color: #64748b;
+                    color: ${appTheme.colors.textSecondary};
                 }
 
                 /* ==================== ADDONS ==================== */
-                .addon-form {
-                    margin-bottom: 20px;
-                    padding: 16px;
-                    background: #f8fafc;
-                    border-radius: 8px;
-                }
-
-                .addon-inputs {
+                .addon-input-group {
                     display: grid;
                     grid-template-columns: 1.5fr 1fr 2fr auto;
                     gap: 8px;
-                }
-
-                @media (max-width: 1024px) {
-                    .addon-inputs {
-                        grid-template-columns: 1fr;
-                    }
-                }
-
-                .add-addon-btn {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 4px;
-                    padding: 0 16px;
-                    border: none;
-                    border-radius: 8px;
-                    color: white;
-                    font-size: 0.85rem;
-                    cursor: pointer;
-                    white-space: nowrap;
                 }
 
                 .addons-list {
                     display: flex;
                     flex-direction: column;
                     gap: 8px;
+                    margin-top: 16px;
                 }
 
                 .addon-item {
@@ -5185,15 +4899,16 @@ export default function CreateServicePage() {
                     justify-content: space-between;
                     align-items: center;
                     padding: 12px;
-                    background: white;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
+                    background: ${appTheme.colors.backgroundLight};
+                    border: 1px solid ${appTheme.colors.border};
+                    border-radius: ${appTheme.radius.md};
                 }
 
                 .addon-info {
                     display: flex;
                     flex-direction: column;
                     gap: 2px;
+                    flex: 1;
                 }
 
                 .addon-name {
@@ -5203,237 +4918,14 @@ export default function CreateServicePage() {
 
                 .addon-desc {
                     font-size: 0.688rem;
-                    color: #64748b;
+                    color: ${appTheme.colors.textSecondary};
                 }
 
                 .addon-price {
                     font-size: 0.875rem;
                     font-weight: 600;
-                    color: #10b981;
-                }
-
-                /* ==================== REQUIREMENTS ==================== */
-                .requirements-list {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 8px;
-                }
-
-                .requirement-row {
-                    display: flex;
-                    gap: 8px;
-                }
-
-                .remove-row-btn {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 0 10px;
-                    background: rgba(239, 68, 68, 0.1);
-                    border: 1px solid rgba(239, 68, 68, 0.3);
-                    border-radius: 8px;
-                    color: #ef4444;
-                    cursor: pointer;
-                }
-
-                .add-row-btn {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 4px;
-                    padding: 8px;
-                    background: white;
-                    border: 1px dashed #e2e8f0;
-                    border-radius: 8px;
-                    color: #64748b;
-                    font-size: 0.85rem;
-                    cursor: pointer;
-                }
-
-                /* ==================== RESTRICTIONS ==================== */
-                .restrictions-grid {
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 12px;
-                }
-
-                @media (max-width: 768px) {
-                    .restrictions-grid {
-                        grid-template-columns: 1fr;
-                    }
-                }
-
-                .restriction-card {
-                    padding: 16px;
-                    background: #f8fafc;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
-                }
-
-                .restriction-header {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    margin-bottom: 12px;
-                    color: #475569;
-                }
-
-                .restriction-input {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                }
-
-                .restriction-input input {
-                    width: 80px;
-                    padding: 6px 8px;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
-                    text-align: center;
-                }
-
-                .restriction-input span {
-                    color: #64748b;
-                    font-size: 0.8rem;
-                }
-
-                .age-inputs {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                }
-
-                .age-inputs input {
-                    width: 70px;
-                    padding: 6px 8px;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
-                    text-align: center;
-                }
-
-                .age-inputs span {
-                    color: #64748b;
-                }
-
-                .gender-options {
-                    display: flex;
-                    gap: 6px;
-                }
-
-                .gender-option {
-                    flex: 1;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    gap: 4px;
-                    padding: 8px 4px;
-                    background: white;
-                    border: 2px solid #e2e8f0;
-                    border-radius: 8px;
-                    cursor: pointer;
-                }
-
-                .gender-option input {
-                    position: absolute;
-                    opacity: 0;
-                }
-
-                .gender-option.selected {
-                    background: rgba(59, 130, 246, 0.1);
-                }
-
-                .gender-icon {
-                    font-size: 1rem;
-                }
-
-                .gender-label {
-                    font-size: 0.688rem;
-                    font-weight: 500;
-                    color: #1e293b;
-                }
-
-                /* ==================== STATUS SECTION ==================== */
-                .status-section {
-                    background: white;
-                    border-radius: 8px;
-                    padding: 24px;
-                    margin-top: 24px;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-                }
-
-                .status-header {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    margin-bottom: 16px;
-                }
-
-                .status-header svg {
-                    color: #3b82f6;
-                }
-
-                .status-header h3 {
-                    font-size: 1rem;
-                    font-weight: 600;
-                    color: #0f172a;
-                    margin: 0;
-                }
-
-                .status-grid {
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 12px;
-                }
-
-                @media (max-width: 640px) {
-                    .status-grid {
-                        grid-template-columns: 1fr;
-                    }
-                }
-
-                .status-checkbox {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 12px;
-                    background: #f8fafc;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
-                    cursor: pointer;
-                }
-
-                .status-checkbox input {
-                    width: 18px;
-                    height: 18px;
-                }
-
-                .status-checkbox span {
-                    font-size: 0.875rem;
-                    color: #1e293b;
-                }
-
-                /* ==================== EMPTY STATE ==================== */
-                .empty-state {
-                    text-align: center;
-                    padding: 32px 24px;
-                    background: #f8fafc;
-                    border-radius: 8px;
-                    color: #64748b;
-                }
-
-                .empty-state svg {
-                    margin-bottom: 12px;
-                    color: #94a3b8;
-                }
-
-                .empty-state p {
-                    font-size: 0.875rem;
-                    font-weight: 500;
-                    margin: 0 0 4px;
-                }
-
-                .empty-state span {
-                    font-size: 0.75rem;
+                    color: ${appTheme.colors.success};
+                    margin: 0 12px;
                 }
 
                 /* ==================== MOBILE SAVE ==================== */
@@ -5444,24 +4936,24 @@ export default function CreateServicePage() {
                     left: 0;
                     right: 0;
                     padding: 16px;
-                    background: linear-gradient(to top, #f1f5f9, transparent);
+                    background: linear-gradient(to top, ${appTheme.colors.backgroundLight}, transparent);
                     z-index: 100;
                 }
 
                 .mobile-save-btn {
                     width: 100%;
                     padding: 16px;
-                    background: #3b82f6;
+                    background: ${appTheme.colors.primary};
                     color: white;
                     border: none;
-                    border-radius: 8px;
+                    border-radius: ${appTheme.radius.md};
                     font-size: 1rem;
                     font-weight: 600;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     gap: 8px;
-                    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+                    box-shadow: 0 4px 20px ${appTheme.colors.primary}40;
                 }
 
                 .mobile-save-btn:disabled {
@@ -5469,26 +4961,32 @@ export default function CreateServicePage() {
                     cursor: not-allowed;
                 }
 
-                .remove-btn {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 6px;
-                    background: transparent;
-                    border: none;
-                    color: #ef4444;
-                    cursor: pointer;
-                    border-radius: 6px;
-                }
-
-                .remove-btn:hover {
-                    background: rgba(239, 68, 68, 0.1);
-                }
-
                 /* ==================== RESPONSIVE ==================== */
+                @media (max-width: 1200px) {
+                    .header-content,
+                    .main-content,
+                    .company-banner,
+                    .api-error {
+                        padding: 0 20px;
+                    }
+                }
+
                 @media (max-width: 1024px) {
-                    .stats-grid {
-                        display: none;
+                    .form-row {
+                        grid-template-columns: repeat(2, 1fr);
+                    }
+
+                    .form-group.span-2,
+                    .form-group.span-3 {
+                        grid-column: span 2;
+                    }
+
+                    .variation-input-group {
+                        grid-template-columns: 1fr;
+                    }
+
+                    .addon-input-group {
+                        grid-template-columns: 1fr;
                     }
                 }
 
@@ -5501,19 +4999,11 @@ export default function CreateServicePage() {
                         flex-direction: column;
                         gap: 16px;
                         align-items: flex-start;
-                    }
-
-                    .page-title {
-                        font-size: 1.25rem;
-                    }
-
-                    .page-description {
-                        font-size: 0.813rem;
+                        padding: 0 16px;
                     }
 
                     .header-actions {
                         width: 100%;
-                        justify-content: flex-end;
                     }
 
                     .save-button {
@@ -5524,8 +5014,12 @@ export default function CreateServicePage() {
                         display: block;
                     }
 
-                    .desktop-tabs {
-                        display: none;
+                    .page-title {
+                        font-size: 1.25rem;
+                    }
+
+                    .main-content {
+                        padding: 0 16px 100px 16px;
                     }
 
                     .section-header {
@@ -5541,50 +5035,26 @@ export default function CreateServicePage() {
                         height: 36px;
                     }
 
-                    .section-icon svg {
-                        width: 18px;
-                        height: 18px;
-                    }
-
-                    .section-title h2 {
+                    .section-header-left h2 {
                         font-size: 0.938rem;
                     }
 
-                    .section-title p {
+                    .section-header-left p {
                         font-size: 0.688rem;
                     }
 
                     .section-content {
-                        padding: 0 16px 16px 16px;
+                        padding: 16px;
                     }
 
-                    .form-block h3 {
-                        font-size: 0.813rem;
-                    }
-
-                    .form-field input,
-                    .form-field select,
-                    .form-field textarea {
-                        font-size: 16px;
-                        min-height: 48px;
-                    }
-
-                    .category-cards {
-                        grid-template-columns: repeat(2, 1fr);
-                    }
-
-                    .type-cards {
+                    .form-row {
                         grid-template-columns: 1fr;
+                        gap: 16px;
                     }
 
-                    .variation-inputs,
-                    .addon-inputs {
-                        grid-template-columns: 1fr;
-                    }
-
-                    .add-variation-btn,
-                    .add-addon-btn {
-                        padding: 12px;
+                    .form-group.span-2,
+                    .form-group.span-3 {
+                        grid-column: span 1;
                     }
 
                     .variation-info {
@@ -5593,43 +5063,36 @@ export default function CreateServicePage() {
                         gap: 4px;
                     }
 
-                    .restrictions-grid {
-                        grid-template-columns: 1fr;
+                    .addon-item {
+                        flex-wrap: wrap;
+                        gap: 8px;
                     }
 
-                    .gender-options {
-                        flex-wrap: wrap;
+                    .company-banner,
+                    .api-error {
+                        padding: 0 16px;
                     }
                 }
 
                 @media (max-width: 480px) {
-                    .main-content {
-                        padding: 16px 16px 90px 16px;
+                    .form-group label {
+                        font-size: 0.75rem;
                     }
 
-                    .tag-input-group {
+                    .form-group input,
+                    .form-group select,
+                    .form-group textarea {
+                        font-size: 16px;
+                        padding: 10px 12px;
+                    }
+
+                    .input-group {
                         flex-direction: column;
                     }
 
-                    .add-btn {
-                        padding: 12px;
+                    .add-button {
+                        width: 100%;
                         justify-content: center;
-                    }
-
-                    .pricing-grid {
-                        grid-template-columns: 1fr;
-                    }
-
-                    .status-grid {
-                        grid-template-columns: 1fr;
-                    }
-
-                    .requirement-row {
-                        flex-direction: column;
-                    }
-
-                    .remove-row-btn {
-                        padding: 12px;
                     }
                 }
             `}</style>

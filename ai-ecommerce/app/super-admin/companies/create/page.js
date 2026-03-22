@@ -1,3 +1,5 @@
+
+
 // // app/super-admin/companies/create/page.js
 // 'use client';
 
@@ -24,6 +26,12 @@
 //   Copy,
 //   Eye,
 //   EyeOff,
+//   Smartphone,
+//   Wifi,
+//   Plus,
+//   Trash2,
+//   MessageSquare,
+//   QrCode,
 // } from 'lucide-react';
 
 // export default function CreateCompanyPage() {
@@ -36,6 +44,10 @@
 //     companyName: '',
 //     companyEmail: '',
 //     companyPhone: '',
+    
+//     // WhatsApp Configuration - CRITICAL for multi-tenant
+//     whatsappNumber: '', // Primary WhatsApp number customers will message
+//     additionalWhatsAppNumbers: [], // Additional routing numbers
     
 //     // Address
 //     address: {
@@ -70,7 +82,12 @@
 //   const [loading, setLoading] = useState(false);
 //   const [error, setError] = useState(null);
 //   const [success, setSuccess] = useState(false);
-//   const [step, setStep] = useState(1); // 1: Company, 2: Admin, 3: Plan, 4: Review
+//   const [step, setStep] = useState(1); // 1: Company, 2: WhatsApp, 3: Admin, 4: Plan, 5: Review
+  
+//   // New WhatsApp number input
+//   const [newWhatsAppNumber, setNewWhatsAppNumber] = useState('');
+//   const [newWhatsAppDesc, setNewWhatsAppDesc] = useState('');
+//   const [newWhatsAppPrimary, setNewWhatsAppPrimary] = useState(false);
 
 //   // Form validation errors
 //   const [errors, setErrors] = useState({});
@@ -131,6 +148,22 @@
 //     }
 
 //     if (step === 2) {
+//       // WhatsApp Configuration Validation
+//       if (!formData.whatsappNumber.trim()) {
+//         newErrors.whatsappNumber = 'Primary WhatsApp number is required';
+//       } else if (!/^\d{10,12}$/.test(formData.whatsappNumber.replace(/\D/g, ''))) {
+//         newErrors.whatsappNumber = 'WhatsApp number must be 10-12 digits';
+//       }
+
+//       // Validate additional numbers if any
+//       formData.additionalWhatsAppNumbers.forEach((num, index) => {
+//         if (!/^\d{10,12}$/.test(num.number.replace(/\D/g, ''))) {
+//           newErrors[`whatsapp_${index}`] = `Invalid number format for ${num.number}`;
+//         }
+//       });
+//     }
+
+//     if (step === 3) {
 //       // Admin Details Validation
 //       if (!formData.adminName.trim()) {
 //         newErrors.adminName = 'Admin name is required';
@@ -156,6 +189,40 @@
 //     return Object.keys(newErrors).length === 0;
 //   };
 
+//   const handleAddWhatsAppNumber = () => {
+//     if (!newWhatsAppNumber.trim()) return;
+    
+//     const cleanNumber = newWhatsAppNumber.replace(/\D/g, '');
+//     if (cleanNumber.length < 10 || cleanNumber.length > 12) {
+//       alert('Please enter a valid 10-12 digit WhatsApp number');
+//       return;
+//     }
+
+//     setFormData({
+//       ...formData,
+//       additionalWhatsAppNumbers: [
+//         ...formData.additionalWhatsAppNumbers,
+//         {
+//           number: cleanNumber,
+//           description: newWhatsAppDesc || `WhatsApp number ${formData.additionalWhatsAppNumbers.length + 2}`,
+//           isPrimary: newWhatsAppPrimary,
+//         }
+//       ]
+//     });
+
+//     // Reset inputs
+//     setNewWhatsAppNumber('');
+//     setNewWhatsAppDesc('');
+//     setNewWhatsAppPrimary(false);
+//   };
+
+//   const handleRemoveWhatsAppNumber = (index) => {
+//     setFormData({
+//       ...formData,
+//       additionalWhatsAppNumbers: formData.additionalWhatsAppNumbers.filter((_, i) => i !== index)
+//     });
+//   };
+
 //   const handleNext = () => {
 //     if (validateStep()) {
 //       setStep(step + 1);
@@ -176,12 +243,24 @@
 //     setError(null);
 
 //     try {
+//       // Clean phone numbers before sending
+//       const submissionData = {
+//         ...formData,
+//         companyPhone: formData.companyPhone.replace(/\D/g, ''),
+//         adminPhone: formData.adminPhone.replace(/\D/g, ''),
+//         whatsappNumber: formData.whatsappNumber.replace(/\D/g, ''),
+//         additionalWhatsAppNumbers: formData.additionalWhatsAppNumbers.map(num => ({
+//           ...num,
+//           number: num.number.replace(/\D/g, '')
+//         }))
+//       };
+
 //       const response = await fetch('/api/companies', {
 //         method: 'POST',
 //         headers: {
 //           'Content-Type': 'application/json',
 //         },
-//         body: JSON.stringify(formData),
+//         body: JSON.stringify(submissionData),
 //       });
 
 //       const data = await response.json();
@@ -210,7 +289,7 @@
 //           </div>
 //           <h2 className="text-2xl font-bold text-gray-900 mb-2">Company Created!</h2>
 //           <p className="text-gray-600 mb-4">
-//             The company has been created successfully. Redirecting to companies list...
+//             WhatsApp number registered. Company admin can now connect their WhatsApp.
 //           </p>
 //           <Loader2 className="w-6 h-6 animate-spin text-indigo-600 mx-auto" />
 //         </div>
@@ -220,9 +299,10 @@
 
 //   const steps = [
 //     { number: 1, name: 'Company Details', icon: Building2 },
-//     { number: 2, name: 'Admin Account', icon: User },
-//     { number: 3, name: 'Plan & Subscription', icon: CreditCard },
-//     { number: 4, name: 'Review', icon: CheckCircle2 },
+//     { number: 2, name: 'WhatsApp Setup', icon: Smartphone },
+//     { number: 3, name: 'Admin Account', icon: User },
+//     { number: 4, name: 'Plan', icon: CreditCard },
+//     { number: 5, name: 'Review', icon: CheckCircle2 },
 //   ];
 
 //   return (
@@ -239,7 +319,7 @@
 //           </button>
 //           <h1 className="text-2xl font-bold text-gray-900">Create New Company</h1>
 //           <p className="mt-1 text-sm text-gray-500">
-//             Set up a new company with admin account and subscription plan
+//             Set up a new company with WhatsApp integration for multi-tenant messaging
 //           </p>
 //         </div>
 
@@ -500,15 +580,140 @@
 //             </div>
 //           )}
 
-//           {/* Step 2: Admin Details */}
+//           {/* Step 2: WhatsApp Configuration */}
 //           {step === 2 && (
+//             <div className="p-6 space-y-6">
+//               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+//                 <Smartphone className="w-5 h-5 mr-2 text-indigo-600" />
+//                 WhatsApp Configuration
+//               </h2>
+//               <p className="text-sm text-gray-500 mb-4">
+//                 Configure WhatsApp numbers for this company. Customers will message these numbers to interact with the business.
+//               </p>
+
+//               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+//                 <div className="flex items-start">
+//                   <MessageSquare className="w-5 h-5 text-blue-600 mt-0.5 mr-3" />
+//                   <div>
+//                     <h3 className="text-sm font-medium text-blue-800">Important: WhatsApp Routing</h3>
+//                     <p className="text-xs text-blue-700 mt-1">
+//                       The primary WhatsApp number is what customers will message. Additional numbers can be used for different departments or purposes. Each company gets a separate WhatsApp session.
+//                     </p>
+//                   </div>
+//                 </div>
+//               </div>
+
+//               {/* Primary WhatsApp Number */}
+//               <div>
+//                 <label className="block text-sm font-medium text-gray-700 mb-1">
+//                   Primary WhatsApp Number <span className="text-red-500">*</span>
+//                 </label>
+//                 <div className="relative">
+//                   <Smartphone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+//                   <input
+//                     type="tel"
+//                     value={formData.whatsappNumber}
+//                     onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
+//                     className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 ${
+//                       errors.whatsappNumber ? 'border-red-500' : 'border-gray-300'
+//                     }`}
+//                     placeholder="919876543210 (with country code)"
+//                   />
+//                 </div>
+//                 {errors.whatsappNumber && (
+//                   <p className="mt-1 text-xs text-red-600">{errors.whatsappNumber}</p>
+//                 )}
+//                 <p className="mt-1 text-xs text-gray-500">
+//                   Include country code (e.g., 91 for India). This number will be used for company identification.
+//                 </p>
+//               </div>
+
+//               {/* Additional WhatsApp Numbers */}
+//               <div className="border-t border-gray-200 pt-6">
+//                 <h3 className="text-md font-medium text-gray-900 mb-4">Additional Routing Numbers</h3>
+                
+//                 {/* List of added numbers */}
+//                 {formData.additionalWhatsAppNumbers.length > 0 && (
+//                   <div className="space-y-2 mb-4">
+//                     {formData.additionalWhatsAppNumbers.map((num, index) => (
+//                       <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+//                         <div className="flex items-center">
+//                           <Smartphone className="w-4 h-4 text-gray-500 mr-2" />
+//                           <div>
+//                             <span className="text-sm font-medium">{num.number}</span>
+//                             {num.description && (
+//                               <span className="text-xs text-gray-500 ml-2">({num.description})</span>
+//                             )}
+//                           </div>
+//                         </div>
+//                         <button
+//                           type="button"
+//                           onClick={() => handleRemoveWhatsAppNumber(index)}
+//                           className="text-red-600 hover:text-red-800"
+//                         >
+//                           <Trash2 className="w-4 h-4" />
+//                         </button>
+//                       </div>
+//                     ))}
+//                   </div>
+//                 )}
+
+//                 {/* Add new number form */}
+//                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+//                   <div className="md:col-span-1">
+//                     <input
+//                       type="tel"
+//                       value={newWhatsAppNumber}
+//                       onChange={(e) => setNewWhatsAppNumber(e.target.value)}
+//                       placeholder="WhatsApp number"
+//                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+//                     />
+//                   </div>
+//                   <div className="md:col-span-1">
+//                     <input
+//                       type="text"
+//                       value={newWhatsAppDesc}
+//                       onChange={(e) => setNewWhatsAppDesc(e.target.value)}
+//                       placeholder="Description (e.g., Support)"
+//                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+//                     />
+//                   </div>
+//                   <div className="md:col-span-1 flex items-center gap-2">
+//                     <label className="flex items-center">
+//                       <input
+//                         type="checkbox"
+//                         checked={newWhatsAppPrimary}
+//                         onChange={(e) => setNewWhatsAppPrimary(e.target.checked)}
+//                         className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+//                       />
+//                       <span className="ml-2 text-sm text-gray-700">Make Primary</span>
+//                     </label>
+//                     <button
+//                       type="button"
+//                       onClick={handleAddWhatsAppNumber}
+//                       className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center"
+//                     >
+//                       <Plus className="w-4 h-4 mr-1" />
+//                       Add
+//                     </button>
+//                   </div>
+//                 </div>
+//                 <p className="mt-2 text-xs text-gray-500">
+//                   Add additional WhatsApp numbers for different departments or purposes.
+//                 </p>
+//               </div>
+//             </div>
+//           )}
+
+//           {/* Step 3: Admin Details */}
+//           {step === 3 && (
 //             <div className="p-6 space-y-6">
 //               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
 //                 <User className="w-5 h-5 mr-2 text-indigo-600" />
 //                 Admin Account
 //               </h2>
 //               <p className="text-sm text-gray-500 mb-4">
-//                 This person will be the company administrator and can log in immediately.
+//                 This person will be the company administrator and can log in to manage WhatsApp and settings.
 //               </p>
 
 //               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -597,8 +802,8 @@
 //             </div>
 //           )}
 
-//           {/* Step 3: Plan & Subscription */}
-//           {step === 3 && (
+//           {/* Step 4: Plan & Subscription */}
+//           {step === 4 && (
 //             <div className="p-6 space-y-6">
 //               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
 //                 <CreditCard className="w-5 h-5 mr-2 text-indigo-600" />
@@ -627,28 +832,28 @@
 //                         <>
 //                           <li>• 3 users max</li>
 //                           <li>• 100 products</li>
-//                           <li>• Basic features</li>
+//                           <li>• 1 WhatsApp number</li>
 //                         </>
 //                       )}
 //                       {plan === 'basic' && (
 //                         <>
 //                           <li>• 10 users max</li>
 //                           <li>• 1000 products</li>
-//                           <li>• Coupons enabled</li>
+//                           <li>• 3 WhatsApp numbers</li>
 //                         </>
 //                       )}
 //                       {plan === 'pro' && (
 //                         <>
 //                           <li>• 50 users max</li>
 //                           <li>• 5000 products</li>
-//                           <li>• API access</li>
+//                           <li>• 10 WhatsApp numbers</li>
 //                         </>
 //                       )}
 //                       {plan === 'enterprise' && (
 //                         <>
 //                           <li>• Unlimited users</li>
 //                           <li>• 100k products</li>
-//                           <li>• Custom domain</li>
+//                           <li>• Unlimited WhatsApp numbers</li>
 //                         </>
 //                       )}
 //                     </ul>
@@ -713,8 +918,8 @@
 //             </div>
 //           )}
 
-//           {/* Step 4: Review */}
-//           {step === 4 && (
+//           {/* Step 5: Review */}
+//           {step === 5 && (
 //             <div className="p-6 space-y-6">
 //               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
 //                 <CheckCircle2 className="w-5 h-5 mr-2 text-indigo-600" />
@@ -751,6 +956,30 @@
 //                 </div>
 
 //                 <div className="border-t border-gray-200 pt-4">
+//                   <h3 className="font-medium text-gray-900 mb-2">WhatsApp Configuration</h3>
+//                   <div className="space-y-2">
+//                     <div className="flex items-center">
+//                       <Smartphone className="w-4 h-4 text-green-600 mr-2" />
+//                       <span className="text-sm font-medium">Primary: {formData.whatsappNumber}</span>
+//                     </div>
+//                     {formData.additionalWhatsAppNumbers.length > 0 && (
+//                       <div className="ml-6 space-y-1">
+//                         <p className="text-xs text-gray-500">Additional numbers:</p>
+//                         {formData.additionalWhatsAppNumbers.map((num, idx) => (
+//                           <div key={idx} className="flex items-center text-sm">
+//                             <span className="text-gray-600 mr-2">•</span>
+//                             <span>{num.number}</span>
+//                             {num.description && (
+//                               <span className="text-xs text-gray-500 ml-2">({num.description})</span>
+//                             )}
+//                           </div>
+//                         ))}
+//                       </div>
+//                     )}
+//                   </div>
+//                 </div>
+
+//                 <div className="border-t border-gray-200 pt-4">
 //                   <h3 className="font-medium text-gray-900 mb-2">Admin Account</h3>
 //                   <div className="grid grid-cols-2 gap-2 text-sm">
 //                     <span className="text-gray-600">Name:</span>
@@ -782,7 +1011,7 @@
 //               </div>
 
 //               <p className="text-sm text-gray-500">
-//                 By clicking Create Company, you confirm that all information is correct and you have permission to create this company.
+//                 By clicking Create Company, you confirm that all information is correct. The company admin will receive login credentials and can configure WhatsApp settings.
 //               </p>
 //             </div>
 //           )}
@@ -801,7 +1030,7 @@
 //               <div></div>
 //             )}
             
-//             {step < 4 ? (
+//             {step < 5 ? (
 //               <button
 //                 type="button"
 //                 onClick={handleNext}
@@ -836,6 +1065,10 @@
 
 
 
+
+
+
+// above code is without catalogue
 
 
 
@@ -880,6 +1113,8 @@ import {
   Trash2,
   MessageSquare,
   QrCode,
+  Link as LinkIcon,
+  Tag,
 } from 'lucide-react';
 
 export default function CreateCompanyPage() {
@@ -892,6 +1127,10 @@ export default function CreateCompanyPage() {
     companyName: '',
     companyEmail: '',
     companyPhone: '',
+    
+    // ✅ NEW: Catalog Fields
+    slug: '', // Auto-generated from company name, but can be customized
+    catalogWhatsapp: '', // Separate WhatsApp for catalog orders
     
     // WhatsApp Configuration - CRITICAL for multi-tenant
     whatsappNumber: '', // Primary WhatsApp number customers will message
@@ -940,6 +1179,37 @@ export default function CreateCompanyPage() {
   // Form validation errors
   const [errors, setErrors] = useState({});
 
+  // ✅ NEW: Auto-generate slug from company name
+  const generateSlug = (name) => {
+    if (!name) return '';
+    let slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    
+    if (!slug || slug.length === 0) {
+      slug = `company-${Date.now()}`;
+    }
+    
+    return slug;
+  };
+
+  // Handle company name change - auto generate slug
+  const handleCompanyNameChange = (e) => {
+    const name = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      companyName: name,
+      slug: generateSlug(name)
+    }));
+  };
+
+  // Handle slug manual edit
+  const handleSlugChange = (e) => {
+    let slug = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    setFormData(prev => ({ ...prev, slug }));
+  };
+
   // Check authentication
   if (status === 'unauthenticated') {
     router.push('/login');
@@ -959,6 +1229,19 @@ export default function CreateCompanyPage() {
       if (!formData.companyName.trim()) {
         newErrors.companyName = 'Company name is required';
       }
+      
+      // ✅ NEW: Slug validation
+      if (!formData.slug.trim()) {
+        newErrors.slug = 'Catalog slug is required';
+      } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(formData.slug)) {
+        newErrors.slug = 'Slug can only contain lowercase letters, numbers, and hyphens';
+      }
+      
+      // ✅ NEW: Catalog WhatsApp validation (optional)
+      if (formData.catalogWhatsapp && !/^\d{10,12}$/.test(formData.catalogWhatsapp.replace(/\D/g, ''))) {
+        newErrors.catalogWhatsapp = 'Catalog WhatsApp must be 10-12 digits';
+      }
+      
       if (!formData.companyEmail.trim()) {
         newErrors.companyEmail = 'Company email is required';
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.companyEmail)) {
@@ -1097,6 +1380,7 @@ export default function CreateCompanyPage() {
         companyPhone: formData.companyPhone.replace(/\D/g, ''),
         adminPhone: formData.adminPhone.replace(/\D/g, ''),
         whatsappNumber: formData.whatsappNumber.replace(/\D/g, ''),
+        catalogWhatsapp: formData.catalogWhatsapp ? formData.catalogWhatsapp.replace(/\D/g, '') : null,
         additionalWhatsAppNumbers: formData.additionalWhatsAppNumbers.map(num => ({
           ...num,
           number: num.number.replace(/\D/g, '')
@@ -1137,6 +1421,14 @@ export default function CreateCompanyPage() {
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Company Created!</h2>
           <p className="text-gray-600 mb-4">
+            Company slug: <strong>{formData.slug}</strong>
+          </p>
+          <p className="text-gray-600 mb-4">
+            Catalog link: <strong className="text-blue-600 text-sm break-all">
+              {window.location.origin}/catalogue/products?company={formData.slug}
+            </strong>
+          </p>
+          <p className="text-gray-500 text-sm mb-4">
             WhatsApp number registered. Company admin can now connect their WhatsApp.
           </p>
           <Loader2 className="w-6 h-6 animate-spin text-indigo-600 mx-auto" />
@@ -1167,7 +1459,7 @@ export default function CreateCompanyPage() {
           </button>
           <h1 className="text-2xl font-bold text-gray-900">Create New Company</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Set up a new company with WhatsApp integration for multi-tenant messaging
+            Set up a new company with catalog link and WhatsApp integration for multi-tenant messaging
           </p>
         </div>
 
@@ -1234,7 +1526,7 @@ export default function CreateCompanyPage() {
                   <input
                     type="text"
                     value={formData.companyName}
-                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                    onChange={handleCompanyNameChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 ${
                       errors.companyName ? 'border-red-500' : 'border-gray-300'
                     }`}
@@ -1243,6 +1535,30 @@ export default function CreateCompanyPage() {
                   {errors.companyName && (
                     <p className="mt-1 text-xs text-red-600">{errors.companyName}</p>
                   )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Catalog Slug <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={formData.slug}
+                      onChange={handleSlugChange}
+                      className={`w-full pl-9 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 ${
+                        errors.slug ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="company-slug"
+                    />
+                  </div>
+                  {errors.slug && (
+                    <p className="mt-1 text-xs text-red-600">{errors.slug}</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    URL: {window.location.origin}/catalogue/products?company={formData.slug || 'your-slug'}
+                  </p>
                 </div>
 
                 <div>
@@ -1279,6 +1595,31 @@ export default function CreateCompanyPage() {
                   {errors.companyPhone && (
                     <p className="mt-1 text-xs text-red-600">{errors.companyPhone}</p>
                   )}
+                </div>
+
+                {/* ✅ NEW: Catalog WhatsApp Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Catalog WhatsApp (Optional)
+                  </label>
+                  <div className="relative">
+                    <Smartphone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="tel"
+                      value={formData.catalogWhatsapp}
+                      onChange={(e) => setFormData({ ...formData, catalogWhatsapp: e.target.value })}
+                      className={`w-full pl-9 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 ${
+                        errors.catalogWhatsapp ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="9876543210"
+                    />
+                  </div>
+                  {errors.catalogWhatsapp && (
+                    <p className="mt-1 text-xs text-red-600">{errors.catalogWhatsapp}</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    Separate WhatsApp number for customer orders. If not set, primary WhatsApp will be used.
+                  </p>
                 </div>
               </div>
 
@@ -1428,7 +1769,7 @@ export default function CreateCompanyPage() {
             </div>
           )}
 
-          {/* Step 2: WhatsApp Configuration */}
+          {/* Step 2: WhatsApp Configuration (unchanged but add catalog note) */}
           {step === 2 && (
             <div className="p-6 space-y-6">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -1437,6 +1778,7 @@ export default function CreateCompanyPage() {
               </h2>
               <p className="text-sm text-gray-500 mb-4">
                 Configure WhatsApp numbers for this company. Customers will message these numbers to interact with the business.
+                Note: The Catalog WhatsApp (set in previous step) is separate for order inquiries.
               </p>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
@@ -1780,6 +2122,14 @@ export default function CreateCompanyPage() {
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <span className="text-gray-600">Name:</span>
                     <span className="font-medium">{formData.companyName}</span>
+                    <span className="text-gray-600">Slug:</span>
+                    <span className="font-medium">{formData.slug}</span>
+                    <span className="text-gray-600">Catalog Link:</span>
+                    <span className="font-medium text-blue-600 break-all">
+                      {window.location.origin}/catalogue/products?company={formData.slug}
+                    </span>
+                    <span className="text-gray-600">Catalog WhatsApp:</span>
+                    <span className="font-medium">{formData.catalogWhatsapp || 'Not set (will use primary)'}</span>
                     <span className="text-gray-600">Email:</span>
                     <span className="font-medium">{formData.companyEmail}</span>
                     <span className="text-gray-600">Phone:</span>

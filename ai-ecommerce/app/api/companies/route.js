@@ -1,8 +1,17 @@
+
+
+
+
+
+
 // // app/api/companies/route.js
+// // PROFESSIONAL COMPANIES API ROUTE - Full multi-tenant WhatsApp support
+// // Handles: Create, Read, Update, Delete companies with WhatsApp integration
+
 // import { NextResponse } from 'next/server';
 // import { getServerSession } from 'next-auth';
 // import { authOptions } from '@/lib/nextauth';
-// import { connectDB } from '@/utils/db';
+// import { connectDB } from '@/utils/db.js';
 // import Company from '@/models/Company';
 // import User from '@/models/user';
 // import CompanySettings from '@/models/CompanySettings';
@@ -156,9 +165,38 @@
 //   return features[plan] || features.free;
 // };
 
-// // Format company response
+// // Format company response with WhatsApp fields
 // const formatCompanyResponse = (company) => {
 //   const companyObj = company.toObject ? company.toObject() : company;
+  
+//   // Get all WhatsApp numbers
+//   const whatsappNumbers = [];
+  
+//   // Add primary WhatsApp number if exists
+//   if (companyObj.whatsapp?.phoneNumber) {
+//     whatsappNumbers.push({
+//       number: companyObj.whatsapp.phoneNumber,
+//       type: 'primary',
+//       isConnected: companyObj.whatsapp.isConnected || false,
+//       status: companyObj.whatsapp.connectionStatus || 'disconnected'
+//     });
+//   }
+  
+//   // Add routing numbers if they exist
+//   if (companyObj.whatsappRouting?.phoneNumbers?.length > 0) {
+//     companyObj.whatsappRouting.phoneNumbers.forEach(p => {
+//       if (p.isActive) {
+//         whatsappNumbers.push({
+//           number: p.number,
+//           type: p.isPrimary ? 'routing_primary' : 'routing',
+//           isPrimary: p.isPrimary || false,
+//           isActive: p.isActive,
+//           description: p.description,
+//           verifiedAt: p.verifiedAt?.toISOString()
+//         });
+//       }
+//     });
+//   }
   
 //   return {
 //     ...companyObj,
@@ -167,6 +205,23 @@
 //     fullAddress: company.fullAddress,
 //     isSubscriptionValid: company.isSubscriptionValid,
 //     daysUntilExpiry: company.daysUntilExpiry,
+    
+//     // WhatsApp fields
+//     whatsapp: companyObj.whatsapp ? {
+//       isConnected: companyObj.whatsapp.isConnected || false,
+//       connectionStatus: companyObj.whatsapp.connectionStatus || 'disconnected',
+//       phoneNumber: companyObj.whatsapp.phoneNumber,
+//       clientId: companyObj.whatsapp.clientId,
+//       connectedAt: companyObj.whatsapp.connectedAt?.toISOString(),
+//       lastMessageAt: companyObj.whatsapp.lastMessageAt?.toISOString(),
+//       lastError: companyObj.whatsapp.lastError,
+//       deviceInfo: companyObj.whatsapp.deviceInfo
+//     } : null,
+    
+//     whatsappNumbers,
+//     totalWhatsAppNumbers: whatsappNumbers.length,
+//     hasActiveWhatsApp: whatsappNumbers.length > 0,
+    
 //     createdAt: companyObj.createdAt?.toISOString(),
 //     updatedAt: companyObj.updatedAt?.toISOString(),
 //     verifiedAt: companyObj.verifiedAt?.toISOString(),
@@ -235,6 +290,8 @@
 //     const search = searchParams.get('search') || '';
 //     const status = searchParams.get('status') || 'all';
 //     const plan = searchParams.get('plan') || 'all';
+//     const whatsappConnected = searchParams.get('whatsappConnected'); // 'true' or 'false'
+//     const hasWhatsapp = searchParams.get('hasWhatsapp'); // 'true' or 'false'
 //     const sortBy = searchParams.get('sortBy') || 'createdAt';
 //     const sortOrder = searchParams.get('sortOrder') || 'desc';
 //     const includeDeleted = searchParams.get('includeDeleted') === 'true';
@@ -256,11 +313,28 @@
 //       query['subscription.plan'] = plan;
 //     }
 
+//     // WhatsApp filters
+//     if (whatsappConnected === 'true') {
+//       query['whatsapp.isConnected'] = true;
+//       query['whatsapp.connectionStatus'] = 'connected';
+//     } else if (whatsappConnected === 'false') {
+//       query['whatsapp.isConnected'] = false;
+//     }
+
+//     if (hasWhatsapp === 'true') {
+//       query.$or = [
+//         { 'whatsapp.phoneNumber': { $exists: true, $ne: null } },
+//         { 'whatsappRouting.phoneNumbers.0': { $exists: true } }
+//       ];
+//     }
+
 //     if (search) {
 //       query.$or = [
 //         { companyName: { $regex: search, $options: 'i' } },
 //         { companyEmail: { $regex: search, $options: 'i' } },
 //         { companyPhone: { $regex: search, $options: 'i' } },
+//         { 'whatsapp.phoneNumber': { $regex: search, $options: 'i' } },
+//         { 'whatsappRouting.phoneNumbers.number': { $regex: search, $options: 'i' } },
 //         { 'address.city': { $regex: search, $options: 'i' } },
 //         { 'address.state': { $regex: search, $options: 'i' } },
 //       ];
@@ -284,24 +358,38 @@
 //       Company.getStats(),
 //     ]);
 
-//     // Format companies
-//     const formattedCompanies = companies.map(company => ({
-//       ...company,
-//       id: company._id.toString(),
-//       _id: company._id.toString(),
-//       fullAddress: `${company.address?.street || ''}, ${company.address?.city || ''}, ${company.address?.state || ''} - ${company.address?.pincode || ''}`.replace(/^, |, $/g, ''),
-//       isSubscriptionValid: company.subscription?.expiryDate 
-//         ? new Date(company.subscription.expiryDate) > new Date() 
-//         : true,
-//       daysUntilExpiry: company.subscription?.expiryDate
-//         ? Math.ceil((new Date(company.subscription.expiryDate) - new Date()) / (1000 * 60 * 60 * 24))
-//         : null,
-//     }));
+//     // Format companies with WhatsApp info
+//     const formattedCompanies = companies.map(company => formatCompanyResponse(company));
+
+//     // Get WhatsApp stats
+//     const whatsappStats = {
+//       total: await Company.countDocuments({ 
+//         $or: [
+//           { 'whatsapp.phoneNumber': { $exists: true, $ne: null } },
+//           { 'whatsappRouting.phoneNumbers.0': { $exists: true } }
+//         ],
+//         deletedAt: null 
+//       }),
+//       connected: await Company.countDocuments({ 
+//         'whatsapp.isConnected': true, 
+//         'whatsapp.connectionStatus': 'connected',
+//         deletedAt: null 
+//       }),
+//       disconnected: await Company.countDocuments({ 
+//         'whatsapp.isConnected': false,
+//         $or: [
+//           { 'whatsapp.phoneNumber': { $exists: true, $ne: null } },
+//           { 'whatsappRouting.phoneNumbers.0': { $exists: true } }
+//         ],
+//         deletedAt: null 
+//       })
+//     };
 
 //     console.log('✅ [COMPANIES API] GET successful:', {
 //       count: formattedCompanies.length,
 //       total,
 //       page,
+//       whatsappConnected: whatsappStats.connected
 //     });
 
 //     return NextResponse.json(
@@ -316,12 +404,17 @@
 //           hasNext: page < Math.ceil(total / limit),
 //           hasPrev: page > 1,
 //         },
-//         stats,
+//         stats: {
+//           ...stats,
+//           whatsapp: whatsappStats
+//         },
 //         filters: {
 //           applied: {
 //             search: search || null,
 //             status: status !== 'all' ? status : null,
 //             plan: plan !== 'all' ? plan : null,
+//             whatsappConnected: whatsappConnected || null,
+//             hasWhatsapp: hasWhatsapp || null,
 //             includeDeleted,
 //           },
 //         },
@@ -454,6 +547,20 @@
 //       errors.companyPhone = 'Phone must be 10-12 digits';
 //     }
 
+//     // WhatsApp number validation
+//     if (body.whatsappNumber && !validatePhone(body.whatsappNumber)) {
+//       errors.whatsappNumber = 'WhatsApp number must be 10-12 digits';
+//     }
+
+//     // Additional WhatsApp numbers validation
+//     if (body.additionalWhatsAppNumbers?.length > 0) {
+//       body.additionalWhatsAppNumbers.forEach((num, index) => {
+//         if (!validatePhone(num.number)) {
+//           errors[`additionalWhatsAppNumbers[${index}].number`] = 'Invalid WhatsApp number format';
+//         }
+//       });
+//     }
+
 //     // Address validation
 //     if (!body.address?.street?.trim()) {
 //       errors['address.street'] = 'Street address is required';
@@ -511,7 +618,7 @@
 
 //     await connectDB();
 
-//     // Check for existing company with same email
+//     // Check for existing company with same email/name
 //     const existingCompany = await Company.findOne({
 //       $or: [
 //         { companyEmail: body.companyEmail.toLowerCase().trim() },
@@ -562,15 +669,54 @@
 //     dbSession.startTransaction();
 
 //     try {
-//       // 1. Create Company
+//       // 1. Create Company with WhatsApp fields
 //       const plan = body.plan || 'free';
 //       const planLimits = getPlanLimits(plan);
 //       const planFeatures = getPlanFeatures(plan);
+
+//       // Generate client ID for WhatsApp
+//       const timestamp = Date.now();
+//       const clientId = body.whatsappNumber 
+//         ? `company_${timestamp}_${body.whatsappNumber.slice(-4)}` 
+//         : null;
 
 //       const [company] = await Company.create([{
 //         companyName: body.companyName.trim(),
 //         companyEmail: body.companyEmail.toLowerCase().trim(),
 //         companyPhone: body.companyPhone.replace(/\D/g, ''),
+        
+//         // WhatsApp configuration
+//         whatsapp: {
+//           phoneNumber: body.whatsappNumber ? body.whatsappNumber.replace(/\D/g, '') : null,
+//           isConnected: false,
+//           connectionStatus: 'pending',
+//           clientId: clientId,
+//           maxReconnectAttempts: 5,
+//           reconnectAttempts: 0,
+//           errorCount: 0
+//         },
+        
+//         // WhatsApp routing numbers
+//         whatsappRouting: {
+//           phoneNumbers: body.additionalWhatsAppNumbers?.map((num, index) => ({
+//             number: num.number.replace(/\D/g, ''),
+//             isPrimary: num.isPrimary || false,
+//             isActive: true,
+//             description: num.description || `WhatsApp number ${index + 1}`,
+//             verifiedAt: new Date()
+//           })) || [],
+//           autoResponse: {
+//             enabled: false,
+//             workingHours: {
+//               enabled: false,
+//               timezone: 'Asia/Kolkata'
+//             }
+//           },
+//           fallback: {
+//             enabled: true
+//           }
+//         },
+        
 //         address: {
 //           street: body.address.street.trim(),
 //           city: body.address.city.trim(),
@@ -597,6 +743,22 @@
 //         createdBy: session.user.id,
 //         notes: body.notes || '',
 //         tags: body.tags || [],
+        
+//         // Initialize stats
+//         stats: {
+//           totalUsers: 0,
+//           totalProducts: 0,
+//           totalOrders: 0,
+//           totalBookings: 0,
+//           totalRevenue: 0,
+//           whatsapp: {
+//             totalMessages: 0,
+//             totalConversations: 0,
+//             totalCustomers: 0,
+//             messagesToday: 0,
+//             lastResetAt: new Date()
+//           }
+//         }
 //       }], { session: dbSession });
 
 //       const companyId = company._id;
@@ -614,6 +776,26 @@
 //         country: body.address.country || 'India',
 //         createdBy: session.user.id,
 //         orderFlowMode: 'short',
+        
+//         // Initialize payment settings
+//         upiIds: body.whatsappNumber ? [{
+//           id: `${body.whatsappNumber.replace(/\D/g, '').slice(-10)}@okhdfcbank`,
+//           name: 'Primary UPI',
+//           appType: 'other',
+//           isActive: true,
+//           description: 'Auto-generated UPI ID',
+//           createdAt: new Date()
+//         }] : [],
+        
+//         paymentSettings: {
+//           preferredMethod: 'upi',
+//           allowPartialPayments: false,
+//           autoVerifyEnabled: true,
+//           minConfidenceForAuto: 85,
+//           paymentTimeout: 30,
+//           requireTransactionId: true,
+//           allowMultiplePaymentMethods: true
+//         }
 //       }], { session: dbSession });
 
 //       // 3. Create Admin User
@@ -633,11 +815,18 @@
 //         createdBy: session.user.id,
 //         notificationSettings: {
 //           pushNotifications: { enabled: true, lastUpdated: new Date() },
+//           notificationTypes: {
+//             newOrders: { enabled: true, priority: 'high', sound: true },
+//             payments: { enabled: true, priority: 'high', sound: true },
+//             lowStock: { enabled: true, priority: 'normal', sound: true },
+//             systemAlerts: { enabled: true, priority: 'high', sound: true },
+//             orderUpdates: { enabled: true, priority: 'normal', sound: true }
+//           },
 //           settingsUpdatedAt: new Date(),
 //         },
 //       }], { session: dbSession });
 
-//       // 4. Initialize Counters for the company - WITH DEFENSIVE CHECK
+//       // 4. Initialize Counters for the company
 //       if (typeof Counter.initializeCompanyCounters === 'function') {
 //         await Counter.initializeCompanyCounters(companyId, adminUser._id);
 //         console.log('✅ Counters initialized for company:', companyId);
@@ -656,6 +845,8 @@
 //         companyName: company.companyName,
 //         adminEmail: adminUser.email,
 //         plan,
+//         whatsappNumber: body.whatsappNumber || 'Not provided',
+//         additionalNumbers: body.additionalWhatsAppNumbers?.length || 0
 //       });
 
 //       // Populate company for response
@@ -665,6 +856,19 @@
 //         .lean();
 
 //       const processingTime = Date.now() - startTime;
+
+//       // Format WhatsApp numbers for response
+//       const whatsappNumbers = [];
+//       if (body.whatsappNumber) {
+//         whatsappNumbers.push({
+//           number: body.whatsappNumber,
+//           type: 'primary',
+//           isPrimary: true
+//         });
+//       }
+//       if (body.additionalWhatsAppNumbers) {
+//         whatsappNumbers.push(...body.additionalWhatsAppNumbers);
+//       }
 
 //       return NextResponse.json(
 //         {
@@ -678,6 +882,12 @@
 //               email: adminUser.email,
 //               phone: adminUser.phone,
 //             },
+//             whatsapp: {
+//               primaryNumber: body.whatsappNumber,
+//               additionalNumbers: body.additionalWhatsAppNumbers || [],
+//               clientId: clientId,
+//               totalNumbers: whatsappNumbers.length
+//             }
 //           },
 //           metadata: {
 //             processingTime,
@@ -906,11 +1116,43 @@
 //         );
 //         break;
 
+//       // WhatsApp bulk operations
+//       case 'disconnect-whatsapp':
+//         updateData = {
+//           'whatsapp.isConnected': false,
+//           'whatsapp.connectionStatus': 'disconnected',
+//           'whatsapp.disconnectedAt': new Date(),
+//           updatedBy: session.user.id,
+//           updatedAt: new Date(),
+//         };
+//         result = await Company.updateMany(
+//           { _id: { $in: validIds } },
+//           { $set: updateData }
+//         );
+//         break;
+
+//       case 'reset-whatsapp':
+//         updateData = {
+//           'whatsapp.isConnected': false,
+//           'whatsapp.connectionStatus': 'pending',
+//           'whatsapp.reconnectAttempts': 0,
+//           'whatsapp.errorCount': 0,
+//           'whatsapp.lastError': null,
+//           'whatsapp.disconnectedAt': null,
+//           updatedBy: session.user.id,
+//           updatedAt: new Date(),
+//         };
+//         result = await Company.updateMany(
+//           { _id: { $in: validIds } },
+//           { $set: updateData }
+//         );
+//         break;
+
 //       default:
 //         return NextResponse.json(
 //           {
 //             success: false,
-//             message: 'Invalid action. Supported actions: activate, suspend, delete, change-plan',
+//             message: 'Invalid action. Supported actions: activate, suspend, delete, change-plan, disconnect-whatsapp, reset-whatsapp',
 //             code: 'INVALID_ACTION',
 //           },
 //           {
@@ -1067,6 +1309,8 @@
 //             deletedAt: new Date(),
 //             deletedBy: session.user.id,
 //             status: 'inactive',
+//             'whatsapp.isConnected': false,
+//             'whatsapp.connectionStatus': 'disconnected',
 //             updatedBy: session.user.id,
 //             updatedAt: new Date(),
 //           },
@@ -1111,6 +1355,18 @@
 //     );
 //   }
 // }
+
+
+//above is without ctalogue
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1187,6 +1443,26 @@ const validatePincode = (pincode) => {
 
 const validatePassword = (password) => {
   return password.length >= 6;
+};
+
+// ✅ NEW: Validate slug format
+const validateSlug = (slug) => {
+  if (!slug) return true;
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug);
+};
+
+// ✅ NEW: Generate slug from company name
+const generateSlug = (name) => {
+  let baseSlug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  
+  if (!baseSlug || baseSlug.length === 0) {
+    baseSlug = `company-${Date.now()}`;
+  }
+  
+  return baseSlug;
 };
 
 // Get plan limits based on plan name
@@ -1277,7 +1553,7 @@ const getPlanFeatures = (plan) => {
   return features[plan] || features.free;
 };
 
-// Format company response with WhatsApp fields
+// Format company response with WhatsApp fields and catalog info
 const formatCompanyResponse = (company) => {
   const companyObj = company.toObject ? company.toObject() : company;
   
@@ -1317,6 +1593,11 @@ const formatCompanyResponse = (company) => {
     fullAddress: company.fullAddress,
     isSubscriptionValid: company.isSubscriptionValid,
     daysUntilExpiry: company.daysUntilExpiry,
+    
+    // ✅ NEW: Catalog fields
+    slug: companyObj.slug,
+    catalogWhatsapp: companyObj.catalogWhatsapp,
+    catalogLink: company.catalogLink,
     
     // WhatsApp fields
     whatsapp: companyObj.whatsapp ? {
@@ -1445,6 +1726,7 @@ export async function GET(request) {
         { companyName: { $regex: search, $options: 'i' } },
         { companyEmail: { $regex: search, $options: 'i' } },
         { companyPhone: { $regex: search, $options: 'i' } },
+        { slug: { $regex: search, $options: 'i' } }, // ✅ Search by slug
         { 'whatsapp.phoneNumber': { $regex: search, $options: 'i' } },
         { 'whatsappRouting.phoneNumbers.number': { $regex: search, $options: 'i' } },
         { 'address.city': { $regex: search, $options: 'i' } },
@@ -1659,6 +1941,21 @@ export async function POST(request) {
       errors.companyPhone = 'Phone must be 10-12 digits';
     }
 
+    // ✅ NEW: Slug validation (auto-generate if not provided)
+    let finalSlug = body.slug;
+    if (!finalSlug && body.companyName) {
+      finalSlug = generateSlug(body.companyName);
+    }
+    
+    if (finalSlug && !validateSlug(finalSlug)) {
+      errors.slug = 'Slug can only contain lowercase letters, numbers, and hyphens';
+    }
+
+    // ✅ NEW: Catalog WhatsApp validation
+    if (body.catalogWhatsapp && !validatePhone(body.catalogWhatsapp)) {
+      errors.catalogWhatsapp = 'Catalog WhatsApp number must be 10-12 digits';
+    }
+
     // WhatsApp number validation
     if (body.whatsappNumber && !validatePhone(body.whatsappNumber)) {
       errors.whatsappNumber = 'WhatsApp number must be 10-12 digits';
@@ -1730,22 +2027,29 @@ export async function POST(request) {
 
     await connectDB();
 
-    // Check for existing company with same email/name
+    // Check for existing company with same email/name/slug
     const existingCompany = await Company.findOne({
       $or: [
         { companyEmail: body.companyEmail.toLowerCase().trim() },
         { companyName: body.companyName.trim() },
+        { slug: finalSlug }
       ],
     });
 
     if (existingCompany) {
-      const field = existingCompany.companyEmail === body.companyEmail.toLowerCase().trim() 
-        ? 'companyEmail' 
-        : 'companyName';
+      let field = '';
+      if (existingCompany.companyEmail === body.companyEmail.toLowerCase().trim()) {
+        field = 'companyEmail';
+      } else if (existingCompany.companyName === body.companyName.trim()) {
+        field = 'companyName';
+      } else if (existingCompany.slug === finalSlug) {
+        field = 'slug';
+      }
+      
       return NextResponse.json(
         {
           success: false,
-          message: `Company with this ${field === 'companyEmail' ? 'email' : 'name'} already exists`,
+          message: `Company with this ${field === 'companyEmail' ? 'email' : field === 'companyName' ? 'name' : 'slug'} already exists`,
           code: 'COMPANY_EXISTS',
           field,
         },
@@ -1781,7 +2085,7 @@ export async function POST(request) {
     dbSession.startTransaction();
 
     try {
-      // 1. Create Company with WhatsApp fields
+      // 1. Create Company with WhatsApp fields and NEW catalog fields
       const plan = body.plan || 'free';
       const planLimits = getPlanLimits(plan);
       const planFeatures = getPlanFeatures(plan);
@@ -1792,10 +2096,29 @@ export async function POST(request) {
         ? `company_${timestamp}_${body.whatsappNumber.slice(-4)}` 
         : null;
 
+      // ✅ Ensure slug is unique
+      let uniqueSlug = finalSlug;
+      let slugCounter = 1;
+      let slugExists = true;
+      
+      while (slugExists) {
+        const existing = await Company.findOne({ slug: uniqueSlug });
+        if (!existing) {
+          slugExists = false;
+        } else {
+          uniqueSlug = `${finalSlug}-${slugCounter}`;
+          slugCounter++;
+        }
+      }
+
       const [company] = await Company.create([{
         companyName: body.companyName.trim(),
         companyEmail: body.companyEmail.toLowerCase().trim(),
         companyPhone: body.companyPhone.replace(/\D/g, ''),
+        
+        // ✅ NEW: Catalog fields
+        slug: uniqueSlug,
+        catalogWhatsapp: body.catalogWhatsapp ? body.catalogWhatsapp.replace(/\D/g, '') : null,
         
         // WhatsApp configuration
         whatsapp: {
@@ -1955,6 +2278,8 @@ export async function POST(request) {
       console.log('✅ [COMPANIES API] Company created successfully:', {
         companyId: companyId.toString(),
         companyName: company.companyName,
+        slug: company.slug,
+        catalogWhatsapp: company.catalogWhatsapp,
         adminEmail: adminUser.email,
         plan,
         whatsappNumber: body.whatsappNumber || 'Not provided',
@@ -1999,6 +2324,12 @@ export async function POST(request) {
               additionalNumbers: body.additionalWhatsAppNumbers || [],
               clientId: clientId,
               totalNumbers: whatsappNumbers.length
+            },
+            // ✅ NEW: Catalog info
+            catalog: {
+              slug: company.slug,
+              link: company.catalogLink,
+              whatsapp: company.catalogWhatsapp
             }
           },
           metadata: {
@@ -2228,6 +2559,45 @@ export async function PUT(request) {
         );
         break;
 
+      // ✅ NEW: Update catalog settings
+      case 'update-catalog':
+        if (data.slug) {
+          if (!validateSlug(data.slug)) {
+            return NextResponse.json(
+              {
+                success: false,
+                message: 'Invalid slug format. Use only lowercase letters, numbers, and hyphens',
+                code: 'INVALID_SLUG',
+              },
+              { status: 400 }
+            );
+          }
+          updateData.slug = data.slug;
+        }
+        
+        if (data.catalogWhatsapp) {
+          if (!validatePhone(data.catalogWhatsapp)) {
+            return NextResponse.json(
+              {
+                success: false,
+                message: 'Invalid catalog WhatsApp number',
+                code: 'INVALID_WHATSAPP',
+              },
+              { status: 400 }
+            );
+          }
+          updateData.catalogWhatsapp = data.catalogWhatsapp.replace(/\D/g, '');
+        }
+        
+        updateData.updatedBy = session.user.id;
+        updateData.updatedAt = new Date();
+        
+        result = await Company.updateMany(
+          { _id: { $in: validIds } },
+          { $set: updateData }
+        );
+        break;
+
       // WhatsApp bulk operations
       case 'disconnect-whatsapp':
         updateData = {
@@ -2264,7 +2634,7 @@ export async function PUT(request) {
         return NextResponse.json(
           {
             success: false,
-            message: 'Invalid action. Supported actions: activate, suspend, delete, change-plan, disconnect-whatsapp, reset-whatsapp',
+            message: 'Invalid action. Supported actions: activate, suspend, delete, change-plan, update-catalog, disconnect-whatsapp, reset-whatsapp',
             code: 'INVALID_ACTION',
           },
           {

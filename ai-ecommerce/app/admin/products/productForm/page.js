@@ -1,8 +1,10 @@
 
 
+
+
 // // app/admin/products/productForm/page.js
 // "use client";
-// import { useState, useEffect, useCallback } from "react";
+// import { useState, useEffect, useCallback, useRef } from "react";
 // import { useRouter, useSearchParams } from "next/navigation";
 // import Head from 'next/head';
 // import { appTheme } from "../../../../src/constants/theme";
@@ -31,53 +33,30 @@
 //     Instagram, Twitter, Youtube, Linkedin, TwitterIcon,
 //     Linkedin as LinkedinIcon, ShieldCheck, ShieldAlert,
 //     Activity, TrendingUp, Users, Briefcase, Calendar as CalendarIcon,
-//     ChevronDown
+//     ChevronDown, Copy as CopyIcon
 // } from 'lucide-react';
 
 // // ==================== CONSTANTS ====================
-// const SECTIONS = [
-//     { 
-//         id: 'basic', 
-//         title: 'Basic Information', 
-//         icon: Package, 
-//         color: appTheme.colors.primary,
-//         description: 'Product name, category, and description'
-//     },
-//     { 
-//         id: 'pricing', 
-//         title: 'Pricing & Stock', 
-//         icon: DollarSign, 
-//         color: appTheme.colors.secondary,
-//         description: 'Pricing, GST, and inventory management'
-//     },
-//     { 
-//         id: 'media', 
-//         title: 'Media', 
-//         icon: Camera, 
-//         color: appTheme.colors.warning,
-//         description: 'Product images and videos'
-//     },
-//     { 
-//         id: 'specs', 
-//         title: 'Specifications', 
-//         icon: Settings, 
-//         color: appTheme.colors.info,
-//         description: 'Technical details and attributes'
-//     },
-//     { 
-//         id: 'seo', 
-//         title: 'SEO', 
-//         icon: Globe, 
-//         color: appTheme.colors.accent,
-//         description: 'Search engine optimization'
-//     },
-//     { 
-//         id: 'shipping', 
-//         title: 'Shipping', 
-//         icon: Truck, 
-//         color: appTheme.colors.success,
-//         description: 'Weight, dimensions, and shipping class'
-//     }
+// const TAX_RATES = [
+//     { value: "0", label: "0%", description: "No tax" },
+//     { value: "5", label: "5%", description: "Reduced rate" },
+//     { value: "12", label: "12%", description: "Standard rate" },
+//     { value: "18", label: "18%", description: "Standard rate" },
+//     { value: "28", label: "28%", description: "Highest rate" }
+// ];
+
+// const TAX_CLASSES = [
+//     { value: "standard", label: "Standard", icon: FileText },
+//     { value: "reduced", label: "Reduced", icon: Percent },
+//     { value: "zero", label: "Zero Rated", icon: Minus },
+//     { value: "exempt", label: "Exempt", icon: Shield }
+// ];
+
+// const FLAGS = [
+//     { id: 'isFeatured', label: 'Featured', icon: Star, color: appTheme.colors.warning },
+//     { id: 'isOnSale', label: 'On Sale', icon: Percent, color: appTheme.colors.success },
+//     { id: 'isNewArrival', label: 'New Arrival', icon: Calendar, color: appTheme.colors.info },
+//     { id: 'isBestSeller', label: 'Best Seller', icon: Crown, color: appTheme.colors.secondary }
 // ];
 
 // // ✅ Helper to validate ObjectId
@@ -90,11 +69,21 @@
 //     const searchParams = useSearchParams();
 //     const productId = searchParams.get("id");
     
-//     const { user } = useAuth();
+//     // Refs for scrolling to error fields
+//     const fieldRefs = useRef({});
+    
+//     const { user, isAuthenticated, isCompanyAdmin, isSuperAdmin, getAuthHeaders } = useAuth();
+
+//     // Redirect if not authenticated or not company admin
+//     useEffect(() => {
+//         if (!isAuthenticated) {
+//             router.push('/login');
+//         } else if (!isCompanyAdmin && !isSuperAdmin) {
+//             router.push('/dashboard');
+//         }
+//     }, [isAuthenticated, isCompanyAdmin, isSuperAdmin, router]);
 
 //     // State management
-//     const [expandedSections, setExpandedSections] = useState(['basic']);
-//     const [activeTab, setActiveTab] = useState('basic');
 //     const [loading, setLoading] = useState(false);
 //     const [saving, setSaving] = useState(false);
 //     const [errors, setErrors] = useState({});
@@ -108,6 +97,8 @@
 //     const [categories, setCategories] = useState([]);
 //     const [subCategories, setSubCategories] = useState([]);
 //     const [loadingCategories, setLoadingCategories] = useState(false);
+//     const [companyInfo, setCompanyInfo] = useState(null);
+//     const [selectedCategoryHasSubs, setSelectedCategoryHasSubs] = useState(false);
 
 //     const [formData, setFormData] = useState({
 //         productName: "",
@@ -160,6 +151,7 @@
 //     const [isSubmitting, setIsSubmitting] = useState(false);
 //     const [specKey, setSpecKey] = useState("");
 //     const [specValue, setSpecValue] = useState("");
+//     const [apiError, setApiError] = useState(null);
 
 //     // Mobile detection
 //     useEffect(() => {
@@ -194,8 +186,11 @@
 
 //     // Fetch categories on mount
 //     useEffect(() => {
-//         fetchCategories();
-//     }, []);
+//         if (user?.companyId) {
+//             fetchCategories();
+//             fetchCompanyInfo();
+//         }
+//     }, [user]);
 
 //     // Fetch subcategories when category changes
 //     useEffect(() => {
@@ -203,18 +198,41 @@
 //             fetchSubCategories(formData.category);
 //         } else {
 //             setSubCategories([]);
+//             setSelectedCategoryHasSubs(false);
 //         }
 //     }, [formData.category]);
 
+//     // Check if selected category has subcategories
+//     useEffect(() => {
+//         if (subCategories.length > 0) {
+//             setSelectedCategoryHasSubs(true);
+//         } else {
+//             setSelectedCategoryHasSubs(false);
+//         }
+//     }, [subCategories]);
+
 //     // Fetch product data if editing
 //     useEffect(() => {
-//         if (productId) {
+//         if (productId && user?.companyId) {
 //             setIsEditing(true);
 //             fetchProduct();
 //         } else {
 //             generateSKU();
 //         }
-//     }, [productId]);
+//     }, [productId, user]);
+
+//     // Scroll to first error field
+//     useEffect(() => {
+//         if (Object.keys(errors).length > 0) {
+//             const firstErrorField = Object.keys(errors)[0];
+//             if (fieldRefs.current[firstErrorField]) {
+//                 fieldRefs.current[firstErrorField].scrollIntoView({
+//                     behavior: 'smooth',
+//                     block: 'center'
+//                 });
+//             }
+//         }
+//     }, [errors]);
 
 //     const showToast = (type, message) => {
 //         setToast({ show: true, type, message });
@@ -242,11 +260,33 @@
 //         return String(id).padStart(5, '0');
 //     };
 
+//     // Fetch company info
+//     const fetchCompanyInfo = async () => {
+//         try {
+//             const res = await fetch(`/api/companies/me`, {
+//                 headers: getAuthHeaders()
+//             });
+//             const data = await res.json();
+//             if (data.success) {
+//                 setCompanyInfo(data.data);
+//             }
+//         } catch (error) {
+//             console.error('Failed to fetch company info:', error);
+//         }
+//     };
+
 //     // Fetch all categories
 //     const fetchCategories = async () => {
 //         setLoadingCategories(true);
 //         try {
-//             const res = await fetch('/api/masters?type=categories&format=flat');
+//             const params = new URLSearchParams({
+//                 type: 'categories',
+//                 format: 'flat'
+//             });
+            
+//             const res = await fetch(`/api/masters?${params}`, {
+//                 headers: getAuthHeaders()
+//             });
 //             const data = await res.json();
 //             if (data.success) {
 //                 // Filter only main categories (level === 0) for main dropdown
@@ -266,7 +306,14 @@
 //         if (!categoryId || !isValidObjectId(categoryId)) return;
         
 //         try {
-//             const res = await fetch(`/api/masters?type=categories&parentId=${categoryId}`);
+//             const params = new URLSearchParams({
+//                 type: 'categories',
+//                 parentId: categoryId
+//             });
+            
+//             const res = await fetch(`/api/masters?${params}`, {
+//                 headers: getAuthHeaders()
+//             });
 //             const data = await res.json();
 //             if (data.success) {
 //                 setSubCategories(data.data);
@@ -279,7 +326,11 @@
 //     const fetchProduct = async () => {
 //         try {
 //             setLoading(true);
-//             const res = await fetch(`/api/products?id=${productId}`);
+//             setApiError(null);
+            
+//             const res = await fetch(`/api/products?id=${productId}`, {
+//                 headers: getAuthHeaders()
+//             });
 //             const data = await res.json();
             
 //             if (data.success) {
@@ -346,12 +397,16 @@
                 
 //                 showToast('success', 'Product loaded successfully');
 //             } else {
+//                 if (res.status === 403) {
+//                     throw new Error("You don't have permission to edit this product");
+//                 }
 //                 showToast('error', 'Failed to fetch product: ' + data.message);
 //                 setTimeout(() => router.push("/admin/products"), 2000);
 //             }
 //         } catch (err) {
 //             console.error("Error fetching product:", err);
-//             showToast('error', 'Failed to load product data');
+//             setApiError(err.message);
+//             showToast('error', err.message || 'Failed to load product data');
 //         } finally {
 //             setLoading(false);
 //         }
@@ -379,9 +434,18 @@
 //             newErrors.category = "Invalid category selected";
 //         }
 
+//         // Subcategory required if category has subcategories
+//         if (formData.category && selectedCategoryHasSubs) {
+//             if (!formData.subCategory) {
+//                 newErrors.subCategory = "Sub-category is required for this category";
+//             } else if (!isValidObjectId(formData.subCategory)) {
+//                 newErrors.subCategory = "Invalid sub-category selected";
+//             }
+//         }
+
 //         // MRP validation
 //         if (!formData.mrp || parseFloat(formData.mrp) <= 0) {
-//             newErrors.mrp = "Valid MRP is required (greater than 0)";
+//             newErrors.mrp = "Valid MRP is required";
 //         }
 
 //         // Discount price validation
@@ -399,7 +463,7 @@
 
 //         // Stock validation
 //         if (!formData.stock || parseInt(formData.stock) < 0) {
-//             newErrors.stock = "Valid stock quantity is required (0 or more)";
+//             newErrors.stock = "Valid stock quantity is required";
 //         }
 
 //         if (!formData.description.trim()) {
@@ -409,24 +473,6 @@
 //         // Image validation
 //         if (imagePreviews.length === 0 && (!formData.imageUrls || formData.imageUrls.length === 0)) {
 //             newErrors.images = "At least one product image is required";
-//         }
-
-//         // Weight validation if provided
-//         if (formData.weight && parseFloat(formData.weight) < 0) {
-//             newErrors.weight = "Weight cannot be negative";
-//         }
-
-//         // Dimensions validation if any dimension is provided
-//         if (formData.dimensions.length || formData.dimensions.width || formData.dimensions.height) {
-//             if (!formData.dimensions.length || parseFloat(formData.dimensions.length) <= 0) {
-//                 newErrors.dimensions = "Valid length is required";
-//             }
-//             if (!formData.dimensions.width || parseFloat(formData.dimensions.width) <= 0) {
-//                 newErrors.dimensions = "Valid width is required";
-//             }
-//             if (!formData.dimensions.height || parseFloat(formData.dimensions.height) <= 0) {
-//                 newErrors.dimensions = "Valid height is required";
-//             }
 //         }
 
 //         setErrors(newErrors);
@@ -482,6 +528,14 @@
 //                         isOnSale: discount < mrp
 //                     }));
 //                 }
+//             }
+
+//             // Clear subcategory when category changes
+//             if (name === 'category') {
+//                 setFormData(prev => ({
+//                     ...prev,
+//                     subCategory: ""
+//                 }));
 //             }
 //         }
         
@@ -651,6 +705,7 @@
         
 //         setIsSubmitting(true);
 //         setSaving(true);
+//         setApiError(null);
 
 //         try {
 //             let imageUrls = [...formData.imageUrls];
@@ -673,8 +728,8 @@
 //                 slug: formData.slug || generateSlug(formData.productName),
 //                 sku: formData.sku.toUpperCase(),
 //                 hsnCode: formData.hsnCode,
-//                 category: formData.category, // This is now an ObjectId
-//                 subCategory: formData.subCategory || undefined, // This is now an ObjectId
+//                 category: formData.category,
+//                 subCategory: formData.subCategory || undefined,
 //                 brand: formData.brand.trim() || undefined,
 //                 mrp: parseFloat(formData.mrp),
 //                 discountPrice: parseFloat(formData.discountPrice),
@@ -711,13 +766,13 @@
 //                 taxClass: formData.taxClass,
 //                 shippingClass: formData.shippingClass || undefined,
 //                 isActive: true,
-//                 createdBy: user?.id || user?.email || 'admin',
+//                 createdBy: user?.id,
 //             };
 
 //             // Add _id for updates
 //             if (isEditing) {
 //                 productData._id = productId;
-//                 productData.updatedBy = user?.id || user?.email || 'admin';
+//                 productData.updatedBy = user?.id;
 //             }
 
 //             const url = "/api/products";
@@ -727,6 +782,7 @@
 //                 method,
 //                 headers: {
 //                     "Content-Type": "application/json",
+//                     ...getAuthHeaders()
 //                 },
 //                 body: JSON.stringify(productData),
 //             });
@@ -737,10 +793,14 @@
 //                 showToast('success', isEditing ? "✅ Product updated successfully!" : "🎉 Product created successfully!");
 //                 setTimeout(() => router.push("/admin/products"), 1500);
 //             } else {
-//                 throw new Error(data.message || "Failed to save product");
+//                 if (res.status === 403) {
+//                     throw new Error("You don't have permission to perform this action");
+//                 }
+//                 throw new Error(data.message || data.error || "Failed to save product");
 //             }
 //         } catch (error) {
 //             console.error("Error saving product:", error);
+//             setApiError(error.message);
 //             showToast('error', `❌ Failed to save product: ${error.message}`);
 //         } finally {
 //             setSaving(false);
@@ -756,86 +816,22 @@
 //         }
 //     }, [router]);
 
-//     const toggleSection = (sectionId) => {
-//         setExpandedSections(prev => {
-//             if (prev.includes(sectionId)) {
-//                 return prev.filter(id => id !== sectionId);
-//             } else {
-//                 return [...prev, sectionId];
-//             }
-//         });
-//     };
-
-//     const handleTabClick = (tabId) => {
-//         setActiveTab(tabId);
-//         if (!expandedSections.includes(tabId)) {
-//             setExpandedSections(prev => [...prev, tabId]);
-//         }
-//     };
-
-//     const expandAll = () => {
-//         setExpandedSections(SECTIONS.map(s => s.id));
-//     };
-
-//     const collapseAll = () => {
-//         setExpandedSections([]);
+//     const copyToClipboard = (text) => {
+//         navigator.clipboard.writeText(text);
+//         showToast('success', 'Copied to clipboard!');
 //     };
 
 //     if (loading && isEditing) {
 //         return (
 //             <div className="loading-container">
-//                 <div className="loading-grid">
-//                     <div className="loading-card"></div>
-//                     <div className="loading-card"></div>
-//                     <div className="loading-card"></div>
-//                 </div>
+//                 <div className="loading-spinner"></div>
 //                 <p className="loading-text">Loading product data...</p>
-//                 <style jsx>{`
-//                     .loading-container {
-//                         min-height: 100vh;
-//                         display: flex;
-//                         flex-direction: column;
-//                         align-items: center;
-//                         justify-content: center;
-//                         background: linear-gradient(135deg, #f6f9fc 0%, #f1f5f9 100%);
-//                     }
-//                     .loading-grid {
-//                         display: grid;
-//                         grid-template-columns: repeat(3, 1fr);
-//                         gap: 16px;
-//                         margin-bottom: 24px;
-//                     }
-//                     .loading-card {
-//                         width: 80px;
-//                         height: 80px;
-//                         background: white;
-//                         border-radius: 8px;
-//                         animation: pulse 1.5s ease-in-out infinite;
-//                     }
-//                     .loading-card:nth-child(2) {
-//                         animation-delay: 0.2s;
-//                     }
-//                     .loading-card:nth-child(3) {
-//                         animation-delay: 0.4s;
-//                     }
-//                     @keyframes pulse {
-//                         0%, 100% {
-//                             opacity: 0.6;
-//                             transform: scale(1);
-//                         }
-//                         50% {
-//                             opacity: 1;
-//                             transform: scale(1.05);
-//                         }
-//                     }
-//                     .loading-text {
-//                         color: #64748b;
-//                         font-size: 0.875rem;
-//                         font-weight: 500;
-//                     }
-//                 `}</style>
 //             </div>
 //         );
+//     }
+
+//     if (!isAuthenticated || !user) {
+//         return null;
 //     }
 
 //     return (
@@ -843,7 +839,6 @@
 //             <Head>
 //                 <title>{isEditing ? 'Edit Product' : 'Add Product'} | LFMS</title>
 //                 <meta name="viewport" content="width=device-width, initial-scale=1" />
-//                 <meta name="description" content="Manage your product information" />
 //             </Head>
 
 //             <div className="product-form-page">
@@ -866,11 +861,10 @@
 //                                 className="back-button"
 //                             >
 //                                 <ArrowLeft size={20} />
-//                                 <span>Back</span>
+//                                 <span>Back to Products</span>
 //                             </button>
 //                             <h1 className="page-title">
-//                                 <Package size={28} className="title-icon" />
-//                                 {isEditing ? 'Edit Product' : 'Add New Product'}
+//                                 {isEditing ? 'Edit Product' : 'Create New Product'}
 //                             </h1>
 //                             <p className="page-description">
 //                                 {isEditing ? 'Update your product information' : 'Fill in the details to create a new product'}
@@ -878,23 +872,9 @@
 //                         </div>
 //                         <div className="header-actions">
 //                             <button
-//                                 onClick={expandAll}
-//                                 className="header-action-btn"
-//                                 title="Expand all sections"
-//                             >
-//                                 <Layers size={18} />
-//                             </button>
-//                             <button
-//                                 onClick={collapseAll}
-//                                 className="header-action-btn"
-//                                 title="Collapse all sections"
-//                             >
-//                                 <Layout size={18} />
-//                             </button>
-//                             <button
 //                                 onClick={handleSubmit}
 //                                 disabled={saving || isSubmitting}
-//                                 className="save-button"
+//                                 className="save-button desktop-save"
 //                             >
 //                                 {saving || isSubmitting ? (
 //                                     <>
@@ -904,7 +884,7 @@
 //                                 ) : (
 //                                     <>
 //                                         <Save size={16} />
-//                                         <span>Save Product</span>
+//                                         <span>{isEditing ? 'Update Product' : 'Save Product'}</span>
 //                                     </>
 //                                 )}
 //                             </button>
@@ -912,785 +892,774 @@
 //                     </div>
 //                 </header>
 
-//                 {/* Desktop Horizontal Tabs */}
-//                 <div className="desktop-tabs">
-//                     {SECTIONS.map(section => {
-//                         const Icon = section.icon;
-//                         return (
-//                             <button
-//                                 key={section.id}
-//                                 className={`tab-button ${activeTab === section.id ? 'active' : ''}`}
-//                                 onClick={() => handleTabClick(section.id)}
-//                             >
-//                                 <div className="tab-icon" style={{ 
-//                                     backgroundColor: activeTab === section.id ? `${section.color}20` : 'transparent',
-//                                     color: activeTab === section.id ? section.color : '#64748b'
-//                                 }}>
-//                                     <Icon size={20} />
-//                                 </div>
-//                                 <span className="tab-title" style={{
-//                                     color: activeTab === section.id ? '#0f172a' : '#64748b',
-//                                     fontWeight: activeTab === section.id ? '600' : '500'
-//                                 }}>{section.title}</span>
-//                                 {activeTab === section.id && (
-//                                     <div className="active-indicator" style={{ backgroundColor: section.color }}></div>
-//                                 )}
-//                             </button>
-//                         );
-//                     })}
+//                 {/* Company Context Banner */}
+//                 <div className="company-banner">
+//                     <div className="company-banner-content">
+//                         <div className="company-banner-left">
+//                             <Building2 size={18} />
+//                             <span>
+//                                 {isSuperAdmin ? 'Super Admin' : 'Company Admin'} · 
+//                                 {companyInfo?.companyName || user?.companyName || 'Your Company'}
+//                             </span>
+//                         </div>
+//                         {isSuperAdmin && (
+//                             <div className="super-admin-badge">
+//                                 <Shield size={14} />
+//                                 Super Admin
+//                             </div>
+//                         )}
+//                     </div>
 //                 </div>
 
-//                 {/* Main Content */}
+//                 {/* API Error Message */}
+//                 {apiError && (
+//                     <div className="api-error">
+//                         <AlertCircle size={18} />
+//                         <span>{apiError}</span>
+//                     </div>
+//                 )}
+
+//                 {/* Main Content - Full Width */}
 //                 <main className="main-content">
-//                     {/* Custom ID Display */}
+//                     {/* Product ID Card - Only for editing */}
 //                     {isEditing && customId && (
-//                         <div className="custom-id-card">
-//                             <div className="custom-id-content">
-//                                 <div className="custom-id-icon">
-//                                     <Hash size={24} />
-//                                 </div>
-//                                 <div className="custom-id-info">
-//                                     <span className="custom-id-label">Product ID</span>
-//                                     <span className="custom-id-value">{formattedId}</span>
+//                         <div className="product-id-card">
+//                             <div className="product-id-info">
+//                                 <Hash size={20} />
+//                                 <div>
+//                                     <span className="product-id-label">Product ID</span>
+//                                     <span className="product-id-value">{formattedId}</span>
 //                                 </div>
 //                             </div>
-//                             <div className="custom-id-meta">
-//                                 <span className="meta-label">MongoDB ID:</span>
-//                                 <span className="meta-value">{productId?.slice(-8)}</span>
-//                             </div>
+//                             <button 
+//                                 className="copy-button"
+//                                 onClick={() => copyToClipboard(formattedId)}
+//                             >
+//                                 <CopyIcon size={16} />
+//                             </button>
 //                         </div>
 //                     )}
 
-//                     {/* Sections */}
-//                     <div className="sections-container">
-//                         {SECTIONS.map(section => {
-//                             const Icon = section.icon;
-//                             const isExpanded = expandedSections.includes(section.id);
+//                     {/* Form Sections */}
+//                     <div className="form-sections">
+//                         {/* Basic Information */}
+//                         <div className="form-section">
+//                             <div className="section-header">
+//                                 <div className="section-header-left">
+//                                     <div className="section-icon" style={{ background: `${appTheme.colors.primary}15`, color: appTheme.colors.primary }}>
+//                                         <Package size={20} />
+//                                     </div>
+//                                     <div>
+//                                         <h2>Basic Information</h2>
+//                                         <p>Product name, category, and description</p>
+//                                     </div>
+//                                 </div>
+//                             </div>
                             
-//                             return (
-//                                 <div key={section.id} className={`section-card ${activeTab === section.id ? 'active' : ''}`}>
-//                                     {/* Section Header */}
-//                                     <div 
-//                                         className="section-header"
-//                                         onClick={() => toggleSection(section.id)}
-//                                     >
-//                                         <div className="section-header-left">
-//                                             <div 
-//                                                 className="section-icon"
-//                                                 style={{ background: `${section.color}15`, color: section.color }}
-//                                             >
-//                                                 <Icon size={20} />
-//                                             </div>
-//                                             <div className="section-title">
-//                                                 <h2>{section.title}</h2>
-//                                                 <p>{section.description}</p>
-//                                             </div>
-//                                         </div>
-//                                         <div className="section-header-right">
-//                                             <ChevronRight 
-//                                                 size={20} 
-//                                                 className={`chevron-icon ${isExpanded ? 'expanded' : ''}`}
-//                                                 style={{
-//                                                     transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-//                                                     transition: 'transform 0.3s ease'
-//                                                 }}
+//                             <div className="section-content">
+//                                 <div className="form-row">
+//                                     <div className="form-group span-3">
+//                                         <label>
+//                                             Product Name <span className="required">*</span>
+//                                             <span className="label-hint">Required</span>
+//                                         </label>
+//                                         <input
+//                                             type="text"
+//                                             name="productName"
+//                                             value={formData.productName}
+//                                             onChange={handleInputChange}
+//                                             className={errors.productName ? 'error' : ''}
+//                                             placeholder="e.g., Premium Cotton T-Shirt"
+//                                             ref={el => fieldRefs.current['productName'] = el}
+//                                         />
+//                                         {errors.productName && <span className="error-text">{errors.productName}</span>}
+//                                     </div>
+//                                 </div>
+
+//                                 <div className="form-row">
+//                                     <div className="form-group">
+//                                         <label>Slug (URL)</label>
+//                                         <div className="input-with-hint">
+//                                             <input
+//                                                 type="text"
+//                                                 name="slug"
+//                                                 value={formData.slug}
+//                                                 onChange={handleInputChange}
+//                                                 placeholder="premium-cotton-tshirt"
 //                                             />
+//                                             <span className="field-hint">Auto-generated</span>
 //                                         </div>
 //                                     </div>
 
-//                                     {/* Section Content */}
-//                                     {isExpanded && (
-//                                         <div className="section-content">
-//                                             {/* Basic Info Section */}
-//                                             {section.id === 'basic' && (
-//                                                 <>
-//                                                     <div className="form-block">
-//                                                         <h3>
-//                                                             <Package size={16} />
-//                                                             Basic Information
-//                                                         </h3>
-//                                                         <div className="form-grid">
-//                                                             <div className="form-field span-2">
-//                                                                 <label>Product Name <span className="required">*</span></label>
-//                                                                 <input
-//                                                                     type="text"
-//                                                                     name="productName"
-//                                                                     value={formData.productName}
-//                                                                     onChange={handleInputChange}
-//                                                                     className={errors.productName ? 'error' : ''}
-//                                                                     placeholder="Enter product name"
-//                                                                 />
-//                                                                 {errors.productName && <span className="error-text">{errors.productName}</span>}
-//                                                             </div>
-
-//                                                             <div className="form-field span-2">
-//                                                                 <label>Slug (URL)</label>
-//                                                                 <input
-//                                                                     type="text"
-//                                                                     name="slug"
-//                                                                     value={formData.slug}
-//                                                                     onChange={handleInputChange}
-//                                                                     className="input"
-//                                                                     placeholder="product-url-slug"
-//                                                                 />
-//                                                                 <span className="hint">Auto-generated from product name</span>
-//                                                             </div>
-
-//                                                             <div className="form-field">
-//                                                                 <label>SKU <span className="required">*</span></label>
-//                                                                 <div className="input-group">
-//                                                                     <input
-//                                                                         type="text"
-//                                                                         name="sku"
-//                                                                         value={formData.sku}
-//                                                                         onChange={handleInputChange}
-//                                                                         className={errors.sku ? 'error' : ''}
-//                                                                         placeholder="PRD-123456-ABC"
-//                                                                     />
-//                                                                     <button
-//                                                                         type="button"
-//                                                                         onClick={generateSKU}
-//                                                                         className="generate-btn"
-//                                                                     >
-//                                                                         <RefreshCw size={16} />
-//                                                                     </button>
-//                                                                 </div>
-//                                                                 {errors.sku && <span className="error-text">{errors.sku}</span>}
-//                                                             </div>
-
-//                                                             <div className="form-field">
-//                                                                 <label>HSN Code <span className="required">*</span></label>
-//                                                                 <input
-//                                                                     type="text"
-//                                                                     name="hsnCode"
-//                                                                     value={formData.hsnCode}
-//                                                                     onChange={handleInputChange}
-//                                                                     className={errors.hsnCode ? 'error' : ''}
-//                                                                     placeholder="e.g., 4901, 6307"
-//                                                                 />
-//                                                                 {errors.hsnCode && <span className="error-text">{errors.hsnCode}</span>}
-//                                                             </div>
-
-//                                                             {/* Category Dropdown */}
-//                                                             <div className="form-field">
-//                                                                 <label>Category <span className="required">*</span></label>
-//                                                                 <select
-//                                                                     name="category"
-//                                                                     value={formData.category}
-//                                                                     onChange={handleInputChange}
-//                                                                     className={errors.category ? 'error' : ''}
-//                                                                     disabled={loadingCategories}
-//                                                                 >
-//                                                                     <option value="">Select Category</option>
-//                                                                     {categories.map(cat => (
-//                                                                         <option key={cat._id} value={cat._id}>
-//                                                                             {cat.name}
-//                                                                         </option>
-//                                                                     ))}
-//                                                                 </select>
-//                                                                 {errors.category && <span className="error-text">{errors.category}</span>}
-//                                                                 {loadingCategories && <span className="hint">Loading categories...</span>}
-//                                                             </div>
-
-//                                                             {/* SubCategory Dropdown */}
-//                                                             <div className="form-field">
-//                                                                 <label>Sub Category</label>
-//                                                                 <select
-//                                                                     name="subCategory"
-//                                                                     value={formData.subCategory}
-//                                                                     onChange={handleInputChange}
-//                                                                     disabled={!formData.category || !isValidObjectId(formData.category) || subCategories.length === 0}
-//                                                                 >
-//                                                                     <option value="">Select Sub Category (Optional)</option>
-//                                                                     {subCategories.map(sub => (
-//                                                                         <option key={sub._id} value={sub._id}>
-//                                                                             {sub.name}
-//                                                                         </option>
-//                                                                     ))}
-//                                                                 </select>
-//                                                                 {!formData.category && (
-//                                                                     <span className="hint">Select a category first</span>
-//                                                                 )}
-//                                                             </div>
-
-//                                                             <div className="form-field">
-//                                                                 <label>Brand</label>
-//                                                                 <input
-//                                                                     type="text"
-//                                                                     name="brand"
-//                                                                     value={formData.brand}
-//                                                                     onChange={handleInputChange}
-//                                                                     className="input"
-//                                                                     placeholder="Brand name"
-//                                                                 />
-//                                                             </div>
-//                                                         </div>
-//                                                     </div>
-
-//                                                     <div className="form-block">
-//                                                         <h3>
-//                                                             <FileText size={16} />
-//                                                             Description
-//                                                         </h3>
-//                                                         <div className="form-grid">
-//                                                             <div className="form-field span-2">
-//                                                                 <label>Short Description</label>
-//                                                                 <textarea
-//                                                                     name="shortDescription"
-//                                                                     value={formData.shortDescription}
-//                                                                     onChange={handleInputChange}
-//                                                                     rows="2"
-//                                                                     placeholder="Brief summary of the product (max 500 characters)"
-//                                                                     maxLength="500"
-//                                                                 />
-//                                                             </div>
-
-//                                                             <div className="form-field span-2">
-//                                                                 <label>Full Description <span className="required">*</span></label>
-//                                                                 <textarea
-//                                                                     name="description"
-//                                                                     value={formData.description}
-//                                                                     onChange={handleInputChange}
-//                                                                     rows={isMobile ? "5" : "4"}
-//                                                                     className={errors.description ? 'error' : ''}
-//                                                                     placeholder="Detailed description of your product..."
-//                                                                 />
-//                                                                 {errors.description && <span className="error-text">{errors.description}</span>}
-//                                                             </div>
-
-//                                                             <div className="form-field span-2">
-//                                                                 <label>Options & Customization</label>
-//                                                                 <input
-//                                                                     type="text"
-//                                                                     name="options"
-//                                                                     value={formData.options}
-//                                                                     onChange={handleInputChange}
-//                                                                     placeholder="e.g., Color: Red, Size: Large, Material: Premium Paper"
-//                                                                 />
-//                                                                 <span className="hint">Separate options with commas for better display</span>
-//                                                             </div>
-//                                                         </div>
-//                                                     </div>
-//                                                 </>
-//                                             )}
-
-//                                             {/* Pricing & Stock Section */}
-//                                             {section.id === 'pricing' && (
-//                                                 <>
-//                                                     <div className="form-block">
-//                                                         <h3>
-//                                                             <DollarSign size={16} />
-//                                                             Pricing
-//                                                         </h3>
-//                                                         <div className="form-grid">
-//                                                             <div className="form-field">
-//                                                                 <label>MRP (₹) <span className="required">*</span></label>
-//                                                                 <input
-//                                                                     type="number"
-//                                                                     step="0.01"
-//                                                                     min="0.01"
-//                                                                     name="mrp"
-//                                                                     value={formData.mrp}
-//                                                                     onChange={handleInputChange}
-//                                                                     className={errors.mrp ? 'error' : ''}
-//                                                                     placeholder="0.00"
-//                                                                 />
-//                                                                 {errors.mrp && <span className="error-text">{errors.mrp}</span>}
-//                                                             </div>
-
-//                                                             <div className="form-field">
-//                                                                 <label>Selling Price (₹) <span className="required">*</span></label>
-//                                                                 <input
-//                                                                     type="number"
-//                                                                     step="0.01"
-//                                                                     min="0"
-//                                                                     name="discountPrice"
-//                                                                     value={formData.discountPrice}
-//                                                                     onChange={handleInputChange}
-//                                                                     className={errors.discountPrice ? 'error' : ''}
-//                                                                     placeholder="0.00"
-//                                                                 />
-//                                                                 {errors.discountPrice && <span className="error-text">{errors.discountPrice}</span>}
-//                                                             </div>
-
-//                                                             <div className="form-field">
-//                                                                 <label>Cost Price (₹)</label>
-//                                                                 <input
-//                                                                     type="number"
-//                                                                     step="0.01"
-//                                                                     min="0"
-//                                                                     name="costPrice"
-//                                                                     value={formData.costPrice}
-//                                                                     onChange={handleInputChange}
-//                                                                     placeholder="0.00"
-//                                                                 />
-//                                                                 <span className="hint">For margin calculation</span>
-//                                                             </div>
-//                                                         </div>
-//                                                     </div>
-
-//                                                     <div className="form-block">
-//                                                         <h3>
-//                                                             <Percent size={16} />
-//                                                             Tax Settings
-//                                                         </h3>
-//                                                         <div className="form-grid">
-//                                                             <div className="form-field">
-//                                                                 <label>GST Rate (%) <span className="required">*</span></label>
-//                                                                 <select
-//                                                                     name="gstRate"
-//                                                                     value={formData.gstRate}
-//                                                                     onChange={handleInputChange}
-//                                                                     className={errors.gstRate ? 'error' : ''}
-//                                                                 >
-//                                                                     <option value="0">0%</option>
-//                                                                     <option value="5">5%</option>
-//                                                                     <option value="12">12%</option>
-//                                                                     <option value="18">18%</option>
-//                                                                     <option value="28">28%</option>
-//                                                                 </select>
-//                                                                 {errors.gstRate && <span className="error-text">{errors.gstRate}</span>}
-//                                                             </div>
-
-//                                                             <div className="form-field checkbox-field">
-//                                                                 <label className="checkbox-label">
-//                                                                     <input
-//                                                                         type="checkbox"
-//                                                                         name="gstIncluded"
-//                                                                         checked={formData.gstIncluded}
-//                                                                         onChange={handleInputChange}
-//                                                                     />
-//                                                                     <span>Price includes GST</span>
-//                                                                 </label>
-//                                                             </div>
-
-//                                                             <div className="form-field">
-//                                                                 <label>Tax Class</label>
-//                                                                 <select
-//                                                                     name="taxClass"
-//                                                                     value={formData.taxClass}
-//                                                                     onChange={handleInputChange}
-//                                                                 >
-//                                                                     <option value="standard">Standard</option>
-//                                                                     <option value="reduced">Reduced</option>
-//                                                                     <option value="zero">Zero Rated</option>
-//                                                                     <option value="exempt">Exempt</option>
-//                                                                 </select>
-//                                                             </div>
-//                                                         </div>
-//                                                     </div>
-
-//                                                     <div className="form-block">
-//                                                         <h3>
-//                                                             <Box size={16} />
-//                                                             Inventory
-//                                                         </h3>
-//                                                         <div className="form-grid">
-//                                                             <div className="form-field">
-//                                                                 <label>Stock Quantity <span className="required">*</span></label>
-//                                                                 <input
-//                                                                     type="number"
-//                                                                     min="0"
-//                                                                     name="stock"
-//                                                                     value={formData.stock}
-//                                                                     onChange={handleInputChange}
-//                                                                     className={errors.stock ? 'error' : ''}
-//                                                                     placeholder="0"
-//                                                                 />
-//                                                                 {errors.stock && <span className="error-text">{errors.stock}</span>}
-//                                                             </div>
-
-//                                                             <div className="form-field">
-//                                                                 <label>Low Stock Alert At</label>
-//                                                                 <input
-//                                                                     type="number"
-//                                                                     min="1"
-//                                                                     name="lowStockThreshold"
-//                                                                     value={formData.lowStockThreshold}
-//                                                                     onChange={handleInputChange}
-//                                                                     placeholder="5"
-//                                                                 />
-//                                                             </div>
-
-//                                                             <div className="form-field">
-//                                                                 <label>Max Order Quantity</label>
-//                                                                 <input
-//                                                                     type="number"
-//                                                                     min="1"
-//                                                                     name="maxOrderQuantity"
-//                                                                     value={formData.maxOrderQuantity}
-//                                                                     onChange={handleInputChange}
-//                                                                     placeholder="10"
-//                                                                 />
-//                                                             </div>
-
-//                                                             <div className="form-field checkbox-field">
-//                                                                 <label className="checkbox-label">
-//                                                                     <input
-//                                                                         type="checkbox"
-//                                                                         name="trackInventory"
-//                                                                         checked={formData.trackInventory}
-//                                                                         onChange={handleInputChange}
-//                                                                     />
-//                                                                     <span>Track Inventory</span>
-//                                                                 </label>
-//                                                             </div>
-
-//                                                             <div className="form-field checkbox-field">
-//                                                                 <label className="checkbox-label">
-//                                                                     <input
-//                                                                         type="checkbox"
-//                                                                         name="allowBackorder"
-//                                                                         checked={formData.allowBackorder}
-//                                                                         onChange={handleInputChange}
-//                                                                     />
-//                                                                     <span>Allow Backorder</span>
-//                                                                 </label>
-//                                                             </div>
-//                                                         </div>
-//                                                     </div>
-//                                                 </>
-//                                             )}
-
-//                                             {/* Media Section */}
-//                                             {section.id === 'media' && (
-//                                                 <>
-//                                                     <div className="form-block">
-//                                                         <h3>
-//                                                             <Camera size={16} />
-//                                                             Product Images
-//                                                         </h3>
-//                                                         <div className="image-section">
-//                                                             <div className="image-header">
-//                                                                 <label>Product Images {!isEditing && "*"}</label>
-//                                                                 <span className="image-count">{imagePreviews.length}/8</span>
-//                                                             </div>
-                                                            
-//                                                             {errors.images && <span className="error-text">{errors.images}</span>}
-                                                            
-//                                                             {/* Image Previews Grid */}
-//                                                             {imagePreviews.length > 0 && (
-//                                                                 <div className="image-grid">
-//                                                                     {imagePreviews.map((preview, index) => (
-//                                                                         <div key={index} className="image-preview">
-//                                                                             <img src={preview} alt={`Preview ${index + 1}`} />
-//                                                                             <button
-//                                                                                 type="button"
-//                                                                                 onClick={() => removeImage(index)}
-//                                                                                 className="remove-image-btn"
-//                                                                             >
-//                                                                                 <X size={16} />
-//                                                                             </button>
-//                                                                         </div>
-//                                                                     ))}
-//                                                                 </div>
-//                                                             )}
-
-//                                                             {/* Upload Area */}
-//                                                             {imagePreviews.length < 8 && (
-//                                                                 <div 
-//                                                                     className="upload-area"
-//                                                                     onClick={() => document.getElementById("image-upload").click()}
-//                                                                     onDragOver={(e) => e.preventDefault()}
-//                                                                     onDrop={(e) => {
-//                                                                         e.preventDefault();
-//                                                                         const files = Array.from(e.dataTransfer.files);
-//                                                                         if (files.length > 0) {
-//                                                                             handleImageChange({ target: { files } });
-//                                                                         }
-//                                                                     }}
-//                                                                 >
-//                                                                     <input
-//                                                                         type="file"
-//                                                                         accept="image/*"
-//                                                                         onChange={handleImageChange}
-//                                                                         id="image-upload"
-//                                                                         multiple
-//                                                                     />
-//                                                                     <Upload size={32} />
-//                                                                     <p>{isMobile ? "Tap to upload images" : "Click or drag to upload images"}</p>
-//                                                                     <span>JPEG, PNG, WebP, GIF (Max 5MB)</span>
-//                                                                 </div>
-//                                                             )}
-//                                                         </div>
-//                                                     </div>
-
-//                                                     <div className="form-block">
-//                                                         <h3>
-//                                                             <Video size={16} />
-//                                                             Product Video
-//                                                         </h3>
-//                                                         <div className="form-field">
-//                                                             <label>Video URL</label>
-//                                                             <input
-//                                                                 type="url"
-//                                                                 name="videoUrl"
-//                                                                 value={formData.videoUrl}
-//                                                                 onChange={handleInputChange}
-//                                                                 placeholder="https://youtube.com/watch?v=..."
-//                                                             />
-//                                                             <span className="hint">YouTube or Vimeo link</span>
-//                                                         </div>
-//                                                     </div>
-//                                                 </>
-//                                             )}
-
-//                                             {/* Specifications Section */}
-//                                             {section.id === 'specs' && (
-//                                                 <>
-//                                                     <div className="form-block">
-//                                                         <h3>
-//                                                             <Settings size={16} />
-//                                                             Add Specifications
-//                                                         </h3>
-//                                                         <div className="spec-input-group">
-//                                                             <input
-//                                                                 type="text"
-//                                                                 placeholder="Specification name"
-//                                                                 value={specKey}
-//                                                                 onChange={(e) => setSpecKey(e.target.value)}
-//                                                             />
-//                                                             <input
-//                                                                 type="text"
-//                                                                 placeholder="Specification value"
-//                                                                 value={specValue}
-//                                                                 onChange={(e) => setSpecValue(e.target.value)}
-//                                                             />
-//                                                             <button
-//                                                                 type="button"
-//                                                                 onClick={addSpecification}
-//                                                                 className="add-spec-btn"
-//                                                             >
-//                                                                 <Plus size={16} />
-//                                                                 <span>Add</span>
-//                                                             </button>
-//                                                         </div>
-//                                                     </div>
-
-//                                                     <div className="form-block">
-//                                                         <h3>
-//                                                             <FileText size={16} />
-//                                                             Specifications List
-//                                                         </h3>
-//                                                         {Object.keys(formData.specifications).length > 0 ? (
-//                                                             <div className="specs-list">
-//                                                                 {Object.entries(formData.specifications).map(([key, value], index) => (
-//                                                                     <div key={key} className="spec-item">
-//                                                                         <div className="spec-content">
-//                                                                             <span className="spec-key">{key}:</span>
-//                                                                             <span className="spec-value">{value}</span>
-//                                                                         </div>
-//                                                                         <button
-//                                                                             type="button"
-//                                                                             onClick={() => removeSpecification(key)}
-//                                                                             className="remove-spec-btn"
-//                                                                         >
-//                                                                             <Trash2 size={14} />
-//                                                                         </button>
-//                                                                     </div>
-//                                                                 ))}
-//                                                             </div>
-//                                                         ) : (
-//                                                             <div className="empty-state small">
-//                                                                 <Settings size={32} />
-//                                                                 <p>No specifications added yet</p>
-//                                                             </div>
-//                                                         )}
-//                                                     </div>
-//                                                 </>
-//                                             )}
-
-//                                             {/* SEO Section */}
-//                                             {section.id === 'seo' && (
-//                                                 <>
-//                                                     <div className="form-block">
-//                                                         <h3>
-//                                                             <Globe size={16} />
-//                                                             SEO Settings
-//                                                         </h3>
-//                                                         <div className="form-grid">
-//                                                             <div className="form-field span-2">
-//                                                                 <label>Meta Title</label>
-//                                                                 <input
-//                                                                     type="text"
-//                                                                     name="metaTitle"
-//                                                                     value={formData.metaTitle}
-//                                                                     onChange={handleInputChange}
-//                                                                     placeholder="SEO title (60-70 characters)"
-//                                                                     maxLength="70"
-//                                                                 />
-//                                                             </div>
-
-//                                                             <div className="form-field span-2">
-//                                                                 <label>Meta Description</label>
-//                                                                 <textarea
-//                                                                     name="metaDescription"
-//                                                                     value={formData.metaDescription}
-//                                                                     onChange={handleInputChange}
-//                                                                     rows="3"
-//                                                                     placeholder="SEO description (150-160 characters)"
-//                                                                     maxLength="160"
-//                                                                 />
-//                                                             </div>
-
-//                                                             <div className="form-field span-2">
-//                                                                 <label>Meta Keywords</label>
-//                                                                 <input
-//                                                                     type="text"
-//                                                                     value={formData.metaKeywords.join(', ')}
-//                                                                     onChange={handleMetaKeywordsChange}
-//                                                                     placeholder="keyword1, keyword2, keyword3"
-//                                                                 />
-//                                                                 <span className="hint">Separate with commas</span>
-//                                                             </div>
-//                                                         </div>
-//                                                     </div>
-
-//                                                     <div className="form-block">
-//                                                         <h3>
-//                                                             <Award size={16} />
-//                                                             Product Flags
-//                                                         </h3>
-//                                                         <div className="flags-grid">
-//                                                             <label className={`flag-checkbox ${formData.isFeatured ? 'active' : ''}`} style={{ borderColor: appTheme.colors.warning }}>
-//                                                                 <input
-//                                                                     type="checkbox"
-//                                                                     name="isFeatured"
-//                                                                     checked={formData.isFeatured}
-//                                                                     onChange={handleInputChange}
-//                                                                 />
-//                                                                 <Star size={16} />
-//                                                                 <span>Featured</span>
-//                                                             </label>
-
-//                                                             <label className={`flag-checkbox ${formData.isOnSale ? 'active' : ''}`} style={{ borderColor: appTheme.colors.success }}>
-//                                                                 <input
-//                                                                     type="checkbox"
-//                                                                     name="isOnSale"
-//                                                                     checked={formData.isOnSale}
-//                                                                     onChange={handleInputChange}
-//                                                                 />
-//                                                                 <Percent size={16} />
-//                                                                 <span>On Sale</span>
-//                                                             </label>
-
-//                                                             <label className={`flag-checkbox ${formData.isNewArrival ? 'active' : ''}`} style={{ borderColor: appTheme.colors.info }}>
-//                                                                 <input
-//                                                                     type="checkbox"
-//                                                                     name="isNewArrival"
-//                                                                     checked={formData.isNewArrival}
-//                                                                     onChange={handleInputChange}
-//                                                                 />
-//                                                                 <Calendar size={16} />
-//                                                                 <span>New Arrival</span>
-//                                                             </label>
-
-//                                                             <label className={`flag-checkbox ${formData.isBestSeller ? 'active' : ''}`} style={{ borderColor: appTheme.colors.secondary }}>
-//                                                                 <input
-//                                                                     type="checkbox"
-//                                                                     name="isBestSeller"
-//                                                                     checked={formData.isBestSeller}
-//                                                                     onChange={handleInputChange}
-//                                                                 />
-//                                                                 <Crown size={16} />
-//                                                                 <span>Best Seller</span>
-//                                                             </label>
-//                                                         </div>
-//                                                     </div>
-//                                                 </>
-//                                             )}
-
-//                                             {/* Shipping Section */}
-//                                             {section.id === 'shipping' && (
-//                                                 <>
-//                                                     <div className="form-block">
-//                                                         <h3>
-//                                                             <Truck size={16} />
-//                                                             Shipping Details
-//                                                         </h3>
-//                                                         <div className="form-grid">
-//                                                             <div className="form-field">
-//                                                                 <label>Weight (kg)</label>
-//                                                                 <input
-//                                                                     type="number"
-//                                                                     step="0.01"
-//                                                                     min="0"
-//                                                                     name="weight"
-//                                                                     value={formData.weight}
-//                                                                     onChange={handleInputChange}
-//                                                                     className={errors.weight ? 'error' : ''}
-//                                                                     placeholder="0.00"
-//                                                                 />
-//                                                                 {errors.weight && <span className="error-text">{errors.weight}</span>}
-//                                                             </div>
-
-//                                                             <div className="form-field">
-//                                                                 <label>Shipping Class</label>
-//                                                                 <input
-//                                                                     type="text"
-//                                                                     name="shippingClass"
-//                                                                     value={formData.shippingClass}
-//                                                                     onChange={handleInputChange}
-//                                                                     placeholder="e.g., Standard, Express, Fragile"
-//                                                                 />
-//                                                             </div>
-//                                                         </div>
-//                                                     </div>
-
-//                                                     <div className="form-block">
-//                                                         <h3>
-//                                                             <Box size={16} />
-//                                                             Package Dimensions
-//                                                         </h3>
-//                                                         <div className="dimensions-grid">
-//                                                             <input
-//                                                                 type="number"
-//                                                                 step="0.1"
-//                                                                 min="0"
-//                                                                 name="dimensions.length"
-//                                                                 value={formData.dimensions.length}
-//                                                                 onChange={handleInputChange}
-//                                                                 placeholder="Length"
-//                                                                 className={errors.dimensions ? 'error' : ''}
-//                                                             />
-//                                                             <input
-//                                                                 type="number"
-//                                                                 step="0.1"
-//                                                                 min="0"
-//                                                                 name="dimensions.width"
-//                                                                 value={formData.dimensions.width}
-//                                                                 onChange={handleInputChange}
-//                                                                 placeholder="Width"
-//                                                                 className={errors.dimensions ? 'error' : ''}
-//                                                             />
-//                                                             <input
-//                                                                 type="number"
-//                                                                 step="0.1"
-//                                                                 min="0"
-//                                                                 name="dimensions.height"
-//                                                                 value={formData.dimensions.height}
-//                                                                 onChange={handleInputChange}
-//                                                                 placeholder="Height"
-//                                                                 className={errors.dimensions ? 'error' : ''}
-//                                                             />
-//                                                             <select
-//                                                                 name="dimensions.unit"
-//                                                                 value={formData.dimensions.unit}
-//                                                                 onChange={handleInputChange}
-//                                                             >
-//                                                                 <option value="cm">cm</option>
-//                                                                 <option value="in">in</option>
-//                                                             </select>
-//                                                         </div>
-//                                                         {errors.dimensions && <span className="error-text">{errors.dimensions}</span>}
-//                                                     </div>
-//                                                 </>
-//                                             )}
+//                                     <div className="form-group">
+//                                         <label>
+//                                             SKU <span className="required">*</span>
+//                                         </label>
+//                                         <div className="input-group">
+//                                             <input
+//                                                 type="text"
+//                                                 name="sku"
+//                                                 value={formData.sku}
+//                                                 onChange={handleInputChange}
+//                                                 className={errors.sku ? 'error' : ''}
+//                                                 placeholder="PRD-123456-ABC"
+//                                                 ref={el => fieldRefs.current['sku'] = el}
+//                                             />
+//                                             <button
+//                                                 type="button"
+//                                                 onClick={generateSKU}
+//                                                 className="icon-button"
+//                                                 title="Generate new SKU"
+//                                             >
+//                                                 <RefreshCw size={16} />
+//                                             </button>
 //                                         </div>
-//                                     )}
+//                                         {errors.sku && <span className="error-text">{errors.sku}</span>}
+//                                     </div>
+
+//                                     <div className="form-group">
+//                                         <label>
+//                                             HSN Code <span className="required">*</span>
+//                                         </label>
+//                                         <input
+//                                             type="text"
+//                                             name="hsnCode"
+//                                             value={formData.hsnCode}
+//                                             onChange={handleInputChange}
+//                                             className={errors.hsnCode ? 'error' : ''}
+//                                             placeholder="e.g., 6109"
+//                                             ref={el => fieldRefs.current['hsnCode'] = el}
+//                                         />
+//                                         {errors.hsnCode && <span className="error-text">{errors.hsnCode}</span>}
+//                                     </div>
 //                                 </div>
-//                             );
-//                         })}
+
+//                                 <div className="form-row">
+//                                     <div className="form-group">
+//                                         <label>
+//                                             Category <span className="required">*</span>
+//                                         </label>
+//                                         <select
+//                                             name="category"
+//                                             value={formData.category}
+//                                             onChange={handleInputChange}
+//                                             className={errors.category ? 'error' : ''}
+//                                             disabled={loadingCategories}
+//                                             ref={el => fieldRefs.current['category'] = el}
+//                                         >
+//                                             <option value="">Select Category</option>
+//                                             {categories.map(cat => (
+//                                                 <option key={cat._id} value={cat._id}>
+//                                                     {cat.name}
+//                                                 </option>
+//                                             ))}
+//                                         </select>
+//                                         {errors.category && <span className="error-text">{errors.category}</span>}
+//                                     </div>
+
+//                                     <div className="form-group">
+//                                         <label>
+//                                             Sub Category
+//                                             {selectedCategoryHasSubs && <span className="required">*</span>}
+//                                         </label>
+//                                         <select
+//                                             name="subCategory"
+//                                             value={formData.subCategory}
+//                                             onChange={handleInputChange}
+//                                             className={errors.subCategory ? 'error' : ''}
+//                                             disabled={!formData.category || subCategories.length === 0}
+//                                             ref={el => fieldRefs.current['subCategory'] = el}
+//                                         >
+//                                             <option value="">
+//                                                 {selectedCategoryHasSubs 
+//                                                     ? "Select Sub Category" 
+//                                                     : subCategories.length === 0 && formData.category
+//                                                         ? "No subcategories"
+//                                                         : "Select Sub Category"
+//                                                 }
+//                                             </option>
+//                                             {subCategories.map(sub => (
+//                                                 <option key={sub._id} value={sub._id}>
+//                                                     {sub.name}
+//                                                 </option>
+//                                             ))}
+//                                         </select>
+//                                         {errors.subCategory && <span className="error-text">{errors.subCategory}</span>}
+//                                     </div>
+
+//                                     <div className="form-group">
+//                                         <label>Brand</label>
+//                                         <input
+//                                             type="text"
+//                                             name="brand"
+//                                             value={formData.brand}
+//                                             onChange={handleInputChange}
+//                                             placeholder="Brand name"
+//                                         />
+//                                     </div>
+//                                 </div>
+
+//                                 <div className="form-row">
+//                                     <div className="form-group span-3">
+//                                         <label>Short Description</label>
+//                                         <textarea
+//                                             name="shortDescription"
+//                                             value={formData.shortDescription}
+//                                             onChange={handleInputChange}
+//                                             rows="2"
+//                                             placeholder="Brief summary of the product (max 500 characters)"
+//                                             maxLength="500"
+//                                         />
+//                                     </div>
+//                                 </div>
+
+//                                 <div className="form-row">
+//                                     <div className="form-group span-3">
+//                                         <label>
+//                                             Full Description <span className="required">*</span>
+//                                         </label>
+//                                         <textarea
+//                                             name="description"
+//                                             value={formData.description}
+//                                             onChange={handleInputChange}
+//                                             rows={isMobile ? "4" : "3"}
+//                                             className={errors.description ? 'error' : ''}
+//                                             placeholder="Detailed description of your product..."
+//                                             ref={el => fieldRefs.current['description'] = el}
+//                                         />
+//                                         {errors.description && <span className="error-text">{errors.description}</span>}
+//                                     </div>
+//                                 </div>
+
+//                                 <div className="form-row">
+//                                     <div className="form-group span-3">
+//                                         <label>Options & Customization</label>
+//                                         <input
+//                                             type="text"
+//                                             name="options"
+//                                             value={formData.options}
+//                                             onChange={handleInputChange}
+//                                             placeholder="e.g., Color: Red, Size: Large, Material: Premium Cotton"
+//                                         />
+//                                     </div>
+//                                 </div>
+//                             </div>
+//                         </div>
+
+//                         {/* Pricing & Stock */}
+//                         <div className="form-section">
+//                             <div className="section-header">
+//                                 <div className="section-header-left">
+//                                     <div className="section-icon" style={{ background: `${appTheme.colors.secondary}15`, color: appTheme.colors.secondary }}>
+//                                         <DollarSign size={20} />
+//                                     </div>
+//                                     <div>
+//                                         <h2>Pricing & Stock</h2>
+//                                         <p>Pricing, GST, and inventory management</p>
+//                                     </div>
+//                                 </div>
+//                             </div>
+                            
+//                             <div className="section-content">
+//                                 <div className="form-row">
+//                                     <div className="form-group">
+//                                         <label>
+//                                             MRP (₹) <span className="required">*</span>
+//                                         </label>
+//                                         <input
+//                                             type="number"
+//                                             step="0.01"
+//                                             min="0.01"
+//                                             name="mrp"
+//                                             value={formData.mrp}
+//                                             onChange={handleInputChange}
+//                                             className={errors.mrp ? 'error' : ''}
+//                                             placeholder="0.00"
+//                                             ref={el => fieldRefs.current['mrp'] = el}
+//                                         />
+//                                         {errors.mrp && <span className="error-text">{errors.mrp}</span>}
+//                                     </div>
+
+//                                     <div className="form-group">
+//                                         <label>
+//                                             Selling Price (₹) <span className="required">*</span>
+//                                         </label>
+//                                         <input
+//                                             type="number"
+//                                             step="0.01"
+//                                             min="0"
+//                                             name="discountPrice"
+//                                             value={formData.discountPrice}
+//                                             onChange={handleInputChange}
+//                                             className={errors.discountPrice ? 'error' : ''}
+//                                             placeholder="0.00"
+//                                             ref={el => fieldRefs.current['discountPrice'] = el}
+//                                         />
+//                                         {errors.discountPrice && <span className="error-text">{errors.discountPrice}</span>}
+//                                     </div>
+
+//                                     <div className="form-group">
+//                                         <label>Cost Price (₹)</label>
+//                                         <input
+//                                             type="number"
+//                                             step="0.01"
+//                                             min="0"
+//                                             name="costPrice"
+//                                             value={formData.costPrice}
+//                                             onChange={handleInputChange}
+//                                             placeholder="0.00"
+//                                         />
+//                                     </div>
+//                                 </div>
+
+//                                 <div className="form-row">
+//                                     <div className="form-group">
+//                                         <label>
+//                                             GST Rate (%) <span className="required">*</span>
+//                                         </label>
+//                                         <select
+//                                             name="gstRate"
+//                                             value={formData.gstRate}
+//                                             onChange={handleInputChange}
+//                                             className={errors.gstRate ? 'error' : ''}
+//                                             ref={el => fieldRefs.current['gstRate'] = el}
+//                                         >
+//                                             {TAX_RATES.map(rate => (
+//                                                 <option key={rate.value} value={rate.value}>
+//                                                     {rate.label}
+//                                                 </option>
+//                                             ))}
+//                                         </select>
+//                                         {errors.gstRate && <span className="error-text">{errors.gstRate}</span>}
+//                                     </div>
+
+//                                     <div className="form-group">
+//                                         <label>Tax Class</label>
+//                                         <select
+//                                             name="taxClass"
+//                                             value={formData.taxClass}
+//                                             onChange={handleInputChange}
+//                                         >
+//                                             {TAX_CLASSES.map(tc => (
+//                                                 <option key={tc.value} value={tc.value}>
+//                                                     {tc.label}
+//                                                 </option>
+//                                             ))}
+//                                         </select>
+//                                     </div>
+
+//                                     <div className="form-group checkbox-group">
+//                                         <label className="checkbox-label">
+//                                             <input
+//                                                 type="checkbox"
+//                                                 name="gstIncluded"
+//                                                 checked={formData.gstIncluded}
+//                                                 onChange={handleInputChange}
+//                                             />
+//                                             <span>Price includes GST</span>
+//                                         </label>
+//                                     </div>
+//                                 </div>
+
+//                                 <div className="form-row">
+//                                     <div className="form-group">
+//                                         <label>
+//                                             Stock Quantity <span className="required">*</span>
+//                                         </label>
+//                                         <input
+//                                             type="number"
+//                                             min="0"
+//                                             name="stock"
+//                                             value={formData.stock}
+//                                             onChange={handleInputChange}
+//                                             className={errors.stock ? 'error' : ''}
+//                                             placeholder="0"
+//                                             ref={el => fieldRefs.current['stock'] = el}
+//                                         />
+//                                         {errors.stock && <span className="error-text">{errors.stock}</span>}
+//                                     </div>
+
+//                                     <div className="form-group">
+//                                         <label>Low Stock Alert</label>
+//                                         <input
+//                                             type="number"
+//                                             min="1"
+//                                             name="lowStockThreshold"
+//                                             value={formData.lowStockThreshold}
+//                                             onChange={handleInputChange}
+//                                             placeholder="5"
+//                                         />
+//                                     </div>
+
+//                                     <div className="form-group">
+//                                         <label>Max Order Quantity</label>
+//                                         <input
+//                                             type="number"
+//                                             min="1"
+//                                             name="maxOrderQuantity"
+//                                             value={formData.maxOrderQuantity}
+//                                             onChange={handleInputChange}
+//                                             placeholder="10"
+//                                         />
+//                                     </div>
+//                                 </div>
+
+//                                 <div className="form-row">
+//                                     <div className="form-group checkbox-group">
+//                                         <label className="checkbox-label">
+//                                             <input
+//                                                 type="checkbox"
+//                                                 name="trackInventory"
+//                                                 checked={formData.trackInventory}
+//                                                 onChange={handleInputChange}
+//                                             />
+//                                             <span>Track Inventory</span>
+//                                         </label>
+//                                     </div>
+
+//                                     <div className="form-group checkbox-group">
+//                                         <label className="checkbox-label">
+//                                             <input
+//                                                 type="checkbox"
+//                                                 name="allowBackorder"
+//                                                 checked={formData.allowBackorder}
+//                                                 onChange={handleInputChange}
+//                                             />
+//                                             <span>Allow Backorder</span>
+//                                         </label>
+//                                     </div>
+//                                 </div>
+//                             </div>
+//                         </div>
+
+//                         {/* Media */}
+//                         <div className="form-section">
+//                             <div className="section-header">
+//                                 <div className="section-header-left">
+//                                     <div className="section-icon" style={{ background: `${appTheme.colors.warning}15`, color: appTheme.colors.warning }}>
+//                                         <Camera size={20} />
+//                                     </div>
+//                                     <div>
+//                                         <h2>Media</h2>
+//                                         <p>Product images and videos</p>
+//                                     </div>
+//                                 </div>
+//                             </div>
+                            
+//                             <div className="section-content">
+//                                 <div className="form-row">
+//                                     <div className="form-group span-3">
+//                                         <label>
+//                                             Product Images {!isEditing && "*"}
+//                                             <span className="image-count">{imagePreviews.length}/8</span>
+//                                         </label>
+                                        
+//                                         {errors.images && <span className="error-text">{errors.images}</span>}
+                                        
+//                                         {/* Image Grid */}
+//                                         {imagePreviews.length > 0 && (
+//                                             <div className="image-grid">
+//                                                 {imagePreviews.map((preview, index) => (
+//                                                     <div key={index} className="image-preview">
+//                                                         <img src={preview} alt={`Preview ${index + 1}`} />
+//                                                         <button
+//                                                             type="button"
+//                                                             onClick={() => removeImage(index)}
+//                                                             className="remove-image-btn"
+//                                                         >
+//                                                             <X size={14} />
+//                                                         </button>
+//                                                     </div>
+//                                                 ))}
+//                                             </div>
+//                                         )}
+
+//                                         {/* Upload Area */}
+//                                         {imagePreviews.length < 8 && (
+//                                             <div 
+//                                                 className="upload-area"
+//                                                 onClick={() => document.getElementById("image-upload").click()}
+//                                                 onDragOver={(e) => e.preventDefault()}
+//                                                 onDrop={(e) => {
+//                                                     e.preventDefault();
+//                                                     const files = Array.from(e.dataTransfer.files);
+//                                                     if (files.length > 0) {
+//                                                         handleImageChange({ target: { files } });
+//                                                     }
+//                                                 }}
+//                                             >
+//                                                 <input
+//                                                     type="file"
+//                                                     accept="image/*"
+//                                                     onChange={handleImageChange}
+//                                                     id="image-upload"
+//                                                     multiple
+//                                                 />
+//                                                 <Upload size={32} />
+//                                                 <p>Click or drag to upload images</p>
+//                                                 <span>JPEG, PNG, WebP, GIF (Max 5MB each)</span>
+//                                             </div>
+//                                         )}
+//                                     </div>
+//                                 </div>
+
+//                                 <div className="form-row">
+//                                     <div className="form-group span-3">
+//                                         <label>Video URL</label>
+//                                         <input
+//                                             type="url"
+//                                             name="videoUrl"
+//                                             value={formData.videoUrl}
+//                                             onChange={handleInputChange}
+//                                             placeholder="https://youtube.com/watch?v=..."
+//                                         />
+//                                     </div>
+//                                 </div>
+//                             </div>
+//                         </div>
+
+//                         {/* Specifications */}
+//                         <div className="form-section">
+//                             <div className="section-header">
+//                                 <div className="section-header-left">
+//                                     <div className="section-icon" style={{ background: `${appTheme.colors.info}15`, color: appTheme.colors.info }}>
+//                                         <Settings size={20} />
+//                                     </div>
+//                                     <div>
+//                                         <h2>Specifications</h2>
+//                                         <p>Technical details and attributes</p>
+//                                     </div>
+//                                 </div>
+//                             </div>
+                            
+//                             <div className="section-content">
+//                                 <div className="form-row">
+//                                     <div className="form-group span-3">
+//                                         <label>Add Specification</label>
+//                                         <div className="spec-input-group">
+//                                             <input
+//                                                 type="text"
+//                                                 placeholder="Specification name"
+//                                                 value={specKey}
+//                                                 onChange={(e) => setSpecKey(e.target.value)}
+//                                             />
+//                                             <input
+//                                                 type="text"
+//                                                 placeholder="Specification value"
+//                                                 value={specValue}
+//                                                 onChange={(e) => setSpecValue(e.target.value)}
+//                                             />
+//                                             <button
+//                                                 type="button"
+//                                                 onClick={addSpecification}
+//                                                 className="add-spec-btn"
+//                                             >
+//                                                 <Plus size={16} />
+//                                                 <span>Add</span>
+//                                             </button>
+//                                         </div>
+//                                     </div>
+//                                 </div>
+
+//                                 {Object.keys(formData.specifications).length > 0 && (
+//                                     <div className="form-row">
+//                                         <div className="form-group span-3">
+//                                             <div className="specs-list">
+//                                                 {Object.entries(formData.specifications).map(([key, value]) => (
+//                                                     <div key={key} className="spec-item">
+//                                                         <div className="spec-content">
+//                                                             <span className="spec-key">{key}:</span>
+//                                                             <span className="spec-value">{value}</span>
+//                                                         </div>
+//                                                         <button
+//                                                             type="button"
+//                                                             onClick={() => removeSpecification(key)}
+//                                                             className="remove-spec-btn"
+//                                                         >
+//                                                             <Trash2 size={14} />
+//                                                         </button>
+//                                                     </div>
+//                                                 ))}
+//                                             </div>
+//                                         </div>
+//                                     </div>
+//                                 )}
+//                             </div>
+//                         </div>
+
+//                         {/* SEO & Flags */}
+//                         <div className="form-section">
+//                             <div className="section-header">
+//                                 <div className="section-header-left">
+//                                     <div className="section-icon" style={{ background: `${appTheme.colors.accent}15`, color: appTheme.colors.accent }}>
+//                                         <Globe size={20} />
+//                                     </div>
+//                                     <div>
+//                                         <h2>SEO & Flags</h2>
+//                                         <p>Search engine optimization and product badges</p>
+//                                     </div>
+//                                 </div>
+//                             </div>
+                            
+//                             <div className="section-content">
+//                                 <div className="form-row">
+//                                     <div className="form-group span-2">
+//                                         <label>Meta Title</label>
+//                                         <input
+//                                             type="text"
+//                                             name="metaTitle"
+//                                             value={formData.metaTitle}
+//                                             onChange={handleInputChange}
+//                                             placeholder="SEO title (60-70 characters)"
+//                                             maxLength="70"
+//                                         />
+//                                     </div>
+
+//                                     <div className="form-group">
+//                                         <label>Meta Keywords</label>
+//                                         <input
+//                                             type="text"
+//                                             value={formData.metaKeywords.join(', ')}
+//                                             onChange={handleMetaKeywordsChange}
+//                                             placeholder="keyword1, keyword2, keyword3"
+//                                         />
+//                                     </div>
+//                                 </div>
+
+//                                 <div className="form-row">
+//                                     <div className="form-group span-3">
+//                                         <label>Meta Description</label>
+//                                         <textarea
+//                                             name="metaDescription"
+//                                             value={formData.metaDescription}
+//                                             onChange={handleInputChange}
+//                                             rows="2"
+//                                             placeholder="SEO description (150-160 characters)"
+//                                             maxLength="160"
+//                                         />
+//                                     </div>
+//                                 </div>
+
+//                                 <div className="form-row">
+//                                     <div className="form-group span-3">
+//                                         <label>Product Flags</label>
+//                                         <div className="flags-grid">
+//                                             {FLAGS.map(flag => {
+//                                                 const Icon = flag.icon;
+//                                                 const isActive = formData[flag.id];
+//                                                 return (
+//                                                     <label 
+//                                                         key={flag.id} 
+//                                                         className={`flag-checkbox ${isActive ? 'active' : ''}`}
+//                                                         style={{ 
+//                                                             borderColor: isActive ? flag.color : appTheme.colors.border,
+//                                                             background: isActive ? `${flag.color}10` : 'white'
+//                                                         }}
+//                                                     >
+//                                                         <input
+//                                                             type="checkbox"
+//                                                             name={flag.id}
+//                                                             checked={isActive}
+//                                                             onChange={handleInputChange}
+//                                                         />
+//                                                         <Icon size={16} color={isActive ? flag.color : appTheme.colors.textSecondary} />
+//                                                         <span style={{ color: isActive ? flag.color : appTheme.colors.textPrimary }}>
+//                                                             {flag.label}
+//                                                         </span>
+//                                                     </label>
+//                                                 );
+//                                             })}
+//                                         </div>
+//                                     </div>
+//                                 </div>
+//                             </div>
+//                         </div>
+
+//                         {/* Shipping */}
+//                         <div className="form-section">
+//                             <div className="section-header">
+//                                 <div className="section-header-left">
+//                                     <div className="section-icon" style={{ background: `${appTheme.colors.success}15`, color: appTheme.colors.success }}>
+//                                         <Truck size={20} />
+//                                     </div>
+//                                     <div>
+//                                         <h2>Shipping</h2>
+//                                         <p>Weight, dimensions, and shipping class</p>
+//                                     </div>
+//                                 </div>
+//                             </div>
+                            
+//                             <div className="section-content">
+//                                 <div className="form-row">
+//                                     <div className="form-group">
+//                                         <label>Weight (kg)</label>
+//                                         <input
+//                                             type="number"
+//                                             step="0.01"
+//                                             min="0"
+//                                             name="weight"
+//                                             value={formData.weight}
+//                                             onChange={handleInputChange}
+//                                             placeholder="0.00"
+//                                         />
+//                                     </div>
+
+//                                     <div className="form-group">
+//                                         <label>Shipping Class</label>
+//                                         <input
+//                                             type="text"
+//                                             name="shippingClass"
+//                                             value={formData.shippingClass}
+//                                             onChange={handleInputChange}
+//                                             placeholder="e.g., Standard, Express, Fragile"
+//                                         />
+//                                     </div>
+//                                 </div>
+
+//                                 <div className="form-row">
+//                                     <div className="form-group span-3">
+//                                         <label>Package Dimensions</label>
+//                                         <div className="dimensions-grid">
+//                                             <input
+//                                                 type="number"
+//                                                 step="0.1"
+//                                                 min="0"
+//                                                 name="dimensions.length"
+//                                                 value={formData.dimensions.length}
+//                                                 onChange={handleInputChange}
+//                                                 placeholder="Length"
+//                                             />
+//                                             <input
+//                                                 type="number"
+//                                                 step="0.1"
+//                                                 min="0"
+//                                                 name="dimensions.width"
+//                                                 value={formData.dimensions.width}
+//                                                 onChange={handleInputChange}
+//                                                 placeholder="Width"
+//                                             />
+//                                             <input
+//                                                 type="number"
+//                                                 step="0.1"
+//                                                 min="0"
+//                                                 name="dimensions.height"
+//                                                 value={formData.dimensions.height}
+//                                                 onChange={handleInputChange}
+//                                                 placeholder="Height"
+//                                             />
+//                                             <select
+//                                                 name="dimensions.unit"
+//                                                 value={formData.dimensions.unit}
+//                                                 onChange={handleInputChange}
+//                                             >
+//                                                 <option value="cm">cm</option>
+//                                                 <option value="in">in</option>
+//                                             </select>
+//                                         </div>
+//                                     </div>
+//                                 </div>
+//                             </div>
+//                         </div>
 //                     </div>
 //                 </main>
 
@@ -1717,7 +1686,37 @@
 //                 /* ==================== GLOBAL STYLES ==================== */
 //                 .product-form-page {
 //                     min-height: 100vh;
-//                     background: linear-gradient(135deg, #f6f9fc 0%, #f1f5f9 100%);
+//                     background: ${appTheme.colors.backgroundLight};
+//                     width: 100%;
+//                 }
+
+//                 /* ==================== LOADING ==================== */
+//                 .loading-container {
+//                     min-height: 100vh;
+//                     display: flex;
+//                     flex-direction: column;
+//                     align-items: center;
+//                     justify-content: center;
+//                     background: ${appTheme.colors.backgroundLight};
+//                 }
+
+//                 .loading-spinner {
+//                     width: 40px;
+//                     height: 40px;
+//                     border: 3px solid ${appTheme.colors.primary}20;
+//                     border-top-color: ${appTheme.colors.primary};
+//                     border-radius: 50%;
+//                     animation: spin 0.8s linear infinite;
+//                     margin-bottom: 16px;
+//                 }
+
+//                 .loading-text {
+//                     color: ${appTheme.colors.textSecondary};
+//                     font-size: 0.875rem;
+//                 }
+
+//                 @keyframes spin {
+//                     to { transform: rotate(360deg); }
 //                 }
 
 //                 /* ==================== TOAST NOTIFICATION ==================== */
@@ -1730,12 +1729,13 @@
 //                     align-items: center;
 //                     gap: 10px;
 //                     padding: 12px 20px;
-//                     background: white;
-//                     border-radius: 8px;
-//                     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+//                     background: ${appTheme.colors.backgroundCard};
+//                     border-radius: ${appTheme.radius.md};
+//                     box-shadow: ${appTheme.shadows.lg};
 //                     animation: slideInRight 0.3s ease;
 //                     font-size: 0.875rem;
 //                     max-width: 400px;
+//                     border: 1px solid ${appTheme.colors.border};
 //                 }
 
 //                 .toast-notification.success {
@@ -1775,7 +1775,7 @@
 
 //                 /* ==================== HEADER ==================== */
 //                 .page-header {
-//                     background: white;
+//                     background: ${appTheme.colors.backgroundCard};
 //                     border-bottom: 1px solid ${appTheme.colors.border};
 //                     padding: 20px 24px;
 //                     position: sticky;
@@ -1783,30 +1783,32 @@
 //                     z-index: 100;
 //                     backdrop-filter: blur(10px);
 //                     background: rgba(255, 255, 255, 0.95);
+//                     width: 100%;
 //                 }
 
 //                 .header-content {
-//                     max-width: 1200px;
+//                     max-width: 100%;
 //                     margin: 0 auto;
 //                     display: flex;
 //                     justify-content: space-between;
 //                     align-items: center;
+//                     padding: 0 24px;
 //                 }
 
 //                 .header-left {
 //                     display: flex;
 //                     flex-direction: column;
-//                     gap: 8px;
+//                     gap: 4px;
 //                 }
 
 //                 .back-button {
-//                     display: flex;
+//                     display: inline-flex;
 //                     align-items: center;
-//                     gap: 8px;
+//                     gap: 6px;
 //                     background: none;
 //                     border: none;
 //                     color: ${appTheme.colors.primary};
-//                     font-size: 0.875rem;
+//                     font-size: 0.813rem;
 //                     font-weight: 500;
 //                     cursor: pointer;
 //                     padding: 4px 0;
@@ -1819,21 +1821,14 @@
 //                 }
 
 //                 .page-title {
-//                     display: flex;
-//                     align-items: center;
-//                     gap: 12px;
 //                     font-size: 1.5rem;
 //                     font-weight: 600;
-//                     color: #0f172a;
+//                     color: ${appTheme.colors.textPrimary};
 //                     margin: 0;
 //                 }
 
-//                 .title-icon {
-//                     color: ${appTheme.colors.primary};
-//                 }
-
 //                 .page-description {
-//                     color: #64748b;
+//                     color: ${appTheme.colors.textSecondary};
 //                     font-size: 0.875rem;
 //                     margin: 0;
 //                 }
@@ -1841,38 +1836,22 @@
 //                 .header-actions {
 //                     display: flex;
 //                     align-items: center;
-//                     gap: 8px;
+//                     gap: 12px;
 //                 }
 
-//                 .header-action-btn {
-//                     width: 40px;
-//                     height: 40px;
+//                 .desktop-save {
 //                     display: flex;
-//                     align-items: center;
-//                     justify-content: center;
-//                     background: #f8fafc;
-//                     border: 1px solid ${appTheme.colors.border};
-//                     border-radius: 8px;
-//                     color: #64748b;
-//                     cursor: pointer;
-//                     transition: all 0.2s ease;
-//                 }
-
-//                 .header-action-btn:hover {
-//                     background: #f1f5f9;
-//                     color: ${appTheme.colors.primary};
-//                     border-color: ${appTheme.colors.primary};
 //                 }
 
 //                 .save-button {
 //                     display: flex;
 //                     align-items: center;
 //                     gap: 8px;
-//                     padding: 10px 20px;
+//                     padding: 12px 24px;
 //                     background: ${appTheme.colors.primary};
 //                     color: white;
 //                     border: none;
-//                     border-radius: 8px;
+//                     border-radius: ${appTheme.radius.md};
 //                     font-size: 0.875rem;
 //                     font-weight: 500;
 //                     cursor: pointer;
@@ -1881,7 +1860,7 @@
 //                 }
 
 //                 .save-button:hover {
-//                     background: #2563eb;
+//                     background: ${appTheme.colors.gradientStart};
 //                     transform: translateY(-1px);
 //                     box-shadow: 0 6px 16px ${appTheme.colors.primary}40;
 //                 }
@@ -1901,181 +1880,143 @@
 //                     animation: spin 0.8s linear infinite;
 //                 }
 
-//                 @keyframes spin {
-//                     to { transform: rotate(360deg); }
-//                 }
-
-//                 /* ==================== DESKTOP TABS ==================== */
-//                 .desktop-tabs {
-//                     max-width: 1200px;
-//                     margin: 0 auto 24px auto;
+//                 /* ==================== COMPANY BANNER ==================== */
+//                 .company-banner {
+//                     width: 100%;
+//                     margin: 16px 0 0 0;
 //                     padding: 0 24px;
-//                     display: none;
-//                     background: white;
-//                     border-bottom: 2px solid #e2e8f0;
 //                 }
 
-//                 @media (min-width: 1024px) {
-//                     .desktop-tabs {
-//                         display: flex;
-//                         padding: 0 24px;
-//                         margin: 0 auto 24px auto;
-//                     }
-//                 }
-
-//                 .tab-button {
+//                 .company-banner-content {
+//                     background: ${appTheme.colors.backgroundCard};
+//                     border: 1px solid ${appTheme.colors.border};
+//                     border-radius: ${appTheme.radius.md};
+//                     padding: 12px 16px;
 //                     display: flex;
 //                     align-items: center;
-//                     justify-content: center;
+//                     justify-content: space-between;
+//                     width: 100%;
+//                 }
+
+//                 .company-banner-left {
+//                     display: flex;
+//                     align-items: center;
 //                     gap: 8px;
-//                     padding: 16px 12px;
-//                     background: transparent;
-//                     border: none;
-//                     cursor: pointer;
-//                     transition: all 0.2s ease;
-//                     white-space: nowrap;
+//                     color: ${appTheme.colors.textPrimary};
 //                     font-size: 0.875rem;
-//                     position: relative;
-//                     border-bottom: 2px solid transparent;
-//                     margin-bottom: -2px;
-//                     flex: 1;
-//                     min-width: 0;
 //                 }
 
-//                 .tab-button:hover {
-//                     background: #f8fafc;
+//                 .company-banner-left svg {
+//                     color: ${appTheme.colors.primary};
 //                 }
 
-//                 .tab-button.active {
-//                     background: #f8fafc;
-//                     border-bottom: 2px solid;
-//                 }
-
-//                 .tab-icon {
+//                 .super-admin-badge {
 //                     display: flex;
 //                     align-items: center;
-//                     justify-content: center;
-//                     padding: 6px;
-//                     border-radius: 8px;
-//                     transition: all 0.2s ease;
-//                     flex-shrink: 0;
+//                     gap: 6px;
+//                     padding: 4px 10px;
+//                     background: ${appTheme.colors.warning}15;
+//                     border: 1px solid ${appTheme.colors.warning}30;
+//                     border-radius: 20px;
+//                     color: ${appTheme.colors.warning};
+//                     font-size: 0.75rem;
+//                     font-weight: 600;
 //                 }
 
-//                 .tab-title {
-//                     overflow: hidden;
-//                     text-overflow: ellipsis;
-//                     white-space: nowrap;
+//                 /* ==================== API ERROR ==================== */
+//                 .api-error {
+//                     width: 100%;
+//                     margin: 16px 0 0 0;
+//                     padding: 0 24px;
 //                 }
 
-//                 .active-indicator {
-//                     position: absolute;
-//                     bottom: -2px;
-//                     left: 0;
-//                     right: 0;
-//                     height: 2px;
+//                 .api-error {
+//                     background: ${appTheme.colors.error}10;
+//                     border: 1px solid ${appTheme.colors.error}30;
+//                     border-radius: ${appTheme.radius.md};
+//                     padding: 12px 16px;
+//                     display: flex;
+//                     align-items: center;
+//                     gap: 8px;
+//                     color: ${appTheme.colors.error};
+//                     font-size: 0.875rem;
 //                 }
 
 //                 /* ==================== MAIN CONTENT ==================== */
 //                 .main-content {
-//                     max-width: 1200px;
-//                     margin: 24px auto;
-//                     padding: 0 24px 100px 24px;
+//                     width: 100%;
+//                     margin: 24px 0;
+//                     padding: 0 24px;
 //                 }
 
-//                 /* ==================== CUSTOM ID CARD ==================== */
-//                 .custom-id-card {
-//                     margin-bottom: 24px;
-//                     padding: 16px;
+//                 /* ==================== PRODUCT ID CARD ==================== */
+//                 .product-id-card {
 //                     background: linear-gradient(135deg, ${appTheme.colors.primary}10, ${appTheme.colors.secondary}10);
-//                     border-radius: 8px;
 //                     border: 1px solid ${appTheme.colors.primary}30;
+//                     border-radius: ${appTheme.radius.md};
+//                     padding: 16px;
+//                     margin-bottom: 24px;
 //                     display: flex;
 //                     align-items: center;
 //                     justify-content: space-between;
-//                     flex-wrap: wrap;
-//                     gap: 12px;
 //                 }
 
-//                 .custom-id-content {
+//                 .product-id-info {
 //                     display: flex;
 //                     align-items: center;
 //                     gap: 12px;
 //                 }
 
-//                 .custom-id-icon {
-//                     width: 40px;
-//                     height: 40px;
-//                     border-radius: 8px;
-//                     background: ${appTheme.colors.primary};
-//                     display: flex;
-//                     align-items: center;
-//                     justify-content: center;
-//                     color: white;
+//                 .product-id-info svg {
+//                     color: ${appTheme.colors.primary};
 //                 }
 
-//                 .custom-id-info {
-//                     display: flex;
-//                     flex-direction: column;
-//                 }
-
-//                 .custom-id-label {
+//                 .product-id-label {
 //                     font-size: 0.75rem;
-//                     color: #64748b;
+//                     color: ${appTheme.colors.textSecondary};
+//                     display: block;
 //                 }
 
-//                 .custom-id-value {
-//                     font-size: 1.5rem;
+//                 .product-id-value {
+//                     font-size: 1.25rem;
 //                     font-weight: 700;
 //                     color: ${appTheme.colors.primary};
 //                     font-family: monospace;
 //                     letter-spacing: 1px;
 //                 }
 
-//                 .custom-id-meta {
-//                     background: white;
-//                     padding: 8px 12px;
-//                     border-radius: 8px;
-//                     border: 1px solid ${appTheme.colors.border};
-//                     font-size: 0.8rem;
-//                     color: #64748b;
-//                 }
-
-//                 .meta-label {
-//                     font-weight: 600;
-//                     color: #0f172a;
-//                 }
-
-//                 /* ==================== SECTIONS CONTAINER ==================== */
-//                 .sections-container {
-//                     display: flex;
-//                     flex-direction: column;
-//                     gap: 16px;
-//                 }
-
-//                 .section-card {
-//                     background: white;
-//                     border-radius: 8px;
-//                     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-//                     overflow: hidden;
-//                 }
-
-//                 @media (min-width: 1024px) {
-//                     .section-card:not(.active) {
-//                         display: none;
-//                     }
-//                 }
-
-//                 .section-header {
-//                     padding: 20px 24px;
-//                     display: flex;
-//                     justify-content: space-between;
-//                     align-items: center;
+//                 .copy-button {
+//                     background: ${appTheme.colors.backgroundCard};
+//                     border: 1px solid ${appTheme.colors.primary}30;
+//                     border-radius: ${appTheme.radius.sm};
+//                     padding: 8px;
+//                     color: ${appTheme.colors.primary};
 //                     cursor: pointer;
 //                     transition: all 0.2s ease;
 //                 }
 
-//                 .section-header:hover {
-//                     background: #f8fafc;
+//                 .copy-button:hover {
+//                     background: ${appTheme.colors.hover};
+//                 }
+
+//                 /* ==================== FORM SECTIONS ==================== */
+//                 .form-sections {
+//                     display: flex;
+//                     flex-direction: column;
+//                     gap: 20px;
+//                 }
+
+//                 .form-section {
+//                     background: ${appTheme.colors.backgroundCard};
+//                     border: 1px solid ${appTheme.colors.border};
+//                     border-radius: ${appTheme.radius.lg};
+//                     overflow: hidden;
+//                 }
+
+//                 .section-header {
+//                     padding: 20px 24px;
+//                     background: #fafbfc;
+//                     border-bottom: 1px solid ${appTheme.colors.border};
 //                 }
 
 //                 .section-header-left {
@@ -2090,161 +2031,106 @@
 //                     display: flex;
 //                     align-items: center;
 //                     justify-content: center;
-//                     border-radius: 8px;
+//                     border-radius: ${appTheme.radius.md};
 //                 }
 
-//                 .section-title h2 {
+//                 .section-header-left h2 {
 //                     font-size: 1rem;
 //                     font-weight: 600;
-//                     color: #0f172a;
+//                     color: ${appTheme.colors.textPrimary};
 //                     margin: 0 0 4px 0;
 //                 }
 
-//                 .section-title p {
+//                 .section-header-left p {
 //                     font-size: 0.75rem;
-//                     color: #64748b;
+//                     color: ${appTheme.colors.textSecondary};
 //                     margin: 0;
 //                 }
 
-//                 .chevron-icon {
-//                     color: #94a3b8;
-//                     transition: transform 0.3s ease;
-//                 }
-
 //                 .section-content {
-//                     padding: 0 24px 24px 24px;
-//                     border-top: 1px solid ${appTheme.colors.border};
-//                     animation: slideDown 0.3s ease;
+//                     padding: 24px;
 //                 }
 
-//                 @keyframes slideDown {
-//                     from {
-//                         opacity: 0;
-//                         transform: translateY(-10px);
-//                     }
-//                     to {
-//                         opacity: 1;
-//                         transform: translateY(0);
-//                     }
+//                 /* ==================== FORM LAYOUT ==================== */
+//                 .form-row {
+//                     display: grid;
+//                     grid-template-columns: repeat(3, 1fr);
+//                     gap: 20px;
+//                     margin-bottom: 20px;
 //                 }
 
-//                 /* ==================== FORM BLOCKS ==================== */
-//                 .form-block {
-//                     margin-bottom: 28px;
-//                 }
-
-//                 .form-block:last-child {
+//                 .form-row:last-child {
 //                     margin-bottom: 0;
 //                 }
 
-//                 .form-block h3 {
-//                     display: flex;
-//                     align-items: center;
-//                     gap: 8px;
-//                     font-size: 0.875rem;
-//                     font-weight: 600;
-//                     color: #334155;
-//                     margin: 0 0 16px 0;
-//                     padding-bottom: 8px;
-//                     border-bottom: 1px dashed ${appTheme.colors.border};
-//                 }
-
-//                 .form-block h3 svg {
-//                     color: ${appTheme.colors.primary};
-//                 }
-
-//                 .form-grid {
-//                     display: grid;
-//                     grid-template-columns: repeat(1, 1fr);
-//                     gap: 16px;
-//                 }
-
-//                 @media (min-width: 640px) {
-//                     .form-grid {
-//                         grid-template-columns: repeat(2, 1fr);
-//                     }
-//                 }
-
-//                 .span-2 {
-//                     grid-column: 1 / -1;
-//                 }
-
-//                 .form-field {
+//                 .form-group {
 //                     display: flex;
 //                     flex-direction: column;
 //                     gap: 6px;
 //                 }
 
-//                 .form-field.checkbox-field {
-//                     flex-direction: row;
-//                     align-items: center;
-//                     gap: 10px;
+//                 .form-group.span-2 {
+//                     grid-column: span 2;
 //                 }
 
-//                 .form-field label {
-//                     font-size: 0.75rem;
+//                 .form-group.span-3 {
+//                     grid-column: span 3;
+//                 }
+
+//                 .form-group.checkbox-group {
+//                     justify-content: flex-end;
+//                 }
+
+//                 .form-group label {
+//                     font-size: 0.813rem;
 //                     font-weight: 500;
-//                     color: #475569;
-//                     text-transform: uppercase;
-//                     letter-spacing: 0.3px;
-//                 }
-
-//                 .checkbox-label {
+//                     color: ${appTheme.colors.textPrimary};
 //                     display: flex;
 //                     align-items: center;
-//                     gap: 8px;
-//                     cursor: pointer;
-//                     font-size: 0.875rem;
+//                     justify-content: space-between;
+//                 }
+
+//                 .label-hint {
+//                     font-size: 0.688rem;
 //                     font-weight: normal;
-//                     text-transform: none;
-//                     color: #334155;
+//                     color: ${appTheme.colors.textSecondary};
 //                 }
 
-//                 .checkbox-label input[type="checkbox"] {
-//                     width: 18px;
-//                     height: 18px;
-//                     cursor: pointer;
+//                 .required {
+//                     color: ${appTheme.colors.error};
+//                     margin-left: 4px;
 //                 }
 
-//                 .form-field input,
-//                 .form-field select,
-//                 .form-field textarea {
+//                 .form-group input,
+//                 .form-group select,
+//                 .form-group textarea {
 //                     width: 100%;
-//                     padding: 10px 14px;
+//                     padding: 12px 14px;
 //                     border: 1px solid ${appTheme.colors.border};
-//                     border-radius: 8px;
+//                     border-radius: ${appTheme.radius.md};
 //                     font-size: 0.938rem;
 //                     transition: all 0.2s ease;
-//                     background: white;
-//                     font-family: ${appTheme.fonts.primary};
+//                     background: ${appTheme.colors.backgroundCard};
+//                     color: ${appTheme.colors.textPrimary};
 //                 }
 
-//                 .form-field input:focus,
-//                 .form-field select:focus,
-//                 .form-field textarea:focus {
+//                 .form-group input:focus,
+//                 .form-group select:focus,
+//                 .form-group textarea:focus {
 //                     outline: none;
 //                     border-color: ${appTheme.colors.primary};
-//                     box-shadow: 0 0 0 3px ${appTheme.colors.primary}20;
+//                     box-shadow: 0 0 0 4px ${appTheme.colors.primary}15;
 //                 }
 
-//                 .form-field input.error,
-//                 .form-field select.error,
-//                 .form-field textarea.error {
+//                 .form-group input.error,
+//                 .form-group select.error,
+//                 .form-group textarea.error {
 //                     border-color: ${appTheme.colors.error};
 //                 }
 
 //                 .error-text {
 //                     font-size: 0.688rem;
 //                     color: ${appTheme.colors.error};
-//                 }
-
-//                 .required {
-//                     color: ${appTheme.colors.error};
-//                 }
-
-//                 .hint {
-//                     font-size: 0.688rem;
-//                     color: #94a3b8;
 //                 }
 
 //                 .input-group {
@@ -2256,62 +2142,67 @@
 //                     flex: 1;
 //                 }
 
-//                 .generate-btn {
-//                     padding: 10px 14px;
+//                 .icon-button {
+//                     padding: 12px;
 //                     border: 1px solid ${appTheme.colors.border};
-//                     border-radius: 8px;
-//                     background: #f8fafc;
-//                     color: #64748b;
+//                     border-radius: ${appTheme.radius.md};
+//                     background: ${appTheme.colors.backgroundLight};
+//                     color: ${appTheme.colors.textSecondary};
 //                     cursor: pointer;
 //                     transition: all 0.2s ease;
-//                     min-height: 42px;
-//                     min-width: 42px;
 //                     display: flex;
 //                     align-items: center;
 //                     justify-content: center;
 //                 }
 
-//                 .generate-btn:hover {
-//                     background: #f1f5f9;
+//                 .icon-button:hover {
+//                     background: ${appTheme.colors.hover};
 //                     color: ${appTheme.colors.primary};
 //                     border-color: ${appTheme.colors.primary};
 //                 }
 
-//                 /* ==================== IMAGE SECTION ==================== */
-//                 .image-section {
-//                     margin-bottom: 20px;
+//                 .input-with-hint {
+//                     position: relative;
 //                 }
 
-//                 .image-header {
+//                 .field-hint {
+//                     position: absolute;
+//                     right: 12px;
+//                     top: 50%;
+//                     transform: translateY(-50%);
+//                     font-size: 0.688rem;
+//                     color: ${appTheme.colors.textSecondary};
+//                     pointer-events: none;
+//                 }
+
+//                 .checkbox-label {
 //                     display: flex;
 //                     align-items: center;
-//                     justify-content: space-between;
-//                     margin-bottom: 12px;
+//                     gap: 8px;
+//                     cursor: pointer;
+//                     padding: 8px 0;
+//                     color: ${appTheme.colors.textPrimary};
 //                 }
 
-//                 .image-header label {
-//                     font-size: 0.875rem;
-//                     font-weight: 600;
-//                     color: #0f172a;
+//                 .checkbox-label input[type="checkbox"] {
+//                     width: 18px;
+//                     height: 18px;
+//                     cursor: pointer;
+//                     accent-color: ${appTheme.colors.primary};
 //                 }
 
+//                 /* ==================== IMAGE SECTION ==================== */
 //                 .image-count {
 //                     font-size: 0.75rem;
-//                     color: #64748b;
-//                     font-weight: 500;
+//                     color: ${appTheme.colors.textSecondary};
+//                     font-weight: normal;
 //                 }
 
 //                 .image-grid {
 //                     display: grid;
 //                     grid-template-columns: repeat(4, 1fr);
 //                     gap: 12px;
-//                     margin-bottom: 16px;
-//                 }
-
-//                 @media (max-width: 640px) {
-//                     .image-grid {
-//                         grid-template-columns: repeat(2, 1fr);
-//                     }
+//                     margin: 16px 0;
 //                 }
 
 //                 .image-preview {
@@ -2319,9 +2210,9 @@
 //                     width: 100%;
 //                     aspect-ratio: 1/1;
 //                     border: 1px solid ${appTheme.colors.border};
-//                     border-radius: 8px;
+//                     border-radius: ${appTheme.radius.md};
 //                     overflow: hidden;
-//                     background: #f8fafc;
+//                     background: ${appTheme.colors.backgroundLight};
 //                 }
 
 //                 .image-preview img {
@@ -2339,7 +2230,7 @@
 //                     background: ${appTheme.colors.error};
 //                     color: white;
 //                     border: none;
-//                     border-radius: 8px;
+//                     border-radius: ${appTheme.radius.sm};
 //                     cursor: pointer;
 //                     display: flex;
 //                     align-items: center;
@@ -2354,12 +2245,12 @@
 
 //                 .upload-area {
 //                     border: 2px dashed ${appTheme.colors.border};
-//                     border-radius: 8px;
-//                     padding: 24px;
+//                     border-radius: ${appTheme.radius.md};
+//                     padding: 32px;
 //                     text-align: center;
 //                     cursor: pointer;
 //                     transition: all 0.2s ease;
-//                     background: #f8fafc;
+//                     background: ${appTheme.colors.backgroundLight};
 //                 }
 
 //                 .upload-area:hover {
@@ -2373,19 +2264,19 @@
 
 //                 .upload-area svg {
 //                     color: ${appTheme.colors.primary};
-//                     margin-bottom: 8px;
+//                     margin-bottom: 12px;
 //                 }
 
 //                 .upload-area p {
-//                     font-size: 0.875rem;
+//                     font-size: 0.938rem;
 //                     font-weight: 500;
-//                     color: #0f172a;
+//                     color: ${appTheme.colors.textPrimary};
 //                     margin: 0 0 4px 0;
 //                 }
 
 //                 .upload-area span {
-//                     font-size: 0.688rem;
-//                     color: #64748b;
+//                     font-size: 0.75rem;
+//                     color: ${appTheme.colors.textSecondary};
 //                 }
 
 //                 /* ==================== SPECIFICATIONS ==================== */
@@ -2393,13 +2284,6 @@
 //                     display: grid;
 //                     grid-template-columns: 1fr 1fr auto;
 //                     gap: 10px;
-//                     margin-bottom: 20px;
-//                 }
-
-//                 @media (max-width: 640px) {
-//                     .spec-input-group {
-//                         grid-template-columns: 1fr;
-//                     }
 //                 }
 
 //                 .add-spec-btn {
@@ -2407,26 +2291,26 @@
 //                     align-items: center;
 //                     justify-content: center;
 //                     gap: 6px;
-//                     padding: 10px 16px;
+//                     padding: 0 20px;
 //                     background: ${appTheme.colors.primary};
 //                     color: white;
 //                     border: none;
-//                     border-radius: 8px;
+//                     border-radius: ${appTheme.radius.md};
 //                     cursor: pointer;
 //                     font-size: 0.875rem;
 //                     font-weight: 500;
 //                     transition: all 0.2s ease;
-//                     min-height: 42px;
 //                 }
 
 //                 .add-spec-btn:hover {
-//                     background: #2563eb;
+//                     background: ${appTheme.colors.gradientStart};
 //                 }
 
 //                 .specs-list {
 //                     border: 1px solid ${appTheme.colors.border};
-//                     border-radius: 8px;
+//                     border-radius: ${appTheme.radius.md};
 //                     overflow: hidden;
+//                     margin-top: 16px;
 //                 }
 
 //                 .spec-item {
@@ -2435,7 +2319,7 @@
 //                     justify-content: space-between;
 //                     padding: 12px 16px;
 //                     border-bottom: 1px solid ${appTheme.colors.border};
-//                     background: white;
+//                     background: ${appTheme.colors.backgroundCard};
 //                 }
 
 //                 .spec-item:last-child {
@@ -2443,7 +2327,7 @@
 //                 }
 
 //                 .spec-item:nth-child(even) {
-//                     background: #f8fafc;
+//                     background: ${appTheme.colors.backgroundLight};
 //                 }
 
 //                 .spec-content {
@@ -2453,11 +2337,11 @@
 
 //                 .spec-key {
 //                     font-weight: 600;
-//                     color: #0f172a;
+//                     color: ${appTheme.colors.textPrimary};
 //                 }
 
 //                 .spec-value {
-//                     color: #475569;
+//                     color: ${appTheme.colors.textSecondary};
 //                     margin-left: 4px;
 //                 }
 
@@ -2467,12 +2351,7 @@
 //                     color: ${appTheme.colors.error};
 //                     cursor: pointer;
 //                     padding: 4px;
-//                     min-height: 32px;
-//                     min-width: 32px;
-//                     display: flex;
-//                     align-items: center;
-//                     justify-content: center;
-//                     border-radius: 6px;
+//                     border-radius: ${appTheme.radius.sm};
 //                     transition: all 0.2s ease;
 //                 }
 
@@ -2485,12 +2364,7 @@
 //                     display: grid;
 //                     grid-template-columns: repeat(4, 1fr);
 //                     gap: 12px;
-//                 }
-
-//                 @media (max-width: 640px) {
-//                     .flags-grid {
-//                         grid-template-columns: repeat(2, 1fr);
-//                     }
+//                     margin-top: 8px;
 //                 }
 
 //                 .flag-checkbox {
@@ -2500,10 +2374,10 @@
 //                     gap: 8px;
 //                     padding: 12px;
 //                     border: 1px solid ${appTheme.colors.border};
-//                     border-radius: 8px;
+//                     border-radius: ${appTheme.radius.md};
 //                     cursor: pointer;
 //                     transition: all 0.2s ease;
-//                     background: white;
+//                     background: ${appTheme.colors.backgroundCard};
 //                 }
 
 //                 .flag-checkbox input {
@@ -2512,73 +2386,36 @@
 
 //                 .flag-checkbox.active {
 //                     background: ${appTheme.colors.primary}10;
-//                     border-color: ${appTheme.colors.primary};
-//                 }
-
-//                 .flag-checkbox svg {
-//                     color: ${appTheme.colors.primary};
 //                 }
 
 //                 .flag-checkbox span {
 //                     font-size: 0.813rem;
 //                     font-weight: 500;
-//                     color: #0f172a;
 //                 }
 
-//                 /* ==================== DIMENSIONS ==================== */
+//                 /* ==================== DIMENSIONS GRID ==================== */
 //                 .dimensions-grid {
 //                     display: grid;
 //                     grid-template-columns: 1fr 1fr 1fr auto;
 //                     gap: 10px;
-//                 }
-
-//                 @media (max-width: 640px) {
-//                     .dimensions-grid {
-//                         grid-template-columns: 1fr 1fr;
-//                     }
+//                     margin-top: 8px;
 //                 }
 
 //                 .dimensions-grid input,
 //                 .dimensions-grid select {
-//                     padding: 10px 14px;
+//                     padding: 12px 14px;
 //                     border: 1px solid ${appTheme.colors.border};
-//                     border-radius: 8px;
+//                     border-radius: ${appTheme.radius.md};
 //                     font-size: 0.938rem;
-//                     background: white;
+//                     background: ${appTheme.colors.backgroundCard};
+//                     color: ${appTheme.colors.textPrimary};
 //                 }
 
 //                 .dimensions-grid input:focus,
 //                 .dimensions-grid select:focus {
 //                     outline: none;
 //                     border-color: ${appTheme.colors.primary};
-//                     box-shadow: 0 0 0 3px ${appTheme.colors.primary}20;
-//                 }
-
-//                 .dimensions-grid input.error {
-//                     border-color: ${appTheme.colors.error};
-//                 }
-
-//                 /* ==================== EMPTY STATE ==================== */
-//                 .empty-state {
-//                     text-align: center;
-//                     padding: 48px 24px;
-//                     background: #f8fafc;
-//                     border-radius: 8px;
-//                 }
-
-//                 .empty-state.small {
-//                     padding: 32px 24px;
-//                 }
-
-//                 .empty-state svg {
-//                     color: #94a3b8;
-//                     margin-bottom: 16px;
-//                 }
-
-//                 .empty-state p {
-//                     font-size: 0.875rem;
-//                     color: #64748b;
-//                     margin: 0;
+//                     box-shadow: 0 0 0 4px ${appTheme.colors.primary}15;
 //                 }
 
 //                 /* ==================== MOBILE SAVE ==================== */
@@ -2589,7 +2426,7 @@
 //                     left: 0;
 //                     right: 0;
 //                     padding: 16px;
-//                     background: linear-gradient(to top, #f1f5f9, transparent);
+//                     background: linear-gradient(to top, ${appTheme.colors.backgroundLight}, transparent);
 //                     z-index: 100;
 //                 }
 
@@ -2599,7 +2436,7 @@
 //                     background: ${appTheme.colors.primary};
 //                     color: white;
 //                     border: none;
-//                     border-radius: 8px;
+//                     border-radius: ${appTheme.radius.md};
 //                     font-size: 1rem;
 //                     font-weight: 600;
 //                     display: flex;
@@ -2615,9 +2452,23 @@
 //                 }
 
 //                 /* ==================== RESPONSIVE ==================== */
+//                 @media (max-width: 1200px) {
+//                     .header-content,
+//                     .main-content,
+//                     .company-banner,
+//                     .api-error {
+//                         padding: 0 20px;
+//                     }
+//                 }
+
 //                 @media (max-width: 1024px) {
-//                     .stats-grid {
-//                         display: none;
+//                     .form-row {
+//                         grid-template-columns: repeat(2, 1fr);
+//                     }
+
+//                     .form-group.span-2,
+//                     .form-group.span-3 {
+//                         grid-column: span 2;
 //                     }
 //                 }
 
@@ -2630,35 +2481,28 @@
 //                         flex-direction: column;
 //                         gap: 16px;
 //                         align-items: flex-start;
-//                     }
-
-//                     .page-title {
-//                         font-size: 1.25rem;
-//                     }
-
-//                     .page-description {
-//                         font-size: 0.813rem;
+//                         padding: 0 16px;
 //                     }
 
 //                     .header-actions {
 //                         width: 100%;
-//                         justify-content: flex-end;
 //                     }
 
-//                     .save-button {
-//                         display: none;
+//                     .desktop-save {
+//                         display: none !important;
 //                     }
 
 //                     .mobile-save {
 //                         display: block;
 //                     }
 
-//                     .desktop-tabs {
-//                         display: none;
+//                     .page-title {
+//                         font-size: 1.25rem;
 //                     }
 
-//                     .stats-grid {
-//                         display: none;
+//                     .main-content {
+//                         padding: 0 16px;
+//                         margin-bottom: 80px;
 //                     }
 
 //                     .section-header {
@@ -2674,41 +2518,22 @@
 //                         height: 36px;
 //                     }
 
-//                     .section-icon svg {
-//                         width: 18px;
-//                         height: 18px;
-//                     }
-
-//                     .section-title h2 {
-//                         font-size: 0.938rem;
-//                     }
-
-//                     .section-title p {
-//                         font-size: 0.688rem;
-//                     }
-
 //                     .section-content {
-//                         padding: 0 16px 16px 16px;
+//                         padding: 16px;
 //                     }
 
-//                     .form-block h3 {
-//                         font-size: 0.813rem;
+//                     .form-row {
+//                         grid-template-columns: 1fr;
+//                         gap: 16px;
 //                     }
 
-//                     .form-field input,
-//                     .form-field select,
-//                     .form-field textarea {
-//                         font-size: 16px;
-//                         min-height: 48px;
+//                     .form-group.span-2,
+//                     .form-group.span-3 {
+//                         grid-column: span 1;
 //                     }
 
-//                     .custom-id-card {
-//                         flex-direction: column;
-//                         align-items: flex-start;
-//                     }
-
-//                     .custom-id-meta {
-//                         width: 100%;
+//                     .image-grid {
+//                         grid-template-columns: repeat(2, 1fr);
 //                     }
 
 //                     .spec-input-group {
@@ -2716,7 +2541,11 @@
 //                     }
 
 //                     .add-spec-btn {
-//                         min-height: 48px;
+//                         padding: 12px;
+//                     }
+
+//                     .flags-grid {
+//                         grid-template-columns: repeat(2, 1fr);
 //                     }
 
 //                     .dimensions-grid {
@@ -2726,23 +2555,39 @@
 //                     .dimensions-grid select {
 //                         grid-column: span 2;
 //                     }
+
+//                     .upload-area {
+//                         padding: 24px;
+//                     }
+
+//                     .upload-area p {
+//                         font-size: 0.875rem;
+//                     }
+
+//                     .company-banner,
+//                     .api-error {
+//                         padding: 0 16px;
+//                     }
 //                 }
 
 //                 @media (max-width: 480px) {
-//                     .main-content {
-//                         padding: 16px 16px 90px 16px;
+//                     .form-group label {
+//                         font-size: 0.75rem;
 //                     }
 
-//                     .stats-grid {
-//                         display: none;
+//                     .form-group input,
+//                     .form-group select,
+//                     .form-group textarea {
+//                         font-size: 16px;
+//                         padding: 10px 12px;
 //                     }
 
 //                     .image-grid {
-//                         grid-template-columns: 1fr 1fr;
+//                         grid-template-columns: repeat(2, 1fr);
 //                     }
 
 //                     .flags-grid {
-//                         grid-template-columns: 1fr 1fr;
+//                         grid-template-columns: repeat(2, 1fr);
 //                     }
 
 //                     .flag-checkbox {
@@ -2766,19 +2611,14 @@
 
 
 
-// above code is working without saas
 
 
 
 
 
 
+'use client';
 
-
-
-
-// app/admin/products/productForm/page.js
-"use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Head from 'next/head';
@@ -2808,53 +2648,30 @@ import {
     Instagram, Twitter, Youtube, Linkedin, TwitterIcon,
     Linkedin as LinkedinIcon, ShieldCheck, ShieldAlert,
     Activity, TrendingUp, Users, Briefcase, Calendar as CalendarIcon,
-    ChevronDown
+    ChevronDown, Copy as CopyIcon
 } from 'lucide-react';
 
 // ==================== CONSTANTS ====================
-const SECTIONS = [
-    { 
-        id: 'basic', 
-        title: 'Basic Information', 
-        icon: Package, 
-        color: appTheme.colors.primary,
-        description: 'Product name, category, and description'
-    },
-    { 
-        id: 'pricing', 
-        title: 'Pricing & Stock', 
-        icon: DollarSign, 
-        color: appTheme.colors.secondary,
-        description: 'Pricing, GST, and inventory management'
-    },
-    { 
-        id: 'media', 
-        title: 'Media', 
-        icon: Camera, 
-        color: appTheme.colors.warning,
-        description: 'Product images and videos'
-    },
-    { 
-        id: 'specs', 
-        title: 'Specifications', 
-        icon: Settings, 
-        color: appTheme.colors.info,
-        description: 'Technical details and attributes'
-    },
-    { 
-        id: 'seo', 
-        title: 'SEO', 
-        icon: Globe, 
-        color: appTheme.colors.accent,
-        description: 'Search engine optimization'
-    },
-    { 
-        id: 'shipping', 
-        title: 'Shipping', 
-        icon: Truck, 
-        color: appTheme.colors.success,
-        description: 'Weight, dimensions, and shipping class'
-    }
+const TAX_RATES = [
+    { value: "0", label: "0%", description: "No tax" },
+    { value: "5", label: "5%", description: "Reduced rate" },
+    { value: "12", label: "12%", description: "Standard rate" },
+    { value: "18", label: "18%", description: "Standard rate" },
+    { value: "28", label: "28%", description: "Highest rate" }
+];
+
+const TAX_CLASSES = [
+    { value: "standard", label: "Standard", icon: FileText },
+    { value: "reduced", label: "Reduced", icon: Percent },
+    { value: "zero", label: "Zero Rated", icon: Minus },
+    { value: "exempt", label: "Exempt", icon: Shield }
+];
+
+const FLAGS = [
+    { id: 'isFeatured', label: 'Featured', icon: Star, color: appTheme.colors.warning },
+    { id: 'isOnSale', label: 'On Sale', icon: Percent, color: appTheme.colors.success },
+    { id: 'isNewArrival', label: 'New Arrival', icon: Calendar, color: appTheme.colors.info },
+    { id: 'isBestSeller', label: 'Best Seller', icon: Crown, color: appTheme.colors.secondary }
 ];
 
 // ✅ Helper to validate ObjectId
@@ -2882,8 +2699,6 @@ export default function ProductForm() {
     }, [isAuthenticated, isCompanyAdmin, isSuperAdmin, router]);
 
     // State management
-    const [expandedSections, setExpandedSections] = useState(['basic']);
-    const [activeTab, setActiveTab] = useState('basic');
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState({});
@@ -3075,11 +2890,14 @@ export default function ProductForm() {
         }
     };
 
-    // Fetch all categories
+    // ✅ FIXED: Fetch all categories with companyId
     const fetchCategories = async () => {
+        if (!user?.companyId) return;
+        
         setLoadingCategories(true);
         try {
             const params = new URLSearchParams({
+                companyId: user.companyId,
                 type: 'categories',
                 format: 'flat'
             });
@@ -3101,12 +2919,13 @@ export default function ProductForm() {
         }
     };
 
-    // Fetch subcategories for selected category
+    // ✅ FIXED: Fetch subcategories with companyId
     const fetchSubCategories = async (categoryId) => {
-        if (!categoryId || !isValidObjectId(categoryId)) return;
+        if (!categoryId || !isValidObjectId(categoryId) || !user?.companyId) return;
         
         try {
             const params = new URLSearchParams({
+                companyId: user.companyId,
                 type: 'categories',
                 parentId: categoryId
             });
@@ -3123,12 +2942,13 @@ export default function ProductForm() {
         }
     };
 
+    // ✅ FIXED: Fetch product with company context
     const fetchProduct = async () => {
         try {
             setLoading(true);
             setApiError(null);
             
-            const res = await fetch(`/api/products?id=${productId}`, {
+            const res = await fetch(`/api/products?id=${productId}&companyId=${user?.companyId}`, {
                 headers: getAuthHeaders()
             });
             const data = await res.json();
@@ -3195,6 +3015,11 @@ export default function ProductForm() {
                     setImagePreviews(product.imageUrls);
                 }
                 
+                // Fetch subcategories if category exists
+                if (categoryId) {
+                    await fetchSubCategories(categoryId);
+                }
+                
                 showToast('success', 'Product loaded successfully');
             } else {
                 if (res.status === 403) {
@@ -3234,7 +3059,7 @@ export default function ProductForm() {
             newErrors.category = "Invalid category selected";
         }
 
-        // ===== FIX: SUBCATEGORY REQUIRED IF CATEGORY HAS SUBCATEGORIES =====
+        // Subcategory required if category has subcategories
         if (formData.category && selectedCategoryHasSubs) {
             if (!formData.subCategory) {
                 newErrors.subCategory = "Sub-category is required for this category";
@@ -3245,7 +3070,7 @@ export default function ProductForm() {
 
         // MRP validation
         if (!formData.mrp || parseFloat(formData.mrp) <= 0) {
-            newErrors.mrp = "Valid MRP is required (greater than 0)";
+            newErrors.mrp = "Valid MRP is required";
         }
 
         // Discount price validation
@@ -3263,7 +3088,7 @@ export default function ProductForm() {
 
         // Stock validation
         if (!formData.stock || parseInt(formData.stock) < 0) {
-            newErrors.stock = "Valid stock quantity is required (0 or more)";
+            newErrors.stock = "Valid stock quantity is required";
         }
 
         if (!formData.description.trim()) {
@@ -3273,24 +3098,6 @@ export default function ProductForm() {
         // Image validation
         if (imagePreviews.length === 0 && (!formData.imageUrls || formData.imageUrls.length === 0)) {
             newErrors.images = "At least one product image is required";
-        }
-
-        // Weight validation if provided
-        if (formData.weight && parseFloat(formData.weight) < 0) {
-            newErrors.weight = "Weight cannot be negative";
-        }
-
-        // Dimensions validation if any dimension is provided
-        if (formData.dimensions.length || formData.dimensions.width || formData.dimensions.height) {
-            if (!formData.dimensions.length || parseFloat(formData.dimensions.length) <= 0) {
-                newErrors.dimensions = "Valid length is required";
-            }
-            if (!formData.dimensions.width || parseFloat(formData.dimensions.width) <= 0) {
-                newErrors.dimensions = "Valid width is required";
-            }
-            if (!formData.dimensions.height || parseFloat(formData.dimensions.height) <= 0) {
-                newErrors.dimensions = "Valid height is required";
-            }
         }
 
         setErrors(newErrors);
@@ -3354,6 +3161,8 @@ export default function ProductForm() {
                     ...prev,
                     subCategory: ""
                 }));
+                setSubCategories([]);
+                setSelectedCategoryHasSubs(false);
             }
         }
         
@@ -3516,43 +3325,6 @@ export default function ProductForm() {
         
         if (!validateForm()) {
             showToast('error', "Please fix the errors before submitting.");
-            
-            // Expand the section containing the first error
-            const firstErrorField = Object.keys(errors)[0];
-            if (firstErrorField) {
-                // Find which section this field belongs to
-                if (['productName', 'slug', 'sku', 'hsnCode', 'category', 'subCategory', 'brand', 'description', 'shortDescription', 'options'].includes(firstErrorField)) {
-                    if (!expandedSections.includes('basic')) {
-                        setExpandedSections(prev => [...prev, 'basic']);
-                    }
-                    setActiveTab('basic');
-                } else if (['mrp', 'discountPrice', 'costPrice', 'gstRate', 'gstIncluded', 'taxClass', 'stock', 'lowStockThreshold', 'maxOrderQuantity', 'trackInventory', 'allowBackorder'].includes(firstErrorField)) {
-                    if (!expandedSections.includes('pricing')) {
-                        setExpandedSections(prev => [...prev, 'pricing']);
-                    }
-                    setActiveTab('pricing');
-                } else if (['images', 'videoUrl'].includes(firstErrorField)) {
-                    if (!expandedSections.includes('media')) {
-                        setExpandedSections(prev => [...prev, 'media']);
-                    }
-                    setActiveTab('media');
-                } else if (firstErrorField === 'specifications') {
-                    if (!expandedSections.includes('specs')) {
-                        setExpandedSections(prev => [...prev, 'specs']);
-                    }
-                    setActiveTab('specs');
-                } else if (['metaTitle', 'metaDescription', 'metaKeywords'].includes(firstErrorField)) {
-                    if (!expandedSections.includes('seo')) {
-                        setExpandedSections(prev => [...prev, 'seo']);
-                    }
-                    setActiveTab('seo');
-                } else if (['weight', 'dimensions', 'shippingClass'].includes(firstErrorField)) {
-                    if (!expandedSections.includes('shipping')) {
-                        setExpandedSections(prev => [...prev, 'shipping']);
-                    }
-                    setActiveTab('shipping');
-                }
-            }
             return;
         }
 
@@ -3583,8 +3355,8 @@ export default function ProductForm() {
                 slug: formData.slug || generateSlug(formData.productName),
                 sku: formData.sku.toUpperCase(),
                 hsnCode: formData.hsnCode,
-                category: formData.category, // This is now an ObjectId
-                subCategory: formData.subCategory || undefined, // This is now an ObjectId
+                category: formData.category,
+                subCategory: formData.subCategory || undefined,
                 brand: formData.brand.trim() || undefined,
                 mrp: parseFloat(formData.mrp),
                 discountPrice: parseFloat(formData.discountPrice),
@@ -3671,84 +3443,16 @@ export default function ProductForm() {
         }
     }, [router]);
 
-    const toggleSection = (sectionId) => {
-        setExpandedSections(prev => {
-            if (prev.includes(sectionId)) {
-                return prev.filter(id => id !== sectionId);
-            } else {
-                return [...prev, sectionId];
-            }
-        });
-    };
-
-    const handleTabClick = (tabId) => {
-        setActiveTab(tabId);
-        if (!expandedSections.includes(tabId)) {
-            setExpandedSections(prev => [...prev, tabId]);
-        }
-    };
-
-    const expandAll = () => {
-        setExpandedSections(SECTIONS.map(s => s.id));
-    };
-
-    const collapseAll = () => {
-        setExpandedSections([]);
+    const copyToClipboard = (text) => {
+        navigator.clipboard.writeText(text);
+        showToast('success', 'Copied to clipboard!');
     };
 
     if (loading && isEditing) {
         return (
             <div className="loading-container">
-                <div className="loading-grid">
-                    <div className="loading-card"></div>
-                    <div className="loading-card"></div>
-                    <div className="loading-card"></div>
-                </div>
+                <div className="loading-spinner"></div>
                 <p className="loading-text">Loading product data...</p>
-                <style jsx>{`
-                    .loading-container {
-                        min-height: 100vh;
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        justify-content: center;
-                        background: linear-gradient(135deg, #f6f9fc 0%, #f1f5f9 100%);
-                    }
-                    .loading-grid {
-                        display: grid;
-                        grid-template-columns: repeat(3, 1fr);
-                        gap: 16px;
-                        margin-bottom: 24px;
-                    }
-                    .loading-card {
-                        width: 80px;
-                        height: 80px;
-                        background: white;
-                        border-radius: 8px;
-                        animation: pulse 1.5s ease-in-out infinite;
-                    }
-                    .loading-card:nth-child(2) {
-                        animation-delay: 0.2s;
-                    }
-                    .loading-card:nth-child(3) {
-                        animation-delay: 0.4s;
-                    }
-                    @keyframes pulse {
-                        0%, 100% {
-                            opacity: 0.6;
-                            transform: scale(1);
-                        }
-                        50% {
-                            opacity: 1;
-                            transform: scale(1.05);
-                        }
-                    }
-                    .loading-text {
-                        color: #64748b;
-                        font-size: 0.875rem;
-                        font-weight: 500;
-                    }
-                `}</style>
             </div>
         );
     }
@@ -3762,7 +3466,6 @@ export default function ProductForm() {
             <Head>
                 <title>{isEditing ? 'Edit Product' : 'Add Product'} | LFMS</title>
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <meta name="description" content="Manage your product information" />
             </Head>
 
             <div className="product-form-page">
@@ -3785,11 +3488,10 @@ export default function ProductForm() {
                                 className="back-button"
                             >
                                 <ArrowLeft size={20} />
-                                <span>Back</span>
+                                <span>Back to Products</span>
                             </button>
                             <h1 className="page-title">
-                                <Package size={28} className="title-icon" />
-                                {isEditing ? 'Edit Product' : 'Add New Product'}
+                                {isEditing ? 'Edit Product' : 'Create New Product'}
                             </h1>
                             <p className="page-description">
                                 {isEditing ? 'Update your product information' : 'Fill in the details to create a new product'}
@@ -3797,23 +3499,9 @@ export default function ProductForm() {
                         </div>
                         <div className="header-actions">
                             <button
-                                onClick={expandAll}
-                                className="header-action-btn"
-                                title="Expand all sections"
-                            >
-                                <Layers size={18} />
-                            </button>
-                            <button
-                                onClick={collapseAll}
-                                className="header-action-btn"
-                                title="Collapse all sections"
-                            >
-                                <Layout size={18} />
-                            </button>
-                            <button
                                 onClick={handleSubmit}
                                 disabled={saving || isSubmitting}
-                                className="save-button"
+                                className="save-button desktop-save"
                             >
                                 {saving || isSubmitting ? (
                                     <>
@@ -3823,7 +3511,7 @@ export default function ProductForm() {
                                 ) : (
                                     <>
                                         <Save size={16} />
-                                        <span>Save Product</span>
+                                        <span>{isEditing ? 'Update Product' : 'Save Product'}</span>
                                     </>
                                 )}
                             </button>
@@ -3835,15 +3523,15 @@ export default function ProductForm() {
                 <div className="company-banner">
                     <div className="company-banner-content">
                         <div className="company-banner-left">
-                            <Building2 size={20} />
+                            <Building2 size={18} />
                             <span>
-                                {isSuperAdmin ? 'Super Admin View' : 'Company Admin View'} - 
+                                {isSuperAdmin ? 'Super Admin' : 'Company Admin'} · 
                                 {companyInfo?.companyName || user?.companyName || 'Your Company'}
                             </span>
                         </div>
                         {isSuperAdmin && (
                             <div className="super-admin-badge">
-                                <Shield size={16} />
+                                <Shield size={14} />
                                 Super Admin
                             </div>
                         )}
@@ -3853,873 +3541,755 @@ export default function ProductForm() {
                 {/* API Error Message */}
                 {apiError && (
                     <div className="api-error">
-                        <AlertCircle size={20} />
+                        <AlertCircle size={18} />
                         <span>{apiError}</span>
                     </div>
                 )}
 
-                {/* Desktop Horizontal Tabs */}
-                <div className="desktop-tabs">
-                    {SECTIONS.map(section => {
-                        const Icon = section.icon;
-                        return (
-                            <button
-                                key={section.id}
-                                className={`tab-button ${activeTab === section.id ? 'active' : ''}`}
-                                onClick={() => handleTabClick(section.id)}
-                            >
-                                <div className="tab-icon" style={{ 
-                                    backgroundColor: activeTab === section.id ? `${section.color}20` : 'transparent',
-                                    color: activeTab === section.id ? section.color : '#64748b'
-                                }}>
-                                    <Icon size={20} />
-                                </div>
-                                <span className="tab-title" style={{
-                                    color: activeTab === section.id ? '#0f172a' : '#64748b',
-                                    fontWeight: activeTab === section.id ? '600' : '500'
-                                }}>{section.title}</span>
-                                {activeTab === section.id && (
-                                    <div className="active-indicator" style={{ backgroundColor: section.color }}></div>
-                                )}
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {/* Main Content */}
+                {/* Main Content - Full Width */}
                 <main className="main-content">
-                    {/* Custom ID Display */}
+                    {/* Product ID Card - Only for editing */}
                     {isEditing && customId && (
-                        <div className="custom-id-card">
-                            <div className="custom-id-content">
-                                <div className="custom-id-icon">
-                                    <Hash size={24} />
-                                </div>
-                                <div className="custom-id-info">
-                                    <span className="custom-id-label">Product ID</span>
-                                    <span className="custom-id-value">{formattedId}</span>
+                        <div className="product-id-card">
+                            <div className="product-id-info">
+                                <Hash size={20} />
+                                <div>
+                                    <span className="product-id-label">Product ID</span>
+                                    <span className="product-id-value">{formattedId}</span>
                                 </div>
                             </div>
-                            <div className="custom-id-meta">
-                                <span className="meta-label">MongoDB ID:</span>
-                                <span className="meta-value">{productId?.slice(-8)}</span>
-                            </div>
+                            <button 
+                                className="copy-button"
+                                onClick={() => copyToClipboard(formattedId)}
+                            >
+                                <CopyIcon size={16} />
+                            </button>
                         </div>
                     )}
 
-                    {/* Sections */}
-                    <div className="sections-container">
-                        {SECTIONS.map(section => {
-                            const Icon = section.icon;
-                            const isExpanded = expandedSections.includes(section.id);
+                    {/* Form Sections */}
+                    <div className="form-sections">
+                        {/* Basic Information */}
+                        <div className="form-section">
+                            <div className="section-header">
+                                <div className="section-header-left">
+                                    <div className="section-icon" style={{ background: `${appTheme.colors.primary}15`, color: appTheme.colors.primary }}>
+                                        <Package size={20} />
+                                    </div>
+                                    <div>
+                                        <h2>Basic Information</h2>
+                                        <p>Product name, category, and description</p>
+                                    </div>
+                                </div>
+                            </div>
                             
-                            return (
-                                <div key={section.id} className={`section-card ${activeTab === section.id ? 'active' : ''}`}>
-                                    {/* Section Header */}
-                                    <div 
-                                        className="section-header"
-                                        onClick={() => toggleSection(section.id)}
-                                    >
-                                        <div className="section-header-left">
-                                            <div 
-                                                className="section-icon"
-                                                style={{ background: `${section.color}15`, color: section.color }}
-                                            >
-                                                <Icon size={20} />
-                                            </div>
-                                            <div className="section-title">
-                                                <h2>{section.title}</h2>
-                                                <p>{section.description}</p>
-                                            </div>
-                                        </div>
-                                        <div className="section-header-right">
-                                            <ChevronRight 
-                                                size={20} 
-                                                className={`chevron-icon ${isExpanded ? 'expanded' : ''}`}
-                                                style={{
-                                                    transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                                                    transition: 'transform 0.3s ease'
-                                                }}
+                            <div className="section-content">
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>
+                                            Product Name <span className="required">*</span>
+                                            <span className="label-hint">Required</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="productName"
+                                            value={formData.productName}
+                                            onChange={handleInputChange}
+                                            className={errors.productName ? 'error' : ''}
+                                            placeholder="e.g., Premium Cotton T-Shirt"
+                                            ref={el => fieldRefs.current['productName'] = el}
+                                        />
+                                        {errors.productName && <span className="error-text">{errors.productName}</span>}
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Slug (URL)</label>
+                                        <div className="input-with-hint">
+                                            <input
+                                                type="text"
+                                                name="slug"
+                                                value={formData.slug}
+                                                onChange={handleInputChange}
+                                                placeholder="premium-cotton-tshirt"
                                             />
+                                            <span className="field-hint">Auto-generated</span>
                                         </div>
                                     </div>
 
-                                    {/* Section Content */}
-                                    {isExpanded && (
-                                        <div className="section-content">
-                                            {/* Basic Info Section */}
-                                            {section.id === 'basic' && (
-                                                <>
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Package size={16} />
-                                                            Basic Information
-                                                        </h3>
-                                                        <div className="form-grid">
-                                                            <div className="form-field span-2">
-                                                                <label 
-                                                                    htmlFor="productName"
-                                                                    ref={el => fieldRefs.current['productName'] = el}
-                                                                >
-                                                                    Product Name <span className="required">*</span>
-                                                                </label>
-                                                                <input
-                                                                    id="productName"
-                                                                    type="text"
-                                                                    name="productName"
-                                                                    value={formData.productName}
-                                                                    onChange={handleInputChange}
-                                                                    className={errors.productName ? 'error' : ''}
-                                                                    placeholder="Enter product name"
-                                                                />
-                                                                {errors.productName && <span className="error-text">{errors.productName}</span>}
-                                                            </div>
-
-                                                            <div className="form-field span-2">
-                                                                <label>Slug (URL)</label>
-                                                                <input
-                                                                    type="text"
-                                                                    name="slug"
-                                                                    value={formData.slug}
-                                                                    onChange={handleInputChange}
-                                                                    className="input"
-                                                                    placeholder="product-url-slug"
-                                                                />
-                                                                <span className="hint">Auto-generated from product name</span>
-                                                            </div>
-
-                                                            <div className="form-field">
-                                                                <label 
-                                                                    htmlFor="sku"
-                                                                    ref={el => fieldRefs.current['sku'] = el}
-                                                                >
-                                                                    SKU <span className="required">*</span>
-                                                                </label>
-                                                                <div className="input-group">
-                                                                    <input
-                                                                        id="sku"
-                                                                        type="text"
-                                                                        name="sku"
-                                                                        value={formData.sku}
-                                                                        onChange={handleInputChange}
-                                                                        className={errors.sku ? 'error' : ''}
-                                                                        placeholder="PRD-123456-ABC"
-                                                                    />
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={generateSKU}
-                                                                        className="generate-btn"
-                                                                    >
-                                                                        <RefreshCw size={16} />
-                                                                    </button>
-                                                                </div>
-                                                                {errors.sku && <span className="error-text">{errors.sku}</span>}
-                                                            </div>
-
-                                                            <div className="form-field">
-                                                                <label 
-                                                                    htmlFor="hsnCode"
-                                                                    ref={el => fieldRefs.current['hsnCode'] = el}
-                                                                >
-                                                                    HSN Code <span className="required">*</span>
-                                                                </label>
-                                                                <input
-                                                                    id="hsnCode"
-                                                                    type="text"
-                                                                    name="hsnCode"
-                                                                    value={formData.hsnCode}
-                                                                    onChange={handleInputChange}
-                                                                    className={errors.hsnCode ? 'error' : ''}
-                                                                    placeholder="e.g., 4901, 6307"
-                                                                />
-                                                                {errors.hsnCode && <span className="error-text">{errors.hsnCode}</span>}
-                                                            </div>
-
-                                                            {/* Category Dropdown */}
-                                                            <div className="form-field">
-                                                                <label 
-                                                                    htmlFor="category"
-                                                                    ref={el => fieldRefs.current['category'] = el}
-                                                                >
-                                                                    Category <span className="required">*</span>
-                                                                </label>
-                                                                <select
-                                                                    id="category"
-                                                                    name="category"
-                                                                    value={formData.category}
-                                                                    onChange={handleInputChange}
-                                                                    className={errors.category ? 'error' : ''}
-                                                                    disabled={loadingCategories}
-                                                                >
-                                                                    <option value="">Select Category</option>
-                                                                    {categories.map(cat => (
-                                                                        <option key={cat._id} value={cat._id}>
-                                                                            {cat.name}
-                                                                        </option>
-                                                                    ))}
-                                                                </select>
-                                                                {errors.category && <span className="error-text">{errors.category}</span>}
-                                                                {loadingCategories && <span className="hint">Loading categories...</span>}
-                                                            </div>
-
-                                                            {/* SubCategory Dropdown - FIXED: Required when category has subs */}
-                                                            <div className="form-field">
-                                                                <label 
-                                                                    htmlFor="subCategory"
-                                                                    ref={el => fieldRefs.current['subCategory'] = el}
-                                                                >
-                                                                    Sub Category 
-                                                                    {selectedCategoryHasSubs && <span className="required">*</span>}
-                                                                </label>
-                                                                <select
-                                                                    id="subCategory"
-                                                                    name="subCategory"
-                                                                    value={formData.subCategory}
-                                                                    onChange={handleInputChange}
-                                                                    className={errors.subCategory ? 'error' : ''}
-                                                                    disabled={!formData.category || !isValidObjectId(formData.category) || subCategories.length === 0}
-                                                                >
-                                                                    <option value="">
-                                                                        {selectedCategoryHasSubs 
-                                                                            ? "Select Sub Category (Required)" 
-                                                                            : subCategories.length === 0 && formData.category
-                                                                                ? "No subcategories available"
-                                                                                : "Select Sub Category"
-                                                                        }
-                                                                    </option>
-                                                                    {subCategories.map(sub => (
-                                                                        <option key={sub._id} value={sub._id}>
-                                                                            {sub.name}
-                                                                        </option>
-                                                                    ))}
-                                                                </select>
-                                                                {errors.subCategory && <span className="error-text">{errors.subCategory}</span>}
-                                                                {!formData.category && (
-                                                                    <span className="hint">Select a category first</span>
-                                                                )}
-                                                                {formData.category && subCategories.length === 0 && (
-                                                                    <span className="hint">This category has no subcategories</span>
-                                                                )}
-                                                            </div>
-
-                                                            <div className="form-field">
-                                                                <label>Brand</label>
-                                                                <input
-                                                                    type="text"
-                                                                    name="brand"
-                                                                    value={formData.brand}
-                                                                    onChange={handleInputChange}
-                                                                    className="input"
-                                                                    placeholder="Brand name"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <FileText size={16} />
-                                                            Description
-                                                        </h3>
-                                                        <div className="form-grid">
-                                                            <div className="form-field span-2">
-                                                                <label>Short Description</label>
-                                                                <textarea
-                                                                    name="shortDescription"
-                                                                    value={formData.shortDescription}
-                                                                    onChange={handleInputChange}
-                                                                    rows="2"
-                                                                    placeholder="Brief summary of the product (max 500 characters)"
-                                                                    maxLength="500"
-                                                                />
-                                                            </div>
-
-                                                            <div className="form-field span-2">
-                                                                <label 
-                                                                    htmlFor="description"
-                                                                    ref={el => fieldRefs.current['description'] = el}
-                                                                >
-                                                                    Full Description <span className="required">*</span>
-                                                                </label>
-                                                                <textarea
-                                                                    id="description"
-                                                                    name="description"
-                                                                    value={formData.description}
-                                                                    onChange={handleInputChange}
-                                                                    rows={isMobile ? "5" : "4"}
-                                                                    className={errors.description ? 'error' : ''}
-                                                                    placeholder="Detailed description of your product..."
-                                                                />
-                                                                {errors.description && <span className="error-text">{errors.description}</span>}
-                                                            </div>
-
-                                                            <div className="form-field span-2">
-                                                                <label>Options & Customization</label>
-                                                                <input
-                                                                    type="text"
-                                                                    name="options"
-                                                                    value={formData.options}
-                                                                    onChange={handleInputChange}
-                                                                    placeholder="e.g., Color: Red, Size: Large, Material: Premium Paper"
-                                                                />
-                                                                <span className="hint">Separate options with commas for better display</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {/* Pricing & Stock Section */}
-                                            {section.id === 'pricing' && (
-                                                <>
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <DollarSign size={16} />
-                                                            Pricing
-                                                        </h3>
-                                                        <div className="form-grid">
-                                                            <div className="form-field">
-                                                                <label 
-                                                                    htmlFor="mrp"
-                                                                    ref={el => fieldRefs.current['mrp'] = el}
-                                                                >
-                                                                    MRP (₹) <span className="required">*</span>
-                                                                </label>
-                                                                <input
-                                                                    id="mrp"
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    min="0.01"
-                                                                    name="mrp"
-                                                                    value={formData.mrp}
-                                                                    onChange={handleInputChange}
-                                                                    className={errors.mrp ? 'error' : ''}
-                                                                    placeholder="0.00"
-                                                                />
-                                                                {errors.mrp && <span className="error-text">{errors.mrp}</span>}
-                                                            </div>
-
-                                                            <div className="form-field">
-                                                                <label 
-                                                                    htmlFor="discountPrice"
-                                                                    ref={el => fieldRefs.current['discountPrice'] = el}
-                                                                >
-                                                                    Selling Price (₹) <span className="required">*</span>
-                                                                </label>
-                                                                <input
-                                                                    id="discountPrice"
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    min="0"
-                                                                    name="discountPrice"
-                                                                    value={formData.discountPrice}
-                                                                    onChange={handleInputChange}
-                                                                    className={errors.discountPrice ? 'error' : ''}
-                                                                    placeholder="0.00"
-                                                                />
-                                                                {errors.discountPrice && <span className="error-text">{errors.discountPrice}</span>}
-                                                            </div>
-
-                                                            <div className="form-field">
-                                                                <label>Cost Price (₹)</label>
-                                                                <input
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    min="0"
-                                                                    name="costPrice"
-                                                                    value={formData.costPrice}
-                                                                    onChange={handleInputChange}
-                                                                    placeholder="0.00"
-                                                                />
-                                                                <span className="hint">For margin calculation</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Percent size={16} />
-                                                            Tax Settings
-                                                        </h3>
-                                                        <div className="form-grid">
-                                                            <div className="form-field">
-                                                                <label 
-                                                                    htmlFor="gstRate"
-                                                                    ref={el => fieldRefs.current['gstRate'] = el}
-                                                                >
-                                                                    GST Rate (%) <span className="required">*</span>
-                                                                </label>
-                                                                <select
-                                                                    id="gstRate"
-                                                                    name="gstRate"
-                                                                    value={formData.gstRate}
-                                                                    onChange={handleInputChange}
-                                                                    className={errors.gstRate ? 'error' : ''}
-                                                                >
-                                                                    <option value="0">0%</option>
-                                                                    <option value="5">5%</option>
-                                                                    <option value="12">12%</option>
-                                                                    <option value="18">18%</option>
-                                                                    <option value="28">28%</option>
-                                                                </select>
-                                                                {errors.gstRate && <span className="error-text">{errors.gstRate}</span>}
-                                                            </div>
-
-                                                            <div className="form-field checkbox-field">
-                                                                <label className="checkbox-label">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        name="gstIncluded"
-                                                                        checked={formData.gstIncluded}
-                                                                        onChange={handleInputChange}
-                                                                    />
-                                                                    <span>Price includes GST</span>
-                                                                </label>
-                                                            </div>
-
-                                                            <div className="form-field">
-                                                                <label>Tax Class</label>
-                                                                <select
-                                                                    name="taxClass"
-                                                                    value={formData.taxClass}
-                                                                    onChange={handleInputChange}
-                                                                >
-                                                                    <option value="standard">Standard</option>
-                                                                    <option value="reduced">Reduced</option>
-                                                                    <option value="zero">Zero Rated</option>
-                                                                    <option value="exempt">Exempt</option>
-                                                                </select>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Box size={16} />
-                                                            Inventory
-                                                        </h3>
-                                                        <div className="form-grid">
-                                                            <div className="form-field">
-                                                                <label 
-                                                                    htmlFor="stock"
-                                                                    ref={el => fieldRefs.current['stock'] = el}
-                                                                >
-                                                                    Stock Quantity <span className="required">*</span>
-                                                                </label>
-                                                                <input
-                                                                    id="stock"
-                                                                    type="number"
-                                                                    min="0"
-                                                                    name="stock"
-                                                                    value={formData.stock}
-                                                                    onChange={handleInputChange}
-                                                                    className={errors.stock ? 'error' : ''}
-                                                                    placeholder="0"
-                                                                />
-                                                                {errors.stock && <span className="error-text">{errors.stock}</span>}
-                                                            </div>
-
-                                                            <div className="form-field">
-                                                                <label>Low Stock Alert At</label>
-                                                                <input
-                                                                    type="number"
-                                                                    min="1"
-                                                                    name="lowStockThreshold"
-                                                                    value={formData.lowStockThreshold}
-                                                                    onChange={handleInputChange}
-                                                                    placeholder="5"
-                                                                />
-                                                            </div>
-
-                                                            <div className="form-field">
-                                                                <label>Max Order Quantity</label>
-                                                                <input
-                                                                    type="number"
-                                                                    min="1"
-                                                                    name="maxOrderQuantity"
-                                                                    value={formData.maxOrderQuantity}
-                                                                    onChange={handleInputChange}
-                                                                    placeholder="10"
-                                                                />
-                                                            </div>
-
-                                                            <div className="form-field checkbox-field">
-                                                                <label className="checkbox-label">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        name="trackInventory"
-                                                                        checked={formData.trackInventory}
-                                                                        onChange={handleInputChange}
-                                                                    />
-                                                                    <span>Track Inventory</span>
-                                                                </label>
-                                                            </div>
-
-                                                            <div className="form-field checkbox-field">
-                                                                <label className="checkbox-label">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        name="allowBackorder"
-                                                                        checked={formData.allowBackorder}
-                                                                        onChange={handleInputChange}
-                                                                    />
-                                                                    <span>Allow Backorder</span>
-                                                                </label>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {/* Media Section */}
-                                            {section.id === 'media' && (
-                                                <>
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Camera size={16} />
-                                                            Product Images
-                                                        </h3>
-                                                        <div className="image-section">
-                                                            <div className="image-header">
-                                                                <label 
-                                                                    ref={el => fieldRefs.current['images'] = el}
-                                                                >
-                                                                    Product Images {!isEditing && "*"}
-                                                                </label>
-                                                                <span className="image-count">{imagePreviews.length}/8</span>
-                                                            </div>
-                                                            
-                                                            {errors.images && <span className="error-text">{errors.images}</span>}
-                                                            
-                                                            {/* Image Previews Grid */}
-                                                            {imagePreviews.length > 0 && (
-                                                                <div className="image-grid">
-                                                                    {imagePreviews.map((preview, index) => (
-                                                                        <div key={index} className="image-preview">
-                                                                            <img src={preview} alt={`Preview ${index + 1}`} />
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => removeImage(index)}
-                                                                                className="remove-image-btn"
-                                                                            >
-                                                                                <X size={16} />
-                                                                            </button>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-
-                                                            {/* Upload Area */}
-                                                            {imagePreviews.length < 8 && (
-                                                                <div 
-                                                                    className="upload-area"
-                                                                    onClick={() => document.getElementById("image-upload").click()}
-                                                                    onDragOver={(e) => e.preventDefault()}
-                                                                    onDrop={(e) => {
-                                                                        e.preventDefault();
-                                                                        const files = Array.from(e.dataTransfer.files);
-                                                                        if (files.length > 0) {
-                                                                            handleImageChange({ target: { files } });
-                                                                        }
-                                                                    }}
-                                                                >
-                                                                    <input
-                                                                        type="file"
-                                                                        accept="image/*"
-                                                                        onChange={handleImageChange}
-                                                                        id="image-upload"
-                                                                        multiple
-                                                                    />
-                                                                    <Upload size={32} />
-                                                                    <p>{isMobile ? "Tap to upload images" : "Click or drag to upload images"}</p>
-                                                                    <span>JPEG, PNG, WebP, GIF (Max 5MB)</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Video size={16} />
-                                                            Product Video
-                                                        </h3>
-                                                        <div className="form-field">
-                                                            <label>Video URL</label>
-                                                            <input
-                                                                type="url"
-                                                                name="videoUrl"
-                                                                value={formData.videoUrl}
-                                                                onChange={handleInputChange}
-                                                                placeholder="https://youtube.com/watch?v=..."
-                                                            />
-                                                            <span className="hint">YouTube or Vimeo link</span>
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {/* Specifications Section */}
-                                            {section.id === 'specs' && (
-                                                <>
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Settings size={16} />
-                                                            Add Specifications
-                                                        </h3>
-                                                        <div className="spec-input-group">
-                                                            <input
-                                                                type="text"
-                                                                placeholder="Specification name"
-                                                                value={specKey}
-                                                                onChange={(e) => setSpecKey(e.target.value)}
-                                                            />
-                                                            <input
-                                                                type="text"
-                                                                placeholder="Specification value"
-                                                                value={specValue}
-                                                                onChange={(e) => setSpecValue(e.target.value)}
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                onClick={addSpecification}
-                                                                className="add-spec-btn"
-                                                            >
-                                                                <Plus size={16} />
-                                                                <span>Add</span>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <FileText size={16} />
-                                                            Specifications List
-                                                        </h3>
-                                                        {Object.keys(formData.specifications).length > 0 ? (
-                                                            <div className="specs-list">
-                                                                {Object.entries(formData.specifications).map(([key, value], index) => (
-                                                                    <div key={key} className="spec-item">
-                                                                        <div className="spec-content">
-                                                                            <span className="spec-key">{key}:</span>
-                                                                            <span className="spec-value">{value}</span>
-                                                                        </div>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => removeSpecification(key)}
-                                                                            className="remove-spec-btn"
-                                                                        >
-                                                                            <Trash2 size={14} />
-                                                                        </button>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        ) : (
-                                                            <div className="empty-state small">
-                                                                <Settings size={32} />
-                                                                <p>No specifications added yet</p>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {/* SEO Section */}
-                                            {section.id === 'seo' && (
-                                                <>
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Globe size={16} />
-                                                            SEO Settings
-                                                        </h3>
-                                                        <div className="form-grid">
-                                                            <div className="form-field span-2">
-                                                                <label>Meta Title</label>
-                                                                <input
-                                                                    type="text"
-                                                                    name="metaTitle"
-                                                                    value={formData.metaTitle}
-                                                                    onChange={handleInputChange}
-                                                                    placeholder="SEO title (60-70 characters)"
-                                                                    maxLength="70"
-                                                                />
-                                                            </div>
-
-                                                            <div className="form-field span-2">
-                                                                <label>Meta Description</label>
-                                                                <textarea
-                                                                    name="metaDescription"
-                                                                    value={formData.metaDescription}
-                                                                    onChange={handleInputChange}
-                                                                    rows="3"
-                                                                    placeholder="SEO description (150-160 characters)"
-                                                                    maxLength="160"
-                                                                />
-                                                            </div>
-
-                                                            <div className="form-field span-2">
-                                                                <label>Meta Keywords</label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={formData.metaKeywords.join(', ')}
-                                                                    onChange={handleMetaKeywordsChange}
-                                                                    placeholder="keyword1, keyword2, keyword3"
-                                                                />
-                                                                <span className="hint">Separate with commas</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Award size={16} />
-                                                            Product Flags
-                                                        </h3>
-                                                        <div className="flags-grid">
-                                                            <label className={`flag-checkbox ${formData.isFeatured ? 'active' : ''}`} style={{ borderColor: appTheme.colors.warning }}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    name="isFeatured"
-                                                                    checked={formData.isFeatured}
-                                                                    onChange={handleInputChange}
-                                                                />
-                                                                <Star size={16} />
-                                                                <span>Featured</span>
-                                                            </label>
-
-                                                            <label className={`flag-checkbox ${formData.isOnSale ? 'active' : ''}`} style={{ borderColor: appTheme.colors.success }}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    name="isOnSale"
-                                                                    checked={formData.isOnSale}
-                                                                    onChange={handleInputChange}
-                                                                />
-                                                                <Percent size={16} />
-                                                                <span>On Sale</span>
-                                                            </label>
-
-                                                            <label className={`flag-checkbox ${formData.isNewArrival ? 'active' : ''}`} style={{ borderColor: appTheme.colors.info }}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    name="isNewArrival"
-                                                                    checked={formData.isNewArrival}
-                                                                    onChange={handleInputChange}
-                                                                />
-                                                                <Calendar size={16} />
-                                                                <span>New Arrival</span>
-                                                            </label>
-
-                                                            <label className={`flag-checkbox ${formData.isBestSeller ? 'active' : ''}`} style={{ borderColor: appTheme.colors.secondary }}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    name="isBestSeller"
-                                                                    checked={formData.isBestSeller}
-                                                                    onChange={handleInputChange}
-                                                                />
-                                                                <Crown size={16} />
-                                                                <span>Best Seller</span>
-                                                            </label>
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {/* Shipping Section */}
-                                            {section.id === 'shipping' && (
-                                                <>
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Truck size={16} />
-                                                            Shipping Details
-                                                        </h3>
-                                                        <div className="form-grid">
-                                                            <div className="form-field">
-                                                                <label 
-                                                                    htmlFor="weight"
-                                                                    ref={el => fieldRefs.current['weight'] = el}
-                                                                >
-                                                                    Weight (kg)
-                                                                </label>
-                                                                <input
-                                                                    id="weight"
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    min="0"
-                                                                    name="weight"
-                                                                    value={formData.weight}
-                                                                    onChange={handleInputChange}
-                                                                    className={errors.weight ? 'error' : ''}
-                                                                    placeholder="0.00"
-                                                                />
-                                                                {errors.weight && <span className="error-text">{errors.weight}</span>}
-                                                            </div>
-
-                                                            <div className="form-field">
-                                                                <label>Shipping Class</label>
-                                                                <input
-                                                                    type="text"
-                                                                    name="shippingClass"
-                                                                    value={formData.shippingClass}
-                                                                    onChange={handleInputChange}
-                                                                    placeholder="e.g., Standard, Express, Fragile"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="form-block">
-                                                        <h3>
-                                                            <Box size={16} />
-                                                            Package Dimensions
-                                                        </h3>
-                                                        <div className="dimensions-grid">
-                                                            <input
-                                                                type="number"
-                                                                step="0.1"
-                                                                min="0"
-                                                                name="dimensions.length"
-                                                                value={formData.dimensions.length}
-                                                                onChange={handleInputChange}
-                                                                placeholder="Length"
-                                                                className={errors.dimensions ? 'error' : ''}
-                                                            />
-                                                            <input
-                                                                type="number"
-                                                                step="0.1"
-                                                                min="0"
-                                                                name="dimensions.width"
-                                                                value={formData.dimensions.width}
-                                                                onChange={handleInputChange}
-                                                                placeholder="Width"
-                                                                className={errors.dimensions ? 'error' : ''}
-                                                            />
-                                                            <input
-                                                                type="number"
-                                                                step="0.1"
-                                                                min="0"
-                                                                name="dimensions.height"
-                                                                value={formData.dimensions.height}
-                                                                onChange={handleInputChange}
-                                                                placeholder="Height"
-                                                                className={errors.dimensions ? 'error' : ''}
-                                                            />
-                                                            <select
-                                                                name="dimensions.unit"
-                                                                value={formData.dimensions.unit}
-                                                                onChange={handleInputChange}
-                                                            >
-                                                                <option value="cm">cm</option>
-                                                                <option value="in">in</option>
-                                                            </select>
-                                                        </div>
-                                                        {errors.dimensions && <span className="error-text">{errors.dimensions}</span>}
-                                                    </div>
-                                                </>
-                                            )}
+                                    <div className="form-group">
+                                        <label>
+                                            SKU <span className="required">*</span>
+                                        </label>
+                                        <div className="input-group">
+                                            <input
+                                                type="text"
+                                                name="sku"
+                                                value={formData.sku}
+                                                onChange={handleInputChange}
+                                                className={errors.sku ? 'error' : ''}
+                                                placeholder="PRD-123456-ABC"
+                                                ref={el => fieldRefs.current['sku'] = el}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={generateSKU}
+                                                className="icon-button"
+                                                title="Generate new SKU"
+                                            >
+                                                <RefreshCw size={16} />
+                                            </button>
                                         </div>
-                                    )}
+                                        {errors.sku && <span className="error-text">{errors.sku}</span>}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>
+                                            HSN Code <span className="required">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="hsnCode"
+                                            value={formData.hsnCode}
+                                            onChange={handleInputChange}
+                                            className={errors.hsnCode ? 'error' : ''}
+                                            placeholder="e.g., 6109"
+                                            ref={el => fieldRefs.current['hsnCode'] = el}
+                                        />
+                                        {errors.hsnCode && <span className="error-text">{errors.hsnCode}</span>}
+                                    </div>
                                 </div>
-                            );
-                        })}
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>
+                                            Category <span className="required">*</span>
+                                        </label>
+                                        <select
+                                            name="category"
+                                            value={formData.category}
+                                            onChange={handleInputChange}
+                                            className={errors.category ? 'error' : ''}
+                                            disabled={loadingCategories}
+                                            ref={el => fieldRefs.current['category'] = el}
+                                        >
+                                            <option value="">Select Category</option>
+                                            {categories.map(cat => (
+                                                <option key={cat._id} value={cat._id}>
+                                                    {cat.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {errors.category && <span className="error-text">{errors.category}</span>}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>
+                                            Sub Category
+                                            {selectedCategoryHasSubs && <span className="required">*</span>}
+                                        </label>
+                                        <select
+                                            name="subCategory"
+                                            value={formData.subCategory}
+                                            onChange={handleInputChange}
+                                            className={errors.subCategory ? 'error' : ''}
+                                            disabled={!formData.category || subCategories.length === 0}
+                                            ref={el => fieldRefs.current['subCategory'] = el}
+                                        >
+                                            <option value="">
+                                                {selectedCategoryHasSubs 
+                                                    ? "Select Sub Category" 
+                                                    : subCategories.length === 0 && formData.category
+                                                        ? "No subcategories available"
+                                                        : "Select Sub Category"
+                                                }
+                                            </option>
+                                            {subCategories.map(sub => (
+                                                <option key={sub._id} value={sub._id}>
+                                                    {sub.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {errors.subCategory && <span className="error-text">{errors.subCategory}</span>}
+                                        {formData.category && subCategories.length === 0 && !selectedCategoryHasSubs && (
+                                            <span className="help-text">No subcategories found for this category</span>
+                                        )}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Brand</label>
+                                        <input
+                                            type="text"
+                                            name="brand"
+                                            value={formData.brand}
+                                            onChange={handleInputChange}
+                                            placeholder="Brand name"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>Short Description</label>
+                                        <textarea
+                                            name="shortDescription"
+                                            value={formData.shortDescription}
+                                            onChange={handleInputChange}
+                                            rows="2"
+                                            placeholder="Brief summary of the product (max 500 characters)"
+                                            maxLength="500"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>
+                                            Full Description <span className="required">*</span>
+                                        </label>
+                                        <textarea
+                                            name="description"
+                                            value={formData.description}
+                                            onChange={handleInputChange}
+                                            rows={isMobile ? "4" : "3"}
+                                            className={errors.description ? 'error' : ''}
+                                            placeholder="Detailed description of your product..."
+                                            ref={el => fieldRefs.current['description'] = el}
+                                        />
+                                        {errors.description && <span className="error-text">{errors.description}</span>}
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>Options & Customization</label>
+                                        <input
+                                            type="text"
+                                            name="options"
+                                            value={formData.options}
+                                            onChange={handleInputChange}
+                                            placeholder="e.g., Color: Red, Size: Large, Material: Premium Cotton"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Pricing & Stock */}
+                        <div className="form-section">
+                            <div className="section-header">
+                                <div className="section-header-left">
+                                    <div className="section-icon" style={{ background: `${appTheme.colors.secondary}15`, color: appTheme.colors.secondary }}>
+                                        <DollarSign size={20} />
+                                    </div>
+                                    <div>
+                                        <h2>Pricing & Stock</h2>
+                                        <p>Pricing, GST, and inventory management</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="section-content">
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>
+                                            MRP (₹) <span className="required">*</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0.01"
+                                            name="mrp"
+                                            value={formData.mrp}
+                                            onChange={handleInputChange}
+                                            className={errors.mrp ? 'error' : ''}
+                                            placeholder="0.00"
+                                            ref={el => fieldRefs.current['mrp'] = el}
+                                        />
+                                        {errors.mrp && <span className="error-text">{errors.mrp}</span>}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>
+                                            Selling Price (₹) <span className="required">*</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            name="discountPrice"
+                                            value={formData.discountPrice}
+                                            onChange={handleInputChange}
+                                            className={errors.discountPrice ? 'error' : ''}
+                                            placeholder="0.00"
+                                            ref={el => fieldRefs.current['discountPrice'] = el}
+                                        />
+                                        {errors.discountPrice && <span className="error-text">{errors.discountPrice}</span>}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Cost Price (₹)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            name="costPrice"
+                                            value={formData.costPrice}
+                                            onChange={handleInputChange}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>
+                                            GST Rate (%) <span className="required">*</span>
+                                        </label>
+                                        <select
+                                            name="gstRate"
+                                            value={formData.gstRate}
+                                            onChange={handleInputChange}
+                                            className={errors.gstRate ? 'error' : ''}
+                                            ref={el => fieldRefs.current['gstRate'] = el}
+                                        >
+                                            {TAX_RATES.map(rate => (
+                                                <option key={rate.value} value={rate.value}>
+                                                    {rate.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {errors.gstRate && <span className="error-text">{errors.gstRate}</span>}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Tax Class</label>
+                                        <select
+                                            name="taxClass"
+                                            value={formData.taxClass}
+                                            onChange={handleInputChange}
+                                        >
+                                            {TAX_CLASSES.map(tc => (
+                                                <option key={tc.value} value={tc.value}>
+                                                    {tc.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="form-group checkbox-group">
+                                        <label className="checkbox-label">
+                                            <input
+                                                type="checkbox"
+                                                name="gstIncluded"
+                                                checked={formData.gstIncluded}
+                                                onChange={handleInputChange}
+                                            />
+                                            <span>Price includes GST</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>
+                                            Stock Quantity <span className="required">*</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            name="stock"
+                                            value={formData.stock}
+                                            onChange={handleInputChange}
+                                            className={errors.stock ? 'error' : ''}
+                                            placeholder="0"
+                                            ref={el => fieldRefs.current['stock'] = el}
+                                        />
+                                        {errors.stock && <span className="error-text">{errors.stock}</span>}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Low Stock Alert</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            name="lowStockThreshold"
+                                            value={formData.lowStockThreshold}
+                                            onChange={handleInputChange}
+                                            placeholder="5"
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Max Order Quantity</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            name="maxOrderQuantity"
+                                            value={formData.maxOrderQuantity}
+                                            onChange={handleInputChange}
+                                            placeholder="10"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group checkbox-group">
+                                        <label className="checkbox-label">
+                                            <input
+                                                type="checkbox"
+                                                name="trackInventory"
+                                                checked={formData.trackInventory}
+                                                onChange={handleInputChange}
+                                            />
+                                            <span>Track Inventory</span>
+                                        </label>
+                                    </div>
+
+                                    <div className="form-group checkbox-group">
+                                        <label className="checkbox-label">
+                                            <input
+                                                type="checkbox"
+                                                name="allowBackorder"
+                                                checked={formData.allowBackorder}
+                                                onChange={handleInputChange}
+                                            />
+                                            <span>Allow Backorder</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Media */}
+                        <div className="form-section">
+                            <div className="section-header">
+                                <div className="section-header-left">
+                                    <div className="section-icon" style={{ background: `${appTheme.colors.warning}15`, color: appTheme.colors.warning }}>
+                                        <Camera size={20} />
+                                    </div>
+                                    <div>
+                                        <h2>Media</h2>
+                                        <p>Product images and videos</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="section-content">
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>
+                                            Product Images {!isEditing && "*"}
+                                            <span className="image-count">{imagePreviews.length}/8</span>
+                                        </label>
+                                        
+                                        {errors.images && <span className="error-text">{errors.images}</span>}
+                                        
+                                        {/* Image Grid */}
+                                        {imagePreviews.length > 0 && (
+                                            <div className="image-grid">
+                                                {imagePreviews.map((preview, index) => (
+                                                    <div key={index} className="image-preview">
+                                                        <img src={preview} alt={`Preview ${index + 1}`} />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeImage(index)}
+                                                            className="remove-image-btn"
+                                                        >
+                                                            <X size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Upload Area */}
+                                        {imagePreviews.length < 8 && (
+                                            <div 
+                                                className="upload-area"
+                                                onClick={() => document.getElementById("image-upload").click()}
+                                                onDragOver={(e) => e.preventDefault()}
+                                                onDrop={(e) => {
+                                                    e.preventDefault();
+                                                    const files = Array.from(e.dataTransfer.files);
+                                                    if (files.length > 0) {
+                                                        handleImageChange({ target: { files } });
+                                                    }
+                                                }}
+                                            >
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={handleImageChange}
+                                                    id="image-upload"
+                                                    multiple
+                                                />
+                                                <Upload size={32} />
+                                                <p>Click or drag to upload images</p>
+                                                <span>JPEG, PNG, WebP, GIF (Max 5MB each)</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>Video URL</label>
+                                        <input
+                                            type="url"
+                                            name="videoUrl"
+                                            value={formData.videoUrl}
+                                            onChange={handleInputChange}
+                                            placeholder="https://youtube.com/watch?v=..."
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Specifications */}
+                        <div className="form-section">
+                            <div className="section-header">
+                                <div className="section-header-left">
+                                    <div className="section-icon" style={{ background: `${appTheme.colors.info}15`, color: appTheme.colors.info }}>
+                                        <Settings size={20} />
+                                    </div>
+                                    <div>
+                                        <h2>Specifications</h2>
+                                        <p>Technical details and attributes</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="section-content">
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>Add Specification</label>
+                                        <div className="spec-input-group">
+                                            <input
+                                                type="text"
+                                                placeholder="Specification name"
+                                                value={specKey}
+                                                onChange={(e) => setSpecKey(e.target.value)}
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="Specification value"
+                                                value={specValue}
+                                                onChange={(e) => setSpecValue(e.target.value)}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={addSpecification}
+                                                className="add-spec-btn"
+                                            >
+                                                <Plus size={16} />
+                                                <span>Add</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {Object.keys(formData.specifications).length > 0 && (
+                                    <div className="form-row">
+                                        <div className="form-group span-3">
+                                            <div className="specs-list">
+                                                {Object.entries(formData.specifications).map(([key, value]) => (
+                                                    <div key={key} className="spec-item">
+                                                        <div className="spec-content">
+                                                            <span className="spec-key">{key}:</span>
+                                                            <span className="spec-value">{value}</span>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeSpecification(key)}
+                                                            className="remove-spec-btn"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* SEO & Flags */}
+                        <div className="form-section">
+                            <div className="section-header">
+                                <div className="section-header-left">
+                                    <div className="section-icon" style={{ background: `${appTheme.colors.accent}15`, color: appTheme.colors.accent }}>
+                                        <Globe size={20} />
+                                    </div>
+                                    <div>
+                                        <h2>SEO & Flags</h2>
+                                        <p>Search engine optimization and product badges</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="section-content">
+                                <div className="form-row">
+                                    <div className="form-group span-2">
+                                        <label>Meta Title</label>
+                                        <input
+                                            type="text"
+                                            name="metaTitle"
+                                            value={formData.metaTitle}
+                                            onChange={handleInputChange}
+                                            placeholder="SEO title (60-70 characters)"
+                                            maxLength="70"
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Meta Keywords</label>
+                                        <input
+                                            type="text"
+                                            value={formData.metaKeywords.join(', ')}
+                                            onChange={handleMetaKeywordsChange}
+                                            placeholder="keyword1, keyword2, keyword3"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>Meta Description</label>
+                                        <textarea
+                                            name="metaDescription"
+                                            value={formData.metaDescription}
+                                            onChange={handleInputChange}
+                                            rows="2"
+                                            placeholder="SEO description (150-160 characters)"
+                                            maxLength="160"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>Product Flags</label>
+                                        <div className="flags-grid">
+                                            {FLAGS.map(flag => {
+                                                const Icon = flag.icon;
+                                                const isActive = formData[flag.id];
+                                                return (
+                                                    <label 
+                                                        key={flag.id} 
+                                                        className={`flag-checkbox ${isActive ? 'active' : ''}`}
+                                                        style={{ 
+                                                            borderColor: isActive ? flag.color : appTheme.colors.border,
+                                                            background: isActive ? `${flag.color}10` : 'white'
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            name={flag.id}
+                                                            checked={isActive}
+                                                            onChange={handleInputChange}
+                                                        />
+                                                        <Icon size={16} color={isActive ? flag.color : appTheme.colors.textSecondary} />
+                                                        <span style={{ color: isActive ? flag.color : appTheme.colors.textPrimary }}>
+                                                            {flag.label}
+                                                        </span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Shipping */}
+                        <div className="form-section">
+                            <div className="section-header">
+                                <div className="section-header-left">
+                                    <div className="section-icon" style={{ background: `${appTheme.colors.success}15`, color: appTheme.colors.success }}>
+                                        <Truck size={20} />
+                                    </div>
+                                    <div>
+                                        <h2>Shipping</h2>
+                                        <p>Weight, dimensions, and shipping class</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="section-content">
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Weight (kg)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            name="weight"
+                                            value={formData.weight}
+                                            onChange={handleInputChange}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Shipping Class</label>
+                                        <input
+                                            type="text"
+                                            name="shippingClass"
+                                            value={formData.shippingClass}
+                                            onChange={handleInputChange}
+                                            placeholder="e.g., Standard, Express, Fragile"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group span-3">
+                                        <label>Package Dimensions</label>
+                                        <div className="dimensions-grid">
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                min="0"
+                                                name="dimensions.length"
+                                                value={formData.dimensions.length}
+                                                onChange={handleInputChange}
+                                                placeholder="Length"
+                                            />
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                min="0"
+                                                name="dimensions.width"
+                                                value={formData.dimensions.width}
+                                                onChange={handleInputChange}
+                                                placeholder="Width"
+                                            />
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                min="0"
+                                                name="dimensions.height"
+                                                value={formData.dimensions.height}
+                                                onChange={handleInputChange}
+                                                placeholder="Height"
+                                            />
+                                            <select
+                                                name="dimensions.unit"
+                                                value={formData.dimensions.unit}
+                                                onChange={handleInputChange}
+                                            >
+                                                <option value="cm">cm</option>
+                                                <option value="in">in</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </main>
 
@@ -4746,7 +4316,37 @@ export default function ProductForm() {
                 /* ==================== GLOBAL STYLES ==================== */
                 .product-form-page {
                     min-height: 100vh;
-                    background: linear-gradient(135deg, #f6f9fc 0%, #f1f5f9 100%);
+                    background: ${appTheme.colors.backgroundLight};
+                    width: 100%;
+                }
+
+                /* ==================== LOADING ==================== */
+                .loading-container {
+                    min-height: 100vh;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    background: ${appTheme.colors.backgroundLight};
+                }
+
+                .loading-spinner {
+                    width: 40px;
+                    height: 40px;
+                    border: 3px solid ${appTheme.colors.primary}20;
+                    border-top-color: ${appTheme.colors.primary};
+                    border-radius: 50%;
+                    animation: spin 0.8s linear infinite;
+                    margin-bottom: 16px;
+                }
+
+                .loading-text {
+                    color: ${appTheme.colors.textSecondary};
+                    font-size: 0.875rem;
+                }
+
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
                 }
 
                 /* ==================== TOAST NOTIFICATION ==================== */
@@ -4759,12 +4359,13 @@ export default function ProductForm() {
                     align-items: center;
                     gap: 10px;
                     padding: 12px 20px;
-                    background: white;
-                    border-radius: 8px;
-                    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+                    background: ${appTheme.colors.backgroundCard};
+                    border-radius: ${appTheme.radius.md};
+                    box-shadow: ${appTheme.shadows.lg};
                     animation: slideInRight 0.3s ease;
                     font-size: 0.875rem;
                     max-width: 400px;
+                    border: 1px solid ${appTheme.colors.border};
                 }
 
                 .toast-notification.success {
@@ -4802,28 +4403,136 @@ export default function ProductForm() {
                     }
                 }
 
+                /* ==================== HEADER ==================== */
+                .page-header {
+                    background: ${appTheme.colors.backgroundCard};
+                    border-bottom: 1px solid ${appTheme.colors.border};
+                    padding: 20px 24px;
+                    position: sticky;
+                    top: 0;
+                    z-index: 100;
+                    backdrop-filter: blur(10px);
+                    background: rgba(255, 255, 255, 0.95);
+                    width: 100%;
+                }
+
+                .header-content {
+                    max-width: 100%;
+                    margin: 0 auto;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 0 24px;
+                }
+
+                .header-left {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                }
+
+                .back-button {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: none;
+                    border: none;
+                    color: ${appTheme.colors.primary};
+                    font-size: 0.813rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    padding: 4px 0;
+                    transition: opacity 0.2s;
+                    width: fit-content;
+                }
+
+                .back-button:hover {
+                    opacity: 0.7;
+                }
+
+                .page-title {
+                    font-size: 1.5rem;
+                    font-weight: 600;
+                    color: ${appTheme.colors.textPrimary};
+                    margin: 0;
+                }
+
+                .page-description {
+                    color: ${appTheme.colors.textSecondary};
+                    font-size: 0.875rem;
+                    margin: 0;
+                }
+
+                .header-actions {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+
+                .desktop-save {
+                    display: flex;
+                }
+
+                .save-button {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 12px 24px;
+                    background: ${appTheme.colors.primary};
+                    color: white;
+                    border: none;
+                    border-radius: ${appTheme.radius.md};
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    box-shadow: 0 4px 12px ${appTheme.colors.primary}30;
+                }
+
+                .save-button:hover {
+                    background: ${appTheme.colors.gradientStart};
+                    transform: translateY(-1px);
+                    box-shadow: 0 6px 16px ${appTheme.colors.primary}40;
+                }
+
+                .save-button:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                    transform: none;
+                }
+
+                .button-spinner {
+                    width: 16px;
+                    height: 16px;
+                    border: 2px solid rgba(255, 255, 255, 0.3);
+                    border-top-color: white;
+                    border-radius: 50%;
+                    animation: spin 0.8s linear infinite;
+                }
+
                 /* ==================== COMPANY BANNER ==================== */
                 .company-banner {
-                    max-width: 1200px;
-                    margin: 0 auto 16px auto;
+                    width: 100%;
+                    margin: 16px 0 0 0;
                     padding: 0 24px;
                 }
 
                 .company-banner-content {
-                    background: white;
+                    background: ${appTheme.colors.backgroundCard};
                     border: 1px solid ${appTheme.colors.border};
-                    border-radius: 8px;
+                    border-radius: ${appTheme.radius.md};
                     padding: 12px 16px;
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
+                    width: 100%;
                 }
 
                 .company-banner-left {
                     display: flex;
                     align-items: center;
                     gap: 8px;
-                    color: #0f172a;
+                    color: ${appTheme.colors.textPrimary};
                     font-size: 0.875rem;
                 }
 
@@ -4846,325 +4555,98 @@ export default function ProductForm() {
 
                 /* ==================== API ERROR ==================== */
                 .api-error {
-                    max-width: 1200px;
-                    margin: 0 auto 16px auto;
+                    width: 100%;
+                    margin: 16px 0 0 0;
                     padding: 0 24px;
                 }
 
                 .api-error {
                     background: ${appTheme.colors.error}10;
-                    border: 1px solid ${appTheme.colors.error};
-                    border-radius: 8px;
+                    border: 1px solid ${appTheme.colors.error}30;
+                    border-radius: ${appTheme.radius.md};
                     padding: 12px 16px;
                     display: flex;
                     align-items: center;
                     gap: 8px;
                     color: ${appTheme.colors.error};
-                }
-
-                /* ==================== HEADER ==================== */
-                .page-header {
-                    background: white;
-                    border-bottom: 1px solid ${appTheme.colors.border};
-                    padding: 20px 24px;
-                    position: sticky;
-                    top: 0;
-                    z-index: 100;
-                    backdrop-filter: blur(10px);
-                    background: rgba(255, 255, 255, 0.95);
-                }
-
-                .header-content {
-                    max-width: 1200px;
-                    margin: 0 auto;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-
-                .header-left {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 8px;
-                }
-
-                .back-button {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    background: none;
-                    border: none;
-                    color: ${appTheme.colors.primary};
                     font-size: 0.875rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    padding: 4px 0;
-                    transition: opacity 0.2s;
-                    width: fit-content;
-                }
-
-                .back-button:hover {
-                    opacity: 0.7;
-                }
-
-                .page-title {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    font-size: 1.5rem;
-                    font-weight: 600;
-                    color: #0f172a;
-                    margin: 0;
-                }
-
-                .title-icon {
-                    color: ${appTheme.colors.primary};
-                }
-
-                .page-description {
-                    color: #64748b;
-                    font-size: 0.875rem;
-                    margin: 0;
-                }
-
-                .header-actions {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-
-                .header-action-btn {
-                    width: 40px;
-                    height: 40px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    background: #f8fafc;
-                    border: 1px solid ${appTheme.colors.border};
-                    border-radius: 8px;
-                    color: #64748b;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }
-
-                .header-action-btn:hover {
-                    background: #f1f5f9;
-                    color: ${appTheme.colors.primary};
-                    border-color: ${appTheme.colors.primary};
-                }
-
-                .save-button {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 10px 20px;
-                    background: ${appTheme.colors.primary};
-                    color: white;
-                    border: none;
-                    border-radius: 8px;
-                    font-size: 0.875rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                    box-shadow: 0 4px 12px ${appTheme.colors.primary}30;
-                }
-
-                .save-button:hover {
-                    background: #2563eb;
-                    transform: translateY(-1px);
-                    box-shadow: 0 6px 16px ${appTheme.colors.primary}40;
-                }
-
-                .save-button:disabled {
-                    opacity: 0.6;
-                    cursor: not-allowed;
-                    transform: none;
-                }
-
-                .button-spinner {
-                    width: 16px;
-                    height: 16px;
-                    border: 2px solid rgba(255, 255, 255, 0.3);
-                    border-top-color: white;
-                    border-radius: 50%;
-                    animation: spin 0.8s linear infinite;
-                }
-
-                @keyframes spin {
-                    to { transform: rotate(360deg); }
-                }
-
-                /* ==================== DESKTOP TABS ==================== */
-                .desktop-tabs {
-                    max-width: 1200px;
-                    margin: 0 auto 24px auto;
-                    padding: 0 24px;
-                    display: none;
-                    background: white;
-                    border-bottom: 2px solid #e2e8f0;
-                }
-
-                @media (min-width: 1024px) {
-                    .desktop-tabs {
-                        display: flex;
-                        padding: 0 24px;
-                        margin: 0 auto 24px auto;
-                    }
-                }
-
-                .tab-button {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 8px;
-                    padding: 16px 12px;
-                    background: transparent;
-                    border: none;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                    white-space: nowrap;
-                    font-size: 0.875rem;
-                    position: relative;
-                    border-bottom: 2px solid transparent;
-                    margin-bottom: -2px;
-                    flex: 1;
-                    min-width: 0;
-                }
-
-                .tab-button:hover {
-                    background: #f8fafc;
-                }
-
-                .tab-button.active {
-                    background: #f8fafc;
-                    border-bottom: 2px solid;
-                }
-
-                .tab-icon {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 6px;
-                    border-radius: 8px;
-                    transition: all 0.2s ease;
-                    flex-shrink: 0;
-                }
-
-                .tab-title {
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                }
-
-                .active-indicator {
-                    position: absolute;
-                    bottom: -2px;
-                    left: 0;
-                    right: 0;
-                    height: 2px;
                 }
 
                 /* ==================== MAIN CONTENT ==================== */
                 .main-content {
-                    max-width: 1200px;
-                    margin: 24px auto;
-                    padding: 0 24px 100px 24px;
+                    width: 100%;
+                    margin: 24px 0;
+                    padding: 0 24px;
                 }
 
-                /* ==================== CUSTOM ID CARD ==================== */
-                .custom-id-card {
-                    margin-bottom: 24px;
-                    padding: 16px;
+                /* ==================== PRODUCT ID CARD ==================== */
+                .product-id-card {
                     background: linear-gradient(135deg, ${appTheme.colors.primary}10, ${appTheme.colors.secondary}10);
-                    border-radius: 8px;
                     border: 1px solid ${appTheme.colors.primary}30;
+                    border-radius: ${appTheme.radius.md};
+                    padding: 16px;
+                    margin-bottom: 24px;
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
-                    flex-wrap: wrap;
-                    gap: 12px;
                 }
 
-                .custom-id-content {
+                .product-id-info {
                     display: flex;
                     align-items: center;
                     gap: 12px;
                 }
 
-                .custom-id-icon {
-                    width: 40px;
-                    height: 40px;
-                    border-radius: 8px;
-                    background: ${appTheme.colors.primary};
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: white;
+                .product-id-info svg {
+                    color: ${appTheme.colors.primary};
                 }
 
-                .custom-id-info {
-                    display: flex;
-                    flex-direction: column;
-                }
-
-                .custom-id-label {
+                .product-id-label {
                     font-size: 0.75rem;
-                    color: #64748b;
+                    color: ${appTheme.colors.textSecondary};
+                    display: block;
                 }
 
-                .custom-id-value {
-                    font-size: 1.5rem;
+                .product-id-value {
+                    font-size: 1.25rem;
                     font-weight: 700;
                     color: ${appTheme.colors.primary};
                     font-family: monospace;
                     letter-spacing: 1px;
                 }
 
-                .custom-id-meta {
-                    background: white;
-                    padding: 8px 12px;
-                    border-radius: 8px;
-                    border: 1px solid ${appTheme.colors.border};
-                    font-size: 0.8rem;
-                    color: #64748b;
-                }
-
-                .meta-label {
-                    font-weight: 600;
-                    color: #0f172a;
-                }
-
-                /* ==================== SECTIONS CONTAINER ==================== */
-                .sections-container {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 16px;
-                }
-
-                .section-card {
-                    background: white;
-                    border-radius: 8px;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-                    overflow: hidden;
-                }
-
-                @media (min-width: 1024px) {
-                    .section-card:not(.active) {
-                        display: none;
-                    }
-                }
-
-                .section-header {
-                    padding: 20px 24px;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
+                .copy-button {
+                    background: ${appTheme.colors.backgroundCard};
+                    border: 1px solid ${appTheme.colors.primary}30;
+                    border-radius: ${appTheme.radius.sm};
+                    padding: 8px;
+                    color: ${appTheme.colors.primary};
                     cursor: pointer;
                     transition: all 0.2s ease;
                 }
 
-                .section-header:hover {
-                    background: #f8fafc;
+                .copy-button:hover {
+                    background: ${appTheme.colors.hover};
+                }
+
+                /* ==================== FORM SECTIONS ==================== */
+                .form-sections {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                }
+
+                .form-section {
+                    background: ${appTheme.colors.backgroundCard};
+                    border: 1px solid ${appTheme.colors.border};
+                    border-radius: ${appTheme.radius.lg};
+                    overflow: hidden;
+                }
+
+                .section-header {
+                    padding: 20px 24px;
+                    background: #fafbfc;
+                    border-bottom: 1px solid ${appTheme.colors.border};
                 }
 
                 .section-header-left {
@@ -5179,146 +4661,100 @@ export default function ProductForm() {
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    border-radius: 8px;
+                    border-radius: ${appTheme.radius.md};
                 }
 
-                .section-title h2 {
+                .section-header-left h2 {
                     font-size: 1rem;
                     font-weight: 600;
-                    color: #0f172a;
+                    color: ${appTheme.colors.textPrimary};
                     margin: 0 0 4px 0;
                 }
 
-                .section-title p {
+                .section-header-left p {
                     font-size: 0.75rem;
-                    color: #64748b;
+                    color: ${appTheme.colors.textSecondary};
                     margin: 0;
                 }
 
-                .chevron-icon {
-                    color: #94a3b8;
-                    transition: transform 0.3s ease;
-                }
-
                 .section-content {
-                    padding: 0 24px 24px 24px;
-                    border-top: 1px solid ${appTheme.colors.border};
-                    animation: slideDown 0.3s ease;
+                    padding: 24px;
                 }
 
-                @keyframes slideDown {
-                    from {
-                        opacity: 0;
-                        transform: translateY(-10px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
+                /* ==================== FORM LAYOUT ==================== */
+                .form-row {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 20px;
+                    margin-bottom: 20px;
                 }
 
-                /* ==================== FORM BLOCKS ==================== */
-                .form-block {
-                    margin-bottom: 28px;
-                }
-
-                .form-block:last-child {
+                .form-row:last-child {
                     margin-bottom: 0;
                 }
 
-                .form-block h3 {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    font-size: 0.875rem;
-                    font-weight: 600;
-                    color: #334155;
-                    margin: 0 0 16px 0;
-                    padding-bottom: 8px;
-                    border-bottom: 1px dashed ${appTheme.colors.border};
-                }
-
-                .form-block h3 svg {
-                    color: ${appTheme.colors.primary};
-                }
-
-                .form-grid {
-                    display: grid;
-                    grid-template-columns: repeat(1, 1fr);
-                    gap: 16px;
-                }
-
-                @media (min-width: 640px) {
-                    .form-grid {
-                        grid-template-columns: repeat(2, 1fr);
-                    }
-                }
-
-                .span-2 {
-                    grid-column: 1 / -1;
-                }
-
-                .form-field {
+                .form-group {
                     display: flex;
                     flex-direction: column;
                     gap: 6px;
                 }
 
-                .form-field.checkbox-field {
-                    flex-direction: row;
-                    align-items: center;
-                    gap: 10px;
+                .form-group.span-2 {
+                    grid-column: span 2;
                 }
 
-                .form-field label {
-                    font-size: 0.75rem;
+                .form-group.span-3 {
+                    grid-column: span 3;
+                }
+
+                .form-group.checkbox-group {
+                    justify-content: flex-end;
+                }
+
+                .form-group label {
+                    font-size: 0.813rem;
                     font-weight: 500;
-                    color: #475569;
-                    text-transform: uppercase;
-                    letter-spacing: 0.3px;
-                }
-
-                .checkbox-label {
+                    color: ${appTheme.colors.textPrimary};
                     display: flex;
                     align-items: center;
-                    gap: 8px;
-                    cursor: pointer;
-                    font-size: 0.875rem;
+                    justify-content: space-between;
+                }
+
+                .label-hint {
+                    font-size: 0.688rem;
                     font-weight: normal;
-                    text-transform: none;
-                    color: #334155;
+                    color: ${appTheme.colors.textSecondary};
                 }
 
-                .checkbox-label input[type="checkbox"] {
-                    width: 18px;
-                    height: 18px;
-                    cursor: pointer;
+                .required {
+                    color: ${appTheme.colors.error};
+                    margin-left: 4px;
                 }
 
-                .form-field input,
-                .form-field select,
-                .form-field textarea {
+                .form-group input,
+                .form-group select,
+                .form-group textarea {
                     width: 100%;
-                    padding: 10px 14px;
+                    padding: 12px 14px;
                     border: 1px solid ${appTheme.colors.border};
-                    border-radius: 8px;
+                    border-radius: ${appTheme.radius.md};
                     font-size: 0.938rem;
                     transition: all 0.2s ease;
-                    background: white;
-                    font-family: ${appTheme.fonts.primary};
+                    background: ${appTheme.colors.backgroundCard};
+                    color: ${appTheme.colors.textPrimary};
                 }
 
-                .form-field input:focus,
-                .form-field select:focus,
-                .form-field textarea:focus {
+                .form-group input:focus,
+                .form-group select:focus,
+                .form-group textarea:focus {
                     outline: none;
                     border-color: ${appTheme.colors.primary};
-                    box-shadow: 0 0 0 3px ${appTheme.colors.primary}20;
+                    box-shadow: 0 0 0 4px ${appTheme.colors.primary}15;
                 }
 
-                .form-field input.error,
-                .form-field select.error,
-                .form-field textarea.error {
+                .form-group input.error,
+                .form-group select.error,
+                .form-group textarea.error {
                     border-color: ${appTheme.colors.error};
                 }
 
@@ -5327,13 +4763,10 @@ export default function ProductForm() {
                     color: ${appTheme.colors.error};
                 }
 
-                .required {
-                    color: ${appTheme.colors.error};
-                }
-
-                .hint {
+                .help-text {
                     font-size: 0.688rem;
-                    color: #94a3b8;
+                    color: ${appTheme.colors.textSecondary};
+                    margin-top: 4px;
                 }
 
                 .input-group {
@@ -5345,62 +4778,67 @@ export default function ProductForm() {
                     flex: 1;
                 }
 
-                .generate-btn {
-                    padding: 10px 14px;
+                .icon-button {
+                    padding: 12px;
                     border: 1px solid ${appTheme.colors.border};
-                    border-radius: 8px;
-                    background: #f8fafc;
-                    color: #64748b;
+                    border-radius: ${appTheme.radius.md};
+                    background: ${appTheme.colors.backgroundLight};
+                    color: ${appTheme.colors.textSecondary};
                     cursor: pointer;
                     transition: all 0.2s ease;
-                    min-height: 42px;
-                    min-width: 42px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                 }
 
-                .generate-btn:hover {
-                    background: #f1f5f9;
+                .icon-button:hover {
+                    background: ${appTheme.colors.hover};
                     color: ${appTheme.colors.primary};
                     border-color: ${appTheme.colors.primary};
                 }
 
-                /* ==================== IMAGE SECTION ==================== */
-                .image-section {
-                    margin-bottom: 20px;
+                .input-with-hint {
+                    position: relative;
                 }
 
-                .image-header {
+                .field-hint {
+                    position: absolute;
+                    right: 12px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    font-size: 0.688rem;
+                    color: ${appTheme.colors.textSecondary};
+                    pointer-events: none;
+                }
+
+                .checkbox-label {
                     display: flex;
                     align-items: center;
-                    justify-content: space-between;
-                    margin-bottom: 12px;
+                    gap: 8px;
+                    cursor: pointer;
+                    padding: 8px 0;
+                    color: ${appTheme.colors.textPrimary};
                 }
 
-                .image-header label {
-                    font-size: 0.875rem;
-                    font-weight: 600;
-                    color: #0f172a;
+                .checkbox-label input[type="checkbox"] {
+                    width: 18px;
+                    height: 18px;
+                    cursor: pointer;
+                    accent-color: ${appTheme.colors.primary};
                 }
 
+                /* ==================== IMAGE SECTION ==================== */
                 .image-count {
                     font-size: 0.75rem;
-                    color: #64748b;
-                    font-weight: 500;
+                    color: ${appTheme.colors.textSecondary};
+                    font-weight: normal;
                 }
 
                 .image-grid {
                     display: grid;
                     grid-template-columns: repeat(4, 1fr);
                     gap: 12px;
-                    margin-bottom: 16px;
-                }
-
-                @media (max-width: 640px) {
-                    .image-grid {
-                        grid-template-columns: repeat(2, 1fr);
-                    }
+                    margin: 16px 0;
                 }
 
                 .image-preview {
@@ -5408,9 +4846,9 @@ export default function ProductForm() {
                     width: 100%;
                     aspect-ratio: 1/1;
                     border: 1px solid ${appTheme.colors.border};
-                    border-radius: 8px;
+                    border-radius: ${appTheme.radius.md};
                     overflow: hidden;
-                    background: #f8fafc;
+                    background: ${appTheme.colors.backgroundLight};
                 }
 
                 .image-preview img {
@@ -5428,7 +4866,7 @@ export default function ProductForm() {
                     background: ${appTheme.colors.error};
                     color: white;
                     border: none;
-                    border-radius: 8px;
+                    border-radius: ${appTheme.radius.sm};
                     cursor: pointer;
                     display: flex;
                     align-items: center;
@@ -5443,12 +4881,12 @@ export default function ProductForm() {
 
                 .upload-area {
                     border: 2px dashed ${appTheme.colors.border};
-                    border-radius: 8px;
-                    padding: 24px;
+                    border-radius: ${appTheme.radius.md};
+                    padding: 32px;
                     text-align: center;
                     cursor: pointer;
                     transition: all 0.2s ease;
-                    background: #f8fafc;
+                    background: ${appTheme.colors.backgroundLight};
                 }
 
                 .upload-area:hover {
@@ -5462,19 +4900,19 @@ export default function ProductForm() {
 
                 .upload-area svg {
                     color: ${appTheme.colors.primary};
-                    margin-bottom: 8px;
+                    margin-bottom: 12px;
                 }
 
                 .upload-area p {
-                    font-size: 0.875rem;
+                    font-size: 0.938rem;
                     font-weight: 500;
-                    color: #0f172a;
+                    color: ${appTheme.colors.textPrimary};
                     margin: 0 0 4px 0;
                 }
 
                 .upload-area span {
-                    font-size: 0.688rem;
-                    color: #64748b;
+                    font-size: 0.75rem;
+                    color: ${appTheme.colors.textSecondary};
                 }
 
                 /* ==================== SPECIFICATIONS ==================== */
@@ -5482,13 +4920,6 @@ export default function ProductForm() {
                     display: grid;
                     grid-template-columns: 1fr 1fr auto;
                     gap: 10px;
-                    margin-bottom: 20px;
-                }
-
-                @media (max-width: 640px) {
-                    .spec-input-group {
-                        grid-template-columns: 1fr;
-                    }
                 }
 
                 .add-spec-btn {
@@ -5496,26 +4927,26 @@ export default function ProductForm() {
                     align-items: center;
                     justify-content: center;
                     gap: 6px;
-                    padding: 10px 16px;
+                    padding: 0 20px;
                     background: ${appTheme.colors.primary};
                     color: white;
                     border: none;
-                    border-radius: 8px;
+                    border-radius: ${appTheme.radius.md};
                     cursor: pointer;
                     font-size: 0.875rem;
                     font-weight: 500;
                     transition: all 0.2s ease;
-                    min-height: 42px;
                 }
 
                 .add-spec-btn:hover {
-                    background: #2563eb;
+                    background: ${appTheme.colors.gradientStart};
                 }
 
                 .specs-list {
                     border: 1px solid ${appTheme.colors.border};
-                    border-radius: 8px;
+                    border-radius: ${appTheme.radius.md};
                     overflow: hidden;
+                    margin-top: 16px;
                 }
 
                 .spec-item {
@@ -5524,7 +4955,7 @@ export default function ProductForm() {
                     justify-content: space-between;
                     padding: 12px 16px;
                     border-bottom: 1px solid ${appTheme.colors.border};
-                    background: white;
+                    background: ${appTheme.colors.backgroundCard};
                 }
 
                 .spec-item:last-child {
@@ -5532,7 +4963,7 @@ export default function ProductForm() {
                 }
 
                 .spec-item:nth-child(even) {
-                    background: #f8fafc;
+                    background: ${appTheme.colors.backgroundLight};
                 }
 
                 .spec-content {
@@ -5542,11 +4973,11 @@ export default function ProductForm() {
 
                 .spec-key {
                     font-weight: 600;
-                    color: #0f172a;
+                    color: ${appTheme.colors.textPrimary};
                 }
 
                 .spec-value {
-                    color: #475569;
+                    color: ${appTheme.colors.textSecondary};
                     margin-left: 4px;
                 }
 
@@ -5556,12 +4987,7 @@ export default function ProductForm() {
                     color: ${appTheme.colors.error};
                     cursor: pointer;
                     padding: 4px;
-                    min-height: 32px;
-                    min-width: 32px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    border-radius: 6px;
+                    border-radius: ${appTheme.radius.sm};
                     transition: all 0.2s ease;
                 }
 
@@ -5574,12 +5000,7 @@ export default function ProductForm() {
                     display: grid;
                     grid-template-columns: repeat(4, 1fr);
                     gap: 12px;
-                }
-
-                @media (max-width: 640px) {
-                    .flags-grid {
-                        grid-template-columns: repeat(2, 1fr);
-                    }
+                    margin-top: 8px;
                 }
 
                 .flag-checkbox {
@@ -5589,10 +5010,10 @@ export default function ProductForm() {
                     gap: 8px;
                     padding: 12px;
                     border: 1px solid ${appTheme.colors.border};
-                    border-radius: 8px;
+                    border-radius: ${appTheme.radius.md};
                     cursor: pointer;
                     transition: all 0.2s ease;
-                    background: white;
+                    background: ${appTheme.colors.backgroundCard};
                 }
 
                 .flag-checkbox input {
@@ -5601,73 +5022,36 @@ export default function ProductForm() {
 
                 .flag-checkbox.active {
                     background: ${appTheme.colors.primary}10;
-                    border-color: ${appTheme.colors.primary};
-                }
-
-                .flag-checkbox svg {
-                    color: ${appTheme.colors.primary};
                 }
 
                 .flag-checkbox span {
                     font-size: 0.813rem;
                     font-weight: 500;
-                    color: #0f172a;
                 }
 
-                /* ==================== DIMENSIONS ==================== */
+                /* ==================== DIMENSIONS GRID ==================== */
                 .dimensions-grid {
                     display: grid;
                     grid-template-columns: 1fr 1fr 1fr auto;
                     gap: 10px;
-                }
-
-                @media (max-width: 640px) {
-                    .dimensions-grid {
-                        grid-template-columns: 1fr 1fr;
-                    }
+                    margin-top: 8px;
                 }
 
                 .dimensions-grid input,
                 .dimensions-grid select {
-                    padding: 10px 14px;
+                    padding: 12px 14px;
                     border: 1px solid ${appTheme.colors.border};
-                    border-radius: 8px;
+                    border-radius: ${appTheme.radius.md};
                     font-size: 0.938rem;
-                    background: white;
+                    background: ${appTheme.colors.backgroundCard};
+                    color: ${appTheme.colors.textPrimary};
                 }
 
                 .dimensions-grid input:focus,
                 .dimensions-grid select:focus {
                     outline: none;
                     border-color: ${appTheme.colors.primary};
-                    box-shadow: 0 0 0 3px ${appTheme.colors.primary}20;
-                }
-
-                .dimensions-grid input.error {
-                    border-color: ${appTheme.colors.error};
-                }
-
-                /* ==================== EMPTY STATE ==================== */
-                .empty-state {
-                    text-align: center;
-                    padding: 48px 24px;
-                    background: #f8fafc;
-                    border-radius: 8px;
-                }
-
-                .empty-state.small {
-                    padding: 32px 24px;
-                }
-
-                .empty-state svg {
-                    color: #94a3b8;
-                    margin-bottom: 16px;
-                }
-
-                .empty-state p {
-                    font-size: 0.875rem;
-                    color: #64748b;
-                    margin: 0;
+                    box-shadow: 0 0 0 4px ${appTheme.colors.primary}15;
                 }
 
                 /* ==================== MOBILE SAVE ==================== */
@@ -5678,7 +5062,7 @@ export default function ProductForm() {
                     left: 0;
                     right: 0;
                     padding: 16px;
-                    background: linear-gradient(to top, #f1f5f9, transparent);
+                    background: linear-gradient(to top, ${appTheme.colors.backgroundLight}, transparent);
                     z-index: 100;
                 }
 
@@ -5688,7 +5072,7 @@ export default function ProductForm() {
                     background: ${appTheme.colors.primary};
                     color: white;
                     border: none;
-                    border-radius: 8px;
+                    border-radius: ${appTheme.radius.md};
                     font-size: 1rem;
                     font-weight: 600;
                     display: flex;
@@ -5704,9 +5088,23 @@ export default function ProductForm() {
                 }
 
                 /* ==================== RESPONSIVE ==================== */
+                @media (max-width: 1200px) {
+                    .header-content,
+                    .main-content,
+                    .company-banner,
+                    .api-error {
+                        padding: 0 20px;
+                    }
+                }
+
                 @media (max-width: 1024px) {
-                    .stats-grid {
-                        display: none;
+                    .form-row {
+                        grid-template-columns: repeat(2, 1fr);
+                    }
+
+                    .form-group.span-2,
+                    .form-group.span-3 {
+                        grid-column: span 2;
                     }
                 }
 
@@ -5719,35 +5117,28 @@ export default function ProductForm() {
                         flex-direction: column;
                         gap: 16px;
                         align-items: flex-start;
-                    }
-
-                    .page-title {
-                        font-size: 1.25rem;
-                    }
-
-                    .page-description {
-                        font-size: 0.813rem;
+                        padding: 0 16px;
                     }
 
                     .header-actions {
                         width: 100%;
-                        justify-content: flex-end;
                     }
 
-                    .save-button {
-                        display: none;
+                    .desktop-save {
+                        display: none !important;
                     }
 
                     .mobile-save {
                         display: block;
                     }
 
-                    .desktop-tabs {
-                        display: none;
+                    .page-title {
+                        font-size: 1.25rem;
                     }
 
-                    .stats-grid {
-                        display: none;
+                    .main-content {
+                        padding: 0 16px;
+                        margin-bottom: 80px;
                     }
 
                     .section-header {
@@ -5763,41 +5154,22 @@ export default function ProductForm() {
                         height: 36px;
                     }
 
-                    .section-icon svg {
-                        width: 18px;
-                        height: 18px;
-                    }
-
-                    .section-title h2 {
-                        font-size: 0.938rem;
-                    }
-
-                    .section-title p {
-                        font-size: 0.688rem;
-                    }
-
                     .section-content {
-                        padding: 0 16px 16px 16px;
+                        padding: 16px;
                     }
 
-                    .form-block h3 {
-                        font-size: 0.813rem;
+                    .form-row {
+                        grid-template-columns: 1fr;
+                        gap: 16px;
                     }
 
-                    .form-field input,
-                    .form-field select,
-                    .form-field textarea {
-                        font-size: 16px;
-                        min-height: 48px;
+                    .form-group.span-2,
+                    .form-group.span-3 {
+                        grid-column: span 1;
                     }
 
-                    .custom-id-card {
-                        flex-direction: column;
-                        align-items: flex-start;
-                    }
-
-                    .custom-id-meta {
-                        width: 100%;
+                    .image-grid {
+                        grid-template-columns: repeat(2, 1fr);
                     }
 
                     .spec-input-group {
@@ -5805,7 +5177,11 @@ export default function ProductForm() {
                     }
 
                     .add-spec-btn {
-                        min-height: 48px;
+                        padding: 12px;
+                    }
+
+                    .flags-grid {
+                        grid-template-columns: repeat(2, 1fr);
                     }
 
                     .dimensions-grid {
@@ -5815,23 +5191,39 @@ export default function ProductForm() {
                     .dimensions-grid select {
                         grid-column: span 2;
                     }
+
+                    .upload-area {
+                        padding: 24px;
+                    }
+
+                    .upload-area p {
+                        font-size: 0.875rem;
+                    }
+
+                    .company-banner,
+                    .api-error {
+                        padding: 0 16px;
+                    }
                 }
 
                 @media (max-width: 480px) {
-                    .main-content {
-                        padding: 16px 16px 90px 16px;
+                    .form-group label {
+                        font-size: 0.75rem;
                     }
 
-                    .stats-grid {
-                        display: none;
+                    .form-group input,
+                    .form-group select,
+                    .form-group textarea {
+                        font-size: 16px;
+                        padding: 10px 12px;
                     }
 
                     .image-grid {
-                        grid-template-columns: 1fr 1fr;
+                        grid-template-columns: repeat(2, 1fr);
                     }
 
                     .flags-grid {
-                        grid-template-columns: 1fr 1fr;
+                        grid-template-columns: repeat(2, 1fr);
                     }
 
                     .flag-checkbox {
