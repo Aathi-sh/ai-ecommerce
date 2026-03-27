@@ -1,9 +1,6 @@
 
+// 'use client';
 
-
-
-// // app/admin/products/productForm/page.js
-// "use client";
 // import { useState, useEffect, useCallback, useRef } from "react";
 // import { useRouter, useSearchParams } from "next/navigation";
 // import Head from 'next/head';
@@ -275,11 +272,14 @@
 //         }
 //     };
 
-//     // Fetch all categories
+//     // ✅ FIXED: Fetch all categories with companyId
 //     const fetchCategories = async () => {
+//         if (!user?.companyId) return;
+        
 //         setLoadingCategories(true);
 //         try {
 //             const params = new URLSearchParams({
+//                 companyId: user.companyId,
 //                 type: 'categories',
 //                 format: 'flat'
 //             });
@@ -301,12 +301,13 @@
 //         }
 //     };
 
-//     // Fetch subcategories for selected category
+//     // ✅ FIXED: Fetch subcategories with companyId
 //     const fetchSubCategories = async (categoryId) => {
-//         if (!categoryId || !isValidObjectId(categoryId)) return;
+//         if (!categoryId || !isValidObjectId(categoryId) || !user?.companyId) return;
         
 //         try {
 //             const params = new URLSearchParams({
+//                 companyId: user.companyId,
 //                 type: 'categories',
 //                 parentId: categoryId
 //             });
@@ -323,12 +324,13 @@
 //         }
 //     };
 
+//     // ✅ FIXED: Fetch product with company context
 //     const fetchProduct = async () => {
 //         try {
 //             setLoading(true);
 //             setApiError(null);
             
-//             const res = await fetch(`/api/products?id=${productId}`, {
+//             const res = await fetch(`/api/products?id=${productId}&companyId=${user?.companyId}`, {
 //                 headers: getAuthHeaders()
 //             });
 //             const data = await res.json();
@@ -393,6 +395,11 @@
 //                 // Set existing images as previews
 //                 if (product.imageUrls && product.imageUrls.length > 0) {
 //                     setImagePreviews(product.imageUrls);
+//                 }
+                
+//                 // Fetch subcategories if category exists
+//                 if (categoryId) {
+//                     await fetchSubCategories(categoryId);
 //                 }
                 
 //                 showToast('success', 'Product loaded successfully');
@@ -536,6 +543,8 @@
 //                     ...prev,
 //                     subCategory: ""
 //                 }));
+//                 setSubCategories([]);
+//                 setSelectedCategoryHasSubs(false);
 //             }
 //         }
         
@@ -1074,7 +1083,7 @@
 //                                                 {selectedCategoryHasSubs 
 //                                                     ? "Select Sub Category" 
 //                                                     : subCategories.length === 0 && formData.category
-//                                                         ? "No subcategories"
+//                                                         ? "No subcategories available"
 //                                                         : "Select Sub Category"
 //                                                 }
 //                                             </option>
@@ -1085,6 +1094,9 @@
 //                                             ))}
 //                                         </select>
 //                                         {errors.subCategory && <span className="error-text">{errors.subCategory}</span>}
+//                                         {formData.category && subCategories.length === 0 && !selectedCategoryHasSubs && (
+//                                             <span className="help-text">No subcategories found for this category</span>
+//                                         )}
 //                                     </div>
 
 //                                     <div className="form-group">
@@ -2133,6 +2145,12 @@
 //                     color: ${appTheme.colors.error};
 //                 }
 
+//                 .help-text {
+//                     font-size: 0.688rem;
+//                     color: ${appTheme.colors.textSecondary};
+//                     margin-top: 4px;
+//                 }
+
 //                 .input-group {
 //                     display: flex;
 //                     gap: 8px;
@@ -2602,6 +2620,36 @@
 //         </>
 //     );
 // }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4183,7 +4231,7 @@ export default function ProductForm() {
                                                         className={`flag-checkbox ${isActive ? 'active' : ''}`}
                                                         style={{ 
                                                             borderColor: isActive ? flag.color : appTheme.colors.border,
-                                                            background: isActive ? `${flag.color}10` : 'white'
+                                                            background: isActive ? `${flag.color}10` : appTheme.colors.backgroundCard
                                                         }}
                                                     >
                                                         <input
@@ -4342,7 +4390,7 @@ export default function ProductForm() {
 
                 .loading-text {
                     color: ${appTheme.colors.textSecondary};
-                    font-size: 0.875rem;
+                    font-size: ${appTheme.fonts.sizes.sm};
                 }
 
                 @keyframes spin {
@@ -4363,7 +4411,7 @@ export default function ProductForm() {
                     border-radius: ${appTheme.radius.md};
                     box-shadow: ${appTheme.shadows.lg};
                     animation: slideInRight 0.3s ease;
-                    font-size: 0.875rem;
+                    font-size: ${appTheme.fonts.sizes.sm};
                     max-width: 400px;
                     border: 1px solid ${appTheme.colors.border};
                 }
@@ -4451,15 +4499,15 @@ export default function ProductForm() {
                 }
 
                 .page-title {
-                    font-size: 1.5rem;
-                    font-weight: 600;
+                    font-size: ${appTheme.fonts.sizes["2xl"]};
+                    font-weight: ${appTheme.fonts.weights.semibold};
                     color: ${appTheme.colors.textPrimary};
                     margin: 0;
                 }
 
                 .page-description {
                     color: ${appTheme.colors.textSecondary};
-                    font-size: 0.875rem;
+                    font-size: ${appTheme.fonts.sizes.sm};
                     margin: 0;
                 }
 
@@ -4482,15 +4530,15 @@ export default function ProductForm() {
                     color: white;
                     border: none;
                     border-radius: ${appTheme.radius.md};
-                    font-size: 0.875rem;
-                    font-weight: 500;
+                    font-size: ${appTheme.fonts.sizes.sm};
+                    font-weight: ${appTheme.fonts.weights.medium};
                     cursor: pointer;
                     transition: all 0.2s ease;
                     box-shadow: 0 4px 12px ${appTheme.colors.primary}30;
                 }
 
                 .save-button:hover {
-                    background: ${appTheme.colors.gradientStart};
+                    background: ${appTheme.colors.primaryDark};
                     transform: translateY(-1px);
                     box-shadow: 0 6px 16px ${appTheme.colors.primary}40;
                 }
@@ -4533,7 +4581,7 @@ export default function ProductForm() {
                     align-items: center;
                     gap: 8px;
                     color: ${appTheme.colors.textPrimary};
-                    font-size: 0.875rem;
+                    font-size: ${appTheme.fonts.sizes.sm};
                 }
 
                 .company-banner-left svg {
@@ -4569,7 +4617,7 @@ export default function ProductForm() {
                     align-items: center;
                     gap: 8px;
                     color: ${appTheme.colors.error};
-                    font-size: 0.875rem;
+                    font-size: ${appTheme.fonts.sizes.sm};
                 }
 
                 /* ==================== MAIN CONTENT ==================== */
@@ -4611,7 +4659,7 @@ export default function ProductForm() {
                     font-size: 1.25rem;
                     font-weight: 700;
                     color: ${appTheme.colors.primary};
-                    font-family: monospace;
+                    font-family: ${appTheme.fonts.families.monospace};
                     letter-spacing: 1px;
                 }
 
@@ -4645,7 +4693,7 @@ export default function ProductForm() {
 
                 .section-header {
                     padding: 20px 24px;
-                    background: #fafbfc;
+                    background: ${appTheme.colors.mutedBackground};
                     border-bottom: 1px solid ${appTheme.colors.border};
                 }
 
@@ -4665,8 +4713,8 @@ export default function ProductForm() {
                 }
 
                 .section-header-left h2 {
-                    font-size: 1rem;
-                    font-weight: 600;
+                    font-size: ${appTheme.fonts.sizes.base};
+                    font-weight: ${appTheme.fonts.weights.semibold};
                     color: ${appTheme.colors.textPrimary};
                     margin: 0 0 4px 0;
                 }
@@ -4713,7 +4761,7 @@ export default function ProductForm() {
 
                 .form-group label {
                     font-size: 0.813rem;
-                    font-weight: 500;
+                    font-weight: ${appTheme.fonts.weights.medium};
                     color: ${appTheme.colors.textPrimary};
                     display: flex;
                     align-items: center;
@@ -4875,7 +4923,7 @@ export default function ProductForm() {
                 }
 
                 .remove-image-btn:hover {
-                    background: #dc2626;
+                    background: ${appTheme.colors.destructive};
                     transform: scale(1.1);
                 }
 
@@ -4905,7 +4953,7 @@ export default function ProductForm() {
 
                 .upload-area p {
                     font-size: 0.938rem;
-                    font-weight: 500;
+                    font-weight: ${appTheme.fonts.weights.medium};
                     color: ${appTheme.colors.textPrimary};
                     margin: 0 0 4px 0;
                 }
@@ -4933,13 +4981,13 @@ export default function ProductForm() {
                     border: none;
                     border-radius: ${appTheme.radius.md};
                     cursor: pointer;
-                    font-size: 0.875rem;
-                    font-weight: 500;
+                    font-size: ${appTheme.fonts.sizes.sm};
+                    font-weight: ${appTheme.fonts.weights.medium};
                     transition: all 0.2s ease;
                 }
 
                 .add-spec-btn:hover {
-                    background: ${appTheme.colors.gradientStart};
+                    background: ${appTheme.colors.primaryDark};
                 }
 
                 .specs-list {
@@ -4968,11 +5016,11 @@ export default function ProductForm() {
 
                 .spec-content {
                     flex: 1;
-                    font-size: 0.875rem;
+                    font-size: ${appTheme.fonts.sizes.sm};
                 }
 
                 .spec-key {
-                    font-weight: 600;
+                    font-weight: ${appTheme.fonts.weights.semibold};
                     color: ${appTheme.colors.textPrimary};
                 }
 
@@ -5026,7 +5074,7 @@ export default function ProductForm() {
 
                 .flag-checkbox span {
                     font-size: 0.813rem;
-                    font-weight: 500;
+                    font-weight: ${appTheme.fonts.weights.medium};
                 }
 
                 /* ==================== DIMENSIONS GRID ==================== */
@@ -5073,8 +5121,8 @@ export default function ProductForm() {
                     color: white;
                     border: none;
                     border-radius: ${appTheme.radius.md};
-                    font-size: 1rem;
-                    font-weight: 600;
+                    font-size: ${appTheme.fonts.sizes.base};
+                    font-weight: ${appTheme.fonts.weights.semibold};
                     display: flex;
                     align-items: center;
                     justify-content: center;
@@ -5133,7 +5181,7 @@ export default function ProductForm() {
                     }
 
                     .page-title {
-                        font-size: 1.25rem;
+                        font-size: ${appTheme.fonts.sizes.xl};
                     }
 
                     .main-content {
@@ -5197,7 +5245,7 @@ export default function ProductForm() {
                     }
 
                     .upload-area p {
-                        font-size: 0.875rem;
+                        font-size: ${appTheme.fonts.sizes.sm};
                     }
 
                     .company-banner,

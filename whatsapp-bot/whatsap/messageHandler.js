@@ -1081,7 +1081,8 @@ export default async function handleMessage(message, client) {
         // Check if user is in booking flow
         if (userSession.bookingState !== 'IDLE') {
             console.log(`📅 User ${formattedPhone} in booking flow (state: ${userSession.bookingState})`);
-            return await handleBookingFlow(message, client, userSession, userSessions);
+         //   return await handleBookingFlow(message, client, userSession, userSessions);
+            return await handleBookingFlow(message, client, userSession, userSessions, companyId);
         }
 
         // Handle direct product name search

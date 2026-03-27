@@ -1,5 +1,4 @@
 
-
 // "use client";
 
 // import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
@@ -33,7 +32,7 @@
 // );
 
 // export default function DashboardPage() {
-//   const { user, loading: authLoading, isAuthenticated, session } = useAuth();
+//   const { user, loading: authLoading, isAuthenticated, session, getAuthHeaders } = useAuth();
 //   const { showNotification } = useNotification();
   
 //   const [orders, setOrders] = useState([]);
@@ -197,13 +196,11 @@
 
 //   // ==================== FETCH NOTIFICATIONS ====================
 //   const fetchNotifications = useCallback(async () => {
-//     if (!isAuthenticated || !user || user.role !== 'admin') return;
+//     if (!isAuthenticated || !user) return;
     
 //     try {
 //       const response = await fetch('/api/notifications?limit=10&page=1', {
-//         headers: {
-//           'Content-Type': 'application/json'
-//         },
+//         headers: getAuthHeaders(),
 //         credentials: 'include'
 //       });
       
@@ -216,7 +213,7 @@
 //     } catch (error) {
 //       console.warn('Failed to fetch notifications:', error);
 //     }
-//   }, [isAuthenticated, user]);
+//   }, [isAuthenticated, user, getAuthHeaders]);
 
 //   const markNotificationAsRead = useCallback(async (notificationId) => {
 //     if (!isAuthenticated) return;
@@ -224,9 +221,7 @@
 //     try {
 //       await fetch(`/api/notifications?id=${notificationId}`, {
 //         method: 'PUT',
-//         headers: {
-//           'Content-Type': 'application/json'
-//         },
+//         headers: getAuthHeaders(),
 //         body: JSON.stringify({ markAsRead: true }),
 //         credentials: 'include'
 //       });
@@ -239,7 +234,7 @@
 //     } catch (error) {
 //       console.warn('Failed to mark notification as read:', error);
 //     }
-//   }, [isAuthenticated]);
+//   }, [isAuthenticated, getAuthHeaders]);
 
 //   // ==================== DATA FETCHING ====================
 //   const fetchDashboardData = useCallback(async (force = false) => {
@@ -275,16 +270,22 @@
 //         return;
 //       }
       
-//       const headers = {
-//         'Content-Type': 'application/json'
-//       };
+//       // Get auth headers with user ID and company ID
+//       const authHeaders = getAuthHeaders();
+      
+//       console.log('📊 Fetching dashboard data with headers:', {
+//         hasAuth: !!authHeaders.Authorization,
+//         hasCompanyId: !!authHeaders['x-company-id'],
+//         hasUserId: !!authHeaders['x-user-id'],
+//         companyId: authHeaders['x-company-id']
+//       });
       
 //       const fetchWithTimeout = (url, options, timeout = 10000) => {
 //         return Promise.race([
 //           fetch(url, {
 //             ...options,
 //             credentials: 'include',
-//             headers
+//             headers: authHeaders
 //           }),
 //           new Promise((_, reject) =>
 //             setTimeout(() => reject(new Error('Request timeout')), timeout)
@@ -293,32 +294,49 @@
 //       };
       
 //       const fetchPromises = [
-//         fetchWithTimeout("/api/orders", {}, 8000).then(async res => {
+//         fetchWithTimeout("/api/orders?limit=100", {}, 8000).then(async res => {
 //           if (!res.ok) {
 //             if (res.status === 401) {
 //               throw new Error("Session expired. Please login again.");
 //             }
+//             if (res.status === 403) {
+//               console.warn('Access denied to orders API - admin only');
+//               return [];
+//             }
 //             const errorText = await res.text();
 //             console.warn(`Orders API failed: ${res.status}`, errorText);
-//             throw new Error(`Failed to load orders: ${res.status}`);
+//             return [];
 //           }
 //           const data = await res.json();
+//           console.log('📊 Orders fetched:', data.success ? `${data.data?.length || 0} orders` : 'failed');
 //           return data.success ? (data.data || []) : [];
+//         }).catch(err => {
+//           console.warn('Orders fetch error:', err.message);
+//           return [];
 //         }),
         
-//         fetchWithTimeout("/api/products", {}, 8000).then(async res => {
-//           if (!res.ok) {
-//             const errorText = await res.text();
-//             console.warn(`Products API failed: ${res.status}`, errorText);
-//             throw new Error(`Failed to load products: ${res.status}`);
-//           }
-//           const data = await res.json();
-//           return data.success ? (data.data || []) : [];
-//         }),
-        
-//         fetchWithTimeout("/api/users", {}, 8000).then(async res => {
+//         fetchWithTimeout("/api/products?limit=100", {}, 8000).then(async res => {
 //           if (!res.ok) {
 //             if (res.status === 403) {
+//               console.warn('Access denied to products API');
+//               return [];
+//             }
+//             const errorText = await res.text();
+//             console.warn(`Products API failed: ${res.status}`, errorText);
+//             return [];
+//           }
+//           const data = await res.json();
+//           console.log('📊 Products fetched:', data.success ? `${data.data?.length || 0} products` : 'failed');
+//           return data.success ? (data.data || []) : [];
+//         }).catch(err => {
+//           console.warn('Products fetch error:', err.message);
+//           return [];
+//         }),
+        
+//         fetchWithTimeout("/api/users?limit=100", {}, 8000).then(async res => {
+//           if (!res.ok) {
+//             if (res.status === 403) {
+//               console.warn('Access denied to users API');
 //               return [];
 //             }
 //             return [];
@@ -336,7 +354,11 @@
 //               usersArray = data.users;
 //             }
 //           }
+//           console.log('📊 Users fetched:', usersArray.length);
 //           return usersArray.filter(u => u && typeof u === 'object');
+//         }).catch(err => {
+//           console.warn('Users fetch error:', err.message);
+//           return [];
 //         })
 //       ];
       
@@ -346,6 +368,12 @@
 //         const ordersResult = ordersData.status === 'fulfilled' ? ordersData.value : [];
 //         const productsResult = productsData.status === 'fulfilled' ? productsData.value : [];
 //         const usersResult = usersData.status === 'fulfilled' ? usersData.value : [];
+        
+//         console.log('📊 Dashboard data loaded:', {
+//           orders: ordersResult.length,
+//           products: productsResult.length,
+//           users: usersResult.length
+//         });
         
 //         setOrders(ordersResult);
 //         setProducts(productsResult);
@@ -371,7 +399,7 @@
 //         fetchInProgressRef.current = false;
 //       }
 //     }
-//   }, [isAuthenticated, user, fetchNotifications]);
+//   }, [isAuthenticated, user, fetchNotifications, getAuthHeaders]);
 
 //   // ==================== INITIALIZATION ====================
 //   useEffect(() => {
@@ -393,7 +421,7 @@
 //       }
       
 //       if (!dataFetchedRef.current && !fetchInProgressRef.current) {
-//         await fetchDashboardData();
+//         await fetchDashboardData(true);
 //       }
 //     };
     
@@ -541,7 +569,6 @@
 
 //   const revenueChartData = useMemo(() => {
 //     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-//     const currentMonth = new Date().getMonth();
     
 //     const data = Array(12).fill(0);
     
@@ -566,7 +593,7 @@
 //         },
 //       ],
 //     };
-//   }, [orders, appTheme.colors.primary]);
+//   }, [orders]);
 
 //   const ordersChartData = useMemo(() => ({
 //     labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
@@ -584,7 +611,7 @@
 //         borderRadius: 8,
 //       },
 //     ],
-//   }), [orders, appTheme.colors.secondary]);
+//   }), [orders]);
 
 //   const orderStatusData = useMemo(() => ({
 //     labels: ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"],
@@ -608,7 +635,7 @@
 //         borderColor: appTheme.colors.surface,
 //       },
 //     ],
-//   }), [orderStatusMetrics, appTheme.colors.surface]);
+//   }), [orderStatusMetrics]);
 
 //   const chartOptions = useMemo(() => ({
 //     responsive: true,
@@ -648,7 +675,7 @@
 //         }
 //       },
 //     },
-//   }), [appTheme.colors.border, isMobile]);
+//   }), [isMobile]);
 
 //   const doughnutOptions = useMemo(() => ({
 //     responsive: true,
@@ -1449,7 +1476,7 @@
 //           </div>
 //         </div>
 
-//         {/* Notifications Panel - FIXED for mobile */}
+//         {/* Notifications Panel */}
 //         {notifications.length > 0 && (
 //           <div style={{
 //             backgroundColor: appTheme.colors.surface,
@@ -1833,8 +1860,12 @@
 //         return { bg: `${appTheme.colors.info}20`, color: appTheme.colors.info, icon: '🚚' };
 //       case 'processing':
 //         return { bg: `${appTheme.colors.warning}20`, color: appTheme.colors.warning, icon: '⏳' };
+//       case 'pending':
+//         return { bg: '#FF638420', color: '#FF6384', icon: '⏰' };
+//       case 'cancelled':
+//         return { bg: '#FF9F4020', color: '#FF9F40', icon: '❌' };
 //       default:
-//         return { bg: `${appTheme.colors.error}20`, color: appTheme.colors.error, icon: '❌' };
+//         return { bg: `${appTheme.colors.error}20`, color: appTheme.colors.error, icon: '❓' };
 //     }
 //   };
   
@@ -1858,20 +1889,6 @@
 //     </div>
 //   );
 // };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -2534,7 +2551,7 @@ export default function DashboardPage() {
           "#FF9F40"
         ],
         borderWidth: 2,
-        borderColor: appTheme.colors.surface,
+        borderColor: appTheme.colors.backgroundCard,
       },
     ],
   }), [orderStatusMetrics]);
@@ -2549,10 +2566,19 @@ export default function DashboardPage() {
           usePointStyle: true,
           padding: 15,
           font: {
-            size: isMobile ? 10 : 12
+            size: isMobile ? 10 : 12,
+            family: appTheme.fonts.families.primary
           }
         }
       },
+      tooltip: {
+        bodyFont: {
+          family: appTheme.fonts.families.primary
+        },
+        titleFont: {
+          family: appTheme.fonts.families.primary
+        }
+      }
     },
     scales: {
       y: {
@@ -2562,7 +2588,8 @@ export default function DashboardPage() {
         },
         ticks: {
           font: {
-            size: isMobile ? 9 : 11
+            size: isMobile ? 9 : 11,
+            family: appTheme.fonts.families.primary
           }
         }
       },
@@ -2572,12 +2599,13 @@ export default function DashboardPage() {
         },
         ticks: {
           font: {
-            size: isMobile ? 9 : 11
+            size: isMobile ? 9 : 11,
+            family: appTheme.fonts.families.primary
           }
         }
       },
     },
-  }), [isMobile]);
+  }), [isMobile, appTheme]);
 
   const doughnutOptions = useMemo(() => ({
     responsive: true,
@@ -2589,13 +2617,22 @@ export default function DashboardPage() {
           usePointStyle: true,
           padding: 10,
           font: {
-            size: isMobile ? 9 : 11
+            size: isMobile ? 9 : 11,
+            family: appTheme.fonts.families.primary
           }
         }
       },
+      tooltip: {
+        bodyFont: {
+          family: appTheme.fonts.families.primary
+        },
+        titleFont: {
+          family: appTheme.fonts.families.primary
+        }
+      }
     },
     cutout: isMobile ? '55%' : '65%',
-  }), [isMobile]);
+  }), [isMobile, appTheme]);
 
   // ==================== EVENT HANDLERS ====================
   const handleRetry = useCallback(() => {
@@ -2657,7 +2694,7 @@ export default function DashboardPage() {
     return (
       <div style={{ 
         padding: isMobile ? "20px 16px" : "40px", 
-        backgroundColor: appTheme.colors.background,
+        backgroundColor: appTheme.colors.backgroundLight,
         minHeight: "100vh",
         display: "flex",
         justifyContent: "center",
@@ -2670,13 +2707,16 @@ export default function DashboardPage() {
         <h2 style={{ 
           color: appTheme.colors.error,
           fontSize: isMobile ? "1.3rem" : "1.5rem",
-          margin: "5px 0"
+          margin: "5px 0",
+          fontFamily: appTheme.fonts.families.primary,
+          fontWeight: appTheme.fonts.weights.semibold
         }}>{isSessionExpired ? "Session Expired" : "Error"}</h2>
         <p style={{ 
           color: appTheme.colors.textSecondary,
           fontSize: isMobile ? "0.9rem" : "1rem",
           lineHeight: 1.5,
-          maxWidth: "400px"
+          maxWidth: "400px",
+          fontFamily: appTheme.fonts.families.primary
         }}>{error}</p>
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" }}>
           {isSessionExpired ? (
@@ -2687,12 +2727,13 @@ export default function DashboardPage() {
                 backgroundColor: appTheme.colors.primary,
                 color: "white",
                 border: "none",
-                borderRadius: "8px",
+                borderRadius: appTheme.radius.md,
                 cursor: "pointer",
                 fontSize: isMobile ? "14px" : "16px",
-                fontWeight: "600",
+                fontWeight: appTheme.fonts.weights.semibold,
                 minWidth: "120px",
-                minHeight: "44px"
+                minHeight: "44px",
+                fontFamily: appTheme.fonts.families.primary
               }}
             >
               Go to Login
@@ -2706,12 +2747,13 @@ export default function DashboardPage() {
                   backgroundColor: appTheme.colors.primary,
                   color: "white",
                   border: "none",
-                  borderRadius: "8px",
+                  borderRadius: appTheme.radius.md,
                   cursor: "pointer",
                   fontSize: isMobile ? "14px" : "16px",
-                  fontWeight: "600",
+                  fontWeight: appTheme.fonts.weights.semibold,
                   minWidth: "120px",
-                  minHeight: "44px"
+                  minHeight: "44px",
+                  fontFamily: appTheme.fonts.families.primary
                 }}
               >
                 Go to Login
@@ -2723,12 +2765,13 @@ export default function DashboardPage() {
                   backgroundColor: appTheme.colors.secondary,
                   color: "white",
                   border: "none",
-                  borderRadius: "8px",
+                  borderRadius: appTheme.radius.md,
                   cursor: "pointer",
                   fontSize: isMobile ? "14px" : "16px",
-                  fontWeight: "600",
+                  fontWeight: appTheme.fonts.weights.semibold,
                   minWidth: "120px",
-                  minHeight: "44px"
+                  minHeight: "44px",
+                  fontFamily: appTheme.fonts.families.primary
                 }}
               >
                 Retry
@@ -2744,7 +2787,7 @@ export default function DashboardPage() {
     return (
       <div style={{ 
         padding: isMobile ? "20px 16px" : "40px", 
-        backgroundColor: appTheme.colors.background,
+        backgroundColor: appTheme.colors.backgroundLight,
         minHeight: "100vh",
         display: "flex",
         justifyContent: "center",
@@ -2771,7 +2814,8 @@ export default function DashboardPage() {
           `}</style>
           <p style={{ 
             fontSize: isMobile ? "1rem" : "1.2rem", 
-            marginTop: isMobile ? "15px" : "20px" 
+            marginTop: isMobile ? "15px" : "20px",
+            fontFamily: appTheme.fonts.families.primary
           }}>Loading Dashboard...</p>
         </div>
       </div>
@@ -2783,7 +2827,7 @@ export default function DashboardPage() {
   return (
     <div style={{ 
       padding: isMobile ? "12px" : "24px", 
-      backgroundColor: appTheme.colors.background, 
+      backgroundColor: appTheme.colors.backgroundLight, 
       minHeight: "100vh",
       maxWidth: "100vw",
       overflowX: "hidden",
@@ -2804,9 +2848,10 @@ export default function DashboardPage() {
             color: appTheme.colors.textPrimary, 
             marginBottom: isMobile ? "4px" : "6px",
             fontSize: isMobile ? "1.3rem" : "1.8rem",
-            fontWeight: "700",
+            fontWeight: appTheme.fonts.weights.bold,
             lineHeight: 1.2,
-            wordBreak: "break-word"
+            wordBreak: "break-word",
+            fontFamily: appTheme.fonts.families.primary
           }}>
             Dashboard Overview
           </h1>
@@ -2821,7 +2866,8 @@ export default function DashboardPage() {
               color: appTheme.colors.textSecondary,
               fontSize: isMobile ? "0.8rem" : "0.9rem",
               margin: 0,
-              lineHeight: 1.3
+              lineHeight: 1.3,
+              fontFamily: appTheme.fonts.families.primary
             }}>
               Welcome to your e-commerce dashboard
             </p>
@@ -2837,7 +2883,8 @@ export default function DashboardPage() {
                 alignItems: "center",
                 gap: "4px",
                 whiteSpace: "nowrap",
-                flexShrink: 0
+                flexShrink: 0,
+                fontFamily: appTheme.fonts.families.primary
               }}>
                 <span>🔗</span>Live
               </span>
@@ -2859,7 +2906,8 @@ export default function DashboardPage() {
                   cursor: "pointer",
                   whiteSpace: "nowrap",
                   flexShrink: 0,
-                  minHeight: "28px"
+                  minHeight: "28px",
+                  fontFamily: appTheme.fonts.families.primary
                 }}
                 title="Click to reconnect"
               >
@@ -2883,7 +2931,8 @@ export default function DashboardPage() {
                   cursor: "pointer",
                   whiteSpace: "nowrap",
                   flexShrink: 0,
-                  minHeight: "28px"
+                  minHeight: "28px",
+                  fontFamily: appTheme.fonts.families.primary
                 }}
                 title="View notifications"
               >
@@ -2903,16 +2952,18 @@ export default function DashboardPage() {
             }}>
               <span style={{ 
                 color: appTheme.colors.textSecondary,
-                flexShrink: 0
+                flexShrink: 0,
+                fontFamily: appTheme.fonts.families.primary
               }}>
                 Logged in as:
               </span>
               <span style={{ 
                 color: appTheme.colors.primary,
-                fontWeight: "500",
+                fontWeight: appTheme.fonts.weights.medium,
                 wordBreak: "break-word",
                 flex: 1,
-                minWidth: 0
+                minWidth: 0,
+                fontFamily: appTheme.fonts.families.primary
               }}>
                 {user.email}
               </span>
@@ -2926,7 +2977,8 @@ export default function DashboardPage() {
                 <span style={{ 
                   fontSize: "0.75rem",
                   color: appTheme.colors.textSecondary,
-                  flexShrink: 0
+                  flexShrink: 0,
+                  fontFamily: appTheme.fonts.families.primary
                 }}>
                   Role:
                 </span>
@@ -2936,7 +2988,8 @@ export default function DashboardPage() {
                   padding: "2px 8px",
                   borderRadius: "4px",
                   whiteSpace: "nowrap",
-                  flexShrink: 0
+                  flexShrink: 0,
+                  fontFamily: appTheme.fonts.families.primary
                 }}>
                   {user.role}
                 </span>
@@ -2951,7 +3004,8 @@ export default function DashboardPage() {
                     alignItems: "center",
                     gap: "4px",
                     whiteSpace: "nowrap",
-                    flexShrink: 0
+                    flexShrink: 0,
+                    fontFamily: appTheme.fonts.families.primary
                   }}>
                     <span>🔔</span>On
                   </span>
@@ -2972,7 +3026,8 @@ export default function DashboardPage() {
                       gap: "4px",
                       whiteSpace: "nowrap",
                       minHeight: "24px",
-                      flexShrink: 0
+                      flexShrink: 0,
+                      fontFamily: appTheme.fonts.families.primary
                     }}
                   >
                     <span>🔔</span>Enable
@@ -3001,20 +3056,21 @@ export default function DashboardPage() {
           }}>
             <label style={{ 
               color: appTheme.colors.textSecondary,
-              fontWeight: "500",
+              fontWeight: appTheme.fonts.weights.medium,
               fontSize: isMobile ? "0.85rem" : "0.9rem",
               whiteSpace: "nowrap",
-              flexShrink: 0
+              flexShrink: 0,
+              fontFamily: appTheme.fonts.families.primary
             }}>Period: </label>
             <select
               value={timeFilter}
               onChange={(e) => setTimeFilter(e.target.value)}
               style={{
                 padding: isMobile ? "8px 12px" : "9px 14px",
-                borderRadius: "8px",
+                borderRadius: appTheme.radius.md,
                 border: `1.5px solid ${appTheme.colors.border}`,
-                fontFamily: appTheme.fonts.primary,
-                backgroundColor: appTheme.colors.surface,
+                fontFamily: appTheme.fonts.families.primary,
+                backgroundColor: appTheme.colors.backgroundCard,
                 color: appTheme.colors.textPrimary,
                 fontSize: isMobile ? "0.85rem" : "0.9rem",
                 cursor: "pointer",
@@ -3051,16 +3107,17 @@ export default function DashboardPage() {
                 backgroundColor: `${appTheme.colors.primary}15`,
                 color: appTheme.colors.primary,
                 border: `1px solid ${appTheme.colors.primary}30`,
-                borderRadius: "8px",
+                borderRadius: appTheme.radius.md,
                 cursor: "pointer",
                 fontSize: isMobile ? "0.85rem" : "0.9rem",
-                fontWeight: "500",
+                fontWeight: appTheme.fonts.weights.medium,
                 display: "flex",
                 alignItems: "center",
                 gap: "5px",
                 whiteSpace: "nowrap",
                 minHeight: "36px",
-                flexShrink: 0
+                flexShrink: 0,
+                fontFamily: appTheme.fonts.families.primary
               }}
             >
               <span>🔄</span>
@@ -3075,16 +3132,17 @@ export default function DashboardPage() {
                   backgroundColor: `${appTheme.colors.error}15`,
                   color: appTheme.colors.error,
                   border: `1px solid ${appTheme.colors.error}30`,
-                  borderRadius: "8px",
+                  borderRadius: appTheme.radius.md,
                   cursor: "pointer",
                   fontSize: isMobile ? "0.85rem" : "0.9rem",
-                  fontWeight: "500",
+                  fontWeight: appTheme.fonts.weights.medium,
                   display: "flex",
                   alignItems: "center",
                   gap: "5px",
                   whiteSpace: "nowrap",
                   minHeight: "36px",
-                  flexShrink: 0
+                  flexShrink: 0,
+                  fontFamily: appTheme.fonts.families.primary
                 }}
                 title="Reconnect to real-time server"
               >
@@ -3106,7 +3164,7 @@ export default function DashboardPage() {
         <div style={{
           background: `linear-gradient(135deg, ${appTheme.colors.primary}, ${appTheme.colors.secondary})`,
           padding: isMobile ? "16px" : "20px",
-          borderRadius: "12px",
+          borderRadius: appTheme.radius.lg,
           boxShadow: "0 6px 20px rgba(0, 0, 0, 0.1)",
           color: "white",
           position: "relative",
@@ -3116,21 +3174,24 @@ export default function DashboardPage() {
             <div style={{ 
               fontSize: isMobile ? "0.8rem" : "0.85rem", 
               opacity: 0.9, 
-              marginBottom: "6px" 
+              marginBottom: "6px",
+              fontFamily: appTheme.fonts.families.primary
             }}>
               Total Revenue
             </div>
             <div style={{ 
               fontSize: isMobile ? "1.5rem" : "1.8rem", 
-              fontWeight: "700", 
+              fontWeight: appTheme.fonts.weights.bold, 
               marginBottom: "4px",
-              lineHeight: 1.2
+              lineHeight: 1.2,
+              fontFamily: appTheme.fonts.families.primary
             }}>
               ₹{totalRevenue.toLocaleString()}
             </div>
             <div style={{ 
               fontSize: isMobile ? "0.75rem" : "0.8rem", 
-              opacity: 0.8 
+              opacity: 0.8,
+              fontFamily: appTheme.fonts.families.primary
             }}>
               {timeFilter === 'today' ? 'Today' : 
                timeFilter === 'week' ? 'This Week' : 
@@ -3181,9 +3242,9 @@ export default function DashboardPage() {
         marginBottom: isMobile ? "20px" : "25px"
       }}>
         <div style={{
-          backgroundColor: appTheme.colors.surface,
+          backgroundColor: appTheme.colors.backgroundCard,
           padding: isMobile ? "16px" : "20px",
-          borderRadius: "12px",
+          borderRadius: appTheme.radius.lg,
           boxShadow: "0 4px 15px rgba(0, 0, 0, 0.06)",
           border: `1px solid ${appTheme.colors.border}20`,
           height: "100%",
@@ -3199,7 +3260,9 @@ export default function DashboardPage() {
             <h3 style={{ 
               color: appTheme.colors.textPrimary, 
               margin: 0,
-              fontSize: isMobile ? "1rem" : "1.1rem"
+              fontSize: isMobile ? "1rem" : "1.1rem",
+              fontFamily: appTheme.fonts.families.primary,
+              fontWeight: appTheme.fonts.weights.semibold
             }}>
               Revenue Trend
             </h3>
@@ -3213,7 +3276,8 @@ export default function DashboardPage() {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "4px",
-                whiteSpace: "nowrap"
+                whiteSpace: "nowrap",
+                fontFamily: appTheme.fonts.families.primary
               }}>
                 <div style={{
                   width: "6px",
@@ -3232,9 +3296,9 @@ export default function DashboardPage() {
         </div>
 
         <div style={{
-          backgroundColor: appTheme.colors.surface,
+          backgroundColor: appTheme.colors.backgroundCard,
           padding: isMobile ? "16px" : "20px",
-          borderRadius: "12px",
+          borderRadius: appTheme.radius.lg,
           boxShadow: "0 4px 15px rgba(0, 0, 0, 0.06)",
           border: `1px solid ${appTheme.colors.border}20`,
           height: "100%",
@@ -3250,7 +3314,9 @@ export default function DashboardPage() {
             <h3 style={{ 
               color: appTheme.colors.textPrimary, 
               margin: 0,
-              fontSize: isMobile ? "1rem" : "1.1rem"
+              fontSize: isMobile ? "1rem" : "1.1rem",
+              fontFamily: appTheme.fonts.families.primary,
+              fontWeight: appTheme.fonts.weights.semibold
             }}>
               Order Status
             </h3>
@@ -3265,7 +3331,8 @@ export default function DashboardPage() {
                 borderRadius: "6px",
                 cursor: "pointer",
                 whiteSpace: "nowrap",
-                minHeight: "24px"
+                minHeight: "24px",
+                fontFamily: appTheme.fonts.families.primary
               }}
             >
               Update
@@ -3285,9 +3352,9 @@ export default function DashboardPage() {
         marginBottom: isMobile ? "20px" : "25px"
       }}>
         <div style={{
-          backgroundColor: appTheme.colors.surface,
+          backgroundColor: appTheme.colors.backgroundCard,
           padding: isMobile ? "16px" : "20px",
-          borderRadius: "12px",
+          borderRadius: appTheme.radius.lg,
           boxShadow: "0 4px 15px rgba(0, 0, 0, 0.06)",
           border: `1px solid ${appTheme.colors.border}20`,
           flex: notifications.length > 0 ? (isMobile ? "none" : 2) : 1,
@@ -3302,7 +3369,9 @@ export default function DashboardPage() {
             <h3 style={{ 
               color: appTheme.colors.textPrimary, 
               margin: 0,
-              fontSize: isMobile ? "1rem" : "1.1rem"
+              fontSize: isMobile ? "1rem" : "1.1rem",
+              fontFamily: appTheme.fonts.families.primary,
+              fontWeight: appTheme.fonts.weights.semibold
             }}>
               Recent Orders
             </h3>
@@ -3316,7 +3385,8 @@ export default function DashboardPage() {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "4px",
-                whiteSpace: "nowrap"
+                whiteSpace: "nowrap",
+                fontFamily: appTheme.fonts.families.primary
               }}>
                 <span>📡</span>
                 <span style={{ display: isMobile ? "none" : "inline" }}>Real-time</span>
@@ -3330,24 +3400,25 @@ export default function DashboardPage() {
                 justifyContent: "space-between",
                 alignItems: "center",
                 padding: isMobile ? "10px" : "12px",
-                backgroundColor: `${appTheme.colors.background}50`,
-                borderRadius: "8px",
+                backgroundColor: `${appTheme.colors.backgroundLight}50`,
+                borderRadius: appTheme.radius.md,
                 border: `1px solid ${appTheme.colors.border}15`,
                 transition: "all 0.2s ease",
                 ':hover': {
-                  backgroundColor: `${appTheme.colors.background}70`,
+                  backgroundColor: `${appTheme.colors.backgroundLight}70`,
                   transform: "translateY(-1px)",
                   boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)"
                 }
               }}>
                 <div style={{ flex: 1, minWidth: 0, marginRight: "10px" }}>
                   <div style={{ 
-                    fontWeight: "600", 
+                    fontWeight: appTheme.fonts.weights.semibold, 
                     color: appTheme.colors.textPrimary, 
                     fontSize: isMobile ? "0.85rem" : "0.9rem",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
-                    textOverflow: "ellipsis"
+                    textOverflow: "ellipsis",
+                    fontFamily: appTheme.fonts.families.primary
                   }}>
                     #{order.orderNumber}
                   </div>
@@ -3356,7 +3427,8 @@ export default function DashboardPage() {
                     color: appTheme.colors.textSecondary,
                     whiteSpace: "nowrap",
                     overflow: "hidden",
-                    textOverflow: "ellipsis"
+                    textOverflow: "ellipsis",
+                    fontFamily: appTheme.fonts.families.primary
                   }}>
                     {order.createdBy} • ₹{order.totalPrice.toLocaleString()}
                   </div>
@@ -3370,7 +3442,8 @@ export default function DashboardPage() {
                 textAlign: "center", 
                 padding: "20px", 
                 color: appTheme.colors.textSecondary,
-                fontSize: isMobile ? "0.9rem" : "1rem"
+                fontSize: isMobile ? "0.9rem" : "1rem",
+                fontFamily: appTheme.fonts.families.primary
               }}>
                 No recent orders
               </div>
@@ -3381,9 +3454,9 @@ export default function DashboardPage() {
         {/* Notifications Panel */}
         {notifications.length > 0 && (
           <div style={{
-            backgroundColor: appTheme.colors.surface,
+            backgroundColor: appTheme.colors.backgroundCard,
             padding: isMobile ? "16px" : "20px",
-            borderRadius: "12px",
+            borderRadius: appTheme.radius.lg,
             boxShadow: "0 4px 15px rgba(0, 0, 0, 0.06)",
             border: `1px solid ${appTheme.colors.border}20`,
             flex: isMobile ? "none" : 1,
@@ -3402,7 +3475,9 @@ export default function DashboardPage() {
               <h3 style={{ 
                 color: appTheme.colors.textPrimary, 
                 margin: 0,
-                fontSize: isMobile ? "1rem" : "1.1rem"
+                fontSize: isMobile ? "1rem" : "1.1rem",
+                fontFamily: appTheme.fonts.families.primary,
+                fontWeight: appTheme.fonts.weights.semibold
               }}>
                 Notifications
               </h3>
@@ -3418,7 +3493,8 @@ export default function DashboardPage() {
                     borderRadius: "6px",
                     cursor: "pointer",
                     whiteSpace: "nowrap",
-                    minHeight: "28px"
+                    minHeight: "28px",
+                    fontFamily: appTheme.fonts.families.primary
                   }}
                 >
                   Clear
@@ -3434,7 +3510,8 @@ export default function DashboardPage() {
                     borderRadius: "6px",
                     cursor: "pointer",
                     whiteSpace: "nowrap",
-                    minHeight: "28px"
+                    minHeight: "28px",
+                    fontFamily: appTheme.fonts.families.primary
                   }}
                 >
                   View All
@@ -3451,13 +3528,13 @@ export default function DashboardPage() {
                     justifyContent: "space-between",
                     alignItems: "flex-start",
                     padding: isMobile ? "10px" : "12px",
-                    backgroundColor: notification.status !== 'read' ? `${appTheme.colors.warning}10` : `${appTheme.colors.background}50`,
-                    borderRadius: "8px",
+                    backgroundColor: notification.status !== 'read' ? `${appTheme.colors.warning}10` : `${appTheme.colors.backgroundLight}50`,
+                    borderRadius: appTheme.radius.md,
                     border: `1px solid ${appTheme.colors.border}15`,
                     cursor: "pointer",
                     transition: "all 0.2s ease",
                     ':hover': {
-                      backgroundColor: notification.status !== 'read' ? `${appTheme.colors.warning}20` : `${appTheme.colors.background}70`,
+                      backgroundColor: notification.status !== 'read' ? `${appTheme.colors.warning}20` : `${appTheme.colors.backgroundLight}70`,
                       transform: "translateY(-1px)"
                     },
                     maxWidth: "100%",
@@ -3492,14 +3569,15 @@ export default function DashboardPage() {
                         minWidth: 0
                       }}>
                         <div style={{ 
-                          fontWeight: notification.status !== 'read' ? "700" : "600", 
+                          fontWeight: notification.status !== 'read' ? appTheme.fonts.weights.bold : appTheme.fonts.weights.semibold, 
                           color: appTheme.colors.textPrimary, 
                           fontSize: isMobile ? "0.8rem" : "0.85rem",
                           opacity: notification.status === 'read' ? 0.8 : 1,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
-                          lineHeight: 1.3
+                          lineHeight: 1.3,
+                          fontFamily: appTheme.fonts.families.primary
                         }}>
                           {notification.title}
                         </div>
@@ -3509,7 +3587,8 @@ export default function DashboardPage() {
                           marginTop: "2px",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
-                          whiteSpace: "nowrap"
+                          whiteSpace: "nowrap",
+                          fontFamily: appTheme.fonts.families.primary
                         }}>
                           {notification.message}
                         </div>
@@ -3520,7 +3599,8 @@ export default function DashboardPage() {
                             color: appTheme.colors.primary,
                             overflow: "hidden",
                             textOverflow: "ellipsis",
-                            whiteSpace: "nowrap"
+                            whiteSpace: "nowrap",
+                            fontFamily: appTheme.fonts.families.primary
                           }}>
                             Order #{notification.orderNumber}
                           </div>
@@ -3544,7 +3624,8 @@ export default function DashboardPage() {
                     whiteSpace: "nowrap",
                     marginLeft: "4px",
                     flexShrink: 0,
-                    paddingTop: "1px"
+                    paddingTop: "1px",
+                    fontFamily: appTheme.fonts.families.primary
                   }}>
                     {notification.timeSince || 'Just now'}
                   </div>
@@ -3558,9 +3639,9 @@ export default function DashboardPage() {
       {/* Top Selling Products */}
       <div style={{ marginTop: isMobile ? "16px" : "20px" }}>
         <div style={{
-          backgroundColor: appTheme.colors.surface,
+          backgroundColor: appTheme.colors.backgroundCard,
           padding: isMobile ? "16px" : "20px",
-          borderRadius: "12px",
+          borderRadius: appTheme.radius.lg,
           boxShadow: "0 4px 15px rgba(0, 0, 0, 0.06)",
           border: `1px solid ${appTheme.colors.border}20`,
           width: "100%"
@@ -3568,7 +3649,9 @@ export default function DashboardPage() {
           <h3 style={{ 
             marginBottom: "15px", 
             color: appTheme.colors.textPrimary,
-            fontSize: isMobile ? "1rem" : "1.1rem"
+            fontSize: isMobile ? "1rem" : "1.1rem",
+            fontFamily: appTheme.fonts.families.primary,
+            fontWeight: appTheme.fonts.weights.semibold
           }}>
             Top Selling Products
           </h3>
@@ -3579,12 +3662,12 @@ export default function DashboardPage() {
                 justifyContent: "space-between",
                 alignItems: "center",
                 padding: isMobile ? "10px" : "12px",
-                backgroundColor: `${appTheme.colors.background}50`,
-                borderRadius: "8px",
+                backgroundColor: `${appTheme.colors.backgroundLight}50`,
+                borderRadius: appTheme.radius.md,
                 border: `1px solid ${appTheme.colors.border}15`,
                 transition: "all 0.2s ease",
                 ':hover': {
-                  backgroundColor: `${appTheme.colors.background}70`,
+                  backgroundColor: `${appTheme.colors.backgroundLight}70`,
                   transform: "translateY(-1px)",
                   boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)"
                 }
@@ -3605,38 +3688,42 @@ export default function DashboardPage() {
                     alignItems: "center",
                     justifyContent: "center",
                     fontSize: isMobile ? "0.75rem" : "0.8rem",
-                    fontWeight: "600",
+                    fontWeight: appTheme.fonts.weights.semibold,
                     color: appTheme.colors.primary,
-                    flexShrink: 0
+                    flexShrink: 0,
+                    fontFamily: appTheme.fonts.families.primary
                   }}>
                     {index + 1}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ 
-                      fontWeight: "600", 
+                      fontWeight: appTheme.fonts.weights.semibold, 
                       color: appTheme.colors.textPrimary, 
                       fontSize: isMobile ? "0.85rem" : "0.9rem",
                       whiteSpace: "nowrap",
                       overflow: "hidden",
-                      textOverflow: "ellipsis"
+                      textOverflow: "ellipsis",
+                      fontFamily: appTheme.fonts.families.primary
                     }}>
                       {product.name}
                     </div>
                     <div style={{ 
                       fontSize: isMobile ? "0.75rem" : "0.8rem", 
-                      color: appTheme.colors.textSecondary 
+                      color: appTheme.colors.textSecondary,
+                      fontFamily: appTheme.fonts.families.primary
                     }}>
                       {product.quantity} sold
                     </div>
                   </div>
                 </div>
                 <div style={{ 
-                  fontWeight: "600", 
+                  fontWeight: appTheme.fonts.weights.semibold, 
                   color: appTheme.colors.primary,
                   fontSize: isMobile ? "0.85rem" : "0.9rem",
                   whiteSpace: "nowrap",
                   marginLeft: "10px",
-                  flexShrink: 0
+                  flexShrink: 0,
+                  fontFamily: appTheme.fonts.families.primary
                 }}>
                   ₹{product.revenue.toLocaleString()}
                 </div>
@@ -3646,7 +3733,8 @@ export default function DashboardPage() {
                 textAlign: "center", 
                 padding: "20px", 
                 color: appTheme.colors.textSecondary,
-                fontSize: isMobile ? "0.9rem" : "1rem"
+                fontSize: isMobile ? "0.9rem" : "1rem",
+                fontFamily: appTheme.fonts.families.primary
               }}>
                 No sales data
               </div>
@@ -3702,9 +3790,9 @@ export default function DashboardPage() {
 
 const MetricCard = ({ icon, title, value, color, appTheme, isMobile }) => (
   <div style={{
-    backgroundColor: appTheme.colors.surface,
+    backgroundColor: appTheme.colors.backgroundCard,
     padding: isMobile ? "14px" : "18px",
-    borderRadius: "12px",
+    borderRadius: appTheme.radius.lg,
     boxShadow: "0 4px 15px rgba(0, 0, 0, 0.06)",
     border: `1px solid ${appTheme.colors.border}20`,
     transition: "all 0.2s ease",
@@ -3736,15 +3824,17 @@ const MetricCard = ({ icon, title, value, color, appTheme, isMobile }) => (
           marginBottom: "2px",
           whiteSpace: "nowrap",
           overflow: "hidden",
-          textOverflow: "ellipsis"
+          textOverflow: "ellipsis",
+          fontFamily: appTheme.fonts.families.primary
         }}>
           {title}
         </div>
         <div style={{ 
           fontSize: isMobile ? "1.4rem" : "1.6rem", 
-          fontWeight: "700", 
+          fontWeight: appTheme.fonts.weights.bold, 
           color: appTheme.colors.textPrimary,
-          lineHeight: 1.2
+          lineHeight: 1.2,
+          fontFamily: appTheme.fonts.families.primary
         }}>
           {value}
         </div>
@@ -3778,13 +3868,14 @@ const StatusBadge = ({ status, appTheme, isMobile }) => {
       padding: isMobile ? "3px 8px" : "4px 10px",
       borderRadius: "12px",
       fontSize: isMobile ? "0.65rem" : "0.7rem",
-      fontWeight: "600",
+      fontWeight: appTheme.fonts.weights.semibold,
       backgroundColor: config.bg,
       color: config.color,
       display: "flex",
       alignItems: "center",
       gap: "3px",
-      whiteSpace: "nowrap"
+      whiteSpace: "nowrap",
+      fontFamily: appTheme.fonts.families.primary
     }}>
       <span>{config.icon}</span>
       <span>{isMobile ? status.substring(0, 4) : status}</span>

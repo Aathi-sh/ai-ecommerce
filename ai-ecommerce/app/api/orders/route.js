@@ -1875,6 +1875,7 @@ export async function GET(request) {
 }
 
 // ========== POST HANDLER ==========
+// ========== POST HANDLER ==========
 export async function POST(request) {
   try {
     await connectDB();
@@ -1897,22 +1898,36 @@ export async function POST(request) {
     // Add companyId to body
     body.companyId = companyId;
 
-    // Get user from auth - FIXED: Use helper function
-    const userId = getUserId(request, body);
-    if (!userId) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          message: "User authentication required",
-          error: "User ID could not be determined. Please ensure you are logged in and your session is valid."
-        },
-        { status: 401 }
-      );
+    // ✅ FIX: Check if this is a WhatsApp order (no authentication required)
+    const isWhatsAppOrder = body.source === 'whatsapp' || 
+                            body.createdBy?.includes('@lid') || 
+                            body.whatsappNumber ||
+                            body.phoneNumber;
+    
+    // Get user from auth - ONLY for admin orders, NOT for WhatsApp orders
+    let userId = null;
+    
+    if (!isWhatsAppOrder) {
+      userId = getUserId(request, body);
+      if (!userId) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: "User authentication required",
+            error: "User ID could not be determined. Please ensure you are logged in and your session is valid."
+          },
+          { status: 401 }
+        );
+      }
+      body.createdBy = userId;
+    } else {
+      // ✅ For WhatsApp orders, use WhatsApp ID as createdBy
+      body.createdBy = body.createdBy || body.whatsappNumber || body.phoneNumber || 'whatsapp-customer';
+      body.source = 'whatsapp';
+      console.log('📱 WhatsApp order - No authentication required');
     }
-    body.createdBy = userId;
 
-    // ===== FIX: GENERATE ORDER NUMBER AUTOMATICALLY =====
-    // Format: ORD-YYYYMMDD-XXXX (daily sequence)
+    // ===== GENERATE ORDER NUMBER AUTOMATICALLY =====
     const date = new Date();
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -1951,9 +1966,14 @@ export async function POST(request) {
     }
 
     // Clean phone numbers
-    body.phoneNumber = body.phoneNumber.replace(/\D/g, '');
+    if (body.phoneNumber) {
+      body.phoneNumber = body.phoneNumber.replace(/\D/g, '');
+    }
     if (body.secondaryPhoneNumber) {
       body.secondaryPhoneNumber = body.secondaryPhoneNumber.replace(/\D/g, '');
+    }
+    if (body.whatsappNumber) {
+      body.whatsappNumber = body.whatsappNumber.replace(/\D/g, '');
     }
 
     // Calculate totals for each item
@@ -1961,43 +1981,45 @@ export async function POST(request) {
     let totalDiscount = 0;
     let totalGst = 0;
     
-    for (const item of body.items) {
-      const product = await Product.findOne({ 
-        _id: item.productId, 
-        companyId 
-      });
+    if (body.items && body.items.length > 0) {
+      for (const item of body.items) {
+        const product = await Product.findOne({ 
+          _id: item.productId, 
+          companyId 
+        });
 
-      if (!product) {
-        return NextResponse.json(
-          { 
-            success: false, 
-            message: "Validation failed",
-            error: `Product with ID ${item.productId} not found in this company`
-          },
-          { status: 400 }
-        );
+        if (!product) {
+          return NextResponse.json(
+            { 
+              success: false, 
+              message: "Validation failed",
+              error: `Product with ID ${item.productId} not found in this company`
+            },
+            { status: 400 }
+          );
+        }
+
+        // Take inventory snapshot
+        item.inventorySnapshot = product.stock;
+
+        // Calculate item totals
+        const itemTotal = item.quantity * item.price;
+        subtotal += itemTotal;
+        totalDiscount += item.quantity * ((item.mrp || item.price) - item.price);
+        
+        // Calculate GST
+        let gstAmount = 0;
+        if (item.gstIncluded) {
+          const basePrice = itemTotal * 100 / (100 + item.gstRate);
+          gstAmount = itemTotal - basePrice;
+        } else {
+          gstAmount = (itemTotal * item.gstRate) / 100;
+        }
+        totalGst += gstAmount;
+
+        item.gstAmount = gstAmount;
+        item.totalAmount = itemTotal;
       }
-
-      // Take inventory snapshot
-      item.inventorySnapshot = product.stock;
-
-      // Calculate item totals
-      const itemTotal = item.quantity * item.price;
-      subtotal += itemTotal;
-      totalDiscount += item.quantity * (item.mrp - item.price);
-      
-      // Calculate GST
-      let gstAmount = 0;
-      if (item.gstIncluded) {
-        const basePrice = itemTotal * 100 / (100 + item.gstRate);
-        gstAmount = itemTotal - basePrice;
-      } else {
-        gstAmount = (itemTotal * item.gstRate) / 100;
-      }
-      totalGst += gstAmount;
-
-      item.gstAmount = gstAmount;
-      item.totalAmount = itemTotal;
     }
 
     // Set calculated values
@@ -2019,7 +2041,7 @@ export async function POST(request) {
 
     // Set source if not provided
     if (!body.source) {
-      body.source = "admin"; // Default for manual orders
+      body.source = isWhatsAppOrder ? "whatsapp" : "admin";
     }
 
     // Initialize status history
@@ -2027,17 +2049,17 @@ export async function POST(request) {
       status: body.status || 'pending',
       timestamp: new Date(),
       comment: 'Order created',
-      updatedBy: userId
+      updatedBy: body.createdBy
     }];
 
     // Initialize payment details if paid amount > 0
     if (body.paidAmount > 0) {
       body.paymentDetails = [{
         amount: body.paidAmount,
-        method: body.paymentMethod,
+        method: body.paymentMethod || 'upi',
         transactionId: body.transactionId,
         paidAt: new Date(),
-        verifiedBy: userId,
+        verifiedBy: body.createdBy,
         verifiedAt: new Date()
       }];
     }
@@ -2047,12 +2069,14 @@ export async function POST(request) {
       body.billingAddress = body.shippingAddress;
     }
 
-    // Create the order (orderNumber is now set)
+    // Create the order
     console.log('📦 Creating order with data:', {
       orderNumber: body.orderNumber,
       companyId: body.companyId,
+      source: body.source,
+      createdBy: body.createdBy,
       totalPrice: body.totalPrice,
-      itemsCount: body.items.length
+      itemsCount: body.items?.length || 0
     });
     
     const order = await Order.create(body);
@@ -2061,7 +2085,7 @@ export async function POST(request) {
     // Update product stock atomically
     console.log("📦 Updating product stock after order creation...");
     
-    for (const item of body.items) {
+    for (const item of body.items || []) {
       try {
         const updatedProduct = await Product.findOneAndUpdate(
           { _id: item.productId, companyId },
@@ -2092,28 +2116,7 @@ export async function POST(request) {
         model: Product,
         select: "productName sku hsnCode imageUrls category brand mrp"
       })
-      .populate("createdBy", "fullName email")
       .lean();
-
-    // // Generate invoice number
-    // if (!populatedOrder.invoiceNumber) {
-    //   const invoiceDate = new Date();
-    //   const invoiceYear = invoiceDate.getFullYear();
-    //   const invoiceMonth = (invoiceDate.getMonth() + 1).toString().padStart(2, '0');
-    //   const invoiceSequence = await Order.countDocuments({ 
-    //     companyId,
-    //     invoiceNumber: { $regex: `^INV-${invoiceYear}${invoiceMonth}` }
-    //   }) + 1;
-      
-    //   populatedOrder.invoiceNumber = `INV-${invoiceYear}${invoiceMonth}-${invoiceSequence.toString().padStart(4, '0')}`;
-      
-    //   // Update the order with invoice number
-    //   await Order.findByIdAndUpdate(order._id, {
-    //     invoiceNumber: populatedOrder.invoiceNumber,
-    //     invoiceGenerated: true,
-    //     invoiceGeneratedAt: new Date()
-    //   });
-    // }
 
     return NextResponse.json(
       { 

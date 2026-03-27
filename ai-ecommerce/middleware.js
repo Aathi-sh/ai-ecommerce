@@ -1078,6 +1078,7 @@ const whatsappPaths = new Set([
   '/api/whatsapp/qr',
   '/api/whatsapp/stats',
   '/api/whatsapp/activity',
+   '/api/orders/',
   '/api/orders/public',
   '/api/orders/whatsapp',
   '/api/payments/verify',

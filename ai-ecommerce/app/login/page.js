@@ -1,3 +1,4 @@
+
 // 'use client';
 
 // import { useState, useEffect } from 'react';
@@ -86,10 +87,25 @@
 //     if (status === 'loading') return;
     
 //     if (session?.user) {
-//       console.log('✅ [Login] User already authenticated, redirecting...');
-//       const redirectPath = session.user.role === 'admin' 
-//         ? '/admin/dashboards' 
-//         : '/dashboards';
+//       console.log('✅ [Login] User already authenticated, redirecting...', session.user);
+      
+//       // Determine redirect path based on role and adminType
+//       let redirectPath = '/dashboards';
+      
+//       if (session.user.role === 'admin') {
+//         if (session.user.adminType === 'super') {
+//           redirectPath = '/super-admin/dashboard';  // Super admin goes here
+//           console.log('👑 Super admin detected, redirecting to:', redirectPath);
+//         } else {
+//           redirectPath = '/admin/dashboards';       // Company admin goes here
+//           console.log('🏢 Company admin detected, redirecting to:', redirectPath);
+//         }
+//       } else if (session.user.role === 'manager') {
+//         redirectPath = '/manager/dashboard';
+//       } else {
+//         redirectPath = '/dashboards';
+//       }
+      
 //       router.push(redirectPath);
 //     }
 //   }, [session, status, router]);
@@ -183,6 +199,15 @@
 //           errorMessage = 'Your account is inactive. Please contact support';
 //         } else if (result.error.includes('Too many requests')) {
 //           errorMessage = 'Too many login attempts. Please try again later.';
+//         } else if (result.error.includes('PENDING_VERIFICATION')) {
+//           errorMessage = 'Please verify your email before logging in';
+//           errorType = 'warning';
+//         } else if (result.error.includes('ACCOUNT_INACTIVE')) {
+//           errorMessage = 'Your account is inactive. Please contact support';
+//         } else if (result.error.includes('ACCOUNT_SUSPENDED')) {
+//           errorMessage = 'Your account has been suspended. Please contact support';
+//         } else if (result.error.includes('COMPANY_INACTIVE')) {
+//           errorMessage = 'Your company account is inactive. Please contact support';
 //         }
         
 //         setMessage({ 
@@ -217,16 +242,23 @@
 //       // Wait a moment for session to update
 //       await new Promise(resolve => setTimeout(resolve, 500));
       
-//       // Fetch updated session to get user role
+//       // Fetch updated session to get user role and adminType
 //       const sessionRes = await fetch('/api/auth/session');
 //       const sessionData = await sessionRes.json();
       
+//       // Determine redirect path based on role and adminType
 //       let redirectPath = callbackUrl;
       
 //       if (sessionData?.user?.role === 'admin') {
-//         redirectPath = '/admin/dashboards';
+//         if (sessionData.user.adminType === 'super') {
+//           redirectPath = '/super-admin/dashboard';  // Super admin redirect
+//           console.log('👑 Super admin login, redirecting to:', redirectPath);
+//         } else {
+//           redirectPath = '/admin/dashboards';       // Company admin redirect
+//           console.log('🏢 Company admin login, redirecting to:', redirectPath);
+//         }
 //       } else if (sessionData?.user?.role === 'manager') {
-//         redirectPath = '/manager/dashboards';
+//         redirectPath = '/manager/dashboard';
 //       } else if (sessionData?.user?.role === 'user') {
 //         redirectPath = '/dashboards';
 //       }
@@ -297,7 +329,7 @@
         
 //         setTimeout(() => {
 //           const redirectPath = role === 'admin' ? '/admin/dashboards' : 
-//                               role === 'manager' ? '/manager/dashboards' : '/dashboards';
+//                               role === 'manager' ? '/manager/dashboard' : '/dashboards';
 //           router.push(redirectPath);
 //         }, 1500);
 //       }
@@ -779,6 +811,18 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -801,10 +845,74 @@ export default function Login() {
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
+  
+  // Get theme values with fallbacks
+  const primaryColor = appTheme?.colors?.primary || "#3B82F6";
+  const backgroundColor = appTheme?.colors?.background || "#F9FAFB";
+  const surfaceColor = appTheme?.colors?.surface || appTheme?.colors?.backgroundCard || "#FFFFFF";
+  const textPrimary = appTheme?.colors?.textPrimary || "#111827";
+  const textSecondary = appTheme?.colors?.textSecondary || "#6B7280";
+  const borderColor = appTheme?.colors?.border || "#E5E7EB";
+  const errorColor = appTheme?.colors?.error || "#EF4444";
+  const successColor = appTheme?.colors?.success || "#10B981";
+  const warningColor = appTheme?.colors?.warning || "#F59E0B";
+  
+  // Get font values
+  const fontFamily = appTheme?.fonts?.families?.primary || "Inter, sans-serif";
+  const fontSizes = appTheme?.fonts?.sizes || {
+    xs: "0.75rem",
+    sm: "0.875rem",
+    base: "1rem",
+    lg: "1.125rem",
+    xl: "1.25rem",
+    "2xl": "1.5rem",
+    "3xl": "1.875rem",
+  };
+  const fontWeights = appTheme?.fonts?.weights || {
+    normal: 400,
+    medium: 500,
+    semibold: 600,
+    bold: 700,
+  };
+  
+  // Get spacing
+  const spacing = appTheme?.spacing || {
+    xs: "4px",
+    sm: "8px",
+    md: "16px",
+    lg: "24px",
+    xl: "32px",
+    "2xl": "48px",
+  };
+  
+  // Get transitions
+  const transitionFast = appTheme?.transitions?.fast || "all 0.15s cubic-bezier(0.4, 0, 0.2, 1)";
+  const transitionNormal = appTheme?.transitions?.normal || "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)";
+  
+  // Get radius
+  const radiusMd = appTheme?.radius?.md || "8px";
+  const radiusLg = appTheme?.radius?.lg || "12px";
+  const radiusFull = appTheme?.radius?.full || "9999px";
+  
+  // Get shadows
+  const shadowLg = appTheme?.shadows?.lg || "0 10px 15px -3px rgba(0, 0, 0, 0.1)";
+  
+  // Check for mobile on mount and window resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // Check for callback URL and error messages
   useEffect(() => {
@@ -874,10 +982,10 @@ export default function Login() {
       
       if (session.user.role === 'admin') {
         if (session.user.adminType === 'super') {
-          redirectPath = '/super-admin/dashboard';  // Super admin goes here
+          redirectPath = '/super-admin/dashboard';
           console.log('👑 Super admin detected, redirecting to:', redirectPath);
         } else {
-          redirectPath = '/admin/dashboards';       // Company admin goes here
+          redirectPath = '/admin/dashboards';
           console.log('🏢 Company admin detected, redirecting to:', redirectPath);
         }
       } else if (session.user.role === 'manager') {
@@ -959,14 +1067,13 @@ export default function Login() {
       const result = await signIn('credentials', {
         email,
         password,
-        redirect: false, // We'll handle redirect manually
-        callbackUrl: '/', // Default callback URL
+        redirect: false,
+        callbackUrl: '/',
       });
 
       console.log('📋 [Login] NextAuth sign in result:', result);
 
       if (result?.error) {
-        // Handle specific error cases
         let errorMessage = 'Login failed. Please check your credentials.';
         let errorType = 'error';
         
@@ -995,7 +1102,6 @@ export default function Login() {
           text: `${errorType === 'warning' ? '⚠️' : '❌'} ${errorMessage}` 
         });
         
-        // Clear password field on error
         setFormData(prev => ({ 
           ...prev, 
           password: '' 
@@ -1004,7 +1110,6 @@ export default function Login() {
         return;
       }
 
-      // Login successful
       console.log('✅ [Login] Authentication successful');
       
       setMessage({ 
@@ -1012,29 +1117,24 @@ export default function Login() {
         text: '✅ Login successful! Redirecting...' 
       });
       
-      // Get the callback URL from sessionStorage or use default
       const callbackUrl = sessionStorage.getItem('auth_callback_url') || 
                         (formData.rememberMe ? '/dashboards' : '/');
       
-      // Clear the stored callback URL
       sessionStorage.removeItem('auth_callback_url');
       
-      // Wait a moment for session to update
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Fetch updated session to get user role and adminType
       const sessionRes = await fetch('/api/auth/session');
       const sessionData = await sessionRes.json();
       
-      // Determine redirect path based on role and adminType
       let redirectPath = callbackUrl;
       
       if (sessionData?.user?.role === 'admin') {
         if (sessionData.user.adminType === 'super') {
-          redirectPath = '/super-admin/dashboard';  // Super admin redirect
+          redirectPath = '/super-admin/dashboard';
           console.log('👑 Super admin login, redirecting to:', redirectPath);
         } else {
-          redirectPath = '/admin/dashboards';       // Company admin redirect
+          redirectPath = '/admin/dashboards';
           console.log('🏢 Company admin login, redirecting to:', redirectPath);
         }
       } else if (sessionData?.user?.role === 'manager') {
@@ -1044,8 +1144,6 @@ export default function Login() {
       }
       
       console.log(`🔄 [Login] Redirecting to: ${redirectPath}`);
-      
-      // Use router.push for SPA navigation
       router.push(redirectPath);
       
     } catch (error) {
@@ -1064,7 +1162,6 @@ export default function Login() {
         text: `❌ ${errorMessage}` 
       });
       
-      // Clear password field on error
       setFormData(prev => ({ 
         ...prev, 
         password: '' 
@@ -1078,7 +1175,6 @@ export default function Login() {
     setLoading(true);
     setMessage({ type: '', text: '' });
     
-    // Demo credentials (for development only)
     const demoCredentials = {
       user: { email: 'demo@example.com', password: 'Demo@123' },
       admin: { email: 'admin@example.com', password: 'Admin@123' },
@@ -1125,42 +1221,47 @@ export default function Login() {
   };
 
   const inputStyle = (hasError) => ({
-    padding: "14px 16px",
-    borderRadius: "10px",
-    border: hasError ? `1.5px solid ${appTheme.colors.error}` : "1.5px solid #ddd",
-    fontSize: "16px",
+    padding: isMobile ? `${spacing.sm} ${spacing.md}` : `${spacing.md} ${spacing.md}`,
+    borderRadius: radiusMd,
+    border: hasError ? `1.5px solid ${errorColor}` : `1.5px solid ${borderColor}`,
+    fontSize: isMobile ? fontSizes.base : fontSizes.base,
     outline: "none",
     width: "100%",
     boxSizing: "border-box",
-    transition: "border-color 0.3s, box-shadow 0.3s",
-    backgroundColor: appTheme.colors.surface,
+    transition: transitionFast,
+    backgroundColor: surfaceColor,
+    color: textPrimary,
+    fontFamily: fontFamily,
+    fontWeight: fontWeights.normal,
   });
 
   const errorTextStyle = {
-    color: appTheme.colors.error,
-    fontSize: "12px",
-    marginTop: "6px",
+    color: errorColor,
+    fontSize: isMobile ? fontSizes.xs : fontSizes.sm,
+    marginTop: spacing.xs,
     textAlign: "left",
     display: "block",
+    fontFamily: fontFamily,
   };
 
   const buttonStyle = {
-    backgroundColor: appTheme.colors.primary,
+    backgroundColor: primaryColor,
     color: "#fff",
-    padding: "14px",
+    padding: isMobile ? `${spacing.sm} ${spacing.md}` : `${spacing.md} ${spacing.md}`,
     border: "none",
-    borderRadius: "12px",
-    fontSize: "16px",
+    borderRadius: radiusLg,
+    fontSize: isMobile ? fontSizes.base : fontSizes.lg,
     cursor: loading ? "not-allowed" : "pointer",
-    fontWeight: "600",
+    fontWeight: fontWeights.semibold,
     width: "100%",
-    marginTop: "10px",
+    marginTop: spacing.xs,
     opacity: loading ? 0.7 : 1,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "8px",
-    transition: "all 0.2s ease",
+    gap: spacing.xs,
+    transition: transitionFast,
+    fontFamily: fontFamily,
   };
 
   return (
@@ -1170,68 +1271,73 @@ export default function Login() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: appTheme.colors.background,
-        fontFamily: appTheme.fonts.primary,
-        padding: "20px",
+        backgroundColor: backgroundColor,
+        fontFamily: fontFamily,
+        padding: isMobile ? spacing.md : spacing.lg,
+        overflowY: "auto",
       }}
     >
       <div
         style={{
           width: "100%",
-          maxWidth: "450px",
-          backgroundColor: appTheme.colors.surface,
-          padding: "40px",
-          borderRadius: "20px",
-          boxShadow: appTheme.shadows.lg,
+          maxWidth: isMobile ? "100%" : "480px",
+          backgroundColor: surfaceColor,
+          padding: isMobile ? spacing.lg : spacing.xl,
+          borderRadius: radiusLg,
+          boxShadow: shadowLg,
+          margin: isMobile ? spacing.sm : "0",
+          maxHeight: isMobile ? "calc(100vh - 32px)" : "auto",
+          overflowY: isMobile ? "auto" : "visible",
         }}
       >
-        <div style={{ marginBottom: "30px", textAlign: "center" }}>
+        <div style={{ marginBottom: spacing.lg, textAlign: "center" }}>
           <div style={{
-            width: "64px",
-            height: "64px",
-            backgroundColor: appTheme.colors.primary + "15",
-            borderRadius: "16px",
+            width: isMobile ? "56px" : "64px",
+            height: isMobile ? "56px" : "64px",
+            backgroundColor: `${primaryColor}15`,
+            borderRadius: radiusLg,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             margin: "0 auto 20px",
-            border: `2px solid ${appTheme.colors.primary}30`,
+            border: `2px solid ${primaryColor}30`,
           }}>
             <span style={{ 
-              fontSize: "32px", 
-              color: appTheme.colors.primary,
+              fontSize: isMobile ? fontSizes.xl : fontSizes["2xl"], 
+              color: primaryColor,
             }}>
               🔐
             </span>
           </div>
           <h1
             style={{
-              color: appTheme.colors.textPrimary,
-              fontSize: "28px",
-              marginBottom: "8px",
-              fontWeight: "700",
+              color: textPrimary,
+              fontSize: isMobile ? fontSizes.xl : fontSizes["3xl"],
+              marginBottom: spacing.xs,
+              fontWeight: fontWeights.bold,
             }}
           >
             Welcome Back
           </h1>
           <p style={{
-            color: appTheme.colors.textSecondary,
-            fontSize: "15px",
-            marginBottom: "0",
+            color: textSecondary,
+            fontSize: isMobile ? fontSizes.sm : fontSizes.base,
+            marginBottom: 0,
             lineHeight: "1.5",
           }}>
             Sign in to your Steponext account
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: "grid", gap: "20px" }}>
+        <form onSubmit={handleSubmit} style={{ display: "grid", gap: spacing.md }}>
           <div>
             <label style={{
               display: "block",
-              color: appTheme.colors.textSecondary,
-              fontSize: "14px",
-              fontWeight: "500",
-              marginBottom: "8px",
+              color: textSecondary,
+              fontSize: isMobile ? fontSizes.sm : fontSizes.base,
+              fontWeight: fontWeights.medium,
+              marginBottom: spacing.xs,
+              fontFamily: fontFamily,
             }}>
               Email Address
             </label>
@@ -1255,12 +1361,13 @@ export default function Login() {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: "8px",
+              marginBottom: spacing.xs,
             }}>
               <label style={{
-                color: appTheme.colors.textSecondary,
-                fontSize: "14px",
-                fontWeight: "500",
+                color: textSecondary,
+                fontSize: isMobile ? fontSizes.sm : fontSizes.base,
+                fontWeight: fontWeights.medium,
+                fontFamily: fontFamily,
               }}>
                 Password
               </label>
@@ -1270,15 +1377,17 @@ export default function Login() {
                 style={{
                   background: "none",
                   border: "none",
-                  color: appTheme.colors.primary,
-                  fontSize: "12px",
+                  color: primaryColor,
+                  fontSize: isMobile ? fontSizes.xs : fontSizes.sm,
                   cursor: "pointer",
-                  padding: "4px 8px",
-                  borderRadius: "4px",
-                  transition: "background-color 0.2s",
+                  padding: `${spacing.xs} ${spacing.sm}`,
+                  borderRadius: radiusMd,
+                  transition: transitionFast,
+                  fontFamily: fontFamily,
+                  fontWeight: fontWeights.medium,
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = appTheme.colors.primary + "10";
+                  e.target.style.backgroundColor = `${primaryColor}10`;
                 }}
                 onMouseLeave={(e) => {
                   e.target.style.backgroundColor = "transparent";
@@ -1308,12 +1417,12 @@ export default function Login() {
             justifyContent: "space-between",
             alignItems: "center",
             flexWrap: "wrap",
-            gap: "10px",
+            gap: spacing.xs,
           }}>
             <label style={{
               display: "flex",
               alignItems: "center",
-              gap: "8px",
+              gap: spacing.xs,
               cursor: "pointer",
               userSelect: "none",
             }}>
@@ -1330,8 +1439,9 @@ export default function Login() {
                 disabled={loading}
               />
               <span style={{
-                color: appTheme.colors.textSecondary,
-                fontSize: "14px",
+                color: textSecondary,
+                fontSize: isMobile ? fontSizes.xs : fontSizes.sm,
+                fontFamily: fontFamily,
               }}>
                 Remember me
               </span>
@@ -1340,17 +1450,18 @@ export default function Login() {
             <Link 
               href="/forgot-password" 
               style={{
-                color: appTheme.colors.primary,
+                color: primaryColor,
                 textDecoration: "none",
-                fontSize: "14px",
-                fontWeight: "500",
-                transition: "all 0.2s ease",
-                padding: "4px 8px",
-                borderRadius: "4px",
+                fontSize: isMobile ? fontSizes.xs : fontSizes.sm,
+                fontWeight: fontWeights.medium,
+                transition: transitionFast,
+                padding: `${spacing.xs} ${spacing.sm}`,
+                borderRadius: radiusMd,
+                fontFamily: fontFamily,
               }}
               onMouseEnter={(e) => {
                 e.target.style.textDecoration = "underline";
-                e.target.style.backgroundColor = appTheme.colors.primary + "10";
+                e.target.style.backgroundColor = `${primaryColor}10`;
               }}
               onMouseLeave={(e) => {
                 e.target.style.textDecoration = "none";
@@ -1364,22 +1475,23 @@ export default function Login() {
           {message.text && (
             <div
               style={{
-                padding: "14px 16px",
-                borderRadius: "10px",
-                backgroundColor: message.type === 'success' ? '#f0f9f0' : 
-                               message.type === 'warning' ? '#fff3cd' : '#fef2f2',
-                color: message.type === 'success' ? '#059669' : 
-                      message.type === 'warning' ? '#856404' : appTheme.colors.error,
-                fontSize: "14px",
-                border: `1px solid ${message.type === 'success' ? '#bbf7d0' : 
-                        message.type === 'warning' ? '#ffeaa7' : '#fecaca'}`,
+                padding: spacing.sm,
+                borderRadius: radiusMd,
+                backgroundColor: message.type === 'success' ? `${successColor}10` : 
+                               message.type === 'warning' ? `${warningColor}10` : `${errorColor}10`,
+                color: message.type === 'success' ? successColor : 
+                      message.type === 'warning' ? warningColor : errorColor,
+                fontSize: isMobile ? fontSizes.sm : fontSizes.base,
+                border: `1px solid ${message.type === 'success' ? successColor : 
+                        message.type === 'warning' ? warningColor : errorColor}30`,
                 display: "flex",
                 alignItems: "flex-start",
-                gap: "10px",
+                gap: spacing.xs,
+                fontFamily: fontFamily,
               }}
             >
               <span style={{ 
-                fontSize: "16px",
+                fontSize: isMobile ? fontSizes.base : fontSizes.lg,
                 flexShrink: 0,
                 marginTop: "1px",
               }}>
@@ -1416,7 +1528,7 @@ export default function Login() {
                 <span style={{
                   width: "18px",
                   height: "18px",
-                  border: "2px solid rgba(255,255,255,0.3)",
+                  border: `2px solid rgba(255,255,255,0.3)`,
                   borderTopColor: "#fff",
                   borderRadius: "50%",
                   animation: "spin 0.8s linear infinite",
@@ -1429,20 +1541,21 @@ export default function Login() {
           {/* Demo Login Buttons (Development Only) */}
           {process.env.NODE_ENV === 'development' && (
             <div style={{
-              marginTop: "10px",
+              marginTop: spacing.xs,
             }}>
               <p style={{
-                color: appTheme.colors.textSecondary,
-                fontSize: "12px",
+                color: textSecondary,
+                fontSize: isMobile ? fontSizes.xs : fontSizes.sm,
                 textAlign: "center",
-                marginBottom: "10px",
+                marginBottom: spacing.xs,
+                fontFamily: fontFamily,
               }}>
                 🧪 Development Demo:
               </p>
               <div style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(3, 1fr)",
-                gap: "8px",
+                gap: spacing.xs,
               }}>
                 {['user', 'manager', 'admin'].map((role) => (
                   <button
@@ -1451,26 +1564,28 @@ export default function Login() {
                     onClick={() => handleDemoLogin(role)}
                     disabled={loading}
                     style={{
-                      padding: "10px",
-                      border: `1px solid ${appTheme.colors.border}`,
-                      borderRadius: "8px",
-                      backgroundColor: appTheme.colors.surface,
-                      color: appTheme.colors.textSecondary,
-                      fontSize: "12px",
+                      padding: isMobile ? spacing.xs : spacing.sm,
+                      border: `1px solid ${borderColor}`,
+                      borderRadius: radiusMd,
+                      backgroundColor: surfaceColor,
+                      color: textSecondary,
+                      fontSize: isMobile ? fontSizes.xs : fontSizes.sm,
                       cursor: loading ? "not-allowed" : "pointer",
-                      transition: "all 0.2s ease",
+                      transition: transitionFast,
                       textTransform: "capitalize",
+                      fontFamily: fontFamily,
+                      fontWeight: fontWeights.medium,
                     }}
                     onMouseEnter={(e) => {
                       if (!loading) {
-                        e.target.style.backgroundColor = appTheme.colors.primary + "10";
-                        e.target.style.borderColor = appTheme.colors.primary;
+                        e.target.style.backgroundColor = `${primaryColor}10`;
+                        e.target.style.borderColor = primaryColor;
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!loading) {
-                        e.target.style.backgroundColor = appTheme.colors.surface;
-                        e.target.style.borderColor = appTheme.colors.border;
+                        e.target.style.backgroundColor = surfaceColor;
+                        e.target.style.borderColor = borderColor;
                       }
                     }}
                   >
@@ -1482,35 +1597,37 @@ export default function Login() {
           )}
 
           <div style={{ 
-            marginTop: "30px", 
-            paddingTop: "25px", 
-            borderTop: `1px solid ${appTheme.colors.border}`,
+            marginTop: spacing.lg, 
+            paddingTop: spacing.lg, 
+            borderTop: `1px solid ${borderColor}`,
             textAlign: "center"
           }}>
             <p style={{
-              color: appTheme.colors.textSecondary,
-              fontSize: "14px",
-              marginBottom: "16px",
+              color: textSecondary,
+              fontSize: isMobile ? fontSizes.sm : fontSizes.base,
+              marginBottom: spacing.md,
+              fontFamily: fontFamily,
             }}>
               Don't have an account?
             </p>
             <Link 
               href="/signup" 
               style={{
-                color: appTheme.colors.primary,
+                color: primaryColor,
                 textDecoration: "none",
-                fontSize: "14px",
-                fontWeight: "600",
+                fontSize: isMobile ? fontSizes.sm : fontSizes.base,
+                fontWeight: fontWeights.semibold,
                 display: "inline-flex",
                 alignItems: "center",
-                gap: "6px",
-                padding: "10px 20px",
-                borderRadius: "8px",
-                border: `1.5px solid ${appTheme.colors.primary}30`,
-                transition: "all 0.2s ease",
+                gap: spacing.xs,
+                padding: isMobile ? `${spacing.xs} ${spacing.md}` : `${spacing.sm} ${spacing.lg}`,
+                borderRadius: radiusMd,
+                border: `1.5px solid ${primaryColor}30`,
+                transition: transitionFast,
+                fontFamily: fontFamily,
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = appTheme.colors.primary + "10";
+                e.target.style.backgroundColor = `${primaryColor}10`;
                 e.target.style.transform = "translateX(2px)";
               }}
               onMouseLeave={(e) => {
@@ -1524,18 +1641,19 @@ export default function Login() {
         </form>
 
         <div style={{
-          marginTop: "30px",
-          padding: "16px",
-          backgroundColor: appTheme.colors.background,
-          borderRadius: "10px",
-          border: `1px solid ${appTheme.colors.border}`,
+          marginTop: spacing.lg,
+          padding: spacing.md,
+          backgroundColor: backgroundColor,
+          borderRadius: radiusMd,
+          border: `1px solid ${borderColor}`,
         }}>
           <p style={{
-            color: appTheme.colors.textSecondary,
-            fontSize: "12px",
+            color: textSecondary,
+            fontSize: isMobile ? fontSizes.xs : fontSizes.sm,
             lineHeight: "1.5",
             margin: 0,
             textAlign: "center",
+            fontFamily: fontFamily,
           }}>
             🔒 Your security is our priority. We use industry-standard encryption
             to protect your data.
@@ -1544,12 +1662,13 @@ export default function Login() {
 
         <p
           style={{
-            marginTop: "30px",
-            color: appTheme.colors.textSecondary,
-            fontSize: "12px",
-            paddingTop: "20px",
-            borderTop: `1px solid ${appTheme.colors.border}`,
+            marginTop: spacing.lg,
+            color: textSecondary,
+            fontSize: isMobile ? fontSizes.xs : fontSizes.sm,
+            paddingTop: spacing.md,
+            borderTop: `1px solid ${borderColor}`,
             textAlign: "center",
+            fontFamily: fontFamily,
           }}
         >
           © {new Date().getFullYear()} Steponext. All rights reserved.
@@ -1558,23 +1677,56 @@ export default function Login() {
 
       <style jsx>{`
         @keyframes spin {
-          to { transform: rotate(360deg); }
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
         
         input:focus {
-          border-color: ${appTheme.colors.primary} !important;
-          box-shadow: 0 0 0 3px ${appTheme.colors.primary}20;
+          border-color: ${primaryColor} !important;
+          box-shadow: 0 0 0 3px ${primaryColor}20;
         }
         
         input:disabled, button:disabled {
-          background-color: ${appTheme.colors.background};
+          background-color: ${backgroundColor};
           cursor: not-allowed;
           opacity: 0.6;
         }
         
-        @media (max-width: 480px) {
-          .container {
-            padding: 20px;
+        /* Mobile-specific styles */
+        @media (max-width: 768px) {
+          input, button {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+          }
+          
+          input[type="email"],
+          input[type="password"] {
+            font-size: 16px !important;
+          }
+          
+          button {
+            -webkit-tap-highlight-color: transparent;
+          }
+        }
+        
+        /* Smooth scrolling for mobile */
+        @media (max-width: 768px) {
+          div {
+            scrollbar-width: thin;
+          }
+          
+          div::-webkit-scrollbar {
+            width: 4px;
+          }
+          
+          div::-webkit-scrollbar-track {
+            background: ${backgroundColor};
+          }
+          
+          div::-webkit-scrollbar-thumb {
+            background-color: ${borderColor};
+            border-radius: ${radiusFull};
           }
         }
       `}</style>
