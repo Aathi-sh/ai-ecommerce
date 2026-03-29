@@ -951,7 +951,7 @@ import {
   Package,
   HeartOff
 } from 'lucide-react';
-import { appTheme } from '../../src/constants/theme';
+import { appTheme } from '../../../src/constants/theme';
 
 // ==================== IMAGE ZOOM MODAL ====================
 const ImageZoomModal = ({ images, currentIndex, onClose, onNext, onPrev }) => {
