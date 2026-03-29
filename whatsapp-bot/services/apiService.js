@@ -5290,6 +5290,15 @@ async createOrder(orderData) {
             throw new Error('Missing required order fields');
         }
 
+        // ✅ DEBUG: Log what's being received
+        console.log('📦 [createOrder] Received orderData:', {
+            createdBy: orderData.createdBy,
+            whatsappNumber: orderData.whatsappNumber,
+            phoneNumber: orderData.phoneNumber,
+            orderNumber: orderData.orderNumber,
+            customerName: orderData.customerName
+        });
+
         const formattedOrderData = {
             companyId: orderData.companyId || 'default',
             orderNumber: orderData.orderNumber,
@@ -5338,7 +5347,16 @@ async createOrder(orderData) {
             createdBy: orderData.createdBy || 'whatsapp'
         };
 
-        // ✅ FIX: Add authentication headers
+        // ✅ DEBUG: Log what's being sent
+        console.log('📤 [createOrder] Sending to API:', {
+            createdBy: formattedOrderData.createdBy,
+            whatsappNumber: formattedOrderData.whatsappNumber,
+            phoneNumber: formattedOrderData.phoneNumber,
+            orderNumber: formattedOrderData.orderNumber,
+            hasAtLid: formattedOrderData.createdBy?.includes('@lid')
+        });
+
+        // ✅ Send the request
         const response = await this.client.post('/api/orders', formattedOrderData, {
             headers: {
                 'x-company-id': formattedOrderData.companyId,
@@ -5350,6 +5368,16 @@ async createOrder(orderData) {
         return this.extractData(response.data);
         
     } catch (error) {
+        console.error('❌ [createOrder] Error:', {
+            message: error.message,
+            status: error.response?.status,
+            data: error.response?.data,
+            sentData: {
+                createdBy: orderData?.createdBy,
+                whatsappNumber: orderData?.whatsappNumber,
+                orderNumber: orderData?.orderNumber
+            }
+        });
         this.handleApiError('Create Order', error);
         throw new Error('Failed to create order: ' + (error.response?.data?.message || error.message));
     }
