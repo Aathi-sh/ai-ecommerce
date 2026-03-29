@@ -8,7 +8,7 @@ import { toast, Toaster } from 'react-hot-toast';
 import { useAuth } from '../../../context/AuthContext';
 import Head from 'next/head';
 import { useRouter } from 'next/navigation';
-import TransactionModal from '../../../components/TransactionModal';
+import TransactionModal from '../../../src/components/TransactionModal';
 
 // Import our professional OCR display utilities
 import {

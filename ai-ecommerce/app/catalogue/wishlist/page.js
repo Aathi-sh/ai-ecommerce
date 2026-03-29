@@ -730,7 +730,7 @@ import {
   Sparkles,
   Zap
 } from 'lucide-react';
-import { appTheme } from '../../src/constants/theme';
+import { appTheme } from '../../../src/constants/theme';
 
 export default function WishlistPage() {
   const searchParams = useSearchParams();

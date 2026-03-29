@@ -1016,7 +1016,7 @@ import {
   Headphones as HeadphonesIcon,
   User
 } from 'lucide-react';
-import { appTheme } from '../../../src/constants/theme';
+import { appTheme } from '../../../../src/constants/theme';
 
 // ==================== IMAGE GALLERY COMPONENT ====================
 const ImageGallery = ({ images, productName }) => {
