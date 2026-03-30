@@ -3,7 +3,7 @@ import { connectDB } from '@/utils/db';
 import Counter from '@/models/Counter';
 import Product from '@/models/Product';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '../../../lib/nextauth';
 
 // ✅ GET - Fetch current counter status and history
 export async function GET(request) {
