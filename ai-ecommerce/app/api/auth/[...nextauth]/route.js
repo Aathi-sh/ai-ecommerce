@@ -1,8 +1,7 @@
 export const dynamic = 'force-dynamic'; // ✅ Add this at the top
 
 import NextAuth from 'next-auth';
-import { authOptions } from '@/lib/nextauth';
-
+import { authOptions } from '../../../../lib/nextauth';
 /**
  * NextAuth API Route Handler
  * 
