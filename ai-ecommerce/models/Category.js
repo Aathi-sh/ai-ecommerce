@@ -315,41 +315,65 @@ CategorySchema.post('save', function(doc) {
 // ========== STATIC METHODS (UPDATED WITH COMPANY CONTEXT) ==========
 
 // Get category tree for a company
+// ========== FIXED: Get category tree for a company ==========
 CategorySchema.statics.getTree = async function(companyId, includeInactive = false) {
+    // Get ALL categories for this company (don't filter isActive at query level)
     const query = { 
         companyId, 
-        deletedAt: null,
-        ...(includeInactive ? {} : { isActive: true })
+        deletedAt: null
     };
     
     const categories = await this.find(query)
         .sort({ displayOrder: 1, name: 1 })
         .lean();
     
-    const tree = [];
+    // Build map of all categories
     const map = {};
-    
     categories.forEach(cat => {
-        map[cat._id] = { ...cat, subcategories: [] };
+        map[cat._id] = { 
+            ...cat, 
+            subcategories: [],
+            isVisible: includeInactive ? true : cat.isActive
+        };
     });
+    
+    // Build tree structure
+    const tree = [];
     
     categories.forEach(cat => {
         if (cat.parentId && map[cat.parentId]) {
-            map[cat.parentId].subcategories.push(map[cat._id]);
+            // Add to parent if this category should be visible
+            if (includeInactive || cat.isActive) {
+                map[cat.parentId].subcategories.push(map[cat._id]);
+            }
         } else if (!cat.parentId) {
-            tree.push(map[cat._id]);
+            // Add to root if this category should be visible
+            if (includeInactive || cat.isActive) {
+                tree.push(map[cat._id]);
+            }
         }
     });
     
-    return tree;
+    // Clean up empty parent nodes (parents with no visible children)
+    const cleanEmptyParents = (nodes) => {
+        return nodes.filter(node => {
+            if (node.subcategories.length > 0) {
+                node.subcategories = cleanEmptyParents(node.subcategories);
+            }
+            return node.isVisible;
+        });
+    };
+    
+    return cleanEmptyParents(tree);
 };
 
 // Get flat list with level indicators for a company
+// ========== FIXED: Get flat list with level indicators ==========
 CategorySchema.statics.getFlatList = async function(companyId, includeInactive = false) {
+    // Get ALL categories first (don't filter isActive at query level)
     const query = { 
         companyId, 
-        deletedAt: null,
-        ...(includeInactive ? {} : { isActive: true })
+        deletedAt: null
     };
     
     const categories = await this.find(query)
@@ -359,23 +383,32 @@ CategorySchema.statics.getFlatList = async function(companyId, includeInactive =
     const result = [];
     const map = {};
     
+    // Build map with visibility flag
     categories.forEach(cat => {
-        map[cat._id] = { ...cat, subcategories: [] };
+        map[cat._id] = { 
+            ...cat, 
+            subcategories: [],
+            isVisible: includeInactive ? true : cat.isActive
+        };
     });
     
+    // Build parent-child relationships
     categories.forEach(cat => {
         if (cat.parentId && map[cat.parentId]) {
             map[cat.parentId].subcategories.push(map[cat._id]);
         }
     });
     
+    // Add to flat list with level, only include visible items
     const addWithLevel = (items, level = 0) => {
         items.forEach(item => {
-            result.push({ 
-                ...item, 
-                level,
-                indent: '—'.repeat(level)
-            });
+            if (item.isVisible) {
+                result.push({ 
+                    ...item, 
+                    level,
+                    indent: '—'.repeat(level)
+                });
+            }
             if (item.subcategories?.length) {
                 addWithLevel(item.subcategories, level + 1);
             }

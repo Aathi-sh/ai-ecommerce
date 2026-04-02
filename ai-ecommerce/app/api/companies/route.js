@@ -468,6 +468,7 @@ export async function GET(request) {
 }
 
 // ========== POST HANDLER - Create new company with admin user ==========
+// ========== POST HANDLER - Create new company with admin user ==========
 export async function POST(request) {
   const startTime = Date.now();
   
@@ -707,10 +708,7 @@ export async function POST(request) {
       );
     }
 
-    // Start MongoDB session for transaction
-    const dbSession = await mongoose.startSession();
-    dbSession.startTransaction();
-
+    // NO TRANSACTION - Direct creation
     try {
       // 1. Create Company with WhatsApp fields and NEW catalog fields
       const plan = body.plan || 'free';
@@ -821,7 +819,7 @@ export async function POST(request) {
             lastResetAt: new Date()
           }
         }
-      }], { session: dbSession });
+      }]);
 
       const companyId = company._id;
 
@@ -858,7 +856,7 @@ export async function POST(request) {
           requireTransactionId: true,
           allowMultiplePaymentMethods: true
         }
-      }], { session: dbSession });
+      }]);
 
       // 3. Create Admin User
       const hashedPassword = await bcrypt.hash(body.adminPassword, 12);
@@ -886,7 +884,7 @@ export async function POST(request) {
           },
           settingsUpdatedAt: new Date(),
         },
-      }], { session: dbSession });
+      }]);
 
       // 4. Initialize Counters for the company
       if (typeof Counter.initializeCompanyCounters === 'function') {
@@ -898,9 +896,7 @@ export async function POST(request) {
 
       // Update company with createdBy as the admin user
       company.createdBy = adminUser._id;
-      await company.save({ session: dbSession });
-
-      await dbSession.commitTransaction();
+      await company.save();
 
       console.log('✅ [COMPANIES API] Company created successfully:', {
         companyId: companyId.toString(),
@@ -970,11 +966,9 @@ export async function POST(request) {
           headers: { ...securityHeaders, ...corsHeaders },
         }
       );
-    } catch (transactionError) {
-      await dbSession.abortTransaction();
-      throw transactionError;
-    } finally {
-      dbSession.endSession();
+    } catch (error) {
+      // No transaction to abort, just throw
+      throw error;
     }
   } catch (error) {
     console.error('❌ [COMPANIES API] POST error:', {

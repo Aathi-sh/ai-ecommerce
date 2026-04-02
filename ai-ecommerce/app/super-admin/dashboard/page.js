@@ -1601,7 +1601,7 @@ export default function SuperAdminDashboard() {
 
               {/* Settings */}
               <button
-                onClick={() => handleNavigation('/admin/profile')}
+                onClick={() => handleNavigation('/super-admin/settings')}
                 className="hidden sm:block p-2 rounded-lg"
                 style={{ color: appTheme.colors.textSecondary }}
                 title="Settings"

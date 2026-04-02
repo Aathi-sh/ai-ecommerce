@@ -1679,6 +1679,7 @@ export default function CatalogPage() {
   const spacing = appTheme?.spacing || { xs: "4px", sm: "8px", md: "16px", lg: "24px" };
   const radiusMd = appTheme?.radius?.md || "8px";
   const radiusLg = appTheme?.radius?.lg || "12px";
+  const radiusFull = appTheme?.radius?.full || "9999px";
   const transitionFast = appTheme?.transitions?.fast || "all 0.15s cubic-bezier(0.4, 0, 0.2, 1)";
   const shadowSm = appTheme?.shadows?.sm || "0 1px 2px 0 rgba(0, 0, 0, 0.05)";
 

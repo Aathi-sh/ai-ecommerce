@@ -1,22 +1,21 @@
+
 // import { NextResponse } from 'next/server';
 // import { getServerSession } from 'next-auth';
 // import { authOptions } from '@/lib/nextauth';
 // import { connectDB } from '@/utils/db';
 // import User from '@/models/user';
+// import Company from '@/models/Company';
+// import DeviceToken from '@/models/AdminDeviceToken';
 
 // /**
-//  * Professional Logout API Route
+//  * Professional Logout API Route with SaaS Multi-tenancy
 //  * 
-//  * This endpoint handles secure logout operations including:
-//  * - Server-side session termination
-//  * - Database session cleanup with proper status update to 'offline'
-//  * - FCM token removal for admin users
-//  * - CSRF protection
-//  * - Audit logging
-//  * - Complete cookie clearing
-//  * - LastSeen timestamp update
-//  * 
-//  * Endpoint: POST /api/auth/logout
+//  * Features:
+//  * - Company context in all operations
+//  * - Company-specific device token cleanup
+//  * - Super admin context clearing
+//  * - Company lastActive update
+//  * - Multi-tenant audit logging
 //  */
 
 // // Security headers configuration
@@ -34,7 +33,7 @@
 //     ? process.env.NEXTAUTH_URL || process.env.FRONTEND_URL || 'https://yourdomain.com'
 //     : 'http://localhost:3000',
 //   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-//   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token',
+//   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token, X-Company-ID',
 //   'Access-Control-Allow-Credentials': 'true',
 //   'Access-Control-Max-Age': '86400',
 // };
@@ -78,21 +77,23 @@
 //         }
 //       );
 
-//       // ✅ Still clear cookies even if no session (cleanup)
 //       clearAllCookies(response);
-//       console.log('✅ [LOGOUT API] Cookies cleared (no session)');
+//       clearCompanyContext(response);
+//       console.log('✅ [LOGOUT API] Cookies and company context cleared (no session)');
       
 //       return response;
 //     }
 
-//     // Parse request body for FCM token (if provided)
+//     // Parse request body for FCM token and company context
 //     let fcmToken = null;
+//     let requestCompanyId = null;
 //     let requestBody = {};
 //     try {
 //       const text = await request.text();
 //       if (text) {
 //         requestBody = JSON.parse(text);
 //         fcmToken = requestBody.fcmToken || null;
+//         requestCompanyId = requestBody.companyId || null;
 //       }
 //     } catch (error) {
 //       console.log('ℹ️ [LOGOUT API] No valid JSON body provided');
@@ -101,32 +102,37 @@
 //     const userId = session.user.id;
 //     const userEmail = session.user.email;
 //     const userRole = session.user.role;
-//     const isAdmin = userRole === 'admin';
+//     const userAdminType = session.user.adminType;
+//     const userCompanyId = session.user.companyId;
+    
+//     // Determine effective company ID
+//     const isSuperAdmin = userRole === 'admin' && userAdminType === 'super';
+//     const effectiveCompanyId = requestCompanyId || userCompanyId;
 
 //     console.log('👤 [LOGOUT API] User logging out:', {
 //       email: userEmail,
 //       userId: userId,
 //       role: userRole,
+//       adminType: userAdminType,
+//       companyId: userCompanyId,
+//       effectiveCompanyId,
+//       isSuperAdmin,
 //       hasFCMToken: !!fcmToken,
-//       isAdmin: isAdmin,
 //     });
 
 //     // Connect to database
 //     await connectDB();
 
-//     // ✅ FIXED: Proper database update with offline status
+//     // ===== 1. UPDATE USER STATUS TO OFFLINE =====
 //     let updatedUser = null;
 //     try {
-//       // Find user first to use instance methods if available
 //       const user = await User.findById(userId);
       
 //       if (user) {
-//         // ✅ Use the setOffline method if available (from our fixed User model)
 //         if (typeof user.setOffline === 'function') {
 //           updatedUser = await user.setOffline();
 //           console.log('✅ [LOGOUT API] User status updated to offline via setOffline()');
 //         } else {
-//           // Fallback to direct update
 //           updatedUser = await User.findByIdAndUpdate(
 //             userId,
 //             {
@@ -135,55 +141,94 @@
 //                 lastLogout: new Date(),
 //                 lastSeen: new Date(),
 //               },
-//               $inc: {
-//                 loginCount: 0 // No increment, just to ensure update works
-//               }
 //             },
 //             { 
 //               new: true,
-//               runValidators: true // ✅ This ensures our VALID_STATUSES check runs
+//               runValidators: true
 //             }
-//           ).select('email role status lastLogout lastSeen').lean();
+//           ).select('email role status lastLogout lastSeen companyId').lean();
           
 //           console.log('✅ [LOGOUT API] User status updated to offline via direct update');
 //         }
 //       } else {
 //         console.warn('⚠️ [LOGOUT API] User not found in database:', userId);
 //       }
-
-//       console.log('✅ [LOGOUT API] Database updated for user:', {
-//         email: userEmail,
-//         status: 'offline',
-//         lastLogout: new Date().toISOString()
-//       });
 //     } catch (dbError) {
 //       console.error('❌ [LOGOUT API] Database update failed:', {
 //         error: dbError.message,
 //         code: dbError.code,
 //         userId: userId
 //       });
-//       // Continue with logout even if DB update fails
 //     }
 
-//     // ✅ Handle FCM token cleanup for admin users
-//     if (isAdmin && fcmToken) {
+//     // ===== 2. UPDATE COMPANY LAST ACTIVE =====
+//     if (userCompanyId) {
 //       try {
-//         console.log('🔧 [LOGOUT API] Processing FCM token cleanup for admin');
+//         await Company.findByIdAndUpdate(
+//           userCompanyId,
+//           {
+//             $set: {
+//               'stats.lastActive': new Date(),
+//               updatedAt: new Date()
+//             }
+//           }
+//         );
+//         console.log('✅ [LOGOUT API] Company lastActive updated:', userCompanyId);
+//       } catch (companyError) {
+//         console.error('❌ [LOGOUT API] Company update failed:', companyError.message);
+//       }
+//     }
+
+//     // ===== 3. DEVICE TOKEN CLEANUP (Company-specific) =====
+//     if (fcmToken) {
+//       try {
+//         console.log('🔧 [LOGOUT API] Processing FCM token cleanup');
         
-//         // Remove FCM token from database using $pull
-//         const fcmResult = await User.findByIdAndUpdate(
+//         // Build query with company context
+//         const tokenQuery = { fcmToken };
+//         if (effectiveCompanyId) {
+//           tokenQuery.companyId = effectiveCompanyId;
+//         }
+//         if (userId) {
+//           tokenQuery.userId = userId;
+//         }
+
+//         // Deactivate token in DeviceToken model
+//         const deactivatedToken = await DeviceToken.findOneAndUpdate(
+//           tokenQuery,
+//           {
+//             $set: {
+//               isActive: false,
+//               lastActive: new Date(),
+//               updatedAt: new Date()
+//             }
+//           },
+//           { new: true }
+//         );
+
+//         console.log('✅ [LOGOUT API] Device token deactivated:', {
+//           tokenDeactivated: !!deactivatedToken,
+//           userId,
+//           companyId: effectiveCompanyId
+//         });
+
+//         // Also remove from user's deviceTokens array (legacy)
+//         const userUpdateResult = await User.findByIdAndUpdate(
 //           userId,
 //           {
 //             $pull: {
-//               deviceTokens: { token: fcmToken },
+//               deviceTokens: { 
+//                 token: fcmToken,
+//                 ...(effectiveCompanyId ? { companyId: effectiveCompanyId } : {})
+//               },
 //             },
 //           },
 //           { new: true }
 //         ).select('deviceTokens').lean();
 
-//         console.log('✅ [LOGOUT API] FCM token removed from database:', {
-//           tokenRemoved: !!fcmResult,
-//           userId: userId
+//         console.log('✅ [LOGOUT API] Token removed from user deviceTokens:', {
+//           tokenRemoved: !!userUpdateResult,
+//           userId
 //         });
 
 //         // Call FCM service to deregister token (non-blocking)
@@ -192,11 +237,13 @@
 //             method: 'POST',
 //             headers: { 
 //               'Content-Type': 'application/json',
-//               'Authorization': `Bearer ${process.env.INTERNAL_API_SECRET || ''}`
+//               'Authorization': `Bearer ${process.env.INTERNAL_API_SECRET || ''}`,
+//               'X-Company-ID': effectiveCompanyId || '',
 //             },
 //             body: JSON.stringify({ 
 //               userId,
 //               token: fcmToken,
+//               companyId: effectiveCompanyId,
 //               reason: 'logout'
 //             }),
 //           }).then(res => {
@@ -212,15 +259,47 @@
 
 //       } catch (fcmCleanupError) {
 //         console.error('❌ [LOGOUT API] FCM cleanup error:', fcmCleanupError.message);
-//         // Don't fail logout if FCM cleanup fails
 //       }
 //     }
 
-//     // ✅ Log the logout event for security audit
+//     // ===== 4. DEACTIVATE ALL DEVICE TOKENS FOR THIS USER/COMPANY =====
+//     if (userId) {
+//       try {
+//         const tokenQuery = { userId, isActive: true };
+//         if (effectiveCompanyId) {
+//           tokenQuery.companyId = effectiveCompanyId;
+//         }
+
+//         const deactivatedCount = await DeviceToken.updateMany(
+//           tokenQuery,
+//           {
+//             $set: {
+//               isActive: false,
+//               lastActive: new Date(),
+//               updatedAt: new Date()
+//             }
+//           }
+//         );
+
+//         console.log('✅ [LOGOUT API] Deactivated all active device tokens:', {
+//           count: deactivatedCount.modifiedCount,
+//           userId,
+//           companyId: effectiveCompanyId
+//         });
+//       } catch (tokenError) {
+//         console.error('❌ [LOGOUT API] Failed to deactivate tokens:', tokenError.message);
+//       }
+//     }
+
+//     // ===== 5. AUDIT LOGGING WITH COMPANY CONTEXT =====
 //     const auditLog = {
 //       userId: userId,
 //       email: userEmail,
 //       role: userRole,
+//       adminType: userAdminType,
+//       companyId: userCompanyId,
+//       effectiveCompanyId,
+//       isSuperAdmin,
 //       timestamp: new Date().toISOString(),
 //       ip: request.headers.get('x-forwarded-for') || 
 //            request.headers.get('x-real-ip') || 
@@ -228,20 +307,24 @@
 //       userAgent: request.headers.get('user-agent') || 'Unknown',
 //       method: 'POST',
 //       path: '/api/auth/logout',
-//       fcmTokenRemoved: !!(isAdmin && fcmToken),
-//       status: 'success'
+//       fcmTokenRemoved: !!fcmToken,
+//       status: 'success',
+//       sessionInfo: {
+//         hasSession: true,
+//         sessionAge: session.expires ? 
+//           Math.floor((new Date(session.expires) - new Date()) / 1000) : null
+//       }
 //     };
 
 //     console.log('📝 [LOGOUT API] Logout audit log:', JSON.stringify(auditLog, null, 2));
 
-//     // Store audit log in database (optional - uncomment if you have AuditLog model)
+//     // Store audit log if you have AuditLog model
 //     /*
 //     try {
-//       const AuditLog = mongoose.models.AuditLog || require('@/models/auditLog').default;
+//       const AuditLog = mongoose.models.AuditLog || require('@/models/AuditLog').default;
 //       await AuditLog.create({
-//         userId,
-//         action: 'LOGOUT',
-//         ...auditLog
+//         ...auditLog,
+//         action: 'LOGOUT'
 //       });
 //     } catch (auditError) {
 //       console.warn('⚠️ [LOGOUT API] Audit log storage failed:', auditError.message);
@@ -257,9 +340,14 @@
 //           id: userId,
 //           email: userEmail,
 //           role: userRole,
+//           companyId: userCompanyId,
 //         },
+//         company: userCompanyId ? {
+//           id: userCompanyId,
+//           context: effectiveCompanyId
+//         } : null,
 //         timestamp: new Date().toISOString(),
-//         fcmTokenRemoved: !!(isAdmin && fcmToken),
+//         fcmTokenRemoved: !!fcmToken,
 //         nextSteps: 'All active sessions have been terminated.',
 //       },
 //       {
@@ -275,9 +363,10 @@
 //       }
 //     );
 
-//     // ✅✅✅ CRITICAL: CLEAR ALL SESSION COOKIES ✅✅✅
+//     // Clear all session cookies and company context
 //     clearAllCookies(response);
-//     console.log('✅ [LOGOUT API] All cookies cleared successfully');
+//     clearCompanyContext(response);
+//     console.log('✅ [LOGOUT API] All cookies and company context cleared successfully');
 
 //     return response;
 
@@ -309,6 +398,7 @@
 //     // Attempt to clear cookies even on error
 //     try {
 //       clearAllCookies(errorResponse);
+//       clearCompanyContext(errorResponse);
 //     } catch (cookieError) {
 //       console.error('❌ [LOGOUT API] Failed to clear cookies on error:', cookieError.message);
 //     }
@@ -317,7 +407,9 @@
 //   }
 // }
 
-// // ✅ Helper function to clear all cookies consistently
+// /**
+//  * Clear all session cookies
+//  */
 // function clearAllCookies(response) {
 //   // NextAuth.js cookies - comprehensive list
 //   const nextAuthCookies = [
@@ -361,10 +453,8 @@
 
 //   // Clear all NextAuth cookies
 //   nextAuthCookies.forEach(cookieName => {
-//     // Delete cookie (modern method)
 //     response.cookies.delete(cookieName);
     
-//     // Force expire with various configurations
 //     cookieConfigs.forEach(config => {
 //       response.cookies.set({
 //         name: cookieName,
@@ -393,7 +483,7 @@
 //     });
 //   });
 
-//   // Clear cookies for root domain and subdomains if applicable
+//   // Clear cookies for root domain and subdomains
 //   const domains = ['.localhost', '.steponext.com', ''];
 //   domains.forEach(domain => {
 //     if (domain) {
@@ -416,33 +506,73 @@
 //   return response;
 // }
 
-// // ✅ GET endpoint for API information
+// /**
+//  * Clear company context from client storage
+//  */
+// function clearCompanyContext(response) {
+//   // Clear company context cookies
+//   const companyCookies = [
+//     'current_company',
+//     'company_context',
+//     'active_company',
+//     'company_id',
+//     'company_name',
+//     'company_switched'
+//   ];
+
+//   companyCookies.forEach(cookieName => {
+//     response.cookies.delete(cookieName);
+//     response.cookies.set({
+//       name: cookieName,
+//       value: '',
+//       expires: new Date(0),
+//       maxAge: 0,
+//       path: '/',
+//       secure: process.env.NODE_ENV === 'production',
+//       sameSite: 'lax',
+//     });
+//   });
+
+//   // Add headers to instruct client to clear company context
+//   response.headers.set('X-Clear-Company-Context', 'true');
+//   response.headers.set('X-Logout-Complete', 'true');
+
+//   return response;
+// }
+
+// /**
+//  * GET endpoint for API information
+//  */
 // export async function GET(request) {
 //   return NextResponse.json(
 //     {
 //       endpoint: '/api/auth/logout',
-//       description: 'Secure logout endpoint',
+//       description: 'Secure logout endpoint with multi-tenant support',
 //       method: 'POST',
 //       required: 'Authentication session (via NextAuth cookies)',
 //       optional: {
-//         fcmToken: 'string (FCM token to remove for admin users)'
+//         fcmToken: 'string (FCM token to remove)',
+//         companyId: 'string (company context for super admin)'
 //       },
 //       features: [
 //         'Session termination',
 //         'Database cleanup with offline status',
-//         'FCM token removal for admins',
+//         'Company lastActive update',
+//         'Company-specific FCM token removal',
+//         'DeviceToken model cleanup',
+//         'Super admin context clearing',
 //         'CSRF protection',
-//         'Audit logging',
+//         'Multi-tenant audit logging',
 //         'CORS support',
 //         'Complete multi-cookie clearing',
-//         'LastSeen timestamp update',
+//         'Company context cleanup',
 //       ],
 //       security: [
 //         'HTTPS only in production',
 //         'SameSite cookies',
 //         'CSRF token validation',
 //         'Rate limiting recommended',
-//         'Audit trail',
+//         'Audit trail with company context',
 //       ],
 //       status: 'operational',
 //       timestamp: new Date().toISOString(),
@@ -467,7 +597,21 @@
 
 
 
-// above code is without saas
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -495,6 +639,7 @@ import DeviceToken from '@/models/AdminDeviceToken';
  * - Super admin context clearing
  * - Company lastActive update
  * - Multi-tenant audit logging
+ * - PRESERVES account status (does NOT set to offline)
  */
 
 // Security headers configuration
@@ -602,33 +747,40 @@ export async function POST(request) {
     // Connect to database
     await connectDB();
 
-    // ===== 1. UPDATE USER STATUS TO OFFLINE =====
+    // ===== 1. UPDATE USER LAST LOGOUT (DO NOT CHANGE STATUS) =====
     let updatedUser = null;
     try {
       const user = await User.findById(userId);
       
       if (user) {
-        if (typeof user.setOffline === 'function') {
-          updatedUser = await user.setOffline();
-          console.log('✅ [LOGOUT API] User status updated to offline via setOffline()');
-        } else {
-          updatedUser = await User.findByIdAndUpdate(
-            userId,
-            {
-              $set: {
-                status: 'offline',
-                lastLogout: new Date(),
-                lastSeen: new Date(),
-              },
+        // ✅ PROFESSIONAL APPROACH: Update lastLogout and lastSeen ONLY
+        // DO NOT call setOffline() or change status to 'offline'
+        // This preserves account status so user can login again
+        updatedUser = await User.findByIdAndUpdate(
+          userId,
+          {
+            $set: {
+              lastLogout: new Date(),
+              lastSeen: new Date(),
+              // ✅ IMPORTANT: status field is NOT updated
+              // ✅ User remains 'active' in database
             },
-            { 
-              new: true,
-              runValidators: true
+            $inc: {
+              // Optional: track logout count
+              loginCount: 0 // Not incrementing, just showing pattern
             }
-          ).select('email role status lastLogout lastSeen companyId').lean();
-          
-          console.log('✅ [LOGOUT API] User status updated to offline via direct update');
-        }
+          },
+          { 
+            new: true,
+            runValidators: true
+          }
+        ).select('email role status lastLogout lastSeen companyId adminType').lean();
+        
+        console.log('✅ [LOGOUT API] User lastLogout updated (status preserved)');
+        
+        // Optional: If you want to track offline status for presence (not login blocking)
+        // Use a separate presence field, not the status field
+        // For now, we keep status as is so user can login again
       } else {
         console.warn('⚠️ [LOGOUT API] User not found in database:', userId);
       }
@@ -792,7 +944,10 @@ export async function POST(request) {
         hasSession: true,
         sessionAge: session.expires ? 
           Math.floor((new Date(session.expires) - new Date()) / 1000) : null
-      }
+      },
+      // Track that status was preserved
+      statusPreserved: true,
+      originalStatus: updatedUser?.status || 'unknown'
     };
 
     console.log('📝 [LOGOUT API] Logout audit log:', JSON.stringify(auditLog, null, 2));
@@ -820,6 +975,7 @@ export async function POST(request) {
           email: userEmail,
           role: userRole,
           companyId: userCompanyId,
+          status: updatedUser?.status || 'active', // Show current status
         },
         company: userCompanyId ? {
           id: userCompanyId,
@@ -828,6 +984,10 @@ export async function POST(request) {
         timestamp: new Date().toISOString(),
         fcmTokenRemoved: !!fcmToken,
         nextSteps: 'All active sessions have been terminated.',
+        statusInfo: {
+          preserved: true,
+          message: 'Account status remains active for future logins'
+        }
       },
       {
         status: 200,
@@ -846,6 +1006,7 @@ export async function POST(request) {
     clearAllCookies(response);
     clearCompanyContext(response);
     console.log('✅ [LOGOUT API] All cookies and company context cleared successfully');
+    console.log('✅ [LOGOUT API] User status preserved - account remains active');
 
     return response;
 
@@ -1035,7 +1196,8 @@ export async function GET(request) {
       },
       features: [
         'Session termination',
-        'Database cleanup with offline status',
+        'Preserves account status (does NOT set to offline)',
+        'Updates lastLogout and lastSeen timestamps',
         'Company lastActive update',
         'Company-specific FCM token removal',
         'DeviceToken model cleanup',
@@ -1053,6 +1215,11 @@ export async function GET(request) {
         'Rate limiting recommended',
         'Audit trail with company context',
       ],
+      statusInfo: {
+        accountStatus: 'Preserved',
+        message: 'User status remains unchanged to allow future logins',
+        bestPractice: 'Separate presence tracking from account status'
+      },
       status: 'operational',
       timestamp: new Date().toISOString(),
     },
