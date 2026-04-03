@@ -2408,7 +2408,32 @@ export async function POST(request) {
         const { searchParams } = new URL(request.url);
         const type = searchParams.get('type');
         const body = await request.json();
-        const userId = session?.user?.id || body.userId || 'system';
+        
+        // ✅ FIX: Properly handle userId - try multiple sources
+        let userId = session?.user?.id || body.createdBy || body.userId;
+        
+        // ✅ If still no userId, try to find an admin user for this company
+        if (!userId || userId === 'system') {
+            try {
+                const User = mongoose.model('User');
+                const adminUser = await User.findOne({ 
+                    companyId: companyId,
+                    role: { $in: ['admin', 'superadmin'] }
+                }).select('_id');
+                
+                if (adminUser) {
+                    userId = adminUser._id;
+                    console.log('Using found admin user ID:', userId);
+                } else {
+                    // Last resort - use a dummy ID but log warning
+                    console.warn('No admin user found for company, using system fallback');
+                    userId = 'system';
+                }
+            } catch (userError) {
+                console.warn('Could not find admin user:', userError.message);
+                userId = 'system';
+            }
+        }
 
         // ===== CREATE CATEGORY =====
         if (type === MASTER_TYPES.CATEGORIES) {
@@ -2465,11 +2490,10 @@ export async function POST(request) {
             }
 
             // ✅ FIXED: Explicitly set isActive to true for new categories
-            // If body.isActive is explicitly false, use that, otherwise default to true
             const isActive = body.isActive === undefined ? true : body.isActive;
             
-            // ✅ Create category with ALL fields including slug and isActive
-            const category = await Category.create({
+            // ✅ Create category with ALL fields
+            const categoryData = {
                 companyId,
                 name: body.name,
                 slug: slug,
@@ -2478,11 +2502,15 @@ export async function POST(request) {
                 image: body.image || null,
                 icon: body.icon || '📦',
                 displayOrder: body.displayOrder || 0,
-                isActive: isActive,  // ✅ FIXED: Now properly defaults to true
+                isActive: isActive,
                 metaTitle: body.metaTitle || body.name,
                 metaDescription: body.metaDescription || body.description || '',
                 createdBy: userId
-            });
+            };
+            
+            console.log('Creating category with data:', { ...categoryData, createdBy: userId });
+            
+            const category = await Category.create(categoryData);
 
             console.log(`✅ Category created: ${category.name} (ID: ${category._id}) with isActive: ${category.isActive}`);
 
