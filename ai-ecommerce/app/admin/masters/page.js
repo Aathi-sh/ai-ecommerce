@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../context/AuthContext';
-import { appTheme } from '../../../../src/constants/theme';
+import { appTheme } from '../../../src/constants/theme';
 import {
     Folder,
     Package,
