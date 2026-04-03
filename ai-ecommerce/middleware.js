@@ -66,6 +66,9 @@ const catalogPublicPaths = new Set([
   '/api/categories',
   `/api/masters`,
   '/api/catalog',
+  '/api/companies',
+  '/api/catalog',
+  '/api/catalogue/whislist'
 ]);
 
 // WhatsApp API routes - NO AUTH REQUIRED

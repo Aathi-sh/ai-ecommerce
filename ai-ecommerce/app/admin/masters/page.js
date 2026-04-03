@@ -2921,23 +2921,15 @@ import {
     EyeOff,
     AlertCircle,
     CheckCircle,
-    FolderPlus,
     FilePlus,
-    Menu,
-    Home,
     Grid,
     List,
-    MoveUp,
-    MoveDown,
-    MoreVertical,
-    Download,
-    Upload,
-    Copy,
-    Check,
     Building2,
     Shield,
     AlertTriangle,
-    Layers
+    Layers,
+    TrendingUp,
+    Package
 } from 'lucide-react';
 
 export default function CategoriesPage() {
@@ -2973,6 +2965,7 @@ export default function CategoriesPage() {
     const [stats, setStats] = useState({
         total: 0,
         active: 0,
+        inactive: 0,
         main: 0,
         sub: 0
     });
@@ -3008,6 +3001,35 @@ export default function CategoriesPage() {
         };
     }, []);
 
+    // Fetch stats from API
+    const fetchStats = useCallback(async () => {
+        if (!user?.companyId) return;
+        
+        try {
+            const params = new URLSearchParams({
+                companyId: user.companyId,
+                type: 'stats'
+            });
+            
+            const res = await fetch(`/api/masters?${params}`, {
+                headers: getAuthHeaders()
+            });
+            
+            const data = await res.json();
+            if (data.success && data.data?.categories) {
+                setStats({
+                    total: data.data.categories.total || 0,
+                    active: data.data.categories.active || 0,
+                    inactive: data.data.categories.inactive || 0,
+                    main: data.data.categories.main || 0,
+                    sub: data.data.categories.sub || 0
+                });
+            }
+        } catch (error) {
+            console.error('Failed to fetch stats:', error);
+        }
+    }, [user, getAuthHeaders]);
+
     // Fetch main categories with companyId
     const fetchMainCategories = useCallback(async () => {
         if (!user?.companyId) return;
@@ -3041,7 +3063,7 @@ export default function CategoriesPage() {
         setApiError(null);
         
         try {
-            // Only show active categories - no showInactive toggle
+            // Only show active categories
             const url = `/api/masters?companyId=${user.companyId}&type=categories&format=tree&includeInactive=false`;
             const res = await fetch(url, {
                 headers: getAuthHeaders()
@@ -3058,14 +3080,8 @@ export default function CategoriesPage() {
             
             if (data.success) {
                 setCategories(data.data);
-                if (data.pagination) {
-                    setStats({
-                        total: data.pagination.total,
-                        active: data.stats?.active || 0,
-                        main: data.stats?.main || 0,
-                        sub: data.stats?.sub || 0
-                    });
-                }
+                // Also fetch stats for accurate counts
+                await fetchStats();
             } else {
                 setErrorMessage('Failed to load categories');
             }
@@ -3076,14 +3092,15 @@ export default function CategoriesPage() {
         } finally {
             setLoading(false);
         }
-    }, [user, getAuthHeaders]);
+    }, [user, getAuthHeaders, fetchStats]);
 
     useEffect(() => {
         if (user?.companyId) {
             fetchCategories();
             fetchMainCategories();
+            fetchStats();
         }
-    }, [fetchCategories, fetchMainCategories, user]);
+    }, [fetchCategories, fetchMainCategories, fetchStats, user]);
 
     const toggleExpand = (categoryId) => {
         const newExpanded = new Set(expandedCategories);
@@ -3166,6 +3183,9 @@ export default function CategoriesPage() {
             
             const method = (formMode === 'add' || formMode === 'sub') ? 'POST' : 'PUT';
 
+            // Always set isActive to true for new categories
+            const isActiveValue = (formMode === 'add' || formMode === 'sub') ? true : formData.isActive;
+
             const res = await fetch(url, {
                 method,
                 headers: {
@@ -3178,7 +3198,7 @@ export default function CategoriesPage() {
                     parentId: formData.parentId,
                     icon: formData.icon || '📦',
                     displayOrder: formData.displayOrder || 0,
-                    isActive: formData.isActive
+                    isActive: isActiveValue
                 })
             });
 
@@ -3197,8 +3217,9 @@ export default function CategoriesPage() {
                 setShowForm(false);
                 setEditingCategory(null);
                 setParentCategory(null);
-                fetchCategories();
-                fetchMainCategories();
+                await fetchCategories();
+                await fetchMainCategories();
+                await fetchStats();
                 
                 setTimeout(() => setSuccessMessage(''), 3000);
             } else {
@@ -3232,7 +3253,7 @@ export default function CategoriesPage() {
 
     // Handle delete with companyId
     const handleDelete = async (category) => {
-        if (!confirm(`Are you sure you want to delete "${category.name}"?`)) return;
+        if (!confirm(`Are you sure you want to delete "${category.name}"? This action cannot be undone.`)) return;
 
         try {
             const res = await fetch(`/api/masters?companyId=${user?.companyId}&type=categories&id=${category._id}`, {
@@ -3244,8 +3265,9 @@ export default function CategoriesPage() {
             
             if (data.success) {
                 setSuccessMessage('Category deleted successfully');
-                fetchCategories();
-                fetchMainCategories();
+                await fetchCategories();
+                await fetchMainCategories();
+                await fetchStats();
                 setTimeout(() => setSuccessMessage(''), 3000);
             } else {
                 if (data.categories) {
@@ -3294,15 +3316,16 @@ export default function CategoriesPage() {
             
             if (data.success) {
                 setSuccessMessage(`Category ${!category.isActive ? 'activated' : 'deactivated'} successfully`);
-                fetchCategories();
-                fetchMainCategories();
+                await fetchCategories();
+                await fetchMainCategories();
+                await fetchStats();
                 setTimeout(() => setSuccessMessage(''), 3000);
             } else {
                 alert(data.message || 'Failed to toggle status');
             }
         } catch (error) {
             console.error('Toggle status error:', error);
-            alert('Failed to toggle status');
+            alert('Failed to toggle status: ' + error.message);
         }
     };
 
@@ -3377,13 +3400,14 @@ export default function CategoriesPage() {
                                 )}
                                 {category.productCount > 0 && (
                                     <span style={styles.productCountBadge}>
+                                        <Package size={10} />
                                         {category.productCount} products
                                     </span>
                                 )}
-                                {isSuperAdmin && category.companyId && (
-                                    <span style={styles.companyBadge}>
-                                        <Building2 size={10} />
-                                        {category.companyId?.companyName || 'Company'}
+                                {category.subCategoryCount > 0 && (
+                                    <span style={styles.subCountBadge}>
+                                        <Layers size={10} />
+                                        {category.subCategoryCount} subcategories
                                     </span>
                                 )}
                             </div>
@@ -3402,7 +3426,7 @@ export default function CategoriesPage() {
                             title="Add Subcategory"
                         >
                             <FilePlus size={isMobile ? 16 : 18} />
-                            {!isMobile && <span>Add Sub</span>}
+                            {!isMobile && <span>Sub</span>}
                         </button>
                         
                         <button
@@ -3426,7 +3450,7 @@ export default function CategoriesPage() {
                                 <EyeOff size={isMobile ? 16 : 18} /> : 
                                 <Eye size={isMobile ? 16 : 18} />
                             }
-                            {!isMobile && <span>{category.isActive ? 'Deactivate' : 'Activate'}</span>}
+                            {!isMobile && <span>{category.isActive ? 'Off' : 'On'}</span>}
                         </button>
                         
                         <button
@@ -3436,7 +3460,7 @@ export default function CategoriesPage() {
                             disabled={category.productCount > 0}
                         >
                             <Trash2 size={isMobile ? 16 : 18} />
-                            {!isMobile && <span>Delete</span>}
+                            {!isMobile && <span>Del</span>}
                         </button>
                     </div>
                 </div>
@@ -3486,13 +3510,8 @@ export default function CategoriesPage() {
                             )}
                             {category.productCount > 0 && (
                                 <span style={styles.productCountBadge}>
-                                    {category.productCount} products
-                                </span>
-                            )}
-                            {isSuperAdmin && category.companyId && (
-                                <span style={styles.companyBadge}>
-                                    <Building2 size={10} />
-                                    {category.companyId?.companyName || 'Company'}
+                                    <Package size={10} />
+                                    {category.productCount}
                                 </span>
                             )}
                         </div>
@@ -3610,15 +3629,16 @@ export default function CategoriesPage() {
                         <h1 style={styles.title(isMobile)}>Categories Master</h1>
                     </div>
                     <p style={styles.subtitle(isMobile)}>
-                        Manage your product categories and subcategories for {user?.companyName || 'your company'}
+                        Manage your product categories and subcategories
                     </p>
                 </div>
 
                 <div style={styles.headerActions}>
-                    {/* Show Inactive button REMOVED as requested */}
-                    
                     <button
-                        onClick={fetchCategories}
+                        onClick={() => {
+                            fetchCategories();
+                            fetchStats();
+                        }}
                         style={styles.refreshButton(isMobile)}
                     >
                         <RefreshCw size={18} className={loading ? 'spin' : ''} />
@@ -3647,33 +3667,41 @@ export default function CategoriesPage() {
                 </div>
             </div>
 
-            {/* Stats Cards */}
+            {/* Stats Cards - Improved with proper counts */}
             <div style={styles.statsGrid(isMobile)}>
                 <div style={styles.statCard(isMobile)}>
-                    <Folder size={20} color="#3b82f6" />
+                    <div style={{ ...styles.statIconBg, backgroundColor: '#3b82f620' }}>
+                        <Folder size={20} color="#3b82f6" />
+                    </div>
                     <div>
-                        <p style={styles.statLabel}>Total</p>
+                        <p style={styles.statLabel}>Total Categories</p>
                         <p style={styles.statValue}>{stats.total}</p>
                     </div>
                 </div>
                 <div style={styles.statCard(isMobile)}>
-                    <CheckCircle size={20} color="#10b981" />
+                    <div style={{ ...styles.statIconBg, backgroundColor: '#10b98120' }}>
+                        <CheckCircle size={20} color="#10b981" />
+                    </div>
                     <div>
                         <p style={styles.statLabel}>Active</p>
                         <p style={styles.statValue}>{stats.active}</p>
                     </div>
                 </div>
                 <div style={styles.statCard(isMobile)}>
-                    <Folder size={20} color="#8b5cf6" />
+                    <div style={{ ...styles.statIconBg, backgroundColor: '#8b5cf620' }}>
+                        <Folder size={20} color="#8b5cf6" />
+                    </div>
                     <div>
-                        <p style={styles.statLabel}>Main</p>
+                        <p style={styles.statLabel}>Main Categories</p>
                         <p style={styles.statValue}>{stats.main}</p>
                     </div>
                 </div>
                 <div style={styles.statCard(isMobile)}>
-                    <Folder size={20} color="#f59e0b" />
+                    <div style={{ ...styles.statIconBg, backgroundColor: '#f59e0b20' }}>
+                        <Layers size={20} color="#f59e0b" />
+                    </div>
                     <div>
-                        <p style={styles.statLabel}>Sub</p>
+                        <p style={styles.statLabel}>Subcategories</p>
                         <p style={styles.statValue}>{stats.sub}</p>
                     </div>
                 </div>
@@ -3721,6 +3749,7 @@ export default function CategoriesPage() {
                             ...styles.viewButton(isMobile),
                             ...(viewMode === 'tree' ? styles.viewButtonActive : {})
                         }}
+                        title="Tree View"
                     >
                         <Folder size={18} />
                     </button>
@@ -3730,6 +3759,7 @@ export default function CategoriesPage() {
                             ...styles.viewButton(isMobile),
                             ...(viewMode === 'list' ? styles.viewButtonActive : {})
                         }}
+                        title="List View"
                     >
                         <List size={18} />
                     </button>
@@ -3872,17 +3902,19 @@ export default function CategoriesPage() {
                                 />
                             </div>
 
-                            <div style={styles.formGroup}>
-                                <label style={styles.checkboxLabel}>
-                                    <input
-                                        type="checkbox"
-                                        name="isActive"
-                                        checked={formData.isActive}
-                                        onChange={handleInputChange}
-                                    />
-                                    <span>Active (visible in store)</span>
-                                </label>
-                            </div>
+                            {formMode !== 'add' && formMode !== 'sub' && (
+                                <div style={styles.formGroup}>
+                                    <label style={styles.checkboxLabel}>
+                                        <input
+                                            type="checkbox"
+                                            name="isActive"
+                                            checked={formData.isActive}
+                                            onChange={handleInputChange}
+                                        />
+                                        <span>Active (visible in store)</span>
+                                    </label>
+                                </div>
+                            )}
 
                             <div style={styles.modalFooter}>
                                 <button
@@ -4016,19 +4048,6 @@ const styles = {
         gap: '8px',
         color: appTheme.colors.error,
         fontSize: '0.9rem',
-    },
-
-    companyBadge: {
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '4px',
-        padding: '2px 6px',
-        backgroundColor: `${appTheme.colors.primary}15`,
-        border: `1px solid ${appTheme.colors.primary}30`,
-        borderRadius: '4px',
-        color: appTheme.colors.primary,
-        fontSize: '0.65rem',
-        fontWeight: '500',
     },
 
     toast: {
@@ -4172,13 +4191,22 @@ const styles = {
     statCard: (isMobile) => ({
         display: 'flex',
         alignItems: 'center',
-        gap: isMobile ? '8px' : '12px',
+        gap: isMobile ? '10px' : '12px',
         padding: isMobile ? '12px' : '16px',
         backgroundColor: '#ffffff',
         borderRadius: '10px',
         border: `1px solid ${appTheme.colors.border}30`,
         boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
     }),
+
+    statIconBg: {
+        width: '40px',
+        height: '40px',
+        borderRadius: '10px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
 
     statLabel: {
         fontSize: '0.7rem',
@@ -4187,8 +4215,8 @@ const styles = {
     },
 
     statValue: {
-        fontSize: '1rem',
-        fontWeight: '600',
+        fontSize: '1.2rem',
+        fontWeight: '700',
         color: '#1f2937',
     },
 
@@ -4427,8 +4455,23 @@ const styles = {
     },
 
     productCountBadge: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
         backgroundColor: `${appTheme.colors.primary}15`,
         color: appTheme.colors.primary,
+        padding: '2px 6px',
+        borderRadius: '4px',
+        fontSize: '0.7rem',
+        fontWeight: '500',
+    },
+
+    subCountBadge: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        backgroundColor: '#f59e0b15',
+        color: '#f59e0b',
         padding: '2px 6px',
         borderRadius: '4px',
         fontSize: '0.7rem',

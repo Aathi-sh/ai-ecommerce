@@ -1690,16 +1690,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
 // app/api/masters/route.js
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/utils/db';
@@ -2474,7 +2464,11 @@ export async function POST(request) {
                 }
             }
 
-            // ✅ Create category with ALL fields including slug
+            // ✅ FIXED: Explicitly set isActive to true for new categories
+            // If body.isActive is explicitly false, use that, otherwise default to true
+            const isActive = body.isActive === undefined ? true : body.isActive;
+            
+            // ✅ Create category with ALL fields including slug and isActive
             const category = await Category.create({
                 companyId,
                 name: body.name,
@@ -2484,11 +2478,13 @@ export async function POST(request) {
                 image: body.image || null,
                 icon: body.icon || '📦',
                 displayOrder: body.displayOrder || 0,
-                isActive: body.isActive !== false,
+                isActive: isActive,  // ✅ FIXED: Now properly defaults to true
                 metaTitle: body.metaTitle || body.name,
                 metaDescription: body.metaDescription || body.description || '',
                 createdBy: userId
             });
+
+            console.log(`✅ Category created: ${category.name} (ID: ${category._id}) with isActive: ${category.isActive}`);
 
             return NextResponse.json({
                 success: true,
