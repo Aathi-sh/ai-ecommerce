@@ -2,12 +2,13 @@
   "name": "ai-ecommerce",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "type": "module"
+    "lint": "eslint"
+    
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
