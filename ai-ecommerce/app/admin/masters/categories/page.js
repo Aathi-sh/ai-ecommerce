@@ -1864,10 +1864,7 @@
 
 
 
-
-
-
-//app/admin/masters/categories/page.js
+// app/admin/masters/categories/page.js
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -1897,7 +1894,8 @@ import {
     Zap,
     Building2,
     Shield,
-    AlertTriangle
+    AlertTriangle,
+    Layers
 } from 'lucide-react';
 
 export default function MastersDashboard() {
@@ -1953,7 +1951,7 @@ export default function MastersDashboard() {
         setApiError(null);
         
         try {
-            // ✅ FIX: Add companyId to params
+            // Fetch stats with companyId
             const params = new URLSearchParams({
                 companyId: user.companyId,
                 type: 'stats'
@@ -1972,11 +1970,24 @@ export default function MastersDashboard() {
             
             const data = await res.json();
             
-            if (data.success) {
-                setStats(data.data);
+            if (data.success && data.data) {
+                setStats({
+                    categories: {
+                        total: data.data.categories?.total || 0,
+                        active: data.data.categories?.active || 0,
+                        main: data.data.categories?.main || 0,
+                        sub: data.data.categories?.sub || 0
+                    },
+                    products: {
+                        total: data.data.products?.total || 0,
+                        active: data.data.products?.active || 0,
+                        lowStock: data.data.products?.lowStock || 0,
+                        outOfStock: data.data.products?.outOfStock || 0
+                    }
+                });
             }
 
-            // ✅ FIX: Fetch recent items with companyId
+            // Fetch recent items with companyId
             const recentParams = new URLSearchParams({
                 companyId: user.companyId,
                 type: 'recent',
@@ -2004,7 +2015,7 @@ export default function MastersDashboard() {
             fetchStats();
             
             // Refresh every 30 seconds
-            const interval = setInterval(fetchStats, 30000);
+            const interval = setInterval(fetchStats, 30000000);
             return () => clearInterval(interval);
         }
     }, [user, fetchStats]);
@@ -2029,8 +2040,8 @@ export default function MastersDashboard() {
                 { label: 'Main', value: stats.categories.main },
                 { label: 'Sub', value: stats.categories.sub }
             ],
-            path: '/admin/masters/categories',
-            addPath: '/admin/masters/categories?action=add'
+            path: '/admin/masters',
+            addPath: '/admin/masters?action=add'
         },
         {
             id: 'products',
@@ -2059,7 +2070,7 @@ export default function MastersDashboard() {
             label: 'Add Category', 
             icon: Folder, 
             color: '#3b82f6', 
-            path: '/admin/masters/categories?action=add' 
+            path: '/admin/masters?action=add' 
         },
         { 
             id: 'add-product', 
@@ -2147,10 +2158,10 @@ export default function MastersDashboard() {
                 </button>
             </div>
 
-            {/* Stats Overview */}
+            {/* Stats Overview - Improved with better visuals */}
             <div style={styles.statsGrid(isMobile)}>
                 <div style={styles.statCard(isMobile)}>
-                    <div style={styles.statIcon}>
+                    <div style={{ ...styles.statIcon, backgroundColor: '#3b82f620' }}>
                         <Globe size={isMobile ? 18 : 20} color="#3b82f6" />
                     </div>
                     <div>
@@ -2161,7 +2172,7 @@ export default function MastersDashboard() {
                     </div>
                 </div>
                 <div style={styles.statCard(isMobile)}>
-                    <div style={styles.statIcon}>
+                    <div style={{ ...styles.statIcon, backgroundColor: '#10b98120' }}>
                         <CheckCircle size={isMobile ? 18 : 20} color="#10b981" />
                     </div>
                     <div>
@@ -2172,7 +2183,7 @@ export default function MastersDashboard() {
                     </div>
                 </div>
                 <div style={styles.statCard(isMobile)}>
-                    <div style={styles.statIcon}>
+                    <div style={{ ...styles.statIcon, backgroundColor: '#8b5cf620' }}>
                         <Folder size={isMobile ? 18 : 20} color="#8b5cf6" />
                     </div>
                     <div>
@@ -2181,7 +2192,7 @@ export default function MastersDashboard() {
                     </div>
                 </div>
                 <div style={styles.statCard(isMobile)}>
-                    <div style={styles.statIcon}>
+                    <div style={{ ...styles.statIcon, backgroundColor: '#f59e0b20' }}>
                         <Package size={isMobile ? 18 : 20} color="#f59e0b" />
                     </div>
                     <div>
@@ -2276,6 +2287,36 @@ export default function MastersDashboard() {
                                     </div>
                                 ))}
                             </div>
+
+                            {/* Category Breakdown (only for categories) */}
+                            {card.id === 'categories' && stats.categories.total > 0 && (
+                                <div 
+                                    style={styles.cardProgress(isMobile)}
+                                    onClick={() => router.push(card.path)}
+                                >
+                                    <div style={styles.progressBar}>
+                                        <div style={{
+                                            ...styles.progressFill,
+                                            width: `${(stats.categories.main / stats.categories.total) * 100}%`,
+                                            backgroundColor: '#8b5cf6'
+                                        }} />
+                                        <div style={{
+                                            ...styles.progressFill,
+                                            width: `${(stats.categories.sub / stats.categories.total) * 100}%`,
+                                            backgroundColor: '#f59e0b',
+                                            marginLeft: `${(stats.categories.main / stats.categories.total) * 100}%`
+                                        }} />
+                                    </div>
+                                    <div style={styles.progressLabels}>
+                                        <span style={styles.progressLabel(isMobile)}>
+                                            Main: {stats.categories.main}
+                                        </span>
+                                        <span style={styles.progressLabel(isMobile)}>
+                                            Sub: {stats.categories.sub}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Product Progress Bar (only for products) */}
                             {card.id === 'products' && stats.products.total > 0 && (
@@ -2569,7 +2610,6 @@ const styles = {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#f3f4f6',
     },
 
     statLabel: (isMobile) => ({
@@ -2769,6 +2809,7 @@ const styles = {
         borderRadius: '3px',
         overflow: 'hidden',
         marginBottom: '6px',
+        display: 'flex',
     },
 
     progressFill: {
