@@ -42,7 +42,6 @@ export default function CategoriesPage() {
     const [isMobile, setIsMobile] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [viewMode, setViewMode] = useState('tree');
-    const [showInactive, setShowInactive] = useState(false);
     const [expandedCategories, setExpandedCategories] = useState(new Set());
     const [editingCategory, setEditingCategory] = useState(null);
     const [showForm, setShowForm] = useState(actionParam === 'add');
@@ -53,7 +52,6 @@ export default function CategoriesPage() {
         description: '',
         parentId: null,
         icon: '📦',
-        isActive: true,
         displayOrder: 0
     });
     const [formErrors, setFormErrors] = useState({});
@@ -64,7 +62,6 @@ export default function CategoriesPage() {
     const [stats, setStats] = useState({
         total: 0,
         active: 0,
-        inactive: 0,
         main: 0,
         sub: 0
     });
@@ -121,7 +118,6 @@ export default function CategoriesPage() {
                 setStats({
                     total: data.data.categories.total || 0,
                     active: data.data.categories.active || 0,
-                    inactive: data.data.categories.inactive || 0,
                     main: data.data.categories.main || 0,
                     sub: data.data.categories.sub || 0
                 });
@@ -156,7 +152,7 @@ export default function CategoriesPage() {
         }
     }, [user, getAuthHeaders]);
 
-    // Fetch categories tree
+    // Fetch categories tree (always show active categories)
     const fetchCategories = useCallback(async () => {
         if (!user?.companyId) {
             console.log('No company ID available');
@@ -168,7 +164,7 @@ export default function CategoriesPage() {
         setApiError(null);
         
         try {
-            const url = `/api/masters?companyId=${user.companyId}&type=categories&format=tree${showInactive ? '&includeInactive=true' : '&includeInactive=false'}`;
+            const url = `/api/masters?companyId=${user.companyId}&type=categories&format=tree&includeInactive=false`;
             console.log('Fetching categories from:', url);
             
             const res = await fetch(url, {
@@ -205,7 +201,7 @@ export default function CategoriesPage() {
         } finally {
             setLoading(false);
         }
-    }, [user, getAuthHeaders, showInactive, fetchStats]);
+    }, [user, getAuthHeaders, fetchStats]);
 
     // Load all data
     const loadAllData = useCallback(async () => {
@@ -220,7 +216,7 @@ export default function CategoriesPage() {
 
     useEffect(() => {
         loadAllData();
-    }, [loadAllData, showInactive]);
+    }, [loadAllData]);
 
     const toggleExpand = (categoryId) => {
         const newExpanded = new Set(expandedCategories);
@@ -251,10 +247,10 @@ export default function CategoriesPage() {
     };
 
     const handleInputChange = (e) => {
-        const { name, value, type, checked } = e.target;
+        const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: type === 'checkbox' ? checked : value
+            [name]: value
         }));
         
         if (formErrors[name]) {
@@ -349,7 +345,6 @@ export default function CategoriesPage() {
             description: '',
             parentId: null,
             icon: '📦',
-            isActive: true,
             displayOrder: 0
         });
         setFormErrors({});
@@ -362,7 +357,6 @@ export default function CategoriesPage() {
             description: category.description || '',
             parentId: category.parentId,
             icon: category.icon || '📦',
-            isActive: category.isActive,
             displayOrder: category.displayOrder || 0
         });
         setFormMode('edit');
@@ -409,42 +403,10 @@ export default function CategoriesPage() {
             description: '',
             parentId: parent._id,
             icon: '📦',
-            isActive: true,
             displayOrder: 0
         });
         setFormMode('sub');
         setShowForm(true);
-    };
-
-    // Handle toggle active
-    const handleToggleActive = async (category) => {
-        try {
-            const res = await fetch(`/api/masters?companyId=${user?.companyId}&type=categories`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...getAuthHeaders()
-                },
-                body: JSON.stringify({
-                    action: 'toggle-status',
-                    id: category._id,
-                    isActive: !category.isActive
-                })
-            });
-            
-            const data = await res.json();
-            
-            if (data.success) {
-                setSuccessMessage(`Category ${!category.isActive ? 'activated' : 'deactivated'} successfully`);
-                await loadAllData();
-                setTimeout(() => setSuccessMessage(''), 3000);
-            } else {
-                alert(data.message || 'Failed to toggle status');
-            }
-        } catch (error) {
-            console.error('Toggle status error:', error);
-            alert('Failed to toggle status: ' + error.message);
-        }
     };
 
     const handleCancelForm = () => {
@@ -482,8 +444,6 @@ export default function CategoriesPage() {
                     className="category-row"
                     style={{
                         ...styles.categoryRow(isMobile, level),
-                        opacity: category.isActive ? 1 : 0.6,
-                        backgroundColor: !category.isActive ? '#f9f9f9' : 'transparent'
                     }}
                 >
                     <div style={styles.categoryLeft}>
@@ -508,9 +468,6 @@ export default function CategoriesPage() {
                                 <span style={styles.categoryName(isMobile)}>
                                     {category.name}
                                 </span>
-                                {!category.isActive && (
-                                    <span style={styles.inactiveBadge}>Inactive</span>
-                                )}
                                 {category.productCount > 0 && (
                                     <span style={styles.productCountBadge}>
                                         <Package size={10} />
@@ -537,7 +494,6 @@ export default function CategoriesPage() {
                             onClick={() => handleAddSubcategory(category)}
                             style={styles.actionButton(isMobile, '#10b981')}
                             title="Add Subcategory"
-                            disabled={!category.isActive}
                         >
                             <FilePlus size={isMobile ? 16 : 18} />
                             {!isMobile && <span>Sub</span>}
@@ -550,21 +506,6 @@ export default function CategoriesPage() {
                         >
                             <Edit2 size={isMobile ? 16 : 18} />
                             {!isMobile && <span>Edit</span>}
-                        </button>
-                        
-                        <button
-                            onClick={() => handleToggleActive(category)}
-                            style={styles.actionButton(
-                                isMobile, 
-                                category.isActive ? '#f59e0b' : '#10b981'
-                            )}
-                            title={category.isActive ? 'Deactivate' : 'Activate'}
-                        >
-                            {category.isActive ? 
-                                <EyeOff size={isMobile ? 16 : 18} /> : 
-                                <Eye size={isMobile ? 16 : 18} />
-                            }
-                            {!isMobile && <span>{category.isActive ? 'Off' : 'On'}</span>}
                         </button>
                         
                         <button
@@ -609,8 +550,6 @@ export default function CategoriesPage() {
                 key={category._id}
                 style={{
                     ...styles.listRow(isMobile),
-                    opacity: category.isActive ? 1 : 0.6,
-                    backgroundColor: !category.isActive ? '#f9f9f9' : 'transparent',
                     paddingLeft: isMobile ? 16 + (category.level * 20) : 24 + (category.level * 24)
                 }}
             >
@@ -621,9 +560,6 @@ export default function CategoriesPage() {
                             <span style={styles.categoryName(isMobile)}>
                                 {'—'.repeat(category.level)} {category.name}
                             </span>
-                            {!category.isActive && (
-                                <span style={styles.inactiveBadge}>Inactive</span>
-                            )}
                             {category.productCount > 0 && (
                                 <span style={styles.productCountBadge}>
                                     <Package size={10} />
@@ -639,7 +575,6 @@ export default function CategoriesPage() {
                         onClick={() => handleAddSubcategory(category)}
                         style={styles.actionButton(isMobile, '#10b981')}
                         title="Add Subcategory"
-                        disabled={!category.isActive}
                     >
                         <FilePlus size={isMobile ? 16 : 18} />
                     </button>
@@ -650,20 +585,6 @@ export default function CategoriesPage() {
                         title="Edit"
                     >
                         <Edit2 size={isMobile ? 16 : 18} />
-                    </button>
-                    
-                    <button
-                        onClick={() => handleToggleActive(category)}
-                        style={styles.actionButton(
-                            isMobile, 
-                            category.isActive ? '#f59e0b' : '#10b981'
-                        )}
-                        title={category.isActive ? 'Deactivate' : 'Activate'}
-                    >
-                        {category.isActive ? 
-                            <EyeOff size={isMobile ? 16 : 18} /> : 
-                            <Eye size={isMobile ? 16 : 18} />
-                        }
                     </button>
                     
                     <button
@@ -753,14 +674,6 @@ export default function CategoriesPage() {
 
                 <div style={styles.headerActions}>
                     <button
-                        onClick={() => setShowInactive(!showInactive)}
-                        style={styles.filterButton(isMobile)}
-                    >
-                        {showInactive ? <Eye size={18} /> : <EyeOff size={18} />}
-                        {!isMobile && (showInactive ? 'Hide Inactive' : 'Show Inactive')}
-                    </button>
-                    
-                    <button
                         onClick={loadAllData}
                         style={styles.refreshButton(isMobile)}
                         disabled={loading}
@@ -778,7 +691,6 @@ export default function CategoriesPage() {
                                 description: '',
                                 parentId: null,
                                 icon: '📦',
-                                isActive: true,
                                 displayOrder: 0
                             });
                             setShowForm(true);
@@ -1264,22 +1176,6 @@ const styles = {
         gap: '8px',
     },
 
-    filterButton: (isMobile) => ({
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        padding: isMobile ? '8px 12px' : '10px 16px',
-        backgroundColor: '#f3f4f6',
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px',
-        color: '#4b5563',
-        fontSize: isMobile ? '13px' : '14px',
-        fontWeight: '500',
-        cursor: 'pointer',
-        transition: 'all 0.2s ease',
-        ':hover': { backgroundColor: '#e5e7eb' },
-    }),
-
     refreshButton: (isMobile) => ({
         display: 'flex',
         alignItems: 'center',
@@ -1565,15 +1461,6 @@ const styles = {
         color: '#6b7280',
         marginTop: '2px',
         display: 'block',
-    },
-
-    inactiveBadge: {
-        backgroundColor: '#f3f4f6',
-        color: '#6b7280',
-        padding: '2px 6px',
-        borderRadius: '4px',
-        fontSize: '0.7rem',
-        fontWeight: '500',
     },
 
     productCountBadge: {
