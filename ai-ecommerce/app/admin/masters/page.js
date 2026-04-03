@@ -28,10 +28,6 @@ import {
     AlertTriangle,
     Layers,
     Package,
-    TrendingUp,
-    Zap,
-    Star,
-    Menu
 } from 'lucide-react';
 
 export default function CategoriesPage() {
@@ -72,6 +68,7 @@ export default function CategoriesPage() {
         sub: 0
     });
     const [mainCategories, setMainCategories] = useState([]);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Redirect if not authenticated
     useEffect(() => {
@@ -118,6 +115,7 @@ export default function CategoriesPage() {
             });
             
             const data = await res.json();
+            
             if (data.success && data.data?.categories) {
                 setStats({
                     total: data.data.categories.total || 0,
@@ -126,13 +124,15 @@ export default function CategoriesPage() {
                     main: data.data.categories.main || 0,
                     sub: data.data.categories.sub || 0
                 });
+            } else {
+                console.log('Stats response:', data);
             }
         } catch (error) {
             console.error('Failed to fetch stats:', error);
         }
     }, [user, getAuthHeaders]);
 
-    // Fetch main categories with companyId
+    // Fetch main categories for dropdown
     const fetchMainCategories = useCallback(async () => {
         if (!user?.companyId) return;
         
@@ -157,7 +157,7 @@ export default function CategoriesPage() {
         }
     }, [user, getAuthHeaders]);
 
-    // Fetch categories with companyId
+    // Fetch categories tree
     const fetchCategories = useCallback(async () => {
         if (!user?.companyId) {
             console.log('No company ID available');
@@ -169,9 +169,7 @@ export default function CategoriesPage() {
         setApiError(null);
         
         try {
-            // Only show active categories
             const url = `/api/masters?companyId=${user.companyId}&type=categories&format=tree&includeInactive=false`;
-            console.log('Fetching categories from:', url);
             
             const res = await fetch(url, {
                 headers: getAuthHeaders()
@@ -185,12 +183,15 @@ export default function CategoriesPage() {
             }
             
             const data = await res.json();
-            console.log('Categories response:', data);
             
             if (data.success) {
                 setCategories(data.data || []);
-                // Also fetch stats for accurate counts
-                await fetchStats();
+                // Auto-expand first level
+                const firstLevelIds = new Set();
+                (data.data || []).forEach(cat => {
+                    firstLevelIds.add(cat._id);
+                });
+                setExpandedCategories(firstLevelIds);
             } else {
                 setErrorMessage(data.message || 'Failed to load categories');
             }
@@ -201,15 +202,22 @@ export default function CategoriesPage() {
         } finally {
             setLoading(false);
         }
-    }, [user, getAuthHeaders, fetchStats]);
+    }, [user, getAuthHeaders]);
+
+    // Load all data
+    const loadAllData = useCallback(async () => {
+        if (user?.companyId) {
+            await Promise.all([
+                fetchCategories(),
+                fetchMainCategories(),
+                fetchStats()
+            ]);
+        }
+    }, [fetchCategories, fetchMainCategories, fetchStats, user?.companyId]);
 
     useEffect(() => {
-        if (user?.companyId) {
-            fetchCategories();
-            fetchMainCategories();
-            fetchStats();
-        }
-    }, [fetchCategories, fetchMainCategories, fetchStats, user]);
+        loadAllData();
+    }, [loadAllData]);
 
     const toggleExpand = (categoryId) => {
         const newExpanded = new Set(expandedCategories);
@@ -274,7 +282,7 @@ export default function CategoriesPage() {
         return Object.keys(errors).length === 0;
     };
 
-    // Handle form submit with companyId
+    // Handle form submit
     const handleSubmit = async (e) => {
         e.preventDefault();
         
@@ -286,22 +294,16 @@ export default function CategoriesPage() {
         setApiError(null);
 
         try {
-            // Always set isActive to true for new categories
-            const isActiveValue = (formMode === 'add' || formMode === 'sub') ? true : formData.isActive;
-            
             const requestBody = {
                 name: formData.name.trim(),
                 description: formData.description?.trim() || '',
                 parentId: formData.parentId || null,
                 icon: formData.icon || '📦',
                 displayOrder: formData.displayOrder || 0,
-                isActive: isActiveValue
+                isActive: true // Always active for new categories
             };
             
-            console.log('Saving category with data:', requestBody);
-            console.log('Company ID:', user?.companyId);
-            
-            const url = formMode === 'add' || formMode === 'sub'
+            const url = (formMode === 'add' || formMode === 'sub')
                 ? `/api/masters?companyId=${user?.companyId}&type=categories`
                 : `/api/masters?companyId=${user?.companyId}&type=categories&id=${editingCategory?._id}`;
             
@@ -317,30 +319,13 @@ export default function CategoriesPage() {
             });
 
             const data = await res.json();
-            console.log('Save response:', data);
 
             if (data.success) {
                 setSuccessMessage(data.message);
-                setFormData({
-                    name: '',
-                    description: '',
-                    parentId: null,
-                    icon: '📦',
-                    isActive: true,
-                    displayOrder: 0
-                });
-                setShowForm(false);
-                setEditingCategory(null);
-                setParentCategory(null);
-                await fetchCategories();
-                await fetchMainCategories();
-                await fetchStats();
-                
+                resetForm();
+                await loadAllData();
                 setTimeout(() => setSuccessMessage(''), 3000);
             } else {
-                if (res.status === 403) {
-                    throw new Error("You don't have permission to perform this action");
-                }
                 setErrorMessage(data.message || 'Failed to save category');
             }
         } catch (error) {
@@ -350,6 +335,21 @@ export default function CategoriesPage() {
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const resetForm = () => {
+        setShowForm(false);
+        setEditingCategory(null);
+        setParentCategory(null);
+        setFormData({
+            name: '',
+            description: '',
+            parentId: null,
+            icon: '📦',
+            isActive: true,
+            displayOrder: 0
+        });
+        setFormErrors({});
     };
 
     const handleEdit = (category) => {
@@ -366,10 +366,12 @@ export default function CategoriesPage() {
         setShowForm(true);
     };
 
-    // Handle delete with companyId
+    // Handle delete
     const handleDelete = async (category) => {
         if (!confirm(`Are you sure you want to delete "${category.name}"? This action cannot be undone.`)) return;
-
+        
+        setIsDeleting(true);
+        
         try {
             const res = await fetch(`/api/masters?companyId=${user?.companyId}&type=categories&id=${category._id}`, {
                 method: 'DELETE',
@@ -380,20 +382,16 @@ export default function CategoriesPage() {
             
             if (data.success) {
                 setSuccessMessage('Category deleted successfully');
-                await fetchCategories();
-                await fetchMainCategories();
-                await fetchStats();
+                await loadAllData();
                 setTimeout(() => setSuccessMessage(''), 3000);
             } else {
-                if (data.categories) {
-                    alert(`Cannot delete: Used in products - ${data.categories.join(', ')}`);
-                } else {
-                    alert(data.message || 'Failed to delete category');
-                }
+                alert(data.message || 'Failed to delete category');
             }
         } catch (error) {
             console.error('Delete error:', error);
             alert('Failed to delete category: ' + error.message);
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -411,7 +409,7 @@ export default function CategoriesPage() {
         setShowForm(true);
     };
 
-    // Handle toggle active with companyId
+    // Handle toggle active
     const handleToggleActive = async (category) => {
         try {
             const res = await fetch(`/api/masters?companyId=${user?.companyId}&type=categories`, {
@@ -431,9 +429,7 @@ export default function CategoriesPage() {
             
             if (data.success) {
                 setSuccessMessage(`Category ${!category.isActive ? 'activated' : 'deactivated'} successfully`);
-                await fetchCategories();
-                await fetchMainCategories();
-                await fetchStats();
+                await loadAllData();
                 setTimeout(() => setSuccessMessage(''), 3000);
             } else {
                 alert(data.message || 'Failed to toggle status');
@@ -445,18 +441,7 @@ export default function CategoriesPage() {
     };
 
     const handleCancelForm = () => {
-        setShowForm(false);
-        setEditingCategory(null);
-        setParentCategory(null);
-        setFormData({
-            name: '',
-            description: '',
-            parentId: null,
-            icon: '📦',
-            isActive: true,
-            displayOrder: 0
-        });
-        setFormErrors({});
+        resetForm();
     };
 
     const filterCategories = (items, term) => {
@@ -520,13 +505,13 @@ export default function CategoriesPage() {
                                 {category.productCount > 0 && (
                                     <span style={styles.productCountBadge}>
                                         <Package size={10} />
-                                        {category.productCount} products
+                                        {category.productCount}
                                     </span>
                                 )}
                                 {category.subCategoryCount > 0 && (
                                     <span style={styles.subCountBadge}>
                                         <Layers size={10} />
-                                        {category.subCategoryCount} sub
+                                        {category.subCategoryCount}
                                     </span>
                                 )}
                             </div>
@@ -543,6 +528,7 @@ export default function CategoriesPage() {
                             onClick={() => handleAddSubcategory(category)}
                             style={styles.actionButton(isMobile, '#10b981')}
                             title="Add Subcategory"
+                            disabled={!category.isActive}
                         >
                             <FilePlus size={isMobile ? 16 : 18} />
                             {!isMobile && <span>Sub</span>}
@@ -576,7 +562,7 @@ export default function CategoriesPage() {
                             onClick={() => handleDelete(category)}
                             style={styles.actionButton(isMobile, '#ef4444')}
                             title="Delete"
-                            disabled={category.productCount > 0}
+                            disabled={category.productCount > 0 || isDeleting}
                         >
                             <Trash2 size={isMobile ? 16 : 18} />
                             {!isMobile && <span>Del</span>}
@@ -642,6 +628,7 @@ export default function CategoriesPage() {
                         onClick={() => handleAddSubcategory(category)}
                         style={styles.actionButton(isMobile, '#10b981')}
                         title="Add Subcategory"
+                        disabled={!category.isActive}
                     >
                         <FilePlus size={isMobile ? 16 : 18} />
                     </button>
@@ -672,7 +659,7 @@ export default function CategoriesPage() {
                         onClick={() => handleDelete(category)}
                         style={styles.actionButton(isMobile, '#ef4444')}
                         title="Delete"
-                        disabled={category.productCount > 0}
+                        disabled={category.productCount > 0 || isDeleting}
                     >
                         <Trash2 size={isMobile ? 16 : 18} />
                     </button>
@@ -755,10 +742,7 @@ export default function CategoriesPage() {
 
                 <div style={styles.headerActions}>
                     <button
-                        onClick={() => {
-                            fetchCategories();
-                            fetchStats();
-                        }}
+                        onClick={loadAllData}
                         style={styles.refreshButton(isMobile)}
                         disabled={loading}
                     >
