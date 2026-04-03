@@ -555,7 +555,7 @@ export default function MastersDashboard() {
             {/* Quick Actions Section */}
             {filteredQuickActions.length > 0 && !searchTerm && (
                 <div style={styles.quickActionsSection(isMobile)}>
-                    <div style={styles.sectionHeader}>
+                    <div style={styles.sectionHeader(isMobile)}>
                         <h2 style={styles.sectionTitle(isMobile)}>Quick Actions</h2>
                         <Zap size={18} color="#f59e0b" />
                     </div>
@@ -589,7 +589,7 @@ export default function MastersDashboard() {
             {/* Recent Activity */}
             {recentItems.length > 0 && !searchTerm && (
                 <div style={styles.recentSection(isMobile)}>
-                    <div style={styles.sectionHeader}>
+                    <div style={styles.sectionHeader(isMobile)}>
                         <h2 style={styles.sectionTitle(isMobile)}>Recent Activity</h2>
                         <Clock size={18} color="#6b7280" />
                     </div>
@@ -1204,12 +1204,12 @@ const styles = {
         marginRight: 'auto',
     }),
 
-    sectionHeader: {
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: isMobile ? '14px' : '18px',
-    },
+ sectionHeader: (isMobile) => ({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: isMobile ? '14px' : '18px',
+}),
 
     sectionTitle: (isMobile) => ({
         fontSize: isMobile ? '16px' : '18px',
