@@ -588,7 +588,7 @@
 
 
 
-// lib/nextauth.js - FIXED VERSION
+// lib/nextauth.js
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { connectDB } from '../utils/db';
@@ -974,7 +974,8 @@ export const authOptions = {
   },
 
   secret: process.env.NEXTAUTH_SECRET,
-  useSecureCookies: process.env.NODE_ENV === 'production',
+  useSecureCookies: false, //Need to disable 
+  // useSecureCookies: process.env.NODE_ENV === 'production',
   
   cookies: {
     sessionToken: {
