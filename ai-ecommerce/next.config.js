@@ -4,7 +4,7 @@ const nextConfig = {
   swcMinify: true,
   
   // ✅ Add this to prevent static generation of API routes
-  output: 'standalone',
+  // output: 'standalone',
   
   // ✅ Add this to handle dynamic routes properly
   experimental: {
