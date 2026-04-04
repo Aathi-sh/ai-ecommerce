@@ -1,10 +1,10 @@
-// app/api/category/route.js
+// app/api/masters/route.js
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/utils/db';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/nextauth';
 import Category from '@/models/Category';
-import Product from '@/models/Product';
+import Product from '@/models/Product';  
 import Company from '@/models/Company';
 import mongoose from 'mongoose';
 
@@ -13,6 +13,42 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const maxDuration = 30;
 export const revalidate = 0;
+
+// ========== DEBUG CONFIGURATION ==========
+const DEBUG = process.env.NODE_ENV !== 'production'; // Auto-disable in production
+
+// Enhanced debug logger with timestamps
+const logDebug = (module, action, message, data = null) => {
+    if (DEBUG) {
+        const timestamp = new Date().toISOString().split('T')[1];
+        console.log(`\n🔍 [${timestamp}] [DEBUG][${module}] [${action}]`);
+        console.log(`   📝 ${message}`);
+        if (data) {
+            console.log(`   📦 Data:`, JSON.stringify(data, null, 2));
+        }
+    }
+};
+
+const logError = (module, action, error, context = {}) => {
+    const timestamp = new Date().toISOString().split('T')[1];
+    console.error(`\n❌ [${timestamp}] [ERROR][${module}] [${action}]`);
+    console.error(`   📝 ${error.message}`);
+    if (DEBUG) {
+        console.error(`   📋 Context:`, JSON.stringify(context, null, 2));
+        console.error(`   🔍 Stack:`, error.stack);
+    }
+};
+
+const logInfo = (module, action, message, data = null) => {
+    if (DEBUG) {
+        const timestamp = new Date().toISOString().split('T')[1];
+        console.log(`\n✅ [${timestamp}] [INFO][${module}] [${action}]`);
+        console.log(`   📝 ${message}`);
+        if (data) {
+            console.log(`   📦 Data:`, JSON.stringify(data, null, 2));
+        }
+    }
+};
 
 // ========== MASTER TYPES ==========
 const MASTER_TYPES = {
@@ -26,47 +62,66 @@ const MASTER_TYPES = {
 
 const isValidObjectId = (id) => {
     if (!id) return false;
-    return mongoose.Types.ObjectId.isValid(id) && 
-           /^[0-9a-fA-F]{24}$/.test(id);
+    return mongoose.Types.ObjectId.isValid(id) && /^[0-9a-fA-F]{24}$/.test(id);
 };
 
-// ========== FIXED: SIMPLIFIED COMPANY CONTEXT ==========
+// FIXED: Enhanced company context with better validation
 const getCompanyContext = async (request) => {
+    logDebug('CompanyContext', 'Start', 'Starting company context resolution');
+    
     try {
-        // PRIORITY 1: URL Query Parameter (what frontend sends)
+        // PRIORITY 1: URL Query Parameter
         const urlCompanyId = request.nextUrl?.searchParams.get('companyId');
+        
         if (urlCompanyId && isValidObjectId(urlCompanyId)) {
-            const company = await Company.findById(urlCompanyId);
-            if (company && company.status === 'active' && !company.deletedAt) {
-                console.log('Company context from URL:', urlCompanyId);
+            const company = await Company.findOne({
+                _id: urlCompanyId,
+                status: 'active',
+                deletedAt: null
+            });
+            
+            if (company) {
+                logInfo('CompanyContext', 'Success', `✅ Company found from URL: ${urlCompanyId}`);
                 return urlCompanyId.toString();
             }
         }
         
         // PRIORITY 2: Headers
         const headersCompanyId = request.headers.get('x-company-id');
+        
         if (headersCompanyId && isValidObjectId(headersCompanyId)) {
-            const company = await Company.findById(headersCompanyId);
-            if (company && company.status === 'active' && !company.deletedAt) {
-                console.log('Company context from Header:', headersCompanyId);
+            const company = await Company.findOne({
+                _id: headersCompanyId,
+                status: 'active',
+                deletedAt: null
+            });
+            
+            if (company) {
+                logInfo('CompanyContext', 'Success', `✅ Company found from Header: ${headersCompanyId}`);
                 return headersCompanyId.toString();
             }
         }
         
         // PRIORITY 3: User Session
         const session = await getServerSession(authOptions);
+        
         if (session?.user?.companyId && isValidObjectId(session.user.companyId)) {
-            const company = await Company.findById(session.user.companyId);
-            if (company && company.status === 'active' && !company.deletedAt) {
-                console.log('Company context from Session:', session.user.companyId);
+            const company = await Company.findOne({
+                _id: session.user.companyId,
+                status: 'active',
+                deletedAt: null
+            });
+            
+            if (company) {
+                logInfo('CompanyContext', 'Success', `✅ Company found from Session: ${session.user.companyId}`);
                 return session.user.companyId.toString();
             }
         }
         
-        console.log('No valid company context found');
+        logError('CompanyContext', 'Resolution', new Error('No valid company context found'), {});
         return null;
     } catch (error) {
-        console.error('Error getting company context:', error);
+        logError('CompanyContext', 'Exception', error, {});
         return null;
     }
 };
@@ -90,29 +145,29 @@ const safeUpdateProductCounts = async (companyId) => {
     try {
         if (Category && typeof Category.updateAllProductCounts === 'function') {
             await Category.updateAllProductCounts(companyId);
-        } else {
-            console.warn('Category.updateAllProductCounts is not available');
         }
     } catch (error) {
-        console.warn('Failed to update product counts:', error.message);
+        logError('ProductCount', 'Update', error, { companyId });
     }
 };
 
 // ========== GET HANDLER ==========
 export async function GET(request) {
+    const requestId = Math.random().toString(36).substring(7);
+    
     try {
         await connectDB();
         
         const companyId = await getCompanyContext(request);
+        
         if (!companyId) {
             return NextResponse.json({
                 success: false,
                 message: 'Company context required - please log in again',
-                error: 'Missing or invalid company ID'
+                error: 'Missing or invalid company ID',
+                requestId
             }, { status: 400 });
         }
-        
-        console.log(`GET request for company: ${companyId}`);
         
         const { searchParams } = new URL(request.url);
         const type = searchParams.get('type');
@@ -169,7 +224,8 @@ export async function GET(request) {
                         outOfStock: outOfStockProducts
                     }
                 },
-                companyId
+                companyId,
+                requestId
             });
         }
 
@@ -221,7 +277,8 @@ export async function GET(request) {
             return NextResponse.json({
                 success: true,
                 data: recentItems.slice(0, recentLimit),
-                companyId
+                companyId,
+                requestId
             });
         }
 
@@ -229,6 +286,7 @@ export async function GET(request) {
         if (type === MASTER_TYPES.CATEGORIES) {
             const companyObjectId = new mongoose.Types.ObjectId(companyId);
             
+            // Single category by ID
             if (id) {
                 if (!isValidObjectId(id)) {
                     return NextResponse.json({
@@ -253,42 +311,74 @@ export async function GET(request) {
                 return NextResponse.json({
                     success: true,
                     data: category,
-                    companyId
+                    companyId,
+                    requestId
                 });
             }
 
             // Tree format
             if (format === 'tree') {
-                const tree = await Category.getTree(companyId, includeInactive);
-                return NextResponse.json({
-                    success: true,
-                    data: tree,
-                    companyId
-                });
+                try {
+                    const tree = await Category.getTree(companyId, includeInactive);
+                    return NextResponse.json({
+                        success: true,
+                        data: tree,
+                        companyId,
+                        requestId
+                    });
+                } catch (treeError) {
+                    logError('GET', 'Tree Error', treeError, { companyId, includeInactive });
+                    return NextResponse.json({
+                        success: false,
+                        message: 'Failed to build category tree',
+                        error: treeError.message
+                    }, { status: 500 });
+                }
             }
 
-            // Flat format
+            // Flat format with pagination
             if (format === 'flat') {
-                const flatList = await Category.getFlatList(companyId, includeInactive);
-                return NextResponse.json({
-                    success: true,
-                    data: flatList,
-                    companyId
-                });
+                try {
+                    const flatListResult = await Category.getFlatList(companyId, includeInactive, page, limit);
+                    return NextResponse.json({
+                        success: true,
+                        data: flatListResult.data,
+                        pagination: {
+                            total: flatListResult.total,
+                            page: flatListResult.page,
+                            limit: flatListResult.limit,
+                            totalPages: flatListResult.totalPages
+                        },
+                        companyId,
+                        requestId
+                    });
+                } catch (flatError) {
+                    logError('GET', 'Flat List Error', flatError, { companyId, includeInactive });
+                    return NextResponse.json({
+                        success: false,
+                        message: 'Failed to get flat category list',
+                        error: flatError.message
+                    }, { status: 500 });
+                }
             }
 
             // Regular list with filters
             let query = { companyId: companyObjectId, deletedAt: null };
             
-            if (status === 'active') query.isActive = true;
-            else if (status === 'inactive') query.isActive = false;
+            if (status === 'active') {
+                query.isActive = true;
+            } else if (status === 'inactive') {
+                query.isActive = false;
+            }
             
-            if (parentId === 'null' || parentId === '') {
+            // FIXED: Handle parentId filter properly
+            if (parentId === 'null' || parentId === '' || parentId === 'all') {
                 query.parentId = null;
             } else if (parentId && isValidObjectId(parentId)) {
                 query.parentId = new mongoose.Types.ObjectId(parentId);
             }
             
+            // Handle search
             if (search && search.trim()) {
                 const searchTerm = search.trim();
                 query.$or = [
@@ -314,7 +404,8 @@ export async function GET(request) {
                     limit,
                     totalPages: Math.ceil(total / limit)
                 },
-                companyId
+                companyId,
+                requestId
             });
         }
 
@@ -415,7 +506,7 @@ export async function GET(request) {
         }, { status: 400 });
 
     } catch (error) {
-        console.error('GET masters error:', error);
+        logError('GET', 'Unhandled Exception', error, { url: request.url });
         
         if (error.name === 'CastError') {
             return NextResponse.json({
@@ -435,6 +526,8 @@ export async function GET(request) {
 
 // ========== POST HANDLER (CREATE) ==========
 export async function POST(request) {
+    const requestId = Math.random().toString(36).substring(7);
+    
     try {
         await connectDB();
         
@@ -446,8 +539,6 @@ export async function POST(request) {
                 message: 'Company context required'
             }, { status: 400 });
         }
-        
-        console.log(`POST request for company: ${companyId}`);
         
         const session = await getServerSession(authOptions);
         const { searchParams } = new URL(request.url);
@@ -464,11 +555,6 @@ export async function POST(request) {
                     message: 'Category name is required'
                 }, { status: 400 });
             }
-
-            const slug = body.name
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/^-|-$/g, '');
 
             // Check for existing category
             const existingQuery = {
@@ -494,7 +580,7 @@ export async function POST(request) {
                 }, { status: 409 });
             }
 
-            // Verify parent belongs to same company
+            // Verify parent belongs to same company and check depth
             if (body.parentId && isValidObjectId(body.parentId)) {
                 const parentExists = await Category.findOne({
                     _id: body.parentId,
@@ -508,12 +594,32 @@ export async function POST(request) {
                         message: 'Parent category not found in this company'
                     }, { status: 400 });
                 }
+                
+                // Check depth limit
+                let depth = 1;
+                let currentParent = parentExists;
+                while (currentParent.parentId && depth < 3) {
+                    const nextParent = await Category.findOne({
+                        _id: currentParent.parentId,
+                        companyId: new mongoose.Types.ObjectId(companyId),
+                        deletedAt: null
+                    });
+                    if (!nextParent) break;
+                    currentParent = nextParent;
+                    depth++;
+                }
+                
+                if (depth >= 3) {
+                    return NextResponse.json({
+                        success: false,
+                        message: 'Maximum category depth is 3 levels (Main > Sub > Sub-Sub)'
+                    }, { status: 400 });
+                }
             }
 
             const categoryData = {
                 companyId: new mongoose.Types.ObjectId(companyId),
                 name: body.name.trim(),
-                slug: slug,
                 description: body.description || '',
                 parentId: (body.parentId && isValidObjectId(body.parentId)) ? new mongoose.Types.ObjectId(body.parentId) : null,
                 icon: body.icon || '📦',
@@ -524,12 +630,11 @@ export async function POST(request) {
             
             const category = await Category.create(categoryData);
             
-            console.log(`✅ Category created: ${category.name} (ID: ${category._id})`);
-
             return NextResponse.json({
                 success: true,
                 message: body.parentId ? 'Subcategory created successfully' : 'Category created successfully',
-                data: category
+                data: category,
+                requestId
             }, { status: 201 });
         }
 
@@ -585,6 +690,7 @@ export async function POST(request) {
                 }, { status: 400 });
             }
             
+            // Verify subCategory belongs to category
             if (!subCategory.parentId || subCategory.parentId.toString() !== body.category.toString()) {
                 return NextResponse.json({
                     success: false,
@@ -631,7 +737,7 @@ export async function POST(request) {
         }, { status: 400 });
 
     } catch (error) {
-        console.error('POST masters error:', error);
+        logError('POST', 'Unhandled Exception', error, {});
         
         if (error.code === 11000) {
             const field = Object.keys(error.keyPattern)[0];
@@ -659,6 +765,8 @@ export async function POST(request) {
 
 // ========== PUT HANDLER (UPDATE) ==========
 export async function PUT(request) {
+    const requestId = Math.random().toString(36).substring(7);
+    
     try {
         await connectDB();
         
@@ -700,17 +808,89 @@ export async function PUT(request) {
                 }, { status: 404 });
             }
 
+            // Prepare update data
+            const updateData = {
+                updatedBy: userId
+            };
+            
+            if (body.name !== undefined) updateData.name = body.name.trim();
+            if (body.description !== undefined) updateData.description = body.description;
+            if (body.icon !== undefined) updateData.icon = body.icon;
+            if (body.displayOrder !== undefined) updateData.displayOrder = body.displayOrder;
+            if (body.isActive !== undefined) updateData.isActive = body.isActive;
+            if (body.metaTitle !== undefined) updateData.metaTitle = body.metaTitle;
+            if (body.metaDescription !== undefined) updateData.metaDescription = body.metaDescription;
+            
+            // Handle parentId change with validation
+            if (body.parentId !== undefined) {
+                if (body.parentId === null || body.parentId === '' || body.parentId === 'null') {
+                    updateData.parentId = null;
+                } else if (isValidObjectId(body.parentId)) {
+                    // Don't allow self-parent
+                    if (body.parentId.toString() === id) {
+                        return NextResponse.json({
+                            success: false,
+                            message: 'Category cannot be its own parent'
+                        }, { status: 400 });
+                    }
+                    
+                    // Check parent exists in same company
+                    const newParent = await Category.findOne({
+                        _id: body.parentId,
+                        companyId: new mongoose.Types.ObjectId(companyId),
+                        deletedAt: null
+                    });
+                    
+                    if (!newParent) {
+                        return NextResponse.json({
+                            success: false,
+                            message: 'Parent category not found in this company'
+                        }, { status: 400 });
+                    }
+                    
+                    // Check for circular reference
+                    const descendants = await Category.getAllDescendants(companyId, id);
+                    if (descendants.some(d => d.toString() === body.parentId.toString())) {
+                        return NextResponse.json({
+                            success: false,
+                            message: 'Cannot move category under its own subcategory'
+                        }, { status: 400 });
+                    }
+                    
+                    // Check depth limit
+                    let depth = 1;
+                    let currentParent = newParent;
+                    while (currentParent.parentId && depth < 3) {
+                        const nextParent = await Category.findOne({
+                            _id: currentParent.parentId,
+                            companyId: new mongoose.Types.ObjectId(companyId),
+                            deletedAt: null
+                        });
+                        if (!nextParent) break;
+                        currentParent = nextParent;
+                        depth++;
+                    }
+                    
+                    if (depth >= 3) {
+                        return NextResponse.json({
+                            success: false,
+                            message: 'Maximum category depth is 3 levels'
+                        }, { status: 400 });
+                    }
+                    
+                    updateData.parentId = new mongoose.Types.ObjectId(body.parentId);
+                } else {
+                    return NextResponse.json({
+                        success: false,
+                        message: 'Invalid parent ID format'
+                    }, { status: 400 });
+                }
+            }
+            
             const updated = await Category.findByIdAndUpdate(
                 id,
-                {
-                    name: body.name || category.name,
-                    description: body.description !== undefined ? body.description : category.description,
-                    icon: body.icon || category.icon,
-                    displayOrder: body.displayOrder !== undefined ? body.displayOrder : category.displayOrder,
-                    isActive: body.isActive !== undefined ? body.isActive : category.isActive,
-                    updatedBy: userId
-                },
-                { new: true }
+                updateData,
+                { new: true, runValidators: true }
             );
 
             await safeUpdateProductCounts(companyId);
@@ -718,7 +898,8 @@ export async function PUT(request) {
             return NextResponse.json({
                 success: true,
                 message: 'Category updated successfully',
-                data: updated
+                data: updated,
+                requestId
             });
         }
 
@@ -753,16 +934,23 @@ export async function PUT(request) {
                 }
             }
 
+            const updateData = {
+                ...body,
+                sku: body.sku ? body.sku.toUpperCase() : product.sku,
+                isOnSale: body.discountPrice ? 
+                    parseFloat(body.discountPrice) < (parseFloat(body.mrp) || parseFloat(product.mrp)) : 
+                    product.isOnSale,
+                updatedBy: userId
+            };
+            
+            // Remove undefined fields
+            Object.keys(updateData).forEach(key => 
+                updateData[key] === undefined && delete updateData[key]
+            );
+
             const updated = await Product.findByIdAndUpdate(
                 id,
-                {
-                    ...body,
-                    sku: body.sku ? body.sku.toUpperCase() : product.sku,
-                    isOnSale: body.discountPrice ? 
-                        parseFloat(body.discountPrice) < (parseFloat(body.mrp) || parseFloat(product.mrp)) : 
-                        product.isOnSale,
-                    updatedBy: userId
-                },
+                updateData,
                 { new: true, runValidators: true }
             ).populate('category', 'name slug')
              .populate('subCategory', 'name slug');
@@ -782,7 +970,7 @@ export async function PUT(request) {
         }, { status: 400 });
 
     } catch (error) {
-        console.error('PUT masters error:', error);
+        logError('PUT', 'Unhandled Exception', error, {});
         
         if (error.code === 11000) {
             const field = Object.keys(error.keyPattern)[0];
@@ -800,8 +988,10 @@ export async function PUT(request) {
     }
 }
 
-// ========== FIXED: DELETE HANDLER ==========
+// ========== DELETE HANDLER ==========
 export async function DELETE(request) {
+    const requestId = Math.random().toString(36).substring(7);
+    
     try {
         await connectDB();
         
@@ -813,8 +1003,6 @@ export async function DELETE(request) {
                 message: 'Company context required'
             }, { status: 400 });
         }
-        
-        console.log(`DELETE request for company: ${companyId}`);
         
         const session = await getServerSession(authOptions);
         const { searchParams } = new URL(request.url);
@@ -829,9 +1017,8 @@ export async function DELETE(request) {
             }, { status: 400 });
         }
 
-        // ===== FIXED: DELETE CATEGORY =====
+        // ===== DELETE CATEGORY =====
         if (type === MASTER_TYPES.CATEGORIES) {
-            // First verify category exists AND belongs to this company
             const category = await Category.findOne({
                 _id: id,
                 companyId: new mongoose.Types.ObjectId(companyId),
@@ -844,8 +1031,6 @@ export async function DELETE(request) {
                     message: 'Category not found in this company'
                 }, { status: 404 });
             }
-            
-            console.log(`Found category to delete: ${category.name}`);
             
             // Check if category has products
             const productCount = await Product.countDocuments({
@@ -888,11 +1073,10 @@ export async function DELETE(request) {
                 }
             );
             
-            console.log(`✅ Category deleted: ${category.name}`);
-            
             return NextResponse.json({
                 success: true,
-                message: 'Category deleted successfully'
+                message: 'Category deleted successfully',
+                requestId
             });
         }
 
@@ -924,7 +1108,8 @@ export async function DELETE(request) {
             
             return NextResponse.json({
                 success: true,
-                message: 'Product deleted successfully'
+                message: 'Product deleted successfully',
+                requestId
             });
         }
 
@@ -934,7 +1119,7 @@ export async function DELETE(request) {
         }, { status: 400 });
 
     } catch (error) {
-        console.error('DELETE masters error:', error);
+        logError('DELETE', 'Unhandled Exception', error, {});
         return NextResponse.json({
             success: false,
             message: 'Failed to delete',
@@ -945,6 +1130,8 @@ export async function DELETE(request) {
 
 // ========== PATCH HANDLER ==========
 export async function PATCH(request) {
+    const requestId = Math.random().toString(36).substring(7);
+    
     try {
         await connectDB();
         
@@ -998,7 +1185,8 @@ export async function PATCH(request) {
                 return NextResponse.json({
                     success: true,
                     message: `Category ${body.isActive ? 'activated' : 'deactivated'} successfully`,
-                    data: updated
+                    data: updated,
+                    requestId
                 });
             }
             
@@ -1028,7 +1216,62 @@ export async function PATCH(request) {
                 return NextResponse.json({
                     success: true,
                     message: `Product ${body.isActive ? 'activated' : 'deactivated'} successfully`,
-                    data: updated
+                    data: updated,
+                    requestId
+                });
+            }
+        }
+
+        // Bulk operations
+        if (body.action === 'bulk-update' && body.ids && Array.isArray(body.ids)) {
+            const validIds = body.ids.filter(id => isValidObjectId(id));
+            
+            if (validIds.length === 0) {
+                return NextResponse.json({
+                    success: false,
+                    message: 'No valid IDs provided'
+                }, { status: 400 });
+            }
+            
+            if (type === MASTER_TYPES.CATEGORIES) {
+                const result = await Category.updateMany(
+                    {
+                        _id: { $in: validIds },
+                        companyId: new mongoose.Types.ObjectId(companyId),
+                        deletedAt: null
+                    },
+                    {
+                        isActive: body.isActive,
+                        updatedBy: userId
+                    }
+                );
+                
+                return NextResponse.json({
+                    success: true,
+                    message: `${result.modifiedCount} categories updated`,
+                    modifiedCount: result.modifiedCount,
+                    requestId
+                });
+            }
+            
+            if (type === MASTER_TYPES.PRODUCTS) {
+                const result = await Product.updateMany(
+                    {
+                        _id: { $in: validIds },
+                        companyId: new mongoose.Types.ObjectId(companyId),
+                        deletedAt: null
+                    },
+                    {
+                        isActive: body.isActive,
+                        updatedBy: userId
+                    }
+                );
+                
+                return NextResponse.json({
+                    success: true,
+                    message: `${result.modifiedCount} products updated`,
+                    modifiedCount: result.modifiedCount,
+                    requestId
                 });
             }
         }
@@ -1039,7 +1282,7 @@ export async function PATCH(request) {
         }, { status: 400 });
 
     } catch (error) {
-        console.error('PATCH masters error:', error);
+        logError('PATCH', 'Unhandled Exception', error, {});
         return NextResponse.json({
             success: false,
             message: 'Failed to update',

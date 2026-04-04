@@ -1,2259 +1,1033 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
-import Head from 'next/head';
-import { appTheme } from "../../../src/constants/theme";
-import { useAuth } from '../../../context/AuthContext';
-import {
-    Plus, Edit2, Trash2, Eye, EyeOff, Search, X,
-    ChevronLeft, ChevronRight, RefreshCw, Download,
-    Filter, Grid, List, FolderTree, FolderPlus,
-    Package, ChevronDown, ChevronUp, MoreVertical,
-    CheckCircle, AlertCircle, AlertTriangle, XCircle,
-    Save, Upload, Image as ImageIcon, DollarSign,
-    Percent, Calendar, Tag, Box, Truck, Globe,
-    Settings, Shield, Zap, Star, Heart, Award,
-    ShoppingCart, Clock, MapPin, Phone, Mail,
-    FileText, Copy, Check, Loader2, Camera, Video, Link2, Hash,
-    AtSign, FileSignature, Palette, Brush, Sparkles,
-    Crown, Gem, Diamond, Gift, ThumbsUp, ThumbsDown,
-    MessageSquare, Send, Paperclip, Smile, Home,
-    ArrowLeft, ArrowRight, Grid as GridIcon, List as ListIcon,
-    Filter as FilterIcon, Search as SearchIcon, MoreHorizontal,
-    Download as DownloadIcon, Printer, Share2, Bookmark,
-    Lock, Unlock, Key, Wifi, WifiOff, Battery, BatteryCharging,
-    Cpu, HardDrive, Server, Cloud, CloudOff, Repeat,
-    Shuffle, Play, Pause, Square, Circle, Triangle,
-    Hexagon, Octagon, Building2, CreditCard, Landmark,
-    Receipt, HeadphonesIcon, PhoneCall, MailOpen,
-    MapPinHouse, Building, Store, Globe2, Facebook,
-    Instagram, Twitter, Youtube, Linkedin, TwitterIcon,
-    Linkedin as LinkedinIcon, ShieldCheck, ShieldAlert,
-    Activity, TrendingUp, Users, Briefcase, Calendar as CalendarIcon,
-    Menu, Layers, Layout, Info, HelpCircle, Flag
-} from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
-// ==================== CONSTANTS ====================
-const ITEMS_PER_PAGE = 10;
-
-// Helper to validate ObjectId
-const isValidObjectId = (id) => {
-    return /^[0-9a-fA-F]{24}$/.test(id);
+// ─── ICONS ────────────────────────────────────────────────────────────────────
+const Icon = {
+  Grid: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+      <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+    </svg>
+  ),
+  Package: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2l9 4.9V17L12 22 3 17V6.9L12 2z"/><polyline points="12 22 12 11.1"/><polyline points="3 6.9 12 11.1 21 6.9"/>
+    </svg>
+  ),
+  Plus: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  ),
+  Edit: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    </svg>
+  ),
+  Trash: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+      <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+    </svg>
+  ),
+  Search: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  ),
+  ChevronRight: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  ),
+  ChevronDown: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  ),
+  X: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  ),
+  Tag: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+      <line x1="7" y1="7" x2="7.01" y2="7"/>
+    </svg>
+  ),
+  BarChart: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+    </svg>
+  ),
+  RefreshCw: () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+    </svg>
+  ),
+  Toggle: ({ on }) => (
+    <svg width="36" height="20" viewBox="0 0 36 20">
+      <rect x="0" y="0" width="36" height="20" rx="10" fill={on ? '#10b981' : '#d1d5db'}/>
+      <circle cx={on ? 26 : 10} cy="10" r="8" fill="white" style={{ transition: 'cx 0.2s' }}/>
+    </svg>
+  ),
+  Folder: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+    </svg>
+  ),
+  AlertCircle: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+  ),
+  CheckCircle: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+    </svg>
+  ),
+  Filter: () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+    </svg>
+  ),
+  Eye: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+    </svg>
+  ),
 };
 
-// Helper to format date
-const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
-    });
-};
+// ─── TOAST ─────────────────────────────────────────────────────────────────────
+function Toast({ toasts, removeToast }) {
+  return (
+    <div style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 9999, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {toasts.map(t => (
+        <div key={t.id} style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '12px 16px', borderRadius: '10px', minWidth: '280px', maxWidth: '380px',
+          background: t.type === 'success' ? '#f0fdf4' : t.type === 'error' ? '#fef2f2' : '#fffbeb',
+          border: `1px solid ${t.type === 'success' ? '#bbf7d0' : t.type === 'error' ? '#fecaca' : '#fde68a'}`,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          animation: 'slideIn 0.3s ease',
+          fontFamily: 'var(--font-body)',
+        }}>
+          <span style={{ color: t.type === 'success' ? '#16a34a' : t.type === 'error' ? '#dc2626' : '#d97706' }}>
+            {t.type === 'success' ? <Icon.CheckCircle /> : <Icon.AlertCircle />}
+          </span>
+          <span style={{ flex: 1, fontSize: '13px', color: '#374151', fontWeight: 500 }}>{t.message}</span>
+          <button onClick={() => removeToast(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '0', display: 'flex' }}>
+            <Icon.X />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-// Helper to get time ago
-const getTimeAgo = (dateString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+// ─── CONFIRM MODAL ─────────────────────────────────────────────────────────────
+function ConfirmModal({ open, title, message, onConfirm, onCancel, loading }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div style={{ background: '#fff', borderRadius: '16px', padding: '28px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.18)', fontFamily: 'var(--font-body)' }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: '17px', fontWeight: 700, color: '#111' }}>{title}</h3>
+        <p style={{ margin: '0 0 24px', fontSize: '14px', color: '#6b7280', lineHeight: 1.6 }}>{message}</p>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <button onClick={onCancel} disabled={loading} style={{ padding: '9px 20px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: '#374151' }}>Cancel</button>
+          <button onClick={onConfirm} disabled={loading} style={{ padding: '9px 20px', borderRadius: '8px', border: 'none', background: '#ef4444', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: '#fff', opacity: loading ? 0.7 : 1 }}>
+            {loading ? 'Deleting...' : 'Delete'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return formatDate(dateString);
-};
+// ─── CATEGORY FORM MODAL ───────────────────────────────────────────────────────
+function CategoryModal({ open, onClose, onSave, editData, categories, loading }) {
+  const [form, setForm] = useState({ name: '', description: '', parentId: '', icon: '📦', displayOrder: 0, isActive: true });
+  const [errors, setErrors] = useState({});
 
-export default function MastersPage() {
-    const router = useRouter();
-    const { user, isAuthenticated, isCompanyAdmin, isSuperAdmin, getAuthHeaders } = useAuth();
-
-    // Redirect if not authenticated
-    useEffect(() => {
-        if (!isAuthenticated) {
-            router.push('/login');
-        } else if (!isCompanyAdmin && !isSuperAdmin) {
-            router.push('/dashboard');
-        }
-    }, [isAuthenticated, isCompanyAdmin, isSuperAdmin, router]);
-
-    // ==================== STATE MANAGEMENT ====================
-    const [loading, setLoading] = useState(true);
-    const [allCategories, setAllCategories] = useState([]); // Store ALL categories
-    const [categories, setCategories] = useState([]); // Filtered categories for display
-    const [stats, setStats] = useState({
-        total: 0,
-        active: 0,
-        inactive: 0,
-        main: 0,
-        sub: 0
-    });
-    
-    // UI State
-    const [viewMode, setViewMode] = useState('list'); // 'list' or 'tree'
-    const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(ITEMS_PER_PAGE);
-    
-    // Modal State
-    const [showModal, setShowModal] = useState(false);
-    const [modalMode, setModalMode] = useState('add'); // 'add', 'edit', 'view'
-    const [selectedCategory, setSelectedCategory] = useState(null);
-    const [parentCategories, setParentCategories] = useState([]);
-    
-    // Form State
-    const [formData, setFormData] = useState({
-        name: '',
-        description: '',
-        icon: '📦',
-        displayOrder: 0,
-        parentId: '',
-        isActive: true
-    });
-    
-    const [formErrors, setFormErrors] = useState({});
-    const [submitting, setSubmitting] = useState(false);
-    
-    // Delete Modal State
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [categoryToDelete, setCategoryToDelete] = useState(null);
-    const [deleting, setDeleting] = useState(false);
-    
-    // Toast State
-    const [toast, setToast] = useState({ show: false, type: '', message: '' });
-    
-    // Refs
-    const searchTimeoutRef = useRef(null);
-    const modalRef = useRef(null);
-
-    // ==================== HELPER FUNCTIONS ====================
-    const showToast = (type, message) => {
-        setToast({ show: true, type, message });
-        setTimeout(() => {
-            setToast({ show: false, type: '', message: '' });
-        }, 3000);
-    };
-
-    // Calculate stats from categories
-    const calculateStats = (categoriesList) => {
-        const total = categoriesList.length;
-        const active = categoriesList.filter(c => c.isActive === true).length;
-        const inactive = total - active;
-        const main = categoriesList.filter(c => c.level === 0 || !c.parentId).length;
-        const sub = total - main;
-        
-        setStats({ total, active, inactive, main, sub });
-    };
-
-    // Filter categories based on search and status
-    const filterCategories = useCallback((cats, search, status) => {
-        let filtered = [...cats];
-        
-        // Apply status filter
-        if (status === 'active') {
-            filtered = filtered.filter(c => c.isActive === true);
-        } else if (status === 'inactive') {
-            filtered = filtered.filter(c => c.isActive === false);
-        }
-        
-        // Apply search filter
-        if (search.trim()) {
-            const searchLower = search.toLowerCase();
-            filtered = filtered.filter(c => 
-                c.name.toLowerCase().includes(searchLower) ||
-                (c.description && c.description.toLowerCase().includes(searchLower)) ||
-                (c.slug && c.slug.toLowerCase().includes(searchLower))
-            );
-        }
-        
-        setCategories(filtered);
-        setCurrentPage(1);
-    }, []);
-
-    // ==================== FETCH DATA ====================
-    const fetchCategories = useCallback(async () => {
-        if (!user?.companyId) return;
-        
-        setLoading(true);
-        try {
-            // Fetch flat list with level indicators
-            const params = new URLSearchParams({
-                companyId: user.companyId,
-                type: 'categories',
-                format: 'flat'
-            });
-            
-            const res = await fetch(`/api/masters?${params}`, {
-                headers: getAuthHeaders()
-            });
-            const data = await res.json();
-            
-            console.log('Fetched categories:', data);
-            
-            if (data.success && data.data) {
-                setAllCategories(data.data);
-                filterCategories(data.data, searchTerm, statusFilter);
-                calculateStats(data.data);
-            } else {
-                showToast('error', data.message || 'Failed to load categories');
-            }
-        } catch (error) {
-            console.error('Failed to fetch categories:', error);
-            showToast('error', 'Failed to load categories');
-        } finally {
-            setLoading(false);
-        }
-    }, [user?.companyId, getAuthHeaders, searchTerm, statusFilter, filterCategories]);
-
-    // Fetch parent categories (for subcategory creation) - ONLY ACTIVE MAIN CATEGORIES
-    const fetchParentCategories = useCallback(async () => {
-        if (!user?.companyId) return;
-        
-        try {
-            const params = new URLSearchParams({
-                companyId: user.companyId,
-                type: 'categories',
-                format: 'flat'
-            });
-            
-            const res = await fetch(`/api/masters?${params}`, {
-                headers: getAuthHeaders()
-            });
-            const data = await res.json();
-            
-            if (data.success && data.data) {
-                // Only show ACTIVE main categories as parent options
-                // Also exclude the current category when editing
-                const mains = data.data.filter(c => 
-                    (c.level === 0 || !c.parentId) && 
-                    c.isActive === true &&
-                    (modalMode !== 'edit' || c._id !== selectedCategory?._id)
-                );
-                setParentCategories(mains);
-            }
-        } catch (error) {
-            console.error('Failed to fetch parent categories:', error);
-        }
-    }, [user?.companyId, getAuthHeaders, modalMode, selectedCategory]);
-
-    // ==================== CRUD OPERATIONS ====================
-    const handleAddCategory = () => {
-        setModalMode('add');
-        setSelectedCategory(null);
-        setFormData({
-            name: '',
-            description: '',
-            icon: '📦',
-            displayOrder: 0,
-            parentId: '',
-            isActive: true
-        });
-        setFormErrors({});
-        fetchParentCategories();
-        setShowModal(true);
-    };
-
-    const handleAddSubCategory = (parentCategory) => {
-        setModalMode('add');
-        setSelectedCategory(null);
-        setFormData({
-            name: '',
-            description: '',
-            icon: '📦',
-            displayOrder: 0,
-            parentId: parentCategory._id,
-            isActive: true
-        });
-        setFormErrors({});
-        fetchParentCategories();
-        setShowModal(true);
-    };
-
-    const handleEditCategory = (category) => {
-        setModalMode('edit');
-        setSelectedCategory(category);
-        setFormData({
-            name: category.name || '',
-            description: category.description || '',
-            icon: category.icon || '📦',
-            displayOrder: category.displayOrder || 0,
-            parentId: category.parentId || '',
-            isActive: category.isActive !== false
-        });
-        setFormErrors({});
-        fetchParentCategories();
-        setShowModal(true);
-    };
-
-    const handleViewCategory = (category) => {
-        setModalMode('view');
-        setSelectedCategory(category);
-        setFormData({
-            name: category.name || '',
-            description: category.description || '',
-            icon: category.icon || '📦',
-            displayOrder: category.displayOrder || 0,
-            parentId: category.parentId || '',
-            isActive: category.isActive !== false
-        });
-        setShowModal(true);
-    };
-
-    const handleToggleStatus = async (category) => {
-        try {
-            const newStatus = !category.isActive;
-            
-            const res = await fetch(`/api/masters?type=categories`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...getAuthHeaders()
-                },
-                body: JSON.stringify({
-                    action: 'toggle-status',
-                    id: category._id,
-                    isActive: newStatus
-                })
-            });
-            
-            const data = await res.json();
-            
-            if (data.success) {
-                showToast('success', `Category ${newStatus ? 'activated' : 'deactivated'} successfully`);
-                // Refresh the entire list to get updated data
-                await fetchCategories();
-            } else {
-                showToast('error', data.message || 'Failed to update status');
-            }
-        } catch (error) {
-            console.error('Failed to toggle status:', error);
-            showToast('error', 'Failed to update status');
-        }
-    };
-
-    const handleDeleteClick = (category) => {
-        setCategoryToDelete(category);
-        setShowDeleteModal(true);
-    };
-
-    const handleConfirmDelete = async () => {
-        if (!categoryToDelete) return;
-        
-        setDeleting(true);
-        try {
-            const res = await fetch(`/api/masters?type=categories&id=${categoryToDelete._id}`, {
-                method: 'DELETE',
-                headers: getAuthHeaders()
-            });
-            
-            const data = await res.json();
-            
-            if (data.success) {
-                showToast('success', 'Category deleted successfully');
-                await fetchCategories();
-                setShowDeleteModal(false);
-                setCategoryToDelete(null);
-            } else {
-                showToast('error', data.message || 'Failed to delete category');
-            }
-        } catch (error) {
-            console.error('Failed to delete category:', error);
-            showToast('error', 'Failed to delete category');
-        } finally {
-            setDeleting(false);
-        }
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        
-        // Validate form
-        const errors = {};
-        if (!formData.name.trim()) {
-            errors.name = 'Category name is required';
-        }
-        
-        if (Object.keys(errors).length > 0) {
-            setFormErrors(errors);
-            return;
-        }
-        
-        setSubmitting(true);
-        
-        try {
-            const payload = {
-                name: formData.name.trim(),
-                description: formData.description,
-                icon: formData.icon,
-                displayOrder: parseInt(formData.displayOrder) || 0,
-                parentId: formData.parentId || null,
-                isActive: formData.isActive
-            };
-            
-            let url = `/api/masters?type=categories`;
-            let method = 'POST';
-            
-            if (modalMode === 'edit' && selectedCategory) {
-                method = 'PUT';
-                url = `/api/masters?type=categories&id=${selectedCategory._id}`;
-            }
-            
-            const res = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...getAuthHeaders()
-                },
-                body: JSON.stringify(payload)
-            });
-            
-            const data = await res.json();
-            
-            if (data.success) {
-                showToast('success', modalMode === 'add' ? 'Category created successfully' : 'Category updated successfully');
-                setShowModal(false);
-                await fetchCategories(); // Refresh the list
-            } else {
-                showToast('error', data.message || 'Failed to save category');
-            }
-        } catch (error) {
-            console.error('Failed to save category:', error);
-            showToast('error', 'Failed to save category');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    // ==================== EFFECTS ====================
-    useEffect(() => {
-        if (user?.companyId) {
-            fetchCategories();
-        }
-    }, [user?.companyId, fetchCategories]);
-
-    // Handle search with debounce
-    useEffect(() => {
-        if (searchTimeoutRef.current) {
-            clearTimeout(searchTimeoutRef.current);
-        }
-        
-        searchTimeoutRef.current = setTimeout(() => {
-            filterCategories(allCategories, searchTerm, statusFilter);
-        }, 300);
-        
-        return () => {
-            if (searchTimeoutRef.current) {
-                clearTimeout(searchTimeoutRef.current);
-            }
-        };
-    }, [searchTerm, statusFilter, allCategories, filterCategories]);
-
-    // Pagination
-    const totalPages = Math.ceil(categories.length / itemsPerPage);
-    const paginatedCategories = categories.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
-
-    // Build tree structure for tree view (only show active categories based on filter)
-    const buildTree = (items) => {
-        const map = {};
-        const roots = [];
-        
-        // First, filter items based on current status filter
-        let filteredItems = items;
-        if (statusFilter === 'active') {
-            filteredItems = items.filter(item => item.isActive === true);
-        } else if (statusFilter === 'inactive') {
-            filteredItems = items.filter(item => item.isActive === false);
-        }
-        
-        filteredItems.forEach(item => {
-            map[item._id] = { ...item, children: [] };
-        });
-        
-        filteredItems.forEach(item => {
-            if (item.parentId && map[item.parentId]) {
-                map[item.parentId].children.push(map[item._id]);
-            } else if (!item.parentId) {
-                roots.push(map[item._id]);
-            }
-        });
-        
-        // Sort children by displayOrder
-        const sortChildren = (node) => {
-            node.children.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
-            node.children.forEach(sortChildren);
-        };
-        
-        roots.forEach(sortChildren);
-        return roots;
-    };
-
-    const treeData = buildTree(allCategories);
-
-    // Render tree view recursively
-    const renderTree = (nodes, level = 0) => {
-        return nodes.map(node => (
-            <div key={node._id} className="tree-node" style={{ marginLeft: `${level * 24}px` }}>
-                <div className={`tree-node-item ${!node.isActive ? 'inactive' : ''}`}>
-                    <div className="tree-node-content">
-                        <div className="tree-node-icon">
-                            <span className="category-icon">{node.icon || '📦'}</span>
-                        </div>
-                        <div className="tree-node-info">
-                            <div className="tree-node-name">
-                                {node.name}
-                                {!node.isActive && <span className="status-badge inactive">Inactive</span>}
-                            </div>
-                            {node.description && (
-                                <div className="tree-node-description">{node.description}</div>
-                            )}
-                            <div className="tree-node-meta">
-                                <span className="meta-item">
-                                    <Hash size={12} />
-                                    Order: {node.displayOrder || 0}
-                                </span>
-                                <span className="meta-item">
-                                    <CalendarIcon size={12} />
-                                    {formatDate(node.createdAt)}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="tree-node-actions">
-                        <button
-                            onClick={() => handleViewCategory(node)}
-                            className="action-btn view"
-                            title="View Details"
-                        >
-                            <Eye size={16} />
-                        </button>
-                        <button
-                            onClick={() => handleEditCategory(node)}
-                            className="action-btn edit"
-                            title="Edit"
-                        >
-                            <Edit2 size={16} />
-                        </button>
-                        {(node.level === 0 || !node.parentId) && (
-                            <button
-                                onClick={() => handleAddSubCategory(node)}
-                                className="action-btn add-sub"
-                                title="Add Subcategory"
-                            >
-                                <FolderPlus size={16} />
-                            </button>
-                        )}
-                        <button
-                            onClick={() => handleToggleStatus(node)}
-                            className={`action-btn ${node.isActive ? 'deactivate' : 'activate'}`}
-                            title={node.isActive ? 'Deactivate' : 'Activate'}
-                        >
-                            {node.isActive ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                        <button
-                            onClick={() => handleDeleteClick(node)}
-                            className="action-btn delete"
-                            title="Delete"
-                        >
-                            <Trash2 size={16} />
-                        </button>
-                    </div>
-                </div>
-                {node.children && node.children.length > 0 && renderTree(node.children, level + 1)}
-            </div>
-        ));
-    };
-
-    if (!isAuthenticated || !user) {
-        return null;
+  useEffect(() => {
+    if (editData) {
+      setForm({
+        name: editData.name || '',
+        description: editData.description || '',
+        parentId: editData.parentId || '',
+        icon: editData.icon || '📦',
+        displayOrder: editData.displayOrder ?? 0,
+        isActive: editData.isActive ?? true,
+      });
+    } else {
+      setForm({ name: '', description: '', parentId: '', icon: '📦', displayOrder: 0, isActive: true });
     }
+    setErrors({});
+  }, [editData, open]);
 
-    return (
-        <>
-            <Head>
-                <title>Category Management | Masters | LFMS</title>
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-            </Head>
+  const validate = () => {
+    const e = {};
+    if (!form.name.trim()) e.name = 'Category name is required';
+    else if (form.name.trim().length > 100) e.name = 'Name cannot exceed 100 characters';
+    if (form.description && form.description.length > 500) e.description = 'Description cannot exceed 500 characters';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
 
-            <div className="masters-page">
-                {/* Toast Notification */}
-                {toast.show && (
-                    <div className={`toast-notification ${toast.type}`}>
-                        {toast.type === 'success' ? <CheckCircle size={20} /> : 
-                         toast.type === 'error' ? <AlertCircle size={20} /> : 
-                         <AlertTriangle size={20} />}
-                        <span>{toast.message}</span>
-                    </div>
-                )}
+  const handleSubmit = () => {
+    if (!validate()) return;
+    onSave({ ...form, parentId: form.parentId || null });
+  };
 
-                {/* Header */}
-                <header className="page-header">
-                    <div className="header-content">
-                        <div className="header-left">
-                            <h1 className="page-title">Category Management</h1>
-                            <p className="page-description">
-                                Manage your product categories and subcategories
-                            </p>
-                        </div>
-                        <div className="header-actions">
-                            <button
-                                onClick={handleAddCategory}
-                                className="add-button"
-                            >
-                                <Plus size={18} />
-                                <span>Add Category</span>
-                            </button>
-                        </div>
-                    </div>
-                </header>
+  // Only show top-level categories as parent options (no sub-sub allowed)
+  const parentOptions = categories.filter(c => !c.parentId);
+  const ICONS = ['📦', '🛒', '🏪', '🍎', '👕', '💻', '🏠', '🚗', '📱', '💊', '🎮', '📚', '🎨', '🌿', '⚡', '🔧'];
 
-                {/* Stats Cards */}
-                <div className="stats-grid">
-                    <div className="stat-card total">
-                        <div className="stat-icon">
-                            <FolderTree size={24} />
-                        </div>
-                        <div className="stat-info">
-                            <span className="stat-value">{stats.total}</span>
-                            <span className="stat-label">Total Categories</span>
-                        </div>
-                    </div>
-                    <div className="stat-card main">
-                        <div className="stat-icon">
-                            <Package size={24} />
-                        </div>
-                        <div className="stat-info">
-                            <span className="stat-value">{stats.main}</span>
-                            <span className="stat-label">Main Categories</span>
-                        </div>
-                    </div>
-                    <div className="stat-card sub">
-                        <div className="stat-icon">
-                            <Layers size={24} />
-                        </div>
-                        <div className="stat-info">
-                            <span className="stat-value">{stats.sub}</span>
-                            <span className="stat-label">Sub Categories</span>
-                        </div>
-                    </div>
-                    <div className="stat-card active">
-                        <div className="stat-icon">
-                            <CheckCircle size={24} />
-                        </div>
-                        <div className="stat-info">
-                            <span className="stat-value">{stats.active}</span>
-                            <span className="stat-label">Active</span>
-                        </div>
-                    </div>
-                </div>
+  if (!open) return null;
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 8000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: '#fff', borderRadius: '18px', padding: '32px', maxWidth: '520px', width: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.2)', fontFamily: 'var(--font-body)', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#111', fontFamily: 'var(--font-display)' }}>
+              {editData ? 'Edit Category' : 'New Category'}
+            </h2>
+            <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#9ca3af' }}>
+              {editData ? 'Update category details' : 'Create a main category or subcategory'}
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '8px', padding: '8px', cursor: 'pointer', display: 'flex', color: '#6b7280' }}><Icon.X /></button>
+        </div>
 
-                {/* Filters Bar */}
-                <div className="filters-bar">
-                    <div className="search-wrapper">
-                        <Search size={18} />
-                        <input
-                            type="text"
-                            placeholder="Search categories by name, description..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="search-input"
-                        />
-                        {searchTerm && (
-                            <button onClick={() => setSearchTerm('')} className="clear-search">
-                                <X size={16} />
-                            </button>
-                        )}
-                    </div>
-                    
-                    <div className="filter-group">
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="filter-select"
-                        >
-                            <option value="all">All Status</option>
-                            <option value="active">Active Only</option>
-                            <option value="inactive">Inactive Only</option>
-                        </select>
-                    </div>
-                    
-                    <div className="view-toggle">
-                        <button
-                            onClick={() => setViewMode('list')}
-                            className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
-                            title="List View"
-                        >
-                            <ListIcon size={18} />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('tree')}
-                            className={`toggle-btn ${viewMode === 'tree' ? 'active' : ''}`}
-                            title="Tree View"
-                        >
-                            <FolderTree size={18} />
-                        </button>
-                    </div>
-                    
-                    <button onClick={fetchCategories} className="refresh-btn" title="Refresh">
-                        <RefreshCw size={18} />
-                    </button>
-                </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          {/* Name */}
+          <div>
+            <label style={labelStyle}>Category Name <span style={{ color: '#ef4444' }}>*</span></label>
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. Electronics, Food & Beverages"
+              style={{ ...inputStyle, ...(errors.name ? { borderColor: '#ef4444' } : {}) }} />
+            {errors.name && <p style={errorStyle}>{errors.name}</p>}
+          </div>
 
-                {/* Main Content */}
-                <main className="main-content">
-                    {loading ? (
-                        <div className="loading-state">
-                            <div className="loading-spinner"></div>
-                            <p>Loading categories...</p>
-                        </div>
-                    ) : categories.length === 0 ? (
-                        <div className="empty-state">
-                            <FolderTree size={64} strokeWidth={1.5} />
-                            <h3>No Categories Found</h3>
-                            <p>
-                                {searchTerm || statusFilter !== 'all'
-                                    ? 'Try adjusting your search or filter criteria'
-                                    : 'Get started by creating your first category'}
-                            </p>
-                            {!searchTerm && statusFilter === 'all' && (
-                                <button onClick={handleAddCategory} className="empty-add-btn">
-                                    <Plus size={18} />
-                                    Add Category
-                                </button>
-                            )}
-                        </div>
-                    ) : viewMode === 'tree' ? (
-                        <div className="tree-view">
-                            <div className="tree-header">
-                                <div className="tree-header-content">Category Hierarchy</div>
-                                <div className="tree-header-actions">Actions</div>
-                            </div>
-                            <div className="tree-body">
-                                {renderTree(treeData)}
-                            </div>
-                        </div>
-                    ) : (
-                        <>
-                            <div className="table-container">
-                                <table className="categories-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Icon</th>
-                                            <th>Name</th>
-                                            <th>Type</th>
-                                            <th>Slug</th>
-                                            <th>Order</th>
-                                            <th>Status</th>
-                                            <th>Created</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {paginatedCategories.map((category) => (
-                                            <tr key={category._id} className={!category.isActive ? 'inactive-row' : ''}>
-                                                <td className="icon-cell">
-                                                    <span className="category-icon">{category.icon || '📦'}</span>
-                                                </td>
-                                                <td className="name-cell">
-                                                    <div className="category-name">
-                                                        {category.indent && <span className="indent">{category.indent}</span>}
-                                                        {category.name}
-                                                    </div>
-                                                    {category.description && (
-                                                        <div className="category-description">{category.description}</div>
-                                                    )}
-                                                </td>
-                                                <td>
-                                                    <span className={`type-badge ${category.level === 0 ? 'main' : 'sub'}`}>
-                                                        {category.level === 0 ? 'Main' : 'Sub'}
-                                                    </span>
-                                                </td>
-                                                <td className="slug-cell">{category.slug}</td>
-                                                <td>{category.displayOrder || 0}</td>
-                                                <td>
-                                                    <span className={`status-badge ${category.isActive ? 'active' : 'inactive'}`}>
-                                                        {category.isActive ? 'Active' : 'Inactive'}
-                                                    </span>
-                                                </td>
-                                                <td className="date-cell">
-                                                    <span title={formatDate(category.createdAt)}>
-                                                        {getTimeAgo(category.createdAt)}
-                                                    </span>
-                                                </td>
-                                                <td className="actions-cell">
-                                                    <button
-                                                        onClick={() => handleViewCategory(category)}
-                                                        className="action-btn view"
-                                                        title="View Details"
-                                                    >
-                                                        <Eye size={16} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleEditCategory(category)}
-                                                        className="action-btn edit"
-                                                        title="Edit"
-                                                    >
-                                                        <Edit2 size={16} />
-                                                    </button>
-                                                    {(category.level === 0 || !category.parentId) && (
-                                                        <button
-                                                            onClick={() => handleAddSubCategory(category)}
-                                                            className="action-btn add-sub"
-                                                            title="Add Subcategory"
-                                                        >
-                                                            <FolderPlus size={16} />
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={() => handleToggleStatus(category)}
-                                                        className={`action-btn ${category.isActive ? 'deactivate' : 'activate'}`}
-                                                        title={category.isActive ? 'Deactivate' : 'Activate'}
-                                                    >
-                                                        {category.isActive ? <EyeOff size={16} /> : <Eye size={16} />}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteClick(category)}
-                                                        className="action-btn delete"
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+          {/* Parent Category */}
+          <div>
+            <label style={labelStyle}>Parent Category <span style={{ color: '#9ca3af', fontWeight: 400 }}>(leave empty for main category)</span></label>
+            <select value={form.parentId} onChange={e => setForm(f => ({ ...f, parentId: e.target.value }))} style={inputStyle}>
+              <option value="">— Main Category (no parent) —</option>
+              {parentOptions.map(c => (
+                <option key={c._id} value={c._id}>{c.icon} {c.name}</option>
+              ))}
+            </select>
+            {form.parentId && <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#3b82f6' }}>This will be created as a subcategory</p>}
+          </div>
 
-                            {/* Pagination */}
-                            {totalPages > 1 && (
-                                <div className="pagination">
-                                    <button
-                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                                        disabled={currentPage === 1}
-                                        className="page-btn"
-                                    >
-                                        <ChevronLeft size={16} />
-                                        Previous
-                                    </button>
-                                    <div className="page-numbers">
-                                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                            let pageNum;
-                                            if (totalPages <= 5) {
-                                                pageNum = i + 1;
-                                            } else if (currentPage <= 3) {
-                                                pageNum = i + 1;
-                                            } else if (currentPage >= totalPages - 2) {
-                                                pageNum = totalPages - 4 + i;
-                                            } else {
-                                                pageNum = currentPage - 2 + i;
-                                            }
-                                            
-                                            return (
-                                                <button
-                                                    key={pageNum}
-                                                    onClick={() => setCurrentPage(pageNum)}
-                                                    className={`page-number ${currentPage === pageNum ? 'active' : ''}`}
-                                                >
-                                                    {pageNum}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                    <button
-                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                                        disabled={currentPage === totalPages}
-                                        className="page-btn"
-                                    >
-                                        Next
-                                        <ChevronRight size={16} />
-                                    </button>
-                                </div>
-                            )}
-                        </>
-                    )}
-                </main>
-
-                {/* Add/Edit Modal */}
-                {showModal && (
-                    <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                        <div className="modal-container" onClick={(e) => e.stopPropagation()} ref={modalRef}>
-                            <div className="modal-header">
-                                <div className="modal-header-left">
-                                    <div className="modal-icon">
-                                        {modalMode === 'add' ? <Plus size={20} /> : 
-                                         modalMode === 'edit' ? <Edit2 size={20} /> : 
-                                         <Eye size={20} />}
-                                    </div>
-                                    <div>
-                                        <h2>
-                                            {modalMode === 'add' ? 'Add Category' : 
-                                             modalMode === 'edit' ? 'Edit Category' : 
-                                             'Category Details'}
-                                        </h2>
-                                        <p>
-                                            {modalMode === 'add' ? 'Create a new category or subcategory' :
-                                             modalMode === 'edit' ? 'Update category information' :
-                                             'View category details'}
-                                        </p>
-                                    </div>
-                                </div>
-                                <button onClick={() => setShowModal(false)} className="modal-close">
-                                    <X size={20} />
-                                </button>
-                            </div>
-                            
-                            <form onSubmit={handleSubmit}>
-                                <div className="modal-body">
-                                    {/* Parent Category */}
-                                    <div className="form-group">
-                                        <label>
-                                            Parent Category
-                                            <span className="label-hint">Optional - Leave empty for main category</span>
-                                        </label>
-                                        <select
-                                            value={formData.parentId}
-                                            onChange={(e) => setFormData({ ...formData, parentId: e.target.value })}
-                                            disabled={modalMode === 'view'}
-                                            className={formErrors.parentId ? 'error' : ''}
-                                        >
-                                            <option value="">-- Main Category (No Parent) --</option>
-                                            {parentCategories.map(parent => (
-                                                <option key={parent._id} value={parent._id}>
-                                                    {parent.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {formErrors.parentId && <span className="error-text">{formErrors.parentId}</span>}
-                                    </div>
-
-                                    {/* Category Name */}
-                                    <div className="form-group">
-                                        <label>
-                                            Category Name <span className="required">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.name}
-                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            placeholder="Enter category name"
-                                            disabled={modalMode === 'view'}
-                                            className={formErrors.name ? 'error' : ''}
-                                            autoFocus
-                                        />
-                                        {formErrors.name && <span className="error-text">{formErrors.name}</span>}
-                                    </div>
-
-                                    {/* Icon and Display Order */}
-                                    <div className="form-row">
-                                        <div className="form-group">
-                                            <label>Icon (Emoji)</label>
-                                            <input
-                                                type="text"
-                                                value={formData.icon}
-                                                onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                                                placeholder="📦"
-                                                maxLength="10"
-                                                disabled={modalMode === 'view'}
-                                            />
-                                            <span className="help-text">Use any emoji (max 10 characters)</span>
-                                        </div>
-
-                                        <div className="form-group">
-                                            <label>Display Order</label>
-                                            <input
-                                                type="number"
-                                                value={formData.displayOrder}
-                                                onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
-                                                placeholder="0"
-                                                min="0"
-                                                disabled={modalMode === 'view'}
-                                            />
-                                            <span className="help-text">Lower numbers appear first</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Description */}
-                                    <div className="form-group">
-                                        <label>Description</label>
-                                        <textarea
-                                            value={formData.description}
-                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                            placeholder="Enter category description (max 500 characters)"
-                                            rows="3"
-                                            maxLength="500"
-                                            disabled={modalMode === 'view'}
-                                        />
-                                        <span className="help-text">{formData.description.length}/500 characters</span>
-                                    </div>
-
-                                    {/* Status (Only for edit/add) */}
-                                    {modalMode !== 'view' && (
-                                        <div className="form-group checkbox-group">
-                                            <label className="checkbox-label">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={formData.isActive}
-                                                    onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                                                />
-                                                <span>Active</span>
-                                            </label>
-                                            <span className="help-text">Inactive categories won't appear in product forms</span>
-                                        </div>
-                                    )}
-
-                                    {/* View Mode Additional Info */}
-                                    {modalMode === 'view' && selectedCategory && (
-                                        <div className="view-info">
-                                            <div className="info-row">
-                                                <span className="info-label">Slug:</span>
-                                                <span className="info-value">{selectedCategory.slug}</span>
-                                            </div>
-                                            <div className="info-row">
-                                                <span className="info-label">Created:</span>
-                                                <span className="info-value">{formatDate(selectedCategory.createdAt)}</span>
-                                            </div>
-                                            <div className="info-row">
-                                                <span className="info-label">Last Updated:</span>
-                                                <span className="info-value">{formatDate(selectedCategory.updatedAt)}</span>
-                                            </div>
-                                            <div className="info-row">
-                                                <span className="info-label">Product Count:</span>
-                                                <span className="info-value">{selectedCategory.productCount || 0}</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                
-                                <div className="modal-footer">
-                                    <button type="button" onClick={() => setShowModal(false)} className="btn-secondary">
-                                        {modalMode === 'view' ? 'Close' : 'Cancel'}
-                                    </button>
-                                    {modalMode !== 'view' && (
-                                        <button type="submit" disabled={submitting} className="btn-primary">
-                                            {submitting ? (
-                                                <>
-                                                    <div className="button-spinner"></div>
-                                                    <span>Saving...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Save size={16} />
-                                                    <span>{modalMode === 'add' ? 'Create Category' : 'Save Changes'}</span>
-                                                </>
-                                            )}
-                                        </button>
-                                    )}
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {/* Delete Confirmation Modal */}
-                {showDeleteModal && categoryToDelete && (
-                    <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
-                        <div className="modal-container delete-modal" onClick={(e) => e.stopPropagation()}>
-                            <div className="modal-header">
-                                <div className="modal-icon delete">
-                                    <AlertTriangle size={24} />
-                                </div>
-                                <h2>Delete Category</h2>
-                                <button onClick={() => setShowDeleteModal(false)} className="modal-close">
-                                    <X size={20} />
-                                </button>
-                            </div>
-                            
-                            <div className="modal-body">
-                                <p>Are you sure you want to delete <strong>"{categoryToDelete.name}"</strong>?</p>
-                                {categoryToDelete.productCount > 0 && (
-                                    <div className="warning-message">
-                                        <AlertCircle size={16} />
-                                        <span>This category has {categoryToDelete.productCount} product(s). It cannot be deleted until all products are removed or reassigned.</span>
-                                    </div>
-                                )}
-                                {categoryToDelete.level === 0 && (
-                                    <div className="warning-message">
-                                        <AlertCircle size={16} />
-                                        <span>This is a main category. All subcategories will also be deleted.</span>
-                                    </div>
-                                )}
-                                <p className="delete-confirm-text">This action cannot be undone.</p>
-                            </div>
-                            
-                            <div className="modal-footer">
-                                <button onClick={() => setShowDeleteModal(false)} className="btn-secondary">
-                                    Cancel
-                                </button>
-                                <button 
-                                    onClick={handleConfirmDelete} 
-                                    disabled={deleting || categoryToDelete.productCount > 0}
-                                    className="btn-danger"
-                                >
-                                    {deleting ? (
-                                        <>
-                                            <div className="button-spinner"></div>
-                                            <span>Deleting...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Trash2 size={16} />
-                                            <span>Delete Category</span>
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+          {/* Icon Picker */}
+          <div>
+            <label style={labelStyle}>Icon</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+              {ICONS.map(ic => (
+                <button key={ic} type="button" onClick={() => setForm(f => ({ ...f, icon: ic }))}
+                  style={{ width: '40px', height: '40px', borderRadius: '8px', border: form.icon === ic ? '2px solid #6366f1' : '1px solid #e5e7eb', background: form.icon === ic ? '#eef2ff' : '#fff', cursor: 'pointer', fontSize: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {ic}
+                </button>
+              ))}
             </div>
-
-            <style jsx>{`
-                /* ==================== GLOBAL STYLES ==================== */
-                .masters-page {
-                    min-height: 100vh;
-                    background: ${appTheme.colors.backgroundLight};
-                    width: 100%;
-                }
-
-                /* ==================== TOAST ==================== */
-                .toast-notification {
-                    position: fixed;
-                    top: 20px;
-                    right: 20px;
-                    z-index: 1100;
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    padding: 12px 20px;
-                    background: ${appTheme.colors.backgroundCard};
-                    border-radius: ${appTheme.radius.md};
-                    box-shadow: ${appTheme.shadows.lg};
-                    animation: slideInRight 0.3s ease;
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    max-width: 400px;
-                    border: 1px solid ${appTheme.colors.border};
-                }
-
-                .toast-notification.success {
-                    border-left: 4px solid ${appTheme.colors.success};
-                }
-
-                .toast-notification.error {
-                    border-left: 4px solid ${appTheme.colors.error};
-                }
-
-                .toast-notification.warning {
-                    border-left: 4px solid ${appTheme.colors.warning};
-                }
-
-                @keyframes slideInRight {
-                    from {
-                        transform: translateX(100%);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateX(0);
-                        opacity: 1;
-                    }
-                }
-
-                /* ==================== HEADER ==================== */
-                .page-header {
-                    background: ${appTheme.colors.backgroundCard};
-                    border-bottom: 1px solid ${appTheme.colors.border};
-                    padding: 24px 32px;
-                    width: 100%;
-                }
-
-                .header-content {
-                    max-width: 100%;
-                    margin: 0 auto;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-
-                .header-left {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 4px;
-                }
-
-                .page-title {
-                    font-size: ${appTheme.fonts.sizes["2xl"]};
-                    font-weight: ${appTheme.fonts.weights.semibold};
-                    color: ${appTheme.colors.textPrimary};
-                    margin: 0;
-                }
-
-                .page-description {
-                    color: ${appTheme.colors.textSecondary};
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    margin: 0;
-                }
-
-                .add-button {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 10px 20px;
-                    background: ${appTheme.colors.primary};
-                    color: white;
-                    border: none;
-                    border-radius: ${appTheme.radius.md};
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    font-weight: ${appTheme.fonts.weights.medium};
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }
-
-                .add-button:hover {
-                    background: ${appTheme.colors.primaryDark};
-                    transform: translateY(-1px);
-                }
-
-                /* ==================== STATS GRID ==================== */
-                .stats-grid {
-                    display: grid;
-                    grid-template-columns: repeat(4, 1fr);
-                    gap: 20px;
-                    padding: 24px 32px;
-                }
-
-                .stat-card {
-                    background: ${appTheme.colors.backgroundCard};
-                    border: 1px solid ${appTheme.colors.border};
-                    border-radius: ${appTheme.radius.lg};
-                    padding: 20px;
-                    display: flex;
-                    align-items: center;
-                    gap: 16px;
-                    transition: all 0.2s ease;
-                }
-
-                .stat-card:hover {
-                    transform: translateY(-2px);
-                    box-shadow: ${appTheme.shadows.md};
-                }
-
-                .stat-icon {
-                    width: 52px;
-                    height: 52px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    border-radius: ${appTheme.radius.md};
-                    background: ${appTheme.colors.primary}10;
-                    color: ${appTheme.colors.primary};
-                }
-
-                .stat-card.total .stat-icon {
-                    background: ${appTheme.colors.primary}10;
-                    color: ${appTheme.colors.primary};
-                }
-
-                .stat-card.main .stat-icon {
-                    background: ${appTheme.colors.info}10;
-                    color: ${appTheme.colors.info};
-                }
-
-                .stat-card.sub .stat-icon {
-                    background: ${appTheme.colors.success}10;
-                    color: ${appTheme.colors.success};
-                }
-
-                .stat-card.active .stat-icon {
-                    background: ${appTheme.colors.warning}10;
-                    color: ${appTheme.colors.warning};
-                }
-
-                .stat-info {
-                    display: flex;
-                    flex-direction: column;
-                }
-
-                .stat-value {
-                    font-size: 28px;
-                    font-weight: ${appTheme.fonts.weights.bold};
-                    color: ${appTheme.colors.textPrimary};
-                }
-
-                .stat-label {
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    color: ${appTheme.colors.textSecondary};
-                }
-
-                /* ==================== FILTERS BAR ==================== */
-                .filters-bar {
-                    display: flex;
-                    align-items: center;
-                    gap: 16px;
-                    padding: 0 32px 24px 32px;
-                    flex-wrap: wrap;
-                }
-
-                .search-wrapper {
-                    flex: 1;
-                    min-width: 250px;
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    background: ${appTheme.colors.backgroundCard};
-                    border: 1px solid ${appTheme.colors.border};
-                    border-radius: ${appTheme.radius.md};
-                    padding: 10px 14px;
-                    transition: all 0.2s ease;
-                }
-
-                .search-wrapper:focus-within {
-                    border-color: ${appTheme.colors.primary};
-                    box-shadow: 0 0 0 3px ${appTheme.colors.primary}15;
-                }
-
-                .search-wrapper svg {
-                    color: ${appTheme.colors.textSecondary};
-                }
-
-                .search-input {
-                    flex: 1;
-                    border: none;
-                    outline: none;
-                    background: transparent;
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    color: ${appTheme.colors.textPrimary};
-                }
-
-                .search-input::placeholder {
-                    color: ${appTheme.colors.textSecondary};
-                }
-
-                .clear-search {
-                    background: none;
-                    border: none;
-                    cursor: pointer;
-                    color: ${appTheme.colors.textSecondary};
-                    padding: 4px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    border-radius: ${appTheme.radius.sm};
-                }
-
-                .clear-search:hover {
-                    background: ${appTheme.colors.hover};
-                }
-
-                .filter-group {
-                    display: flex;
-                    gap: 10px;
-                }
-
-                .filter-select {
-                    padding: 10px 14px;
-                    border: 1px solid ${appTheme.colors.border};
-                    border-radius: ${appTheme.radius.md};
-                    background: ${appTheme.colors.backgroundCard};
-                    color: ${appTheme.colors.textPrimary};
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    cursor: pointer;
-                    outline: none;
-                }
-
-                .filter-select:focus {
-                    border-color: ${appTheme.colors.primary};
-                }
-
-                .view-toggle {
-                    display: flex;
-                    gap: 4px;
-                    background: ${appTheme.colors.backgroundLight};
-                    border: 1px solid ${appTheme.colors.border};
-                    border-radius: ${appTheme.radius.md};
-                    padding: 4px;
-                }
-
-                .toggle-btn {
-                    padding: 6px 12px;
-                    background: transparent;
-                    border: none;
-                    border-radius: ${appTheme.radius.sm};
-                    cursor: pointer;
-                    color: ${appTheme.colors.textSecondary};
-                    transition: all 0.2s ease;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-
-                .toggle-btn:hover {
-                    background: ${appTheme.colors.hover};
-                }
-
-                .toggle-btn.active {
-                    background: ${appTheme.colors.primary};
-                    color: white;
-                }
-
-                .refresh-btn {
-                    padding: 10px;
-                    background: ${appTheme.colors.backgroundCard};
-                    border: 1px solid ${appTheme.colors.border};
-                    border-radius: ${appTheme.radius.md};
-                    cursor: pointer;
-                    color: ${appTheme.colors.textSecondary};
-                    transition: all 0.2s ease;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-
-                .refresh-btn:hover {
-                    background: ${appTheme.colors.hover};
-                    color: ${appTheme.colors.primary};
-                }
-
-                /* ==================== MAIN CONTENT ==================== */
-                .main-content {
-                    padding: 0 32px 32px 32px;
-                }
-
-                /* ==================== TABLE VIEW ==================== */
-                .table-container {
-                    background: ${appTheme.colors.backgroundCard};
-                    border: 1px solid ${appTheme.colors.border};
-                    border-radius: ${appTheme.radius.lg};
-                    overflow-x: auto;
-                }
-
-                .categories-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-
-                .categories-table thead {
-                    background: ${appTheme.colors.mutedBackground};
-                    border-bottom: 1px solid ${appTheme.colors.border};
-                }
-
-                .categories-table th {
-                    padding: 14px 16px;
-                    text-align: left;
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    font-weight: ${appTheme.fonts.weights.semibold};
-                    color: ${appTheme.colors.textSecondary};
-                }
-
-                .categories-table td {
-                    padding: 16px;
-                    border-bottom: 1px solid ${appTheme.colors.border};
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    color: ${appTheme.colors.textPrimary};
-                }
-
-                .categories-table tbody tr:hover {
-                    background: ${appTheme.colors.hover};
-                }
-
-                .inactive-row {
-                    opacity: 0.7;
-                    background: ${appTheme.colors.backgroundLight};
-                }
-
-                .icon-cell {
-                    width: 60px;
-                }
-
-                .category-icon {
-                    font-size: 24px;
-                }
-
-                .name-cell {
-                    min-width: 200px;
-                }
-
-                .category-name {
-                    font-weight: ${appTheme.fonts.weights.medium};
-                    display: flex;
-                    align-items: center;
-                    gap: 4px;
-                    flex-wrap: wrap;
-                }
-
-                .indent {
-                    color: ${appTheme.colors.textSecondary};
-                    font-family: monospace;
-                }
-
-                .category-description {
-                    font-size: ${appTheme.fonts.sizes.xs};
-                    color: ${appTheme.colors.textSecondary};
-                    margin-top: 4px;
-                }
-
-                .type-badge {
-                    display: inline-flex;
-                    padding: 4px 10px;
-                    border-radius: 20px;
-                    font-size: ${appTheme.fonts.sizes.xs};
-                    font-weight: ${appTheme.fonts.weights.medium};
-                }
-
-                .type-badge.main {
-                    background: ${appTheme.colors.info}10;
-                    color: ${appTheme.colors.info};
-                }
-
-                .type-badge.sub {
-                    background: ${appTheme.colors.success}10;
-                    color: ${appTheme.colors.success};
-                }
-
-                .slug-cell {
-                    font-family: monospace;
-                    color: ${appTheme.colors.textSecondary};
-                }
-
-                .status-badge {
-                    display: inline-flex;
-                    padding: 4px 10px;
-                    border-radius: 20px;
-                    font-size: ${appTheme.fonts.sizes.xs};
-                    font-weight: ${appTheme.fonts.weights.medium};
-                }
-
-                .status-badge.active {
-                    background: ${appTheme.colors.success}10;
-                    color: ${appTheme.colors.success};
-                }
-
-                .status-badge.inactive {
-                    background: ${appTheme.colors.error}10;
-                    color: ${appTheme.colors.error};
-                }
-
-                .date-cell {
-                    white-space: nowrap;
-                    color: ${appTheme.colors.textSecondary};
-                }
-
-                .actions-cell {
-                    display: flex;
-                    gap: 8px;
-                    white-space: nowrap;
-                }
-
-                .action-btn {
-                    padding: 6px;
-                    background: transparent;
-                    border: none;
-                    border-radius: ${appTheme.radius.sm};
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-
-                .action-btn.view {
-                    color: ${appTheme.colors.info};
-                }
-
-                .action-btn.view:hover {
-                    background: ${appTheme.colors.info}10;
-                }
-
-                .action-btn.edit {
-                    color: ${appTheme.colors.warning};
-                }
-
-                .action-btn.edit:hover {
-                    background: ${appTheme.colors.warning}10;
-                }
-
-                .action-btn.add-sub {
-                    color: ${appTheme.colors.success};
-                }
-
-                .action-btn.add-sub:hover {
-                    background: ${appTheme.colors.success}10;
-                }
-
-                .action-btn.activate {
-                    color: ${appTheme.colors.success};
-                }
-
-                .action-btn.activate:hover {
-                    background: ${appTheme.colors.success}10;
-                }
-
-                .action-btn.deactivate {
-                    color: ${appTheme.colors.warning};
-                }
-
-                .action-btn.deactivate:hover {
-                    background: ${appTheme.colors.warning}10;
-                }
-
-                .action-btn.delete {
-                    color: ${appTheme.colors.error};
-                }
-
-                .action-btn.delete:hover {
-                    background: ${appTheme.colors.error}10;
-                }
-
-                /* ==================== TREE VIEW ==================== */
-                .tree-view {
-                    background: ${appTheme.colors.backgroundCard};
-                    border: 1px solid ${appTheme.colors.border};
-                    border-radius: ${appTheme.radius.lg};
-                    overflow: hidden;
-                }
-
-                .tree-header {
-                    display: flex;
-                    justify-content: space-between;
-                    padding: 14px 20px;
-                    background: ${appTheme.colors.mutedBackground};
-                    border-bottom: 1px solid ${appTheme.colors.border};
-                    font-weight: ${appTheme.fonts.weights.semibold};
-                    color: ${appTheme.colors.textSecondary};
-                    font-size: ${appTheme.fonts.sizes.sm};
-                }
-
-                .tree-body {
-                    padding: 8px 0;
-                }
-
-                .tree-node {
-                    border-bottom: 1px solid ${appTheme.colors.border};
-                }
-
-                .tree-node:last-child {
-                    border-bottom: none;
-                }
-
-                .tree-node-item {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding: 12px 20px;
-                    transition: background 0.2s ease;
-                }
-
-                .tree-node-item:hover {
-                    background: ${appTheme.colors.hover};
-                }
-
-                .tree-node-item.inactive {
-                    opacity: 0.7;
-                }
-
-                .tree-node-content {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    flex: 1;
-                }
-
-                .tree-node-icon .category-icon {
-                    font-size: 20px;
-                }
-
-                .tree-node-info {
-                    flex: 1;
-                }
-
-                .tree-node-name {
-                    font-weight: ${appTheme.fonts.weights.medium};
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    flex-wrap: wrap;
-                }
-
-                .tree-node-description {
-                    font-size: ${appTheme.fonts.sizes.xs};
-                    color: ${appTheme.colors.textSecondary};
-                    margin-top: 2px;
-                }
-
-                .tree-node-meta {
-                    display: flex;
-                    gap: 16px;
-                    margin-top: 4px;
-                }
-
-                .meta-item {
-                    display: flex;
-                    align-items: center;
-                    gap: 4px;
-                    font-size: ${appTheme.fonts.sizes.xs};
-                    color: ${appTheme.colors.textSecondary};
-                }
-
-                .tree-node-actions {
-                    display: flex;
-                    gap: 8px;
-                }
-
-                /* ==================== PAGINATION ==================== */
-                .pagination {
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    gap: 12px;
-                    margin-top: 24px;
-                }
-
-                .page-btn {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    padding: 8px 14px;
-                    background: ${appTheme.colors.backgroundCard};
-                    border: 1px solid ${appTheme.colors.border};
-                    border-radius: ${appTheme.radius.md};
-                    color: ${appTheme.colors.textPrimary};
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }
-
-                .page-btn:hover:not(:disabled) {
-                    background: ${appTheme.colors.hover};
-                    border-color: ${appTheme.colors.primary};
-                }
-
-                .page-btn:disabled {
-                    opacity: 0.5;
-                    cursor: not-allowed;
-                }
-
-                .page-numbers {
-                    display: flex;
-                    gap: 6px;
-                }
-
-                .page-number {
-                    width: 36px;
-                    height: 36px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    background: ${appTheme.colors.backgroundCard};
-                    border: 1px solid ${appTheme.colors.border};
-                    border-radius: ${appTheme.radius.md};
-                    color: ${appTheme.colors.textPrimary};
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }
-
-                .page-number:hover {
-                    background: ${appTheme.colors.hover};
-                    border-color: ${appTheme.colors.primary};
-                }
-
-                .page-number.active {
-                    background: ${appTheme.colors.primary};
-                    border-color: ${appTheme.colors.primary};
-                    color: white;
-                }
-
-                /* ==================== LOADING & EMPTY STATES ==================== */
-                .loading-state {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 60px;
-                    background: ${appTheme.colors.backgroundCard};
-                    border: 1px solid ${appTheme.colors.border};
-                    border-radius: ${appTheme.radius.lg};
-                }
-
-                .loading-spinner {
-                    width: 40px;
-                    height: 40px;
-                    border: 3px solid ${appTheme.colors.primary}20;
-                    border-top-color: ${appTheme.colors.primary};
-                    border-radius: 50%;
-                    animation: spin 0.8s linear infinite;
-                    margin-bottom: 16px;
-                }
-
-                @keyframes spin {
-                    to { transform: rotate(360deg); }
-                }
-
-                .empty-state {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 60px;
-                    background: ${appTheme.colors.backgroundCard};
-                    border: 1px solid ${appTheme.colors.border};
-                    border-radius: ${appTheme.radius.lg};
-                    text-align: center;
-                }
-
-                .empty-state svg {
-                    color: ${appTheme.colors.textSecondary};
-                    margin-bottom: 16px;
-                }
-
-                .empty-state h3 {
-                    font-size: ${appTheme.fonts.sizes.lg};
-                    font-weight: ${appTheme.fonts.weights.semibold};
-                    color: ${appTheme.colors.textPrimary};
-                    margin: 0 0 8px 0;
-                }
-
-                .empty-state p {
-                    color: ${appTheme.colors.textSecondary};
-                    margin: 0 0 20px 0;
-                }
-
-                .empty-add-btn {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 10px 20px;
-                    background: ${appTheme.colors.primary};
-                    color: white;
-                    border: none;
-                    border-radius: ${appTheme.radius.md};
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    cursor: pointer;
-                }
-
-                /* ==================== MODAL ==================== */
-                .modal-overlay {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background: rgba(0, 0, 0, 0.5);
-                    backdrop-filter: blur(4px);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 1000;
-                    animation: fadeIn 0.2s ease;
-                }
-
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-
-                .modal-container {
-                    background: ${appTheme.colors.backgroundCard};
-                    border-radius: ${appTheme.radius.lg};
-                    width: 90%;
-                    max-width: 550px;
-                    max-height: 90vh;
-                    overflow-y: auto;
-                    animation: slideUp 0.3s ease;
-                }
-
-                @keyframes slideUp {
-                    from {
-                        transform: translateY(30px);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateY(0);
-                        opacity: 1;
-                    }
-                }
-
-                .delete-modal {
-                    max-width: 450px;
-                }
-
-                .modal-header {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    padding: 20px 24px;
-                    border-bottom: 1px solid ${appTheme.colors.border};
-                }
-
-                .modal-header-left {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                }
-
-                .modal-icon {
-                    width: 40px;
-                    height: 40px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    background: ${appTheme.colors.primary}10;
-                    border-radius: ${appTheme.radius.md};
-                    color: ${appTheme.colors.primary};
-                }
-
-                .modal-icon.delete {
-                    background: ${appTheme.colors.error}10;
-                    color: ${appTheme.colors.error};
-                }
-
-                .modal-header h2 {
-                    font-size: ${appTheme.fonts.sizes.lg};
-                    font-weight: ${appTheme.fonts.weights.semibold};
-                    color: ${appTheme.colors.textPrimary};
-                    margin: 0 0 4px 0;
-                }
-
-                .modal-header p {
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    color: ${appTheme.colors.textSecondary};
-                    margin: 0;
-                }
-
-                .modal-close {
-                    background: none;
-                    border: none;
-                    cursor: pointer;
-                    color: ${appTheme.colors.textSecondary};
-                    padding: 8px;
-                    border-radius: ${appTheme.radius.sm};
-                    transition: all 0.2s ease;
-                }
-
-                .modal-close:hover {
-                    background: ${appTheme.colors.hover};
-                }
-
-                .modal-body {
-                    padding: 24px;
-                }
-
-                .modal-footer {
-                    display: flex;
-                    justify-content: flex-end;
-                    gap: 12px;
-                    padding: 16px 24px;
-                    border-top: 1px solid ${appTheme.colors.border};
-                }
-
-                .form-group {
-                    margin-bottom: 20px;
-                }
-
-                .form-row {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 16px;
-                }
-
-                .form-group label {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    font-weight: ${appTheme.fonts.weights.medium};
-                    color: ${appTheme.colors.textPrimary};
-                    margin-bottom: 6px;
-                }
-
-                .label-hint {
-                    font-size: ${appTheme.fonts.sizes.xs};
-                    font-weight: normal;
-                    color: ${appTheme.colors.textSecondary};
-                }
-
-                .required {
-                    color: ${appTheme.colors.error};
-                    margin-left: 4px;
-                }
-
-                .form-group input,
-                .form-group select,
-                .form-group textarea {
-                    width: 100%;
-                    padding: 10px 12px;
-                    border: 1px solid ${appTheme.colors.border};
-                    border-radius: ${appTheme.radius.md};
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    background: ${appTheme.colors.backgroundCard};
-                    color: ${appTheme.colors.textPrimary};
-                    transition: all 0.2s ease;
-                }
-
-                .form-group input:focus,
-                .form-group select:focus,
-                .form-group textarea:focus {
-                    outline: none;
-                    border-color: ${appTheme.colors.primary};
-                    box-shadow: 0 0 0 3px ${appTheme.colors.primary}15;
-                }
-
-                .form-group input.error,
-                .form-group select.error,
-                .form-group textarea.error {
-                    border-color: ${appTheme.colors.error};
-                }
-
-                .error-text {
-                    font-size: ${appTheme.fonts.sizes.xs};
-                    color: ${appTheme.colors.error};
-                    margin-top: 4px;
-                    display: block;
-                }
-
-                .help-text {
-                    font-size: ${appTheme.fonts.sizes.xs};
-                    color: ${appTheme.colors.textSecondary};
-                    margin-top: 4px;
-                    display: block;
-                }
-
-                .checkbox-group {
-                    margin-top: 16px;
-                }
-
-                .checkbox-label {
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    cursor: pointer;
-                    font-weight: normal;
-                }
-
-                .checkbox-label input {
-                    width: 18px;
-                    height: 18px;
-                    cursor: pointer;
-                }
-
-                .view-info {
-                    background: ${appTheme.colors.mutedBackground};
-                    border-radius: ${appTheme.radius.md};
-                    padding: 16px;
-                    margin-top: 16px;
-                }
-
-                .info-row {
-                    display: flex;
-                    justify-content: space-between;
-                    padding: 8px 0;
-                    border-bottom: 1px solid ${appTheme.colors.border};
-                }
-
-                .info-row:last-child {
-                    border-bottom: none;
-                }
-
-                .info-label {
-                    font-weight: ${appTheme.fonts.weights.medium};
-                    color: ${appTheme.colors.textSecondary};
-                }
-
-                .info-value {
-                    color: ${appTheme.colors.textPrimary};
-                    font-family: monospace;
-                }
-
-                .warning-message {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    background: ${appTheme.colors.warning}10;
-                    border: 1px solid ${appTheme.colors.warning}30;
-                    border-radius: ${appTheme.radius.md};
-                    padding: 12px;
-                    margin: 16px 0;
-                    color: ${appTheme.colors.warning};
-                    font-size: ${appTheme.fonts.sizes.sm};
-                }
-
-                .delete-confirm-text {
-                    color: ${appTheme.colors.error};
-                    font-weight: ${appTheme.fonts.weights.medium};
-                    margin-top: 16px;
-                }
-
-                .btn-secondary {
-                    padding: 10px 20px;
-                    background: ${appTheme.colors.backgroundLight};
-                    border: 1px solid ${appTheme.colors.border};
-                    border-radius: ${appTheme.radius.md};
-                    color: ${appTheme.colors.textPrimary};
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }
-
-                .btn-secondary:hover {
-                    background: ${appTheme.colors.hover};
-                }
-
-                .btn-primary {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 10px 20px;
-                    background: ${appTheme.colors.primary};
-                    border: none;
-                    border-radius: ${appTheme.radius.md};
-                    color: white;
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    font-weight: ${appTheme.fonts.weights.medium};
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }
-
-                .btn-primary:hover:not(:disabled) {
-                    background: ${appTheme.colors.primaryDark};
-                }
-
-                .btn-primary:disabled {
-                    opacity: 0.6;
-                    cursor: not-allowed;
-                }
-
-                .btn-danger {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 10px 20px;
-                    background: ${appTheme.colors.error};
-                    border: none;
-                    border-radius: ${appTheme.radius.md};
-                    color: white;
-                    font-size: ${appTheme.fonts.sizes.sm};
-                    font-weight: ${appTheme.fonts.weights.medium};
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }
-
-                .btn-danger:hover:not(:disabled) {
-                    background: ${appTheme.colors.destructive};
-                }
-
-                .btn-danger:disabled {
-                    opacity: 0.6;
-                    cursor: not-allowed;
-                }
-
-                .button-spinner {
-                    width: 16px;
-                    height: 16px;
-                    border: 2px solid rgba(255, 255, 255, 0.3);
-                    border-top-color: white;
-                    border-radius: 50%;
-                    animation: spin 0.8s linear infinite;
-                }
-
-                /* ==================== RESPONSIVE ==================== */
-                @media (max-width: 1200px) {
-                    .stats-grid {
-                        grid-template-columns: repeat(2, 1fr);
-                    }
-                }
-
-                @media (max-width: 768px) {
-                    .page-header {
-                        padding: 16px 20px;
-                    }
-
-                    .header-content {
-                        flex-direction: column;
-                        gap: 16px;
-                        align-items: flex-start;
-                    }
-
-                    .stats-grid {
-                        padding: 16px 20px;
-                        gap: 12px;
-                    }
-
-                    .filters-bar {
-                        padding: 0 20px 16px 20px;
-                        flex-direction: column;
-                    }
-
-                    .search-wrapper {
-                        width: 100%;
-                    }
-
-                    .filter-group {
-                        width: 100%;
-                    }
-
-                    .filter-select {
-                        flex: 1;
-                    }
-
-                    .main-content {
-                        padding: 0 20px 20px 20px;
-                    }
-
-                    .table-container {
-                        overflow-x: auto;
-                    }
-
-                    .categories-table {
-                        min-width: 800px;
-                    }
-
-                    .form-row {
-                        grid-template-columns: 1fr;
-                        gap: 12px;
-                    }
-
-                    .modal-container {
-                        width: 95%;
-                        margin: 20px;
-                    }
-
-                    .tree-node-item {
-                        flex-direction: column;
-                        align-items: flex-start;
-                        gap: 12px;
-                    }
-
-                    .tree-node-actions {
-                        width: 100%;
-                        justify-content: flex-start;
-                    }
-
-                    .tree-node-content {
-                        width: 100%;
-                    }
-                }
-
-                @media (max-width: 640px) {
-                    .stats-grid {
-                        grid-template-columns: 1fr;
-                    }
-
-                    .page-title {
-                        font-size: ${appTheme.fonts.sizes.xl};
-                    }
-
-                    .stat-value {
-                        font-size: 22px;
-                    }
-                }
-            `}</style>
-        </>
-    );
+          </div>
+
+          {/* Description */}
+          <div>
+            <label style={labelStyle}>Description <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
+            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="Brief description of this category..."
+              rows={3} style={{ ...inputStyle, resize: 'vertical', minHeight: '80px' }} />
+            {errors.description && <p style={errorStyle}>{errors.description}</p>}
+            <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#9ca3af' }}>{form.description.length}/500</p>
+          </div>
+
+          {/* Display Order & Active */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div>
+              <label style={labelStyle}>Display Order</label>
+              <input type="number" min="0" value={form.displayOrder}
+                onChange={e => setForm(f => ({ ...f, displayOrder: parseInt(e.target.value) || 0 }))}
+                style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Status</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+                <button type="button" onClick={() => setForm(f => ({ ...f, isActive: !f.isActive }))}>
+                  <Icon.Toggle on={form.isActive} />
+                </button>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: form.isActive ? '#16a34a' : '#9ca3af' }}>
+                  {form.isActive ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px', marginTop: '28px', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '10px 22px', borderRadius: '9px', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: '#374151' }}>Cancel</button>
+          <button onClick={handleSubmit} disabled={loading}
+            style={{ padding: '10px 22px', borderRadius: '9px', border: 'none', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', cursor: 'pointer', fontSize: '14px', fontWeight: 700, color: '#fff', opacity: loading ? 0.7 : 1, boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}>
+            {loading ? 'Saving...' : editData ? 'Update Category' : 'Create Category'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── REUSABLE STYLES ───────────────────────────────────────────────────────────
+const labelStyle = { display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' };
+const inputStyle = { width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: '9px', fontSize: '14px', color: '#111', background: '#fafafa', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border-color 0.15s' };
+const errorStyle = { margin: '4px 0 0', fontSize: '12px', color: '#ef4444' };
+
+// ─── STAT CARD ─────────────────────────────────────────────────────────────────
+function StatCard({ label, value, sub, color, icon, loading }) {
+  return (
+    <div style={{
+      background: '#fff', borderRadius: '14px', padding: '20px 22px',
+      border: '1px solid #f0f0f0', boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+      display: 'flex', alignItems: 'flex-start', gap: '14px',
+      fontFamily: 'var(--font-body)', transition: 'box-shadow 0.2s',
+    }}>
+      <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', color: color, flexShrink: 0 }}>
+        {icon}
+      </div>
+      <div style={{ flex: 1 }}>
+        <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
+        {loading ? (
+          <div style={{ height: '28px', width: '60px', background: '#f3f4f6', borderRadius: '6px', marginTop: '6px', animation: 'pulse 1.5s infinite' }} />
+        ) : (
+          <p style={{ margin: '4px 0 2px', fontSize: '26px', fontWeight: 800, color: '#111', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{value ?? '—'}</p>
+        )}
+        {sub && <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af' }}>{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ─── CATEGORY ROW (recursive tree) ─────────────────────────────────────────────
+function CategoryRow({ cat, depth = 0, onEdit, onDelete, onToggle, allCategories }) {
+  const [expanded, setExpanded] = useState(true);
+  const subs = allCategories.filter(c => c.parentId && c.parentId.toString() === cat._id.toString());
+  const hasSubs = subs.length > 0;
+
+  return (
+    <>
+      <tr style={{ background: depth === 0 ? '#fff' : '#fafbff', transition: 'background 0.15s' }}
+        onMouseEnter={e => e.currentTarget.style.background = depth === 0 ? '#f8f9ff' : '#f0f4ff'}
+        onMouseLeave={e => e.currentTarget.style.background = depth === 0 ? '#fff' : '#fafbff'}>
+        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: `${depth * 28}px` }}>
+            {hasSubs ? (
+              <button onClick={() => setExpanded(e => !e)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', color: '#9ca3af', transition: 'transform 0.2s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+                <Icon.ChevronRight />
+              </button>
+            ) : (
+              <div style={{ width: '18px' }} />
+            )}
+            <span style={{ fontSize: '18px' }}>{cat.icon || '📦'}</span>
+            <div>
+              <p style={{ margin: 0, fontSize: '14px', fontWeight: depth === 0 ? 700 : 500, color: '#111' }}>{cat.name}</p>
+              {cat.description && <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.description}</p>}
+            </div>
+          </div>
+        </td>
+        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: depth === 0 ? '#ede9fe' : '#e0f2fe', color: depth === 0 ? '#7c3aed' : '#0369a1' }}>
+            {depth === 0 ? <Icon.Folder /> : <Icon.Tag />}
+            {depth === 0 ? 'Main' : 'Sub'}
+          </span>
+        </td>
+        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', fontSize: '13px', color: '#6b7280' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f9fafb', borderRadius: '6px', padding: '3px 8px', fontWeight: 600 }}>
+            <Icon.Package />
+            {cat.productCount ?? 0}
+          </span>
+        </td>
+        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+          <span style={{ fontSize: '12px', color: '#9ca3af', background: '#f9fafb', padding: '2px 8px', borderRadius: '6px' }}>#{cat.displayOrder ?? 0}</span>
+        </td>
+        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+          <button type="button" onClick={() => onToggle(cat._id, !cat.isActive)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0' }}>
+            <Icon.Toggle on={cat.isActive} />
+          </button>
+        </td>
+        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button onClick={() => onEdit(cat)} title="Edit" style={{ padding: '6px', borderRadius: '7px', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', display: 'flex', color: '#6366f1', transition: 'all 0.15s' }}>
+              <Icon.Edit />
+            </button>
+            <button onClick={() => onDelete(cat)} title="Delete" style={{ padding: '6px', borderRadius: '7px', border: '1px solid #fecaca', background: '#fff', cursor: 'pointer', display: 'flex', color: '#ef4444', transition: 'all 0.15s' }}>
+              <Icon.Trash />
+            </button>
+          </div>
+        </td>
+      </tr>
+      {hasSubs && expanded && subs.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)).map(sub => (
+        <CategoryRow key={sub._id} cat={sub} depth={depth + 1} onEdit={onEdit} onDelete={onDelete} onToggle={onToggle} allCategories={allCategories} />
+      ))}
+    </>
+  );
+}
+
+// ─── MAIN PAGE ─────────────────────────────────────────────────────────────────
+export default function MastersPage() {
+  const { user, getAuthHeaders } = useAuth();
+  const router = useRouter();
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState('categories'); // 'categories' | 'products'
+
+  // Data state
+  const [stats, setStats] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
+
+  // Loading states
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [catLoading, setCatLoading] = useState(true);
+  const [prodLoading, setProdLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  // Pagination
+  const [catPage, setCatPage] = useState(1);
+  const [catTotal, setCatTotal] = useState(0);
+  const [catTotalPages, setCatTotalPages] = useState(1);
+  const [prodPage, setProdPage] = useState(1);
+  const [prodTotal, setProdTotal] = useState(0);
+  const [prodTotalPages, setProdTotalPages] = useState(1);
+  const LIMIT = 50;
+
+  // Filters
+  const [catSearch, setCatSearch] = useState('');
+  const [catStatus, setCatStatus] = useState('');
+  const [catParentFilter, setCatParentFilter] = useState('');
+  const [prodSearch, setProdSearch] = useState('');
+  const [prodStatus, setProdStatus] = useState('');
+  const [prodCategory, setProdCategory] = useState('');
+
+  // Modal state
+  const [catModalOpen, setCatModalOpen] = useState(false);
+  const [editCat, setEditCat] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null); // { type, item }
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Toast
+  const [toasts, setToasts] = useState([]);
+  const toastId = useRef(0);
+
+  // Search debounce
+  const searchTimer = useRef(null);
+
+  const addToast = useCallback((message, type = 'success') => {
+    const id = ++toastId.current;
+    setToasts(t => [...t, { id, message, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000);
+  }, []);
+
+  const removeToast = useCallback((id) => setToasts(t => t.filter(x => x.id !== id)), []);
+
+  const buildHeaders = useCallback(() => {
+    return getAuthHeaders ? getAuthHeaders() : { 'Content-Type': 'application/json' };
+  }, [getAuthHeaders]);
+
+  // ─── FETCH STATS ───────────────────────────────────────────────────────────
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true);
+    try {
+      const res = await fetch('/api/masters?type=stats', { headers: buildHeaders() });
+      const data = await res.json();
+      if (data.success) setStats(data.data);
+    } catch (e) {
+      console.error('Stats fetch error:', e);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [buildHeaders]);
+
+  // ─── FETCH CATEGORIES ──────────────────────────────────────────────────────
+  const fetchCategories = useCallback(async (page = 1) => {
+    setCatLoading(true);
+    try {
+      const params = new URLSearchParams({
+        type: 'categories',
+        page: String(page),
+        limit: String(LIMIT),
+        ...(catSearch && { search: catSearch }),
+        ...(catStatus && { status: catStatus }),
+        ...(catParentFilter === 'main' ? { parentId: 'null' } : catParentFilter ? { parentId: catParentFilter } : {}),
+      });
+      const res = await fetch(`/api/masters?${params}`, { headers: buildHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setCategories(data.data);
+        setCatTotal(data.pagination?.total ?? 0);
+        setCatTotalPages(data.pagination?.totalPages ?? 1);
+      } else {
+        addToast(data.message || 'Failed to load categories', 'error');
+      }
+    } catch (e) {
+      addToast('Network error loading categories', 'error');
+    } finally {
+      setCatLoading(false);
+    }
+  }, [catSearch, catStatus, catParentFilter, buildHeaders, addToast]);
+
+  // ─── FETCH PRODUCTS ────────────────────────────────────────────────────────
+  const fetchProducts = useCallback(async (page = 1) => {
+    setProdLoading(true);
+    try {
+      const params = new URLSearchParams({
+        type: 'products',
+        page: String(page),
+        limit: String(LIMIT),
+        ...(prodSearch && { search: prodSearch }),
+        ...(prodStatus && { status: prodStatus }),
+        ...(prodCategory && prodCategory !== 'all' && { category: prodCategory }),
+      });
+      const res = await fetch(`/api/masters?${params}`, { headers: buildHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setProducts(data.data);
+        setProdTotal(data.pagination?.total ?? 0);
+        setProdTotalPages(data.pagination?.totalPages ?? 1);
+      } else {
+        addToast(data.message || 'Failed to load products', 'error');
+      }
+    } catch (e) {
+      addToast('Network error loading products', 'error');
+    } finally {
+      setProdLoading(false);
+    }
+  }, [prodSearch, prodStatus, prodCategory, buildHeaders, addToast]);
+
+  // ─── INIT ──────────────────────────────────────────────────────────────────
+  useEffect(() => { fetchStats(); }, [fetchStats]);
+  useEffect(() => { fetchCategories(catPage); }, [catSearch, catStatus, catParentFilter, catPage]);
+  useEffect(() => { fetchProducts(prodPage); }, [prodSearch, prodStatus, prodCategory, prodPage]);
+
+  // ─── DEBOUNCED SEARCH ──────────────────────────────────────────────────────
+  const handleCatSearch = (val) => {
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => { setCatSearch(val); setCatPage(1); }, 350);
+  };
+  const handleProdSearch = (val) => {
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => { setProdSearch(val); setProdPage(1); }, 350);
+  };
+
+  // ─── CATEGORY CRUD ─────────────────────────────────────────────────────────
+  const handleSaveCategory = async (formData) => {
+    setActionLoading(true);
+    try {
+      const isEdit = !!editCat;
+      const url = isEdit ? `/api/masters?type=categories&id=${editCat._id}` : '/api/masters?type=categories';
+      const method = isEdit ? 'PUT' : 'POST';
+      const res = await fetch(url, { method, headers: buildHeaders(), body: JSON.stringify(formData) });
+      const data = await res.json();
+      if (data.success) {
+        addToast(data.message || (isEdit ? 'Category updated' : 'Category created'), 'success');
+        setCatModalOpen(false);
+        setEditCat(null);
+        fetchCategories(catPage);
+        fetchStats();
+      } else {
+        addToast(data.message || 'Operation failed', 'error');
+      }
+    } catch (e) {
+      addToast('Network error', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleEditCategory = (cat) => { setEditCat(cat); setCatModalOpen(true); };
+
+  const handleDeleteCategory = (cat) => {
+    setConfirmDelete({ type: 'categories', item: cat });
+  };
+
+  const confirmDeleteAction = async () => {
+    if (!confirmDelete) return;
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`/api/masters?type=${confirmDelete.type}&id=${confirmDelete.item._id}`, { method: 'DELETE', headers: buildHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        addToast(data.message || 'Deleted successfully', 'success');
+        setConfirmDelete(null);
+        if (confirmDelete.type === 'categories') { fetchCategories(catPage); fetchStats(); }
+        else { fetchProducts(prodPage); fetchStats(); }
+      } else {
+        addToast(data.message || 'Delete failed', 'error');
+      }
+    } catch (e) {
+      addToast('Network error', 'error');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleToggleCategory = async (id, isActive) => {
+    try {
+      const res = await fetch('/api/masters?type=categories', {
+        method: 'PATCH',
+        headers: buildHeaders(),
+        body: JSON.stringify({ action: 'toggle-status', id, isActive }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCategories(prev => prev.map(c => c._id.toString() === id.toString() ? { ...c, isActive } : c));
+        addToast(data.message || `Category ${isActive ? 'activated' : 'deactivated'}`, 'success');
+      } else {
+        addToast(data.message || 'Toggle failed', 'error');
+      }
+    } catch (e) {
+      addToast('Network error', 'error');
+    }
+  };
+
+  const handleToggleProduct = async (id, isActive) => {
+    try {
+      const res = await fetch('/api/masters?type=products', {
+        method: 'PATCH',
+        headers: buildHeaders(),
+        body: JSON.stringify({ action: 'toggle-status', id, isActive }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setProducts(prev => prev.map(p => p._id.toString() === id.toString() ? { ...p, isActive } : p));
+        addToast(data.message || `Product ${isActive ? 'activated' : 'deactivated'}`, 'success');
+      } else {
+        addToast(data.message || 'Toggle failed', 'error');
+      }
+    } catch (e) {
+      addToast('Network error', 'error');
+    }
+  };
+
+  const handleDeleteProduct = (prod) => {
+    setConfirmDelete({ type: 'products', item: prod });
+  };
+
+  // Top-level categories for filters / product display
+  const mainCategories = categories.filter(c => !c.parentId);
+
+  // ─── RENDER ────────────────────────────────────────────────────────────────
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
+        :root {
+          --font-display: 'Sora', sans-serif;
+          --font-body: 'DM Sans', sans-serif;
+        }
+        * { box-sizing: border-box; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.4 } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .masters-table tr:hover .row-actions { opacity: 1 !important; }
+        .page-btn:hover { background: #6366f1 !important; color: #fff !important; }
+        .filter-select:focus, .filter-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+        .tab-btn { transition: all 0.2s; }
+        .action-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.12) !important; }
+        @media (max-width: 768px) {
+          .stats-grid { grid-template-columns: 1fr 1fr !important; }
+          .filter-row { flex-direction: column !important; }
+          .page-header { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+          .desktop-only { display: none !important; }
+          .masters-table { font-size: 12px !important; }
+          .masters-table td, .masters-table th { padding: 10px 10px !important; }
+        }
+        @media (max-width: 480px) {
+          .stats-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
+
+      <div style={{ minHeight: '100vh', background: '#f4f5f9', fontFamily: 'var(--font-body)', padding: '24px', animation: 'fadeIn 0.4s ease' }}>
+
+        {/* ── HEADER ── */}
+        <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-display)', letterSpacing: '-0.5px' }}>
+              Masters
+            </h1>
+            <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b' }}>
+              Manage categories, subcategories & products
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button onClick={() => { fetchStats(); fetchCategories(catPage); fetchProducts(prodPage); }}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '9px', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: '#374151' }}>
+              <Icon.RefreshCw /> Refresh
+            </button>
+            {activeTab === 'categories' && (
+              <button onClick={() => { setEditCat(null); setCatModalOpen(true); }} className="action-btn"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 18px', borderRadius: '9px', border: 'none', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#fff', boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}>
+                <Icon.Plus /> Add Category
+              </button>
+            )}
+            {activeTab === 'products' && (
+              <button onClick={() => router.push('/admin/products/productForm')} className="action-btn"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 18px', borderRadius: '9px', border: 'none', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#fff', boxShadow: '0 4px 14px rgba(16,185,129,0.35)' }}>
+                <Icon.Plus /> Add Product
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── STATS ── */}
+        <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+          <StatCard label="Total Categories" value={stats?.categories?.total} sub={`${stats?.categories?.main ?? 0} main · ${stats?.categories?.sub ?? 0} sub`} color="#6366f1" icon={<Icon.Grid />} loading={statsLoading} />
+          <StatCard label="Active Categories" value={stats?.categories?.active} sub={`${(stats?.categories?.total ?? 0) - (stats?.categories?.active ?? 0)} inactive`} color="#10b981" icon={<Icon.Tag />} loading={statsLoading} />
+          <StatCard label="Total Products" value={stats?.products?.total} sub={`${stats?.products?.active ?? 0} active`} color="#f59e0b" icon={<Icon.Package />} loading={statsLoading} />
+          <StatCard label="Stock Alerts" value={(stats?.products?.lowStock ?? 0) + (stats?.products?.outOfStock ?? 0)} sub={`${stats?.products?.outOfStock ?? 0} out of stock`} color="#ef4444" icon={<Icon.BarChart />} loading={statsLoading} />
+        </div>
+
+        {/* ── TABS ── */}
+        <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #f0f0f0', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+          {/* Tab Header */}
+          <div style={{ display: 'flex', borderBottom: '1px solid #f3f4f6', padding: '0 20px' }}>
+            {[
+              { key: 'categories', label: 'Categories', icon: <Icon.Grid />, count: catTotal },
+              { key: 'products', label: 'Products', icon: <Icon.Package />, count: prodTotal },
+            ].map(tab => (
+              <button key={tab.key} className="tab-btn" onClick={() => setActiveTab(tab.key)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '7px', padding: '15px 20px',
+                  border: 'none', background: 'none', cursor: 'pointer',
+                  fontSize: '14px', fontWeight: activeTab === tab.key ? 700 : 500,
+                  color: activeTab === tab.key ? '#6366f1' : '#6b7280',
+                  borderBottom: activeTab === tab.key ? '2px solid #6366f1' : '2px solid transparent',
+                  marginBottom: '-1px', fontFamily: 'var(--font-body)',
+                }}>
+                {tab.icon}
+                {tab.label}
+                <span style={{ background: activeTab === tab.key ? '#eef2ff' : '#f3f4f6', color: activeTab === tab.key ? '#6366f1' : '#9ca3af', borderRadius: '12px', padding: '1px 8px', fontSize: '11px', fontWeight: 700 }}>
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Tab Content */}
+          <div style={{ padding: '20px' }}>
+
+            {/* ── CATEGORIES TAB ── */}
+            {activeTab === 'categories' && (
+              <>
+                {/* Filters */}
+                <div className="filter-row" style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', display: 'flex' }}><Icon.Search /></span>
+                    <input className="filter-input" defaultValue={catSearch} onChange={e => handleCatSearch(e.target.value)}
+                      placeholder="Search categories..." style={{ ...inputStyle, paddingLeft: '38px', background: '#f9fafb' }} />
+                  </div>
+                  <select className="filter-select" value={catStatus} onChange={e => { setCatStatus(e.target.value); setCatPage(1); }}
+                    style={{ ...inputStyle, width: 'auto', minWidth: '130px', cursor: 'pointer' }}>
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                  <select className="filter-select" value={catParentFilter} onChange={e => { setCatParentFilter(e.target.value); setCatPage(1); }}
+                    style={{ ...inputStyle, width: 'auto', minWidth: '150px', cursor: 'pointer' }}>
+                    <option value="">All Types</option>
+                    <option value="main">Main Only</option>
+                    {mainCategories.map(c => <option key={c._id} value={c._id}>{c.icon} {c.name} (subs)</option>)}
+                  </select>
+                  {(catSearch || catStatus || catParentFilter) && (
+                    <button onClick={() => { setCatSearch(''); setCatStatus(''); setCatParentFilter(''); setCatPage(1); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '9px 14px', borderRadius: '9px', border: '1px solid #fecaca', background: '#fff5f5', cursor: 'pointer', fontSize: '13px', color: '#ef4444', fontWeight: 600 }}>
+                      <Icon.X /> Clear
+                    </button>
+                  )}
+                </div>
+
+                {/* Table */}
+                <div style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
+                  <table className="masters-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc' }}>
+                        {['Category', 'Type', 'Products', 'Order', 'Status', 'Actions'].map(h => (
+                          <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #f3f4f6', whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {catLoading ? (
+                        Array.from({ length: 6 }).map((_, i) => (
+                          <tr key={i}>
+                            {Array.from({ length: 6 }).map((_, j) => (
+                              <td key={j} style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                                <div style={{ height: '14px', background: '#f3f4f6', borderRadius: '4px', animation: 'pulse 1.5s infinite', width: j === 0 ? '140px' : j === 5 ? '70px' : '60px' }} />
+                              </td>
+                            ))}
+                          </tr>
+                        ))
+                      ) : categories.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: '#9ca3af' }}>
+                            <div style={{ fontSize: '40px', marginBottom: '12px' }}>📂</div>
+                            <p style={{ margin: 0, fontWeight: 600 }}>No categories found</p>
+                            <p style={{ margin: '4px 0 0', fontSize: '12px' }}>
+                              {catSearch || catStatus ? 'Try adjusting your filters' : 'Create your first category to get started'}
+                            </p>
+                          </td>
+                        </tr>
+                      ) : (
+                        mainCategories
+                          .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+                          .map(cat => (
+                            <CategoryRow key={cat._id} cat={cat} depth={0}
+                              onEdit={handleEditCategory} onDelete={handleDeleteCategory}
+                              onToggle={handleToggleCategory} allCategories={categories} />
+                          ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {catTotalPages > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                    <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                      Showing {((catPage - 1) * LIMIT) + 1}–{Math.min(catPage * LIMIT, catTotal)} of {catTotal} categories
+                    </span>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button className="page-btn" disabled={catPage === 1} onClick={() => setCatPage(p => p - 1)}
+                        style={{ padding: '7px 14px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff', cursor: catPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 600, color: catPage === 1 ? '#d1d5db' : '#374151' }}>
+                        ← Prev
+                      </button>
+                      {Array.from({ length: Math.min(catTotalPages, 5) }).map((_, i) => {
+                        const pg = i + 1;
+                        return (
+                          <button key={pg} className="page-btn" onClick={() => setCatPage(pg)}
+                            style={{ padding: '7px 12px', borderRadius: '8px', border: '1px solid', borderColor: catPage === pg ? '#6366f1' : '#e5e7eb', background: catPage === pg ? '#6366f1' : '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: catPage === pg ? '#fff' : '#374151' }}>
+                            {pg}
+                          </button>
+                        );
+                      })}
+                      <button className="page-btn" disabled={catPage === catTotalPages} onClick={() => setCatPage(p => p + 1)}
+                        style={{ padding: '7px 14px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff', cursor: catPage === catTotalPages ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 600, color: catPage === catTotalPages ? '#d1d5db' : '#374151' }}>
+                        Next →
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── PRODUCTS TAB ── */}
+            {activeTab === 'products' && (
+              <>
+                {/* Filters */}
+                <div className="filter-row" style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', display: 'flex' }}><Icon.Search /></span>
+                    <input className="filter-input" defaultValue={prodSearch} onChange={e => handleProdSearch(e.target.value)}
+                      placeholder="Search by name, SKU..." style={{ ...inputStyle, paddingLeft: '38px', background: '#f9fafb' }} />
+                  </div>
+                  <select className="filter-select" value={prodStatus} onChange={e => { setProdStatus(e.target.value); setProdPage(1); }}
+                    style={{ ...inputStyle, width: 'auto', minWidth: '130px', cursor: 'pointer' }}>
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                  <select className="filter-select" value={prodCategory} onChange={e => { setProdCategory(e.target.value); setProdPage(1); }}
+                    style={{ ...inputStyle, width: 'auto', minWidth: '160px', cursor: 'pointer' }}>
+                    <option value="">All Categories</option>
+                    {mainCategories.map(c => <option key={c._id} value={c._id}>{c.icon} {c.name}</option>)}
+                  </select>
+                  {(prodSearch || prodStatus || prodCategory) && (
+                    <button onClick={() => { setProdSearch(''); setProdStatus(''); setProdCategory(''); setProdPage(1); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '9px 14px', borderRadius: '9px', border: '1px solid #fecaca', background: '#fff5f5', cursor: 'pointer', fontSize: '13px', color: '#ef4444', fontWeight: 600 }}>
+                      <Icon.X /> Clear
+                    </button>
+                  )}
+                </div>
+
+                {/* Products Table */}
+                <div style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
+                  <table className="masters-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc' }}>
+                        {['Product', 'SKU', 'Category', 'MRP / Price', 'Stock', 'GST', 'Status', 'Actions'].map(h => (
+                          <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #f3f4f6', whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {prodLoading ? (
+                        Array.from({ length: 6 }).map((_, i) => (
+                          <tr key={i}>
+                            {Array.from({ length: 8 }).map((_, j) => (
+                              <td key={j} style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                                <div style={{ height: '14px', background: '#f3f4f6', borderRadius: '4px', animation: 'pulse 1.5s infinite', width: j === 0 ? '140px' : '70px' }} />
+                              </td>
+                            ))}
+                          </tr>
+                        ))
+                      ) : products.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} style={{ padding: '48px', textAlign: 'center', color: '#9ca3af' }}>
+                            <div style={{ fontSize: '40px', marginBottom: '12px' }}>📦</div>
+                            <p style={{ margin: 0, fontWeight: 600 }}>No products found</p>
+                            <p style={{ margin: '4px 0 0', fontSize: '12px' }}>
+                              {prodSearch || prodStatus || prodCategory ? 'Try adjusting your filters' : 'Add your first product to get started'}
+                            </p>
+                          </td>
+                        </tr>
+                      ) : products.map(prod => (
+                        <tr key={prod._id}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f8f9ff'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                          style={{ background: '#fff', transition: 'background 0.15s' }}>
+                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              {prod.images?.[0] ? (
+                                <img src={prod.images[0]} alt={prod.productName} style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #f3f4f6', flexShrink: 0 }} />
+                              ) : (
+                                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#9ca3af', fontSize: '16px' }}>📦</div>
+                              )}
+                              <div>
+                                <p style={{ margin: 0, fontWeight: 700, color: '#111', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{prod.productName}</p>
+                                {prod.isOnSale && <span style={{ fontSize: '10px', background: '#fef3c7', color: '#d97706', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>SALE</span>}
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                            <code style={{ fontSize: '11px', background: '#f3f4f6', padding: '3px 7px', borderRadius: '5px', color: '#374151', fontWeight: 600 }}>{prod.sku}</code>
+                          </td>
+                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                            <div>
+                              <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: '#374151' }}>{prod.category?.name || '—'}</p>
+                              {prod.subCategory?.name && <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af' }}>↳ {prod.subCategory.name}</p>}
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                            <div>
+                              <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af', textDecoration: 'line-through' }}>₹{prod.mrp}</p>
+                              <p style={{ margin: 0, fontWeight: 800, color: '#111', fontSize: '14px' }}>₹{prod.discountPrice}</p>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                            <span style={{
+                              padding: '3px 9px', borderRadius: '20px', fontSize: '12px', fontWeight: 700,
+                              background: prod.stock === 0 ? '#fef2f2' : prod.stock <= 5 ? '#fffbeb' : '#f0fdf4',
+                              color: prod.stock === 0 ? '#ef4444' : prod.stock <= 5 ? '#d97706' : '#16a34a',
+                            }}>
+                              {prod.stock === 0 ? 'Out' : prod.stock <= 5 ? `Low: ${prod.stock}` : prod.stock}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>
+                            {prod.gstRate}%
+                          </td>
+                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                            <button type="button" onClick={() => handleToggleProduct(prod._id, !prod.isActive)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0' }}>
+                              <Icon.Toggle on={prod.isActive} />
+                            </button>
+                          </td>
+                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <button onClick={() => router.push(`/admin/products/productForm?id=${prod._id}`)} title="Edit"
+                                style={{ padding: '6px', borderRadius: '7px', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', display: 'flex', color: '#6366f1' }}>
+                                <Icon.Edit />
+                              </button>
+                              <button onClick={() => handleDeleteProduct(prod)} title="Delete"
+                                style={{ padding: '6px', borderRadius: '7px', border: '1px solid #fecaca', background: '#fff', cursor: 'pointer', display: 'flex', color: '#ef4444' }}>
+                                <Icon.Trash />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Products Pagination */}
+                {prodTotalPages > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                    <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                      Showing {((prodPage - 1) * LIMIT) + 1}–{Math.min(prodPage * LIMIT, prodTotal)} of {prodTotal} products
+                    </span>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button className="page-btn" disabled={prodPage === 1} onClick={() => setProdPage(p => p - 1)}
+                        style={{ padding: '7px 14px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff', cursor: prodPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 600, color: prodPage === 1 ? '#d1d5db' : '#374151' }}>
+                        ← Prev
+                      </button>
+                      {Array.from({ length: Math.min(prodTotalPages, 5) }).map((_, i) => {
+                        const pg = i + 1;
+                        return (
+                          <button key={pg} className="page-btn" onClick={() => setProdPage(pg)}
+                            style={{ padding: '7px 12px', borderRadius: '8px', border: '1px solid', borderColor: prodPage === pg ? '#6366f1' : '#e5e7eb', background: prodPage === pg ? '#6366f1' : '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: prodPage === pg ? '#fff' : '#374151' }}>
+                            {pg}
+                          </button>
+                        );
+                      })}
+                      <button className="page-btn" disabled={prodPage === prodTotalPages} onClick={() => setProdPage(p => p + 1)}
+                        style={{ padding: '7px 14px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff', cursor: prodPage === prodTotalPages ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 600, color: prodPage === prodTotalPages ? '#d1d5db' : '#374151' }}>
+                        Next →
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ── QUICK SUMMARY FOOTER ── */}
+        <div style={{ marginTop: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          {[
+            { label: 'Main Categories', value: stats?.categories?.main ?? '—', color: '#6366f1' },
+            { label: 'Subcategories', value: stats?.categories?.sub ?? '—', color: '#8b5cf6' },
+            { label: 'Active Products', value: stats?.products?.active ?? '—', color: '#10b981' },
+            { label: 'Low Stock', value: stats?.products?.lowStock ?? '—', color: '#f59e0b' },
+            { label: 'Out of Stock', value: stats?.products?.outOfStock ?? '—', color: '#ef4444' },
+          ].map(item => (
+            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', borderRadius: '10px', padding: '10px 16px', border: '1px solid #f0f0f0', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color }} />
+              <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500 }}>{item.label}:</span>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#111' }}>{item.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── MODALS ── */}
+      <CategoryModal
+        open={catModalOpen}
+        onClose={() => { setCatModalOpen(false); setEditCat(null); }}
+        onSave={handleSaveCategory}
+        editData={editCat}
+        categories={categories}
+        loading={actionLoading}
+      />
+
+      <ConfirmModal
+        open={!!confirmDelete}
+        title={`Delete ${confirmDelete?.type === 'categories' ? 'Category' : 'Product'}`}
+        message={
+          confirmDelete?.type === 'categories'
+            ? `Are you sure you want to delete "${confirmDelete?.item?.name}"? This action cannot be undone. Products must be removed first.`
+            : `Are you sure you want to delete "${confirmDelete?.item?.productName}"? This action cannot be undone.`
+        }
+        onConfirm={confirmDeleteAction}
+        onCancel={() => setConfirmDelete(null)}
+        loading={deleteLoading}
+      />
+
+      <Toast toasts={toasts} removeToast={removeToast} />
+    </>
+  );
 }

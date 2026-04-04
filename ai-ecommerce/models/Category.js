@@ -154,22 +154,28 @@ CategorySchema.virtual('subcategories', {
     options: { sort: { displayOrder: 1, name: 1 } }
 });
 
-CategorySchema.virtual('fullPath').get(async function() {
+// FIXED: Converted async virtual to method
+CategorySchema.methods.getFullPath = async function() {
     const path = [];
+    let currentId = this.parentId;
     let current = this;
     
-    while (current) {
-        path.unshift(current.name);
-        if (!current.parentId) break;
+    path.unshift(current.name);
+    
+    while (currentId) {
         current = await mongoose.model('Category').findOne({ 
-            _id: current.parentId,
+            _id: currentId,
             companyId: this.companyId,
             deletedAt: null
-        });
+        }).select('name parentId');
+        
+        if (!current) break;
+        path.unshift(current.name);
+        currentId = current.parentId;
     }
     
     return path.join(' > ');
-});
+};
 
 // ========== PRE-SAVE MIDDLEWARE ==========
 CategorySchema.pre('save', async function(next) {
@@ -178,6 +184,7 @@ CategorySchema.pre('save', async function(next) {
             return next(new Error('Company ID is required for category'));
         }
         
+        // Generate unique slug
         if (!this.slug || this.isModified('name')) {
             let baseSlug = this.name
                 .toLowerCase()
@@ -214,6 +221,7 @@ CategorySchema.pre('save', async function(next) {
             }
         }
         
+        // Validate parent category
         if (this.parentId) {
             const parentExists = await mongoose.model('Category').findOne({
                 _id: this.parentId,
@@ -224,8 +232,27 @@ CategorySchema.pre('save', async function(next) {
             if (!parentExists) {
                 return next(new Error('Parent category not found in this company'));
             }
+            
+            // FIXED: Check depth limit (max 3 levels)
+            let depth = 1;
+            let currentParent = parentExists;
+            while (currentParent.parentId && depth < 3) {
+                const nextParent = await mongoose.model('Category').findOne({
+                    _id: currentParent.parentId,
+                    companyId: this.companyId,
+                    deletedAt: null
+                });
+                if (!nextParent) break;
+                currentParent = nextParent;
+                depth++;
+            }
+            
+            if (depth >= 3) {
+                return next(new Error('Maximum category depth is 3 levels (Main > Sub > Sub-Sub)'));
+            }
         }
         
+        // Trim strings
         if (this.name) this.name = this.name.trim();
         if (this.description) this.description = this.description.trim();
         if (this.metaTitle) this.metaTitle = this.metaTitle.trim();
@@ -254,6 +281,7 @@ CategorySchema.pre('findOneAndUpdate', async function(next) {
             return next(new Error('Company context required for category update'));
         }
         
+        // Handle parentId changes
         if (update.parentId || (update.$set && update.$set.parentId)) {
             const parentId = update.parentId || update.$set.parentId;
             const docId = this.getQuery()._id;
@@ -274,6 +302,7 @@ CategorySchema.pre('findOneAndUpdate', async function(next) {
                 }
             }
             
+            // Check for circular reference
             if (parentId) {
                 const Category = mongoose.model('Category');
                 const descendants = await Category.find({ 
@@ -287,6 +316,48 @@ CategorySchema.pre('findOneAndUpdate', async function(next) {
             }
         }
         
+        // FIXED: Handle slug regeneration on name update
+        if (update.name || (update.$set && update.$set.name)) {
+            const newName = update.name || update.$set.name;
+            const docId = this.getQuery()._id;
+            
+            if (newName) {
+                let baseSlug = newName
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-|-$/g, '');
+                
+                if (!baseSlug) baseSlug = 'category';
+                
+                let finalSlug = baseSlug;
+                let counter = 1;
+                
+                const Category = mongoose.model('Category');
+                let slugExists = true;
+                
+                while (slugExists) {
+                    const existing = await Category.findOne({
+                        companyId,
+                        slug: finalSlug,
+                        _id: { $ne: docId },
+                        deletedAt: null
+                    });
+                    
+                    if (!existing) {
+                        slugExists = false;
+                    } else {
+                        finalSlug = `${baseSlug}-${counter++}`;
+                    }
+                }
+                
+                if (update.$set) {
+                    update.$set.slug = finalSlug;
+                } else {
+                    update.slug = finalSlug;
+                }
+            }
+        }
+        
         next();
     } catch (error) {
         console.error('❌ Error in category pre-update:', error);
@@ -296,7 +367,9 @@ CategorySchema.pre('findOneAndUpdate', async function(next) {
 
 // ========== POST-SAVE MIDDLEWARE ==========
 CategorySchema.post('save', function(doc) {
-    console.log(`✅ Category saved: ${doc.name} for company ${doc.companyId}`);
+    if (process.env.NODE_ENV !== 'production') {
+        console.log(`✅ Category saved: ${doc.name} for company ${doc.companyId}`);
+    }
 });
 
 // ========== STATIC METHODS ==========
@@ -305,7 +378,6 @@ CategorySchema.post('save', function(doc) {
 CategorySchema.statics.updateAllProductCounts = async function(companyId) {
     try {
         if (!companyId) {
-            console.log('No companyId provided to updateAllProductCounts');
             return false;
         }
         
@@ -315,7 +387,6 @@ CategorySchema.statics.updateAllProductCounts = async function(companyId) {
         }).select('_id');
         
         if (categories.length === 0) {
-            console.log(`No categories found for company ${companyId}`);
             return true;
         }
         
@@ -323,6 +394,7 @@ CategorySchema.statics.updateAllProductCounts = async function(companyId) {
         
         let updatedCount = 0;
         for (const category of categories) {
+            // FIXED: Products belong to EITHER category OR subCategory, not both
             const productCount = await Product.countDocuments({
                 companyId,
                 $or: [
@@ -339,7 +411,9 @@ CategorySchema.statics.updateAllProductCounts = async function(companyId) {
             updatedCount++;
         }
         
-        console.log(`✅ Updated product counts for ${updatedCount} categories in company ${companyId}`);
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`✅ Updated product counts for ${updatedCount} categories in company ${companyId}`);
+        }
         return true;
     } catch (error) {
         console.error('❌ Error in updateAllProductCounts:', error);
@@ -347,28 +421,39 @@ CategorySchema.statics.updateAllProductCounts = async function(companyId) {
     }
 };
 
-// ========== FIXED: Get category tree for a company ==========
+// FIXED: Get category tree for a company
 CategorySchema.statics.getTree = async function(companyId, includeInactive = false) {
-    // CRITICAL FIX: Validate companyId
+    // Validate companyId
     if (!companyId) {
         console.error('❌ getTree called without companyId');
         return [];
     }
     
     try {
-        // Convert companyId to ObjectId if it's a string
-        const companyObjectId = typeof companyId === 'string' 
-            ? new mongoose.Types.ObjectId(companyId) 
-            : companyId;
+        // FIXED: Safe ObjectId conversion
+        let companyObjectId;
+        if (typeof companyId === 'string') {
+            if (!mongoose.Types.ObjectId.isValid(companyId)) {
+                console.error('❌ Invalid companyId format:', companyId);
+                return [];
+            }
+            companyObjectId = new mongoose.Types.ObjectId(companyId);
+        } else {
+            companyObjectId = companyId;
+        }
         
         const query = { 
             companyId: companyObjectId, 
             deletedAt: null
         };
         
-        const categories = await this.find(query)
+        let categories = await this.find(query)
             .sort({ displayOrder: 1, name: 1 })
             .lean();
+        
+        if (!includeInactive) {
+            categories = categories.filter(cat => cat.isActive === true);
+        }
         
         if (categories.length === 0) {
             return [];
@@ -389,16 +474,13 @@ CategorySchema.statics.getTree = async function(companyId, includeInactive = fal
         
         categories.forEach(cat => {
             const catId = cat._id.toString();
-            const isVisible = includeInactive ? true : cat.isActive === true;
             
             if (cat.parentId && map[cat.parentId.toString()]) {
-                if (isVisible) {
-                    map[cat.parentId.toString()].subcategories.push(map[catId]);
-                }
+                // This is a subcategory
+                map[cat.parentId.toString()].subcategories.push(map[catId]);
             } else if (!cat.parentId) {
-                if (isVisible) {
-                    tree.push(map[catId]);
-                }
+                // This is a main category
+                tree.push(map[catId]);
             }
         });
         
@@ -414,40 +496,117 @@ CategorySchema.statics.getTree = async function(companyId, includeInactive = fal
         };
         
         return sortSubcategories(tree);
+        
     } catch (error) {
-        console.error('❌ Error in getTree:', error);
+        console.error('❌ Error in getTree:', error.message);
         return [];
     }
 };
 
-// ========== FIXED: Get flat list with level indicators ==========
-CategorySchema.statics.getFlatList = async function(companyId, includeInactive = false) {
+// FIXED: Get flat list with pagination support
+CategorySchema.statics.getFlatList = async function(companyId, includeInactive = false, page = 1, limit = 100) {
     if (!companyId) {
-        console.error('❌ getFlatList called without companyId');
         return [];
     }
     
     try {
-        const tree = await this.getTree(companyId, includeInactive);
-        
-        const buildFlatList = (items, level = 0, result = []) => {
-            for (const item of items) {
-                result.push({ 
-                    ...item, 
-                    level,
-                    indent: '—'.repeat(level)
-                });
-                if (item.subcategories && item.subcategories.length > 0) {
-                    buildFlatList(item.subcategories, level + 1, result);
-                }
+        // Safe ObjectId conversion
+        let companyObjectId;
+        if (typeof companyId === 'string') {
+            if (!mongoose.Types.ObjectId.isValid(companyId)) {
+                return [];
             }
-            return result;
+            companyObjectId = new mongoose.Types.ObjectId(companyId);
+        } else {
+            companyObjectId = companyId;
+        }
+        
+        const query = { 
+            companyId: companyObjectId, 
+            deletedAt: null
         };
         
-        return buildFlatList(tree);
+        // Get total count first
+        let totalQuery = { ...query };
+        if (!includeInactive) {
+            totalQuery.isActive = true;
+        }
+        
+        const total = await this.countDocuments(totalQuery);
+        
+        // Get paginated categories
+        let categories = await this.find(query)
+            .sort({ displayOrder: 1, name: 1 })
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .lean();
+        
+        if (!includeInactive) {
+            categories = categories.filter(cat => cat.isActive === true);
+        }
+        
+        if (categories.length === 0) {
+            return { data: [], total, page, limit, totalPages: Math.ceil(total / limit) };
+        }
+        
+        // Build a map for parent-child relationships
+        const categoryMap = new Map();
+        const mainCategories = [];
+        
+        // First pass: Store all categories in map
+        for (const cat of categories) {
+            categoryMap.set(cat._id.toString(), { ...cat, children: [] });
+        }
+        
+        // Second pass: Build parent-child relationships
+        for (const cat of categories) {
+            if (cat.parentId && categoryMap.has(cat.parentId.toString())) {
+                categoryMap.get(cat.parentId.toString()).children.push(categoryMap.get(cat._id.toString()));
+            } else if (!cat.parentId) {
+                mainCategories.push(cat);
+            }
+        }
+        
+        // Sort main categories
+        mainCategories.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+        
+        // Build flat list with levels
+        const flatList = [];
+        
+        const flattenNode = (node, level = 0) => {
+            flatList.push({
+                ...node,
+                level,
+                indent: '—'.repeat(level)
+            });
+            
+            // Sort children
+            const children = (node.children || []).sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+            
+            for (const child of children) {
+                flattenNode(child, level + 1);
+            }
+        };
+        
+        // Flatten all root categories
+        for (const main of mainCategories) {
+            const node = categoryMap.get(main._id.toString());
+            if (node) {
+                flattenNode(node, 0);
+            }
+        }
+        
+        return {
+            data: flatList,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        };
+        
     } catch (error) {
         console.error('❌ Error in getFlatList:', error);
-        return [];
+        return { data: [], total: 0, page: 1, limit: 100, totalPages: 0 };
     }
 };
 
@@ -457,28 +616,42 @@ CategorySchema.statics.getCategoryPath = async function(companyId, categoryId) {
         return [];
     }
     
-    const path = [];
-    let currentId = categoryId;
-    
-    while (currentId) {
-        const category = await this.findOne({ 
-            _id: currentId, 
-            companyId,
-            deletedAt: null 
-        }).select('name slug parentId');
+    try {
+        // Safe ObjectId conversion
+        let companyObjectId;
+        if (typeof companyId === 'string') {
+            if (!mongoose.Types.ObjectId.isValid(companyId)) return [];
+            companyObjectId = new mongoose.Types.ObjectId(companyId);
+        } else {
+            companyObjectId = companyId;
+        }
         
-        if (!category) break;
+        const path = [];
+        let currentId = categoryId;
         
-        path.unshift({
-            _id: category._id,
-            name: category.name,
-            slug: category.slug
-        });
+        while (currentId) {
+            const category = await this.findOne({ 
+                _id: currentId, 
+                companyId: companyObjectId,
+                deletedAt: null 
+            }).select('name slug parentId');
+            
+            if (!category) break;
+            
+            path.unshift({
+                _id: category._id,
+                name: category.name,
+                slug: category.slug
+            });
+            
+            currentId = category.parentId;
+        }
         
-        currentId = category.parentId;
+        return path;
+    } catch (error) {
+        console.error('❌ Error in getCategoryPath:', error);
+        return [];
     }
-    
-    return path;
 };
 
 // Get all descendants of a category within company
@@ -487,22 +660,36 @@ CategorySchema.statics.getAllDescendants = async function(companyId, categoryId)
         return [];
     }
     
-    const descendants = [];
-    const findDescendants = async (id) => {
-        const children = await this.find({ 
-            parentId: id, 
-            companyId,
-            deletedAt: null 
-        }).select('_id');
-        
-        for (const child of children) {
-            descendants.push(child._id);
-            await findDescendants(child._id);
+    try {
+        // Safe ObjectId conversion
+        let companyObjectId;
+        if (typeof companyId === 'string') {
+            if (!mongoose.Types.ObjectId.isValid(companyId)) return [];
+            companyObjectId = new mongoose.Types.ObjectId(companyId);
+        } else {
+            companyObjectId = companyId;
         }
-    };
-    
-    await findDescendants(categoryId);
-    return descendants;
+        
+        const descendants = [];
+        const findDescendants = async (id) => {
+            const children = await this.find({ 
+                parentId: id, 
+                companyId: companyObjectId,
+                deletedAt: null 
+            }).select('_id');
+            
+            for (const child of children) {
+                descendants.push(child._id);
+                await findDescendants(child._id);
+            }
+        };
+        
+        await findDescendants(categoryId);
+        return descendants;
+    } catch (error) {
+        console.error('❌ Error in getAllDescendants:', error);
+        return [];
+    }
 };
 
 // Find categories by company
