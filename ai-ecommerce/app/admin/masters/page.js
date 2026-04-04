@@ -84,8 +84,8 @@ export default function MastersPage() {
 
     // ==================== STATE MANAGEMENT ====================
     const [loading, setLoading] = useState(true);
-    const [categories, setCategories] = useState([]);
-    const [filteredCategories, setFilteredCategories] = useState([]);
+    const [allCategories, setAllCategories] = useState([]); // Store ALL categories
+    const [categories, setCategories] = useState([]); // Filtered categories for display
     const [stats, setStats] = useState({
         total: 0,
         active: 0,
@@ -140,49 +140,19 @@ export default function MastersPage() {
         }, 3000);
     };
 
-    // ==================== FETCH DATA ====================
-    const fetchCategories = useCallback(async () => {
-        if (!user?.companyId) return;
+    // Calculate stats from categories
+    const calculateStats = (categoriesList) => {
+        const total = categoriesList.length;
+        const active = categoriesList.filter(c => c.isActive === true).length;
+        const inactive = total - active;
+        const main = categoriesList.filter(c => c.level === 0 || !c.parentId).length;
+        const sub = total - main;
         
-        setLoading(true);
-        try {
-            // Fetch flat list with level indicators
-            const params = new URLSearchParams({
-                companyId: user.companyId,
-                type: 'categories',
-                format: 'flat'
-            });
-            
-            const res = await fetch(`/api/masters?${params}`, {
-                headers: getAuthHeaders()
-            });
-            const data = await res.json();
-            
-            if (data.success && data.data) {
-                setCategories(data.data);
-                filterCategories(data.data, searchTerm, statusFilter);
-                
-                // Calculate stats
-                const total = data.data.length;
-                const active = data.data.filter(c => c.isActive === true).length;
-                const inactive = total - active;
-                const main = data.data.filter(c => c.level === 0 || !c.parentId).length;
-                const sub = total - main;
-                
-                setStats({ total, active, inactive, main, sub });
-            } else {
-                showToast('error', data.message || 'Failed to load categories');
-            }
-        } catch (error) {
-            console.error('Failed to fetch categories:', error);
-            showToast('error', 'Failed to load categories');
-        } finally {
-            setLoading(false);
-        }
-    }, [user?.companyId, getAuthHeaders]);
+        setStats({ total, active, inactive, main, sub });
+    };
 
     // Filter categories based on search and status
-    const filterCategories = (cats, search, status) => {
+    const filterCategories = useCallback((cats, search, status) => {
         let filtered = [...cats];
         
         // Apply status filter
@@ -202,11 +172,46 @@ export default function MastersPage() {
             );
         }
         
-        setFilteredCategories(filtered);
+        setCategories(filtered);
         setCurrentPage(1);
-    };
+    }, []);
 
-    // Fetch parent categories (for subcategory creation)
+    // ==================== FETCH DATA ====================
+    const fetchCategories = useCallback(async () => {
+        if (!user?.companyId) return;
+        
+        setLoading(true);
+        try {
+            // Fetch flat list with level indicators
+            const params = new URLSearchParams({
+                companyId: user.companyId,
+                type: 'categories',
+                format: 'flat'
+            });
+            
+            const res = await fetch(`/api/masters?${params}`, {
+                headers: getAuthHeaders()
+            });
+            const data = await res.json();
+            
+            console.log('Fetched categories:', data);
+            
+            if (data.success && data.data) {
+                setAllCategories(data.data);
+                filterCategories(data.data, searchTerm, statusFilter);
+                calculateStats(data.data);
+            } else {
+                showToast('error', data.message || 'Failed to load categories');
+            }
+        } catch (error) {
+            console.error('Failed to fetch categories:', error);
+            showToast('error', 'Failed to load categories');
+        } finally {
+            setLoading(false);
+        }
+    }, [user?.companyId, getAuthHeaders, searchTerm, statusFilter, filterCategories]);
+
+    // Fetch parent categories (for subcategory creation) - ONLY ACTIVE MAIN CATEGORIES
     const fetchParentCategories = useCallback(async () => {
         if (!user?.companyId) return;
         
@@ -223,14 +228,19 @@ export default function MastersPage() {
             const data = await res.json();
             
             if (data.success && data.data) {
-                // Only show main categories (level 0) as parent options
-                const mains = data.data.filter(c => c.level === 0 || !c.parentId);
+                // Only show ACTIVE main categories as parent options
+                // Also exclude the current category when editing
+                const mains = data.data.filter(c => 
+                    (c.level === 0 || !c.parentId) && 
+                    c.isActive === true &&
+                    (modalMode !== 'edit' || c._id !== selectedCategory?._id)
+                );
                 setParentCategories(mains);
             }
         } catch (error) {
             console.error('Failed to fetch parent categories:', error);
         }
-    }, [user?.companyId, getAuthHeaders]);
+    }, [user?.companyId, getAuthHeaders, modalMode, selectedCategory]);
 
     // ==================== CRUD OPERATIONS ====================
     const handleAddCategory = () => {
@@ -297,6 +307,8 @@ export default function MastersPage() {
 
     const handleToggleStatus = async (category) => {
         try {
+            const newStatus = !category.isActive;
+            
             const res = await fetch(`/api/masters?type=categories`, {
                 method: 'PATCH',
                 headers: {
@@ -306,15 +318,16 @@ export default function MastersPage() {
                 body: JSON.stringify({
                     action: 'toggle-status',
                     id: category._id,
-                    isActive: !category.isActive
+                    isActive: newStatus
                 })
             });
             
             const data = await res.json();
             
             if (data.success) {
-                showToast('success', `Category ${!category.isActive ? 'activated' : 'deactivated'} successfully`);
-                fetchCategories();
+                showToast('success', `Category ${newStatus ? 'activated' : 'deactivated'} successfully`);
+                // Refresh the entire list to get updated data
+                await fetchCategories();
             } else {
                 showToast('error', data.message || 'Failed to update status');
             }
@@ -343,7 +356,7 @@ export default function MastersPage() {
             
             if (data.success) {
                 showToast('success', 'Category deleted successfully');
-                fetchCategories();
+                await fetchCategories();
                 setShowDeleteModal(false);
                 setCategoryToDelete(null);
             } else {
@@ -405,7 +418,7 @@ export default function MastersPage() {
             if (data.success) {
                 showToast('success', modalMode === 'add' ? 'Category created successfully' : 'Category updated successfully');
                 setShowModal(false);
-                fetchCategories();
+                await fetchCategories(); // Refresh the list
             } else {
                 showToast('error', data.message || 'Failed to save category');
             }
@@ -431,7 +444,7 @@ export default function MastersPage() {
         }
         
         searchTimeoutRef.current = setTimeout(() => {
-            filterCategories(categories, searchTerm, statusFilter);
+            filterCategories(allCategories, searchTerm, statusFilter);
         }, 300);
         
         return () => {
@@ -439,28 +452,36 @@ export default function MastersPage() {
                 clearTimeout(searchTimeoutRef.current);
             }
         };
-    }, [searchTerm, statusFilter, categories]);
+    }, [searchTerm, statusFilter, allCategories, filterCategories]);
 
     // Pagination
-    const totalPages = Math.ceil(filteredCategories.length / itemsPerPage);
-    const paginatedCategories = filteredCategories.slice(
+    const totalPages = Math.ceil(categories.length / itemsPerPage);
+    const paginatedCategories = categories.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
 
-    // Build tree structure for tree view
+    // Build tree structure for tree view (only show active categories based on filter)
     const buildTree = (items) => {
         const map = {};
         const roots = [];
         
-        items.forEach(item => {
+        // First, filter items based on current status filter
+        let filteredItems = items;
+        if (statusFilter === 'active') {
+            filteredItems = items.filter(item => item.isActive === true);
+        } else if (statusFilter === 'inactive') {
+            filteredItems = items.filter(item => item.isActive === false);
+        }
+        
+        filteredItems.forEach(item => {
             map[item._id] = { ...item, children: [] };
         });
         
-        items.forEach(item => {
+        filteredItems.forEach(item => {
             if (item.parentId && map[item.parentId]) {
                 map[item.parentId].children.push(map[item._id]);
-            } else {
+            } else if (!item.parentId) {
                 roots.push(map[item._id]);
             }
         });
@@ -475,7 +496,7 @@ export default function MastersPage() {
         return roots;
     };
 
-    const treeData = buildTree(filteredCategories);
+    const treeData = buildTree(allCategories);
 
     // Render tree view recursively
     const renderTree = (nodes, level = 0) => {
@@ -521,13 +542,15 @@ export default function MastersPage() {
                         >
                             <Edit2 size={16} />
                         </button>
-                        <button
-                            onClick={() => handleAddSubCategory(node)}
-                            className="action-btn add-sub"
-                            title="Add Subcategory"
-                        >
-                            <FolderPlus size={16} />
-                        </button>
+                        {(node.level === 0 || !node.parentId) && (
+                            <button
+                                onClick={() => handleAddSubCategory(node)}
+                                className="action-btn add-sub"
+                                title="Add Subcategory"
+                            >
+                                <FolderPlus size={16} />
+                            </button>
+                        )}
                         <button
                             onClick={() => handleToggleStatus(node)}
                             className={`action-btn ${node.isActive ? 'deactivate' : 'activate'}`}
@@ -657,8 +680,8 @@ export default function MastersPage() {
                             className="filter-select"
                         >
                             <option value="all">All Status</option>
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
+                            <option value="active">Active Only</option>
+                            <option value="inactive">Inactive Only</option>
                         </select>
                     </div>
                     
@@ -691,7 +714,7 @@ export default function MastersPage() {
                             <div className="loading-spinner"></div>
                             <p>Loading categories...</p>
                         </div>
-                    ) : filteredCategories.length === 0 ? (
+                    ) : categories.length === 0 ? (
                         <div className="empty-state">
                             <FolderTree size={64} strokeWidth={1.5} />
                             <h3>No Categories Found</h3>
@@ -780,7 +803,7 @@ export default function MastersPage() {
                                                     >
                                                         <Edit2 size={16} />
                                                     </button>
-                                                    {category.level === 0 && (
+                                                    {(category.level === 0 || !category.parentId) && (
                                                         <button
                                                             onClick={() => handleAddSubCategory(category)}
                                                             className="action-btn add-sub"
@@ -903,13 +926,11 @@ export default function MastersPage() {
                                             className={formErrors.parentId ? 'error' : ''}
                                         >
                                             <option value="">-- Main Category (No Parent) --</option>
-                                            {parentCategories
-                                                .filter(p => modalMode !== 'edit' || p._id !== selectedCategory?._id)
-                                                .map(parent => (
-                                                    <option key={parent._id} value={parent._id}>
-                                                        {parent.name}
-                                                    </option>
-                                                ))}
+                                            {parentCategories.map(parent => (
+                                                <option key={parent._id} value={parent._id}>
+                                                    {parent.name}
+                                                </option>
+                                            ))}
                                         </select>
                                         {formErrors.parentId && <span className="error-text">{formErrors.parentId}</span>}
                                     </div>
@@ -931,7 +952,7 @@ export default function MastersPage() {
                                         {formErrors.name && <span className="error-text">{formErrors.name}</span>}
                                     </div>
 
-                                    {/* Icon */}
+                                    {/* Icon and Display Order */}
                                     <div className="form-row">
                                         <div className="form-group">
                                             <label>Icon (Emoji)</label>
