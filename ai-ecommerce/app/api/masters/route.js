@@ -4,7 +4,7 @@ import { connectDB } from '@/utils/db';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/nextauth';
 import Category from '@/models/Category';
-import Product from '@/models/Product';s
+import Product from '@/models/Product';
 import Company from '@/models/Company';
 import mongoose from 'mongoose';
 
