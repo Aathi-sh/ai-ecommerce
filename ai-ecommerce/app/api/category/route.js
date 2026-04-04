@@ -1,10 +1,10 @@
-// app/api/masters/route.js
+// app/api/category/route.js
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/utils/db';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/nextauth';
 import Category from '@/models/Category';
-import Product from '@/models/Product';
+import Product from '@/models/Product';s
 import Company from '@/models/Company';
 import mongoose from 'mongoose';
 
