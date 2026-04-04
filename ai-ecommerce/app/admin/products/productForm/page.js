@@ -57,7 +57,7 @@ const FLAGS = [
 
 // Helper to validate ObjectId
 const isValidObjectId = (id) => {
-    return /^[0-9a-fA-F]{24}$/.test(id);
+    return id && /^[0-9a-fA-F]{24}$/.test(id);
 };
 
 export default function ProductForm() {
@@ -190,12 +190,25 @@ export default function ProductForm() {
     // Fetch subcategories when category changes
     useEffect(() => {
         if (formData.category && isValidObjectId(formData.category)) {
-            fetchSubCategories(formData.category);
+            // Find subcategories from allCategories data
+            const children = allCategories.filter(cat => 
+                cat.parentId === formData.category && cat._id !== formData.category
+            );
+            setSubCategories(children);
+            setSelectedCategoryHasSubs(children.length > 0);
+            
+            // Clear subCategory if it doesn't belong to selected category
+            if (formData.subCategory) {
+                const subStillValid = children.some(sub => sub._id === formData.subCategory);
+                if (!subStillValid) {
+                    setFormData(prev => ({ ...prev, subCategory: "" }));
+                }
+            }
         } else {
             setSubCategories([]);
             setSelectedCategoryHasSubs(false);
         }
-    }, [formData.category]);
+    }, [formData.category, allCategories]);
 
     // Fetch product data if editing
     useEffect(() => {
@@ -260,108 +273,154 @@ export default function ProductForm() {
         }
     };
 
-    // Fetch ALL categories and separate main from sub
-    const fetchCategories = async () => {
-        if (!user?.companyId) return;
+    // Fetch ALL categories
+  const fetchCategories = useCallback(async (forceRefresh = false) => {
+    if (!user?.companyId) {
+        console.warn('⚠️ No company ID available, skipping category fetch');
+        return;
+    }
+    
+    setLoadingCategories(true);
+    
+    try {
+        // Generate unique timestamp for cache busting
+        const timestamp = Date.now();
+        const refreshParam = forceRefresh ? `&_refresh=${Math.random().toString(36).substring(7)}` : '';
         
-        setLoadingCategories(true);
-        try {
-            const params = new URLSearchParams({
-                companyId: user.companyId,
-                type: 'categories',
-                format: 'flat'
-            });
-            
-            const res = await fetch(`/api/masters?${params}`, {
-                headers: getAuthHeaders()
-            });
-            const data = await res.json();
-            
-            console.log('Categories API Response:', data);
-            
-            if (data.success && data.data) {
-                // Store ALL categories
-                setAllCategories(data.data);
-                
-                // Filter main categories (level === 0 OR parentId === null)
-                const mains = data.data.filter(cat => cat.level === 0 || !cat.parentId);
-                setMainCategories(mains);
-                
-                console.log('Total categories loaded:', data.data.length);
-                console.log('Main categories:', mains.length);
-                console.log('Sub categories:', data.data.filter(c => c.level > 0).length);
-            } else {
-                console.error('Failed to load categories:', data);
-                showToast('error', 'Failed to load categories');
-            }
-        } catch (error) {
-            console.error('Failed to fetch categories:', error);
-            showToast('error', 'Failed to load categories');
-        } finally {
-            setLoadingCategories(false);
-        }
-    };
-
-    // Fetch subcategories for selected parent category
-    const fetchSubCategories = async (categoryId) => {
-        if (!categoryId || !isValidObjectId(categoryId) || !user?.companyId) {
-            setSubCategories([]);
-            setSelectedCategoryHasSubs(false);
-            return;
+        console.log('🔄 Fetching categories with cache busting...', { timestamp, forceRefresh });
+        
+        // Fetch flat list for dropdowns (with cache busting)
+        const flatParams = new URLSearchParams({
+            companyId: user.companyId,
+            type: 'categories',
+            format: 'flat',
+            limit: '1000',
+            _t: timestamp.toString()
+        });
+        
+        const flatUrl = `/api/masters?${flatParams}${refreshParam}`;
+        console.log('📡 Fetching flat categories from:', flatUrl);
+        
+        const flatRes = await fetch(flatUrl, {
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders(),
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+            },
+            cache: 'no-store'
+        });
+        
+        if (!flatRes.ok) {
+            throw new Error(`HTTP ${flatRes.status}: ${flatRes.statusText}`);
         }
         
-        console.log('Fetching subcategories for parent category:', categoryId);
+        const flatData = await flatRes.json();
         
-        try {
-            // Use allCategories data if available (no extra API call)
-            if (allCategories.length > 0) {
-                // Filter direct children where parentId matches selected category
-                const children = allCategories.filter(cat => 
-                    cat.parentId === categoryId && 
-                    cat._id !== categoryId
-                );
-                
-                setSubCategories(children);
-                setSelectedCategoryHasSubs(children.length > 0);
-                console.log(`Found ${children.length} subcategories for ${categoryId}`);
-                
-                if (children.length > 0) {
-                    children.forEach(child => {
-                        console.log(`  - Subcategory: ${child.name} (${child._id})`);
-                    });
-                }
-            } else {
-                // Fallback: Fetch from API if categories not loaded yet
-                const params = new URLSearchParams({
+        console.log('📊 Categories API Response:', {
+            success: flatData.success,
+            totalCategories: flatData.data?.length || 0,
+            hasData: !!flatData.data
+        });
+        
+        if (flatData.success && flatData.data && Array.isArray(flatData.data)) {
+            // Store ALL categories
+            setAllCategories(flatData.data);
+            
+            // Filter main categories (level === 0 OR parentId === null)
+            const mains = flatData.data.filter(cat => {
+                const isMain = !cat.parentId || cat.level === 0;
+                return isMain && cat.isActive !== false;
+            });
+            
+            // Filter sub categories for dropdown reference
+            const subs = flatData.data.filter(cat => cat.parentId && cat.level > 0);
+            
+            setMainCategories(mains);
+            
+            // Also fetch tree structure if needed
+            if (forceRefresh) {
+                const treeParams = new URLSearchParams({
                     companyId: user.companyId,
                     type: 'categories',
-                    parentId: categoryId,
-                    format: 'flat'
+                    format: 'tree',
+                    includeInactive: 'false',
+                    _t: timestamp.toString()
                 });
                 
-                const res = await fetch(`/api/masters?${params}`, {
-                    headers: getAuthHeaders()
+                const treeRes = await fetch(`/api/masters?${treeParams}`, {
+                    headers: {
+                        ...getAuthHeaders(),
+                        'Cache-Control': 'no-cache'
+                    },
+                    cache: 'no-store'
                 });
-                const data = await res.json();
                 
-                if (data.success && data.data) {
-                    const children = data.data.filter(cat => 
-                        cat.parentId === categoryId && cat._id !== categoryId
-                    );
-                    setSubCategories(children);
-                    setSelectedCategoryHasSubs(children.length > 0);
-                    console.log(`Found ${children.length} subcategories via API`);
-                } else {
-                    setSubCategories([]);
-                    setSelectedCategoryHasSubs(false);
+                const treeData = await treeRes.json();
+                if (treeData.success && treeData.data) {
+                    // Update tree structure if needed
+                    console.log('🌳 Tree structure loaded:', treeData.data.length, 'root nodes');
                 }
             }
-        } catch (error) {
-            console.error('Failed to fetch subcategories:', error);
-            setSubCategories([]);
-            setSelectedCategoryHasSubs(false);
+            
+            // Log detailed statistics
+            console.log('✅ Categories loaded successfully:', {
+                total: flatData.data.length,
+                main: mains.length,
+                sub: subs.length,
+                active: flatData.data.filter(c => c.isActive).length,
+                inactive: flatData.data.filter(c => !c.isActive).length,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Log first few main categories for debugging
+            if (mains.length > 0) {
+                console.log('📋 Main categories sample:', mains.slice(0, 5).map(m => ({ 
+                    id: m._id, 
+                    name: m.name,
+                    hasChildren: subs.some(s => s.parentId === m._id)
+                })));
+            } else {
+                console.warn('⚠️ No main categories found! Please create a category first.');
+                showToast('warning', 'No categories found. Please create a category first.', 4000);
+            }
+            
+            return { success: true, categories: flatData.data, mainCategories: mains };
+        } else {
+            throw new Error(flatData.message || 'Invalid response format from server');
         }
-    };
+        
+    } catch (error) {
+        console.error('❌ Failed to fetch categories:', {
+            message: error.message,
+            stack: error.stack,
+            companyId: user?.companyId
+        });
+        
+        // Show user-friendly error message
+        let errorMessage = 'Failed to load categories. ';
+        if (error.message.includes('401')) {
+            errorMessage += 'Please login again.';
+        } else if (error.message.includes('403')) {
+            errorMessage += 'You don\'t have permission.';
+        } else if (error.message.includes('500')) {
+            errorMessage += 'Server error. Please try again later.';
+        } else {
+            errorMessage += 'Please refresh the page.';
+        }
+        
+        showToast('error', errorMessage, 5000);
+        
+        // Set empty arrays to prevent UI breaking
+        setAllCategories([]);
+        setMainCategories([]);
+        
+        return { success: false, error: error.message, categories: [], mainCategories: [] };
+        
+    } finally {
+        setLoadingCategories(false);
+    }
+}, [user, getAuthHeaders, showToast]);
 
     // Fetch product for editing
     const fetchProduct = async () => {
@@ -431,10 +490,6 @@ export default function ProductForm() {
                 
                 if (product.imageUrls && product.imageUrls.length > 0) {
                     setImagePreviews(product.imageUrls);
-                }
-                
-                if (categoryId) {
-                    await fetchSubCategories(categoryId);
                 }
                 
                 showToast('success', 'Product loaded successfully');
@@ -569,8 +624,6 @@ export default function ProductForm() {
                     ...prev,
                     subCategory: ""
                 }));
-                setSubCategories([]);
-                setSelectedCategoryHasSubs(false);
             }
         }
         
@@ -1080,6 +1133,9 @@ export default function ProductForm() {
                                         </select>
                                         {errors.category && <span className="error-text">{errors.category}</span>}
                                         {loadingCategories && <span className="help-text">Loading categories...</span>}
+                                        {!loadingCategories && mainCategories.length === 0 && (
+                                            <span className="help-text">No categories found. Please create a category first.</span>
+                                        )}
                                     </div>
 
                                     <div className="form-group">
@@ -1111,7 +1167,10 @@ export default function ProductForm() {
                                         </select>
                                         {errors.subCategory && <span className="error-text">{errors.subCategory}</span>}
                                         {formData.category && subCategories.length === 0 && !selectedCategoryHasSubs && (
-                                            <span className="help-text">No subcategories found for this category</span>
+                                            <span className="help-text">This category has no subcategories</span>
+                                        )}
+                                        {formData.category && subCategories.length > 0 && (
+                                            <span className="help-text">{subCategories.length} subcategory(s) available</span>
                                         )}
                                     </div>
 

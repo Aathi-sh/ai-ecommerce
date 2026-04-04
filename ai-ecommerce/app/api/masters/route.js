@@ -549,17 +549,49 @@ export async function POST(request) {
 
         // ===== CREATE CATEGORY =====
         if (type === MASTER_TYPES.CATEGORIES) {
-            if (!body.name) {
+            if (!body.name || !body.name.trim()) {
                 return NextResponse.json({
                     success: false,
                     message: 'Category name is required'
                 }, { status: 400 });
             }
 
-            // Check for existing category
+            const companyObjectId = new mongoose.Types.ObjectId(companyId);
+            
+            // ========== GENERATE UNIQUE SLUG (CRITICAL FIX) ==========
+            let baseSlug = body.name
+                .toLowerCase()
+                .trim()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-|-$/g, '');
+            
+            if (!baseSlug || baseSlug.length === 0) {
+                baseSlug = 'category';
+            }
+            
+            let finalSlug = baseSlug;
+            let counter = 1;
+            let isUnique = false;
+            
+            while (!isUnique) {
+                const existingCategory = await Category.findOne({
+                    companyId: companyObjectId,
+                    slug: finalSlug,
+                    deletedAt: null
+                });
+                
+                if (!existingCategory) {
+                    isUnique = true;
+                } else {
+                    finalSlug = `${baseSlug}-${counter}`;
+                    counter++;
+                }
+            }
+            
+            // ========== CHECK FOR EXISTING CATEGORY ==========
             const existingQuery = {
-                companyId: new mongoose.Types.ObjectId(companyId),
-                name: body.name,
+                companyId: companyObjectId,
+                name: body.name.trim(),
                 deletedAt: null
             };
             
@@ -580,11 +612,11 @@ export async function POST(request) {
                 }, { status: 409 });
             }
 
-            // Verify parent belongs to same company and check depth
+            // ========== VERIFY PARENT CATEGORY ==========
             if (body.parentId && isValidObjectId(body.parentId)) {
                 const parentExists = await Category.findOne({
                     _id: body.parentId,
-                    companyId: new mongoose.Types.ObjectId(companyId),
+                    companyId: companyObjectId,
                     deletedAt: null
                 });
                 
@@ -595,13 +627,13 @@ export async function POST(request) {
                     }, { status: 400 });
                 }
                 
-                // Check depth limit
+                // Check depth limit (max 3 levels)
                 let depth = 1;
                 let currentParent = parentExists;
                 while (currentParent.parentId && depth < 3) {
                     const nextParent = await Category.findOne({
                         _id: currentParent.parentId,
-                        companyId: new mongoose.Types.ObjectId(companyId),
+                        companyId: companyObjectId,
                         deletedAt: null
                     });
                     if (!nextParent) break;
@@ -617,9 +649,11 @@ export async function POST(request) {
                 }
             }
 
+            // ========== CREATE CATEGORY WITH SLUG ==========
             const categoryData = {
-                companyId: new mongoose.Types.ObjectId(companyId),
+                companyId: companyObjectId,
                 name: body.name.trim(),
+                slug: finalSlug,  // ← CRITICAL: Include the generated slug
                 description: body.description || '',
                 parentId: (body.parentId && isValidObjectId(body.parentId)) ? new mongoose.Types.ObjectId(body.parentId) : null,
                 icon: body.icon || '📦',
@@ -628,7 +662,11 @@ export async function POST(request) {
                 createdBy: userId
             };
             
+            console.log('📝 Creating category:', { name: categoryData.name, slug: categoryData.slug });
+            
             const category = await Category.create(categoryData);
+            
+            console.log('✅ Category created:', { id: category._id, name: category.name, slug: category.slug });
             
             return NextResponse.json({
                 success: true,
@@ -698,6 +736,7 @@ export async function POST(request) {
                 }, { status: 400 });
             }
 
+            // Check for duplicate SKU
             const existing = await Product.findOne({ 
                 companyId: new mongoose.Types.ObjectId(companyId),
                 sku: body.sku.toUpperCase(),
@@ -711,13 +750,25 @@ export async function POST(request) {
                 }, { status: 409 });
             }
 
-            const product = await Product.create({
+            // Create product
+            const productData = {
                 companyId: new mongoose.Types.ObjectId(companyId),
-                ...body,
-                sku: body.sku.toUpperCase(),
+                productName: body.productName.trim(),
+                sku: body.sku.toUpperCase().trim(),
+                category: new mongoose.Types.ObjectId(body.category),
+                subCategory: new mongoose.Types.ObjectId(body.subCategory),
+                mrp: parseFloat(body.mrp),
+                discountPrice: parseFloat(body.discountPrice),
+                stock: parseInt(body.stock) || 0,
+                hsnCode: body.hsnCode.trim(),
+                gstRate: parseFloat(body.gstRate),
+                description: body.description || '',
                 isOnSale: parseFloat(body.discountPrice) < parseFloat(body.mrp),
+                isActive: body.isActive !== undefined ? body.isActive : true,
                 createdBy: userId
-            });
+            };
+            
+            const product = await Product.create(productData);
 
             await safeUpdateProductCounts(companyId);
 
@@ -733,20 +784,27 @@ export async function POST(request) {
 
         return NextResponse.json({
             success: false,
-            message: 'Invalid type parameter'
+            message: 'Invalid type parameter. Use: categories or products'
         }, { status: 400 });
 
     } catch (error) {
-        logError('POST', 'Unhandled Exception', error, {});
+        console.error('❌ POST Error:', error);
         
+        // Handle duplicate key error (MongoDB error code 11000)
         if (error.code === 11000) {
             const field = Object.keys(error.keyPattern)[0];
+            let message = `${field} already exists`;
+            
+            if (field === 'slug') message = 'Category with similar name already exists';
+            if (field === 'sku') message = 'Product with this SKU already exists';
+            
             return NextResponse.json({
                 success: false,
-                message: `${field} already exists in this company`
+                message: `${message} in this company`
             }, { status: 409 });
         }
 
+        // Handle validation errors
         if (error.name === 'ValidationError') {
             const errors = Object.values(error.errors).map(err => err.message);
             return NextResponse.json({
@@ -755,10 +813,11 @@ export async function POST(request) {
             }, { status: 400 });
         }
 
+        // Handle other errors
         return NextResponse.json({
             success: false,
-            message: 'Failed to create',
-            error: error.message
+            message: error.message || 'Failed to create',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
         }, { status: 500 });
     }
 }

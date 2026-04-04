@@ -1,1033 +1,1480 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useAuth, useProtectedFetch } from '../../../context/AuthContext';
 import { useRouter } from 'next/navigation';
+import {
+  LayoutDashboard,
+  FolderTree,
+  List,
+  Plus,
+  Edit,
+  Trash2,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Search,
+  Filter,
+  ChevronDown,
+  ChevronRight,
+  Folder,
+  FolderOpen,
+  FileText,
+  Package,
+  TrendingUp,
+  Users,
+  ShoppingBag,
+  DollarSign,
+  Percent,
+  Star,
+  Clock,
+  AlertCircle,
+  AlertTriangle,
+  Check,
+  X,
+  Save,
+  Upload,
+  Image,
+  Hash,
+  Tag,
+  Box,
+  Truck,
+  Globe,
+  Settings,
+  Shield,
+  Zap,
+  Heart,
+  Award,
+  Calendar,
+  Sun,
+  Moon,
+  Monitor,
+  Palette,
+  Brush,
+  Sparkles,
+  Crown,
+  Gem,
+  Gift,
+  ThumbsUp,
+  ThumbsDown,
+  MessageSquare,
+  Send,
+  Paperclip,
+  Home,
+  ArrowLeft,
+  ArrowRight,
+  Grid,
+  MoreVertical,
+  Download,
+  Printer,
+  Share2,
+  Bookmark,
+  Eye,
+  EyeOff,
+  Lock,
+  Unlock,
+  Key,
+  Wifi,
+  Cpu,
+  HardDrive,
+  Server,
+  Cloud,
+  Database,
+  Activity,
+  BarChart3,
+  PieChart,
+  LineChart,
+  TrendingUp as TrendingUpIcon,
+  Users as UsersIcon,
+  ShoppingCart,
+  CreditCard,
+  Landmark,
+  Receipt,
+  Building2,
+  Store,
+  Facebook,
+  Instagram,
+  Twitter,
+  Youtube,
+  Linkedin,
+  Menu,
+  ChevronLeft
+} from 'lucide-react';
 
-// ─── ICONS ────────────────────────────────────────────────────────────────────
-const Icon = {
-  Grid: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-      <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
-    </svg>
-  ),
-  Package: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2l9 4.9V17L12 22 3 17V6.9L12 2z"/><polyline points="12 22 12 11.1"/><polyline points="3 6.9 12 11.1 21 6.9"/>
-    </svg>
-  ),
-  Plus: () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-  ),
-  Edit: () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-    </svg>
-  ),
-  Trash: () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-      <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
-    </svg>
-  ),
-  Search: () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-    </svg>
-  ),
-  ChevronRight: () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 18 15 12 9 6"/>
-    </svg>
-  ),
-  ChevronDown: () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="6 9 12 15 18 9"/>
-    </svg>
-  ),
-  X: () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-    </svg>
-  ),
-  Tag: () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-      <line x1="7" y1="7" x2="7.01" y2="7"/>
-    </svg>
-  ),
-  BarChart: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
-    </svg>
-  ),
-  RefreshCw: () => (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-    </svg>
-  ),
-  Toggle: ({ on }) => (
-    <svg width="36" height="20" viewBox="0 0 36 20">
-      <rect x="0" y="0" width="36" height="20" rx="10" fill={on ? '#10b981' : '#d1d5db'}/>
-      <circle cx={on ? 26 : 10} cy="10" r="8" fill="white" style={{ transition: 'cx 0.2s' }}/>
-    </svg>
-  ),
-  Folder: () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-    </svg>
-  ),
-  AlertCircle: () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-    </svg>
-  ),
-  CheckCircle: () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-    </svg>
-  ),
-  Filter: () => (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-    </svg>
-  ),
-  Eye: () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-    </svg>
-  ),
+// Theme configuration
+const THEMES = {
+  light: {
+    primary: '#4361ee',
+    secondary: '#3f37c9',
+    success: '#28a745',
+    danger: '#dc3545',
+    warning: '#ffc107',
+    info: '#17a2b8',
+    background: '#f8f9fa',
+    backgroundCard: '#ffffff',
+    backgroundLight: '#f8f9fa',
+    textPrimary: '#1a1a2e',
+    textSecondary: '#6c757d',
+    border: '#e9ecef',
+    hover: '#f1f3f5'
+  },
+  dark: {
+    primary: '#6366f1',
+    secondary: '#4f46e5',
+    success: '#10b981',
+    danger: '#ef4444',
+    warning: '#f59e0b',
+    info: '#06b6d4',
+    background: '#0f172a',
+    backgroundCard: '#1e293b',
+    backgroundLight: '#334155',
+    textPrimary: '#f1f5f9',
+    textSecondary: '#94a3b8',
+    border: '#334155',
+    hover: '#334155'
+  }
 };
 
-// ─── TOAST ─────────────────────────────────────────────────────────────────────
-function Toast({ toasts, removeToast }) {
-  return (
-    <div style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 9999, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      {toasts.map(t => (
-        <div key={t.id} style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          padding: '12px 16px', borderRadius: '10px', minWidth: '280px', maxWidth: '380px',
-          background: t.type === 'success' ? '#f0fdf4' : t.type === 'error' ? '#fef2f2' : '#fffbeb',
-          border: `1px solid ${t.type === 'success' ? '#bbf7d0' : t.type === 'error' ? '#fecaca' : '#fde68a'}`,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-          animation: 'slideIn 0.3s ease',
-          fontFamily: 'var(--font-body)',
-        }}>
-          <span style={{ color: t.type === 'success' ? '#16a34a' : t.type === 'error' ? '#dc2626' : '#d97706' }}>
-            {t.type === 'success' ? <Icon.CheckCircle /> : <Icon.AlertCircle />}
-          </span>
-          <span style={{ flex: 1, fontSize: '13px', color: '#374151', fontWeight: 500 }}>{t.message}</span>
-          <button onClick={() => removeToast(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '0', display: 'flex' }}>
-            <Icon.X />
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── CONFIRM MODAL ─────────────────────────────────────────────────────────────
-function ConfirmModal({ open, title, message, onConfirm, onCancel, loading }) {
-  if (!open) return null;
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '28px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.18)', fontFamily: 'var(--font-body)' }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: '17px', fontWeight: 700, color: '#111' }}>{title}</h3>
-        <p style={{ margin: '0 0 24px', fontSize: '14px', color: '#6b7280', lineHeight: 1.6 }}>{message}</p>
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-          <button onClick={onCancel} disabled={loading} style={{ padding: '9px 20px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: '#374151' }}>Cancel</button>
-          <button onClick={onConfirm} disabled={loading} style={{ padding: '9px 20px', borderRadius: '8px', border: 'none', background: '#ef4444', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: '#fff', opacity: loading ? 0.7 : 1 }}>
-            {loading ? 'Deleting...' : 'Delete'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── CATEGORY FORM MODAL ───────────────────────────────────────────────────────
-function CategoryModal({ open, onClose, onSave, editData, categories, loading }) {
-  const [form, setForm] = useState({ name: '', description: '', parentId: '', icon: '📦', displayOrder: 0, isActive: true });
-  const [errors, setErrors] = useState({});
-
-  useEffect(() => {
-    if (editData) {
-      setForm({
-        name: editData.name || '',
-        description: editData.description || '',
-        parentId: editData.parentId || '',
-        icon: editData.icon || '📦',
-        displayOrder: editData.displayOrder ?? 0,
-        isActive: editData.isActive ?? true,
-      });
-    } else {
-      setForm({ name: '', description: '', parentId: '', icon: '📦', displayOrder: 0, isActive: true });
-    }
-    setErrors({});
-  }, [editData, open]);
-
-  const validate = () => {
-    const e = {};
-    if (!form.name.trim()) e.name = 'Category name is required';
-    else if (form.name.trim().length > 100) e.name = 'Name cannot exceed 100 characters';
-    if (form.description && form.description.length > 500) e.description = 'Description cannot exceed 500 characters';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = () => {
-    if (!validate()) return;
-    onSave({ ...form, parentId: form.parentId || null });
-  };
-
-  // Only show top-level categories as parent options (no sub-sub allowed)
-  const parentOptions = categories.filter(c => !c.parentId);
-  const ICONS = ['📦', '🛒', '🏪', '🍎', '👕', '💻', '🏠', '🚗', '📱', '💊', '🎮', '📚', '🎨', '🌿', '⚡', '🔧'];
-
-  if (!open) return null;
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 8000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: '#fff', borderRadius: '18px', padding: '32px', maxWidth: '520px', width: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.2)', fontFamily: 'var(--font-body)', maxHeight: '90vh', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#111', fontFamily: 'var(--font-display)' }}>
-              {editData ? 'Edit Category' : 'New Category'}
-            </h2>
-            <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#9ca3af' }}>
-              {editData ? 'Update category details' : 'Create a main category or subcategory'}
-            </p>
-          </div>
-          <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '8px', padding: '8px', cursor: 'pointer', display: 'flex', color: '#6b7280' }}><Icon.X /></button>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-          {/* Name */}
-          <div>
-            <label style={labelStyle}>Category Name <span style={{ color: '#ef4444' }}>*</span></label>
-            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              placeholder="e.g. Electronics, Food & Beverages"
-              style={{ ...inputStyle, ...(errors.name ? { borderColor: '#ef4444' } : {}) }} />
-            {errors.name && <p style={errorStyle}>{errors.name}</p>}
-          </div>
-
-          {/* Parent Category */}
-          <div>
-            <label style={labelStyle}>Parent Category <span style={{ color: '#9ca3af', fontWeight: 400 }}>(leave empty for main category)</span></label>
-            <select value={form.parentId} onChange={e => setForm(f => ({ ...f, parentId: e.target.value }))} style={inputStyle}>
-              <option value="">— Main Category (no parent) —</option>
-              {parentOptions.map(c => (
-                <option key={c._id} value={c._id}>{c.icon} {c.name}</option>
-              ))}
-            </select>
-            {form.parentId && <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#3b82f6' }}>This will be created as a subcategory</p>}
-          </div>
-
-          {/* Icon Picker */}
-          <div>
-            <label style={labelStyle}>Icon</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
-              {ICONS.map(ic => (
-                <button key={ic} type="button" onClick={() => setForm(f => ({ ...f, icon: ic }))}
-                  style={{ width: '40px', height: '40px', borderRadius: '8px', border: form.icon === ic ? '2px solid #6366f1' : '1px solid #e5e7eb', background: form.icon === ic ? '#eef2ff' : '#fff', cursor: 'pointer', fontSize: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {ic}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Description */}
-          <div>
-            <label style={labelStyle}>Description <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
-            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="Brief description of this category..."
-              rows={3} style={{ ...inputStyle, resize: 'vertical', minHeight: '80px' }} />
-            {errors.description && <p style={errorStyle}>{errors.description}</p>}
-            <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#9ca3af' }}>{form.description.length}/500</p>
-          </div>
-
-          {/* Display Order & Active */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-            <div>
-              <label style={labelStyle}>Display Order</label>
-              <input type="number" min="0" value={form.displayOrder}
-                onChange={e => setForm(f => ({ ...f, displayOrder: parseInt(e.target.value) || 0 }))}
-                style={inputStyle} />
-            </div>
-            <div>
-              <label style={labelStyle}>Status</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
-                <button type="button" onClick={() => setForm(f => ({ ...f, isActive: !f.isActive }))}>
-                  <Icon.Toggle on={form.isActive} />
-                </button>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: form.isActive ? '#16a34a' : '#9ca3af' }}>
-                  {form.isActive ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px', marginTop: '28px', justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ padding: '10px 22px', borderRadius: '9px', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: '#374151' }}>Cancel</button>
-          <button onClick={handleSubmit} disabled={loading}
-            style={{ padding: '10px 22px', borderRadius: '9px', border: 'none', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', cursor: 'pointer', fontSize: '14px', fontWeight: 700, color: '#fff', opacity: loading ? 0.7 : 1, boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}>
-            {loading ? 'Saving...' : editData ? 'Update Category' : 'Create Category'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── REUSABLE STYLES ───────────────────────────────────────────────────────────
-const labelStyle = { display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' };
-const inputStyle = { width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: '9px', fontSize: '14px', color: '#111', background: '#fafafa', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border-color 0.15s' };
-const errorStyle = { margin: '4px 0 0', fontSize: '12px', color: '#ef4444' };
-
-// ─── STAT CARD ─────────────────────────────────────────────────────────────────
-function StatCard({ label, value, sub, color, icon, loading }) {
-  return (
-    <div style={{
-      background: '#fff', borderRadius: '14px', padding: '20px 22px',
-      border: '1px solid #f0f0f0', boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
-      display: 'flex', alignItems: 'flex-start', gap: '14px',
-      fontFamily: 'var(--font-body)', transition: 'box-shadow 0.2s',
-    }}>
-      <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', color: color, flexShrink: 0 }}>
-        {icon}
-      </div>
-      <div style={{ flex: 1 }}>
-        <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
-        {loading ? (
-          <div style={{ height: '28px', width: '60px', background: '#f3f4f6', borderRadius: '6px', marginTop: '6px', animation: 'pulse 1.5s infinite' }} />
-        ) : (
-          <p style={{ margin: '4px 0 2px', fontSize: '26px', fontWeight: 800, color: '#111', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{value ?? '—'}</p>
-        )}
-        {sub && <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af' }}>{sub}</p>}
-      </div>
-    </div>
-  );
-}
-
-// ─── CATEGORY ROW (recursive tree) ─────────────────────────────────────────────
-function CategoryRow({ cat, depth = 0, onEdit, onDelete, onToggle, allCategories }) {
-  const [expanded, setExpanded] = useState(true);
-  const subs = allCategories.filter(c => c.parentId && c.parentId.toString() === cat._id.toString());
-  const hasSubs = subs.length > 0;
-
-  return (
-    <>
-      <tr style={{ background: depth === 0 ? '#fff' : '#fafbff', transition: 'background 0.15s' }}
-        onMouseEnter={e => e.currentTarget.style.background = depth === 0 ? '#f8f9ff' : '#f0f4ff'}
-        onMouseLeave={e => e.currentTarget.style.background = depth === 0 ? '#fff' : '#fafbff'}>
-        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: `${depth * 28}px` }}>
-            {hasSubs ? (
-              <button onClick={() => setExpanded(e => !e)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', color: '#9ca3af', transition: 'transform 0.2s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
-                <Icon.ChevronRight />
-              </button>
-            ) : (
-              <div style={{ width: '18px' }} />
-            )}
-            <span style={{ fontSize: '18px' }}>{cat.icon || '📦'}</span>
-            <div>
-              <p style={{ margin: 0, fontSize: '14px', fontWeight: depth === 0 ? 700 : 500, color: '#111' }}>{cat.name}</p>
-              {cat.description && <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.description}</p>}
-            </div>
-          </div>
-        </td>
-        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: depth === 0 ? '#ede9fe' : '#e0f2fe', color: depth === 0 ? '#7c3aed' : '#0369a1' }}>
-            {depth === 0 ? <Icon.Folder /> : <Icon.Tag />}
-            {depth === 0 ? 'Main' : 'Sub'}
-          </span>
-        </td>
-        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', fontSize: '13px', color: '#6b7280' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f9fafb', borderRadius: '6px', padding: '3px 8px', fontWeight: 600 }}>
-            <Icon.Package />
-            {cat.productCount ?? 0}
-          </span>
-        </td>
-        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-          <span style={{ fontSize: '12px', color: '#9ca3af', background: '#f9fafb', padding: '2px 8px', borderRadius: '6px' }}>#{cat.displayOrder ?? 0}</span>
-        </td>
-        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-          <button type="button" onClick={() => onToggle(cat._id, !cat.isActive)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0' }}>
-            <Icon.Toggle on={cat.isActive} />
-          </button>
-        </td>
-        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button onClick={() => onEdit(cat)} title="Edit" style={{ padding: '6px', borderRadius: '7px', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', display: 'flex', color: '#6366f1', transition: 'all 0.15s' }}>
-              <Icon.Edit />
-            </button>
-            <button onClick={() => onDelete(cat)} title="Delete" style={{ padding: '6px', borderRadius: '7px', border: '1px solid #fecaca', background: '#fff', cursor: 'pointer', display: 'flex', color: '#ef4444', transition: 'all 0.15s' }}>
-              <Icon.Trash />
-            </button>
-          </div>
-        </td>
-      </tr>
-      {hasSubs && expanded && subs.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)).map(sub => (
-        <CategoryRow key={sub._id} cat={sub} depth={depth + 1} onEdit={onEdit} onDelete={onDelete} onToggle={onToggle} allCategories={allCategories} />
-      ))}
-    </>
-  );
-}
-
-// ─── MAIN PAGE ─────────────────────────────────────────────────────────────────
 export default function MastersPage() {
-  const { user, getAuthHeaders } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, getCompanyId, isSuperAdmin, isCompanyAdmin } = useAuth();
+  const protectedFetch = useProtectedFetch();
   const router = useRouter();
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState('categories'); // 'categories' | 'products'
+  // Theme State
+  const [theme, setTheme] = useState('light');
+  const colors = THEMES[theme];
 
-  // Data state
-  const [stats, setStats] = useState(null);
+  // State Management
+  const [activeTab, setActiveTab] = useState('stats');
+  const [viewMode, setViewMode] = useState('tree');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Categories State
   const [categories, setCategories] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [categoryTree, setCategoryTree] = useState([]);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categoryFormData, setCategoryFormData] = useState({
+    name: '',
+    description: '',
+    parentId: '',
+    icon: '📦',
+    displayOrder: 0,
+    isActive: true
+  });
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [categorySearch, setCategorySearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [expandedNodes, setExpandedNodes] = useState({});
+  const [categoryPagination, setCategoryPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0
+  });
 
-  // Loading states
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [catLoading, setCatLoading] = useState(true);
-  const [prodLoading, setProdLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+  // Stats State
+  const [stats, setStats] = useState({
+    categories: { total: 0, active: 0, inactive: 0, main: 0, sub: 0 },
+    products: { total: 0, active: 0, inactive: 0, lowStock: 0, outOfStock: 0 },
+    recent: []
+  });
 
-  // Pagination
-  const [catPage, setCatPage] = useState(1);
-  const [catTotal, setCatTotal] = useState(0);
-  const [catTotalPages, setCatTotalPages] = useState(1);
-  const [prodPage, setProdPage] = useState(1);
-  const [prodTotal, setProdTotal] = useState(0);
-  const [prodTotalPages, setProdTotalPages] = useState(1);
-  const LIMIT = 50;
+  // Helper functions
+  const showSuccess = (message) => {
+    setSuccessMessage(message);
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
 
-  // Filters
-  const [catSearch, setCatSearch] = useState('');
-  const [catStatus, setCatStatus] = useState('');
-  const [catParentFilter, setCatParentFilter] = useState('');
-  const [prodSearch, setProdSearch] = useState('');
-  const [prodStatus, setProdStatus] = useState('');
-  const [prodCategory, setProdCategory] = useState('');
+  const showError = (message) => {
+    setError(message);
+    setTimeout(() => setError(null), 5000);
+  };
 
-  // Modal state
-  const [catModalOpen, setCatModalOpen] = useState(false);
-  const [editCat, setEditCat] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null); // { type, item }
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  // Toggle theme
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
 
-  // Toast
-  const [toasts, setToasts] = useState([]);
-  const toastId = useRef(0);
+  // Toggle tree node expansion
+  const toggleNode = (nodeId) => {
+    setExpandedNodes(prev => ({
+      ...prev,
+      [nodeId]: !prev[nodeId]
+    }));
+  };
 
-  // Search debounce
-  const searchTimer = useRef(null);
+  // ========== CATEGORY API CALLS ==========
 
-  const addToast = useCallback((message, type = 'success') => {
-    const id = ++toastId.current;
-    setToasts(t => [...t, { id, message, type }]);
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000);
-  }, []);
+  const fetchCategories = useCallback(async () => {
+    try {
+      setLoading(true);
+      const companyId = getCompanyId();
+      
+      if (!companyId) {
+        console.warn('No company ID available');
+        return;
+      }
 
-  const removeToast = useCallback((id) => setToasts(t => t.filter(x => x.id !== id)), []);
+      if (viewMode === 'tree') {
+        const url = `/api/masters?type=categories&companyId=${companyId}&format=tree&includeInactive=${categoryFilter === 'all'}&_t=${Date.now()}`;
+        const response = await protectedFetch(url, { cache: 'no-store' });
+        const result = await response.json();
+        
+        if (result.success) {
+          setCategoryTree(result.data || []);
+        }
+        
+        const flatResponse = await protectedFetch(
+          `/api/masters?type=categories&companyId=${companyId}&format=flat&limit=1000&_t=${Date.now()}`,
+          { cache: 'no-store' }
+        );
+        const flatResult = await flatResponse.json();
+        if (flatResult.success) {
+          setCategories(flatResult.data || []);
+        }
+      } else {
+        let url = `/api/masters?type=categories&companyId=${companyId}&format=flat&page=${categoryPagination.page}&limit=${categoryPagination.limit}&_t=${Date.now()}`;
+        
+        if (categoryFilter === 'active') url += '&status=active';
+        else if (categoryFilter === 'inactive') url += '&status=inactive';
+        
+        if (categorySearch) url += `&search=${encodeURIComponent(categorySearch)}`;
+        
+        const response = await protectedFetch(url, { cache: 'no-store' });
+        const result = await response.json();
+        
+        if (result.success) {
+          setCategories(result.data || []);
+          if (result.pagination) {
+            setCategoryPagination(prev => ({
+              ...prev,
+              total: result.pagination.total,
+              totalPages: result.pagination.totalPages
+            }));
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+      showError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [protectedFetch, getCompanyId, viewMode, categoryFilter, categorySearch, categoryPagination.page, categoryPagination.limit]);
 
-  const buildHeaders = useCallback(() => {
-    return getAuthHeaders ? getAuthHeaders() : { 'Content-Type': 'application/json' };
-  }, [getAuthHeaders]);
+  const createCategory = async (formData) => {
+    try {
+      const response = await protectedFetch('/api/masters?type=categories', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: formData.name,
+          description: formData.description,
+          parentId: formData.parentId || null,
+          icon: formData.icon,
+          displayOrder: formData.displayOrder
+        })
+      });
 
-  // ─── FETCH STATS ───────────────────────────────────────────────────────────
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to create category');
+      }
+
+      showSuccess(result.message || 'Category created successfully');
+      setShowCategoryModal(false);
+      resetCategoryForm();
+      setRefreshKey(prev => prev + 1);
+      fetchCategories();
+      fetchStats();
+      
+      return result;
+    } catch (err) {
+      console.error('Error creating category:', err);
+      showError(err.message);
+      throw err;
+    }
+  };
+
+  const updateCategory = async (id, formData) => {
+    try {
+      const response = await protectedFetch(`/api/masters?type=categories&id=${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: formData.name,
+          description: formData.description,
+          icon: formData.icon,
+          displayOrder: formData.displayOrder,
+          isActive: formData.isActive
+        })
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to update category');
+      }
+
+      showSuccess(result.message || 'Category updated successfully');
+      setShowCategoryModal(false);
+      resetCategoryForm();
+      setRefreshKey(prev => prev + 1);
+      fetchCategories();
+      fetchStats();
+      
+      return result;
+    } catch (err) {
+      console.error('Error updating category:', err);
+      showError(err.message);
+      throw err;
+    }
+  };
+
+  const deleteCategory = async (id, name) => {
+    if (!confirm(`Are you sure you want to delete category "${name}"? This will also delete all subcategories.`)) {
+      return;
+    }
+
+    try {
+      const response = await protectedFetch(`/api/masters?type=categories&id=${id}`, {
+        method: 'DELETE'
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to delete category');
+      }
+
+      showSuccess(result.message || 'Category deleted successfully');
+      setRefreshKey(prev => prev + 1);
+      fetchCategories();
+      fetchStats();
+    } catch (err) {
+      console.error('Error deleting category:', err);
+      showError(err.message);
+    }
+  };
+
+  const toggleCategoryStatus = async (id, currentStatus) => {
+    try {
+      const response = await protectedFetch('/api/masters?type=categories', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          action: 'toggle-status',
+          id,
+          isActive: !currentStatus
+        })
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to update status');
+      }
+
+      showSuccess(result.message || `Category ${!currentStatus ? 'activated' : 'deactivated'} successfully`);
+      setRefreshKey(prev => prev + 1);
+      fetchCategories();
+      fetchStats();
+    } catch (err) {
+      console.error('Error toggling status:', err);
+      showError(err.message);
+    }
+  };
+
+  // ========== STATS API CALLS ==========
+
   const fetchStats = useCallback(async () => {
-    setStatsLoading(true);
     try {
-      const res = await fetch('/api/masters?type=stats', { headers: buildHeaders() });
-      const data = await res.json();
-      if (data.success) setStats(data.data);
-    } catch (e) {
-      console.error('Stats fetch error:', e);
-    } finally {
-      setStatsLoading(false);
-    }
-  }, [buildHeaders]);
+      const companyId = getCompanyId();
+      if (!companyId) return;
 
-  // ─── FETCH CATEGORIES ──────────────────────────────────────────────────────
-  const fetchCategories = useCallback(async (page = 1) => {
-    setCatLoading(true);
-    try {
-      const params = new URLSearchParams({
-        type: 'categories',
-        page: String(page),
-        limit: String(LIMIT),
-        ...(catSearch && { search: catSearch }),
-        ...(catStatus && { status: catStatus }),
-        ...(catParentFilter === 'main' ? { parentId: 'null' } : catParentFilter ? { parentId: catParentFilter } : {}),
-      });
-      const res = await fetch(`/api/masters?${params}`, { headers: buildHeaders() });
-      const data = await res.json();
-      if (data.success) {
-        setCategories(data.data);
-        setCatTotal(data.pagination?.total ?? 0);
-        setCatTotalPages(data.pagination?.totalPages ?? 1);
-      } else {
-        addToast(data.message || 'Failed to load categories', 'error');
+      const response = await protectedFetch(
+        `/api/masters?type=stats&companyId=${companyId}&_t=${Date.now()}`,
+        { cache: 'no-store' }
+      );
+      
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setStats(result.data);
       }
-    } catch (e) {
-      addToast('Network error loading categories', 'error');
-    } finally {
-      setCatLoading(false);
-    }
-  }, [catSearch, catStatus, catParentFilter, buildHeaders, addToast]);
 
-  // ─── FETCH PRODUCTS ────────────────────────────────────────────────────────
-  const fetchProducts = useCallback(async (page = 1) => {
-    setProdLoading(true);
-    try {
-      const params = new URLSearchParams({
-        type: 'products',
-        page: String(page),
-        limit: String(LIMIT),
-        ...(prodSearch && { search: prodSearch }),
-        ...(prodStatus && { status: prodStatus }),
-        ...(prodCategory && prodCategory !== 'all' && { category: prodCategory }),
-      });
-      const res = await fetch(`/api/masters?${params}`, { headers: buildHeaders() });
-      const data = await res.json();
-      if (data.success) {
-        setProducts(data.data);
-        setProdTotal(data.pagination?.total ?? 0);
-        setProdTotalPages(data.pagination?.totalPages ?? 1);
-      } else {
-        addToast(data.message || 'Failed to load products', 'error');
+      // Fetch recent items
+      const recentResponse = await protectedFetch(
+        `/api/masters?type=recent&companyId=${companyId}&limit=10&_t=${Date.now()}`,
+        { cache: 'no-store' }
+      );
+      const recentResult = await recentResponse.json();
+      
+      if (recentResult.success && recentResult.data) {
+        setStats(prev => ({ ...prev, recent: recentResult.data }));
       }
-    } catch (e) {
-      addToast('Network error loading products', 'error');
-    } finally {
-      setProdLoading(false);
+    } catch (err) {
+      console.error('Error fetching stats:', err);
     }
-  }, [prodSearch, prodStatus, prodCategory, buildHeaders, addToast]);
+  }, [protectedFetch, getCompanyId]);
 
-  // ─── INIT ──────────────────────────────────────────────────────────────────
-  useEffect(() => { fetchStats(); }, [fetchStats]);
-  useEffect(() => { fetchCategories(catPage); }, [catSearch, catStatus, catParentFilter, catPage]);
-  useEffect(() => { fetchProducts(prodPage); }, [prodSearch, prodStatus, prodCategory, prodPage]);
+  // ========== FORM HANDLERS ==========
 
-  // ─── DEBOUNCED SEARCH ──────────────────────────────────────────────────────
-  const handleCatSearch = (val) => {
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => { setCatSearch(val); setCatPage(1); }, 350);
+  const resetCategoryForm = () => {
+    setCategoryFormData({
+      name: '',
+      description: '',
+      parentId: '',
+      icon: '📦',
+      displayOrder: 0,
+      isActive: true
+    });
+    setEditingCategoryId(null);
   };
-  const handleProdSearch = (val) => {
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => { setProdSearch(val); setProdPage(1); }, 350);
+
+  const handleEditCategory = (category) => {
+    setEditingCategoryId(category._id);
+    setCategoryFormData({
+      name: category.name,
+      description: category.description || '',
+      parentId: category.parentId || '',
+      icon: category.icon || '📦',
+      displayOrder: category.displayOrder || 0,
+      isActive: category.isActive
+    });
+    setShowCategoryModal(true);
   };
 
-  // ─── CATEGORY CRUD ─────────────────────────────────────────────────────────
-  const handleSaveCategory = async (formData) => {
-    setActionLoading(true);
-    try {
-      const isEdit = !!editCat;
-      const url = isEdit ? `/api/masters?type=categories&id=${editCat._id}` : '/api/masters?type=categories';
-      const method = isEdit ? 'PUT' : 'POST';
-      const res = await fetch(url, { method, headers: buildHeaders(), body: JSON.stringify(formData) });
-      const data = await res.json();
-      if (data.success) {
-        addToast(data.message || (isEdit ? 'Category updated' : 'Category created'), 'success');
-        setCatModalOpen(false);
-        setEditCat(null);
-        fetchCategories(catPage);
-        fetchStats();
-      } else {
-        addToast(data.message || 'Operation failed', 'error');
-      }
-    } catch (e) {
-      addToast('Network error', 'error');
-    } finally {
-      setActionLoading(false);
+  const handleCategorySubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!categoryFormData.name.trim()) {
+      showError('Category name is required');
+      return;
     }
-  };
 
-  const handleEditCategory = (cat) => { setEditCat(cat); setCatModalOpen(true); };
-
-  const handleDeleteCategory = (cat) => {
-    setConfirmDelete({ type: 'categories', item: cat });
-  };
-
-  const confirmDeleteAction = async () => {
-    if (!confirmDelete) return;
-    setDeleteLoading(true);
-    try {
-      const res = await fetch(`/api/masters?type=${confirmDelete.type}&id=${confirmDelete.item._id}`, { method: 'DELETE', headers: buildHeaders() });
-      const data = await res.json();
-      if (data.success) {
-        addToast(data.message || 'Deleted successfully', 'success');
-        setConfirmDelete(null);
-        if (confirmDelete.type === 'categories') { fetchCategories(catPage); fetchStats(); }
-        else { fetchProducts(prodPage); fetchStats(); }
-      } else {
-        addToast(data.message || 'Delete failed', 'error');
-      }
-    } catch (e) {
-      addToast('Network error', 'error');
-    } finally {
-      setDeleteLoading(false);
+    if (editingCategoryId) {
+      await updateCategory(editingCategoryId, categoryFormData);
+    } else {
+      await createCategory(categoryFormData);
     }
   };
 
-  const handleToggleCategory = async (id, isActive) => {
-    try {
-      const res = await fetch('/api/masters?type=categories', {
-        method: 'PATCH',
-        headers: buildHeaders(),
-        body: JSON.stringify({ action: 'toggle-status', id, isActive }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setCategories(prev => prev.map(c => c._id.toString() === id.toString() ? { ...c, isActive } : c));
-        addToast(data.message || `Category ${isActive ? 'activated' : 'deactivated'}`, 'success');
-      } else {
-        addToast(data.message || 'Toggle failed', 'error');
-      }
-    } catch (e) {
-      addToast('Network error', 'error');
-    }
+  // Get parent categories for category form
+  const getParentCategories = () => {
+    return categories.filter(cat => 
+      !cat.parentId && 
+      (!editingCategoryId || cat._id !== editingCategoryId)
+    );
   };
 
-  const handleToggleProduct = async (id, isActive) => {
-    try {
-      const res = await fetch('/api/masters?type=products', {
-        method: 'PATCH',
-        headers: buildHeaders(),
-        body: JSON.stringify({ action: 'toggle-status', id, isActive }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setProducts(prev => prev.map(p => p._id.toString() === id.toString() ? { ...p, isActive } : p));
-        addToast(data.message || `Product ${isActive ? 'activated' : 'deactivated'}`, 'success');
-      } else {
-        addToast(data.message || 'Toggle failed', 'error');
-      }
-    } catch (e) {
-      addToast('Network error', 'error');
-    }
-  };
+  // ========== RENDER FUNCTIONS ==========
 
-  const handleDeleteProduct = (prod) => {
-    setConfirmDelete({ type: 'products', item: prod });
-  };
-
-  // Top-level categories for filters / product display
-  const mainCategories = categories.filter(c => !c.parentId);
-
-  // ─── RENDER ────────────────────────────────────────────────────────────────
-  return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
-        :root {
-          --font-display: 'Sora', sans-serif;
-          --font-body: 'DM Sans', sans-serif;
-        }
-        * { box-sizing: border-box; }
-        @keyframes slideIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.4 } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .masters-table tr:hover .row-actions { opacity: 1 !important; }
-        .page-btn:hover { background: #6366f1 !important; color: #fff !important; }
-        .filter-select:focus, .filter-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
-        .tab-btn { transition: all 0.2s; }
-        .action-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.12) !important; }
-        @media (max-width: 768px) {
-          .stats-grid { grid-template-columns: 1fr 1fr !important; }
-          .filter-row { flex-direction: column !important; }
-          .page-header { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
-          .desktop-only { display: none !important; }
-          .masters-table { font-size: 12px !important; }
-          .masters-table td, .masters-table th { padding: 10px 10px !important; }
-        }
-        @media (max-width: 480px) {
-          .stats-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
-
-      <div style={{ minHeight: '100vh', background: '#f4f5f9', fontFamily: 'var(--font-body)', padding: '24px', animation: 'fadeIn 0.4s ease' }}>
-
-        {/* ── HEADER ── */}
-        <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-display)', letterSpacing: '-0.5px' }}>
-              Masters
-            </h1>
-            <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b' }}>
-              Manage categories, subcategories & products
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <button onClick={() => { fetchStats(); fetchCategories(catPage); fetchProducts(prodPage); }}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '9px', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: '#374151' }}>
-              <Icon.RefreshCw /> Refresh
-            </button>
-            {activeTab === 'categories' && (
-              <button onClick={() => { setEditCat(null); setCatModalOpen(true); }} className="action-btn"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 18px', borderRadius: '9px', border: 'none', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#fff', boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}>
-                <Icon.Plus /> Add Category
-              </button>
-            )}
-            {activeTab === 'products' && (
-              <button onClick={() => router.push('/admin/products/productForm')} className="action-btn"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 18px', borderRadius: '9px', border: 'none', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#fff', boxShadow: '0 4px 14px rgba(16,185,129,0.35)' }}>
-                <Icon.Plus /> Add Product
-              </button>
-            )}
-          </div>
+ const renderStatCard = (title, icon, stats, color) => (
+    <div style={{
+      background: colors.backgroundCard,
+      borderRadius: '16px',
+      padding: '20px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+      border: `1px solid ${colors.border}`
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', paddingBottom: '12px', borderBottom: `2px solid ${colors.border}` }}>
+        <div style={{
+          width: '44px',
+          height: '44px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: `${color}15`,
+          borderRadius: '12px',
+          color: color
+        }}>
+          {icon}
         </div>
-
-        {/* ── STATS ── */}
-        <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
-          <StatCard label="Total Categories" value={stats?.categories?.total} sub={`${stats?.categories?.main ?? 0} main · ${stats?.categories?.sub ?? 0} sub`} color="#6366f1" icon={<Icon.Grid />} loading={statsLoading} />
-          <StatCard label="Active Categories" value={stats?.categories?.active} sub={`${(stats?.categories?.total ?? 0) - (stats?.categories?.active ?? 0)} inactive`} color="#10b981" icon={<Icon.Tag />} loading={statsLoading} />
-          <StatCard label="Total Products" value={stats?.products?.total} sub={`${stats?.products?.active ?? 0} active`} color="#f59e0b" icon={<Icon.Package />} loading={statsLoading} />
-          <StatCard label="Stock Alerts" value={(stats?.products?.lowStock ?? 0) + (stats?.products?.outOfStock ?? 0)} sub={`${stats?.products?.outOfStock ?? 0} out of stock`} color="#ef4444" icon={<Icon.BarChart />} loading={statsLoading} />
-        </div>
-
-        {/* ── TABS ── */}
-        <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #f0f0f0', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
-          {/* Tab Header */}
-          <div style={{ display: 'flex', borderBottom: '1px solid #f3f4f6', padding: '0 20px' }}>
-            {[
-              { key: 'categories', label: 'Categories', icon: <Icon.Grid />, count: catTotal },
-              { key: 'products', label: 'Products', icon: <Icon.Package />, count: prodTotal },
-            ].map(tab => (
-              <button key={tab.key} className="tab-btn" onClick={() => setActiveTab(tab.key)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '7px', padding: '15px 20px',
-                  border: 'none', background: 'none', cursor: 'pointer',
-                  fontSize: '14px', fontWeight: activeTab === tab.key ? 700 : 500,
-                  color: activeTab === tab.key ? '#6366f1' : '#6b7280',
-                  borderBottom: activeTab === tab.key ? '2px solid #6366f1' : '2px solid transparent',
-                  marginBottom: '-1px', fontFamily: 'var(--font-body)',
-                }}>
-                {tab.icon}
-                {tab.label}
-                <span style={{ background: activeTab === tab.key ? '#eef2ff' : '#f3f4f6', color: activeTab === tab.key ? '#6366f1' : '#9ca3af', borderRadius: '12px', padding: '1px 8px', fontSize: '11px', fontWeight: 700 }}>
-                  {tab.count}
-                </span>
-              </button>
-            ))}
+        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: colors.textPrimary }}>{title}</h3>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+        {Object.entries(stats).map(([key, value]) => (
+          <div key={key} style={{ textAlign: 'center' }}>
+            <span style={{ display: 'block', fontSize: '28px', fontWeight: 'bold', color: colors.textPrimary }}>{value}</span>
+            <span style={{ fontSize: '12px', color: colors.textSecondary, textTransform: 'capitalize' }}>{key.replace(/([A-Z])/g, ' $1').trim()}</span>
           </div>
+        ))}
+      </div>
+    </div>
+  );
 
-          {/* Tab Content */}
-          <div style={{ padding: '20px' }}>
-
-            {/* ── CATEGORIES TAB ── */}
-            {activeTab === 'categories' && (
-              <>
-                {/* Filters */}
-                <div className="filter-row" style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
-                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', display: 'flex' }}><Icon.Search /></span>
-                    <input className="filter-input" defaultValue={catSearch} onChange={e => handleCatSearch(e.target.value)}
-                      placeholder="Search categories..." style={{ ...inputStyle, paddingLeft: '38px', background: '#f9fafb' }} />
-                  </div>
-                  <select className="filter-select" value={catStatus} onChange={e => { setCatStatus(e.target.value); setCatPage(1); }}
-                    style={{ ...inputStyle, width: 'auto', minWidth: '130px', cursor: 'pointer' }}>
-                    <option value="">All Status</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                  <select className="filter-select" value={catParentFilter} onChange={e => { setCatParentFilter(e.target.value); setCatPage(1); }}
-                    style={{ ...inputStyle, width: 'auto', minWidth: '150px', cursor: 'pointer' }}>
-                    <option value="">All Types</option>
-                    <option value="main">Main Only</option>
-                    {mainCategories.map(c => <option key={c._id} value={c._id}>{c.icon} {c.name} (subs)</option>)}
-                  </select>
-                  {(catSearch || catStatus || catParentFilter) && (
-                    <button onClick={() => { setCatSearch(''); setCatStatus(''); setCatParentFilter(''); setCatPage(1); }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '9px 14px', borderRadius: '9px', border: '1px solid #fecaca', background: '#fff5f5', cursor: 'pointer', fontSize: '13px', color: '#ef4444', fontWeight: 600 }}>
-                      <Icon.X /> Clear
-                    </button>
-                  )}
-                </div>
-
-                {/* Table */}
-                <div style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                  <table className="masters-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                    <thead>
-                      <tr style={{ background: '#f8fafc' }}>
-                        {['Category', 'Type', 'Products', 'Order', 'Status', 'Actions'].map(h => (
-                          <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #f3f4f6', whiteSpace: 'nowrap' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {catLoading ? (
-                        Array.from({ length: 6 }).map((_, i) => (
-                          <tr key={i}>
-                            {Array.from({ length: 6 }).map((_, j) => (
-                              <td key={j} style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6' }}>
-                                <div style={{ height: '14px', background: '#f3f4f6', borderRadius: '4px', animation: 'pulse 1.5s infinite', width: j === 0 ? '140px' : j === 5 ? '70px' : '60px' }} />
-                              </td>
-                            ))}
-                          </tr>
-                        ))
-                      ) : categories.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: '#9ca3af' }}>
-                            <div style={{ fontSize: '40px', marginBottom: '12px' }}>📂</div>
-                            <p style={{ margin: 0, fontWeight: 600 }}>No categories found</p>
-                            <p style={{ margin: '4px 0 0', fontSize: '12px' }}>
-                              {catSearch || catStatus ? 'Try adjusting your filters' : 'Create your first category to get started'}
-                            </p>
-                          </td>
-                        </tr>
-                      ) : (
-                        mainCategories
-                          .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
-                          .map(cat => (
-                            <CategoryRow key={cat._id} cat={cat} depth={0}
-                              onEdit={handleEditCategory} onDelete={handleDeleteCategory}
-                              onToggle={handleToggleCategory} allCategories={categories} />
-                          ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Pagination */}
-                {catTotalPages > 1 && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', flexWrap: 'wrap', gap: '10px' }}>
-                    <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                      Showing {((catPage - 1) * LIMIT) + 1}–{Math.min(catPage * LIMIT, catTotal)} of {catTotal} categories
-                    </span>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button className="page-btn" disabled={catPage === 1} onClick={() => setCatPage(p => p - 1)}
-                        style={{ padding: '7px 14px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff', cursor: catPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 600, color: catPage === 1 ? '#d1d5db' : '#374151' }}>
-                        ← Prev
-                      </button>
-                      {Array.from({ length: Math.min(catTotalPages, 5) }).map((_, i) => {
-                        const pg = i + 1;
-                        return (
-                          <button key={pg} className="page-btn" onClick={() => setCatPage(pg)}
-                            style={{ padding: '7px 12px', borderRadius: '8px', border: '1px solid', borderColor: catPage === pg ? '#6366f1' : '#e5e7eb', background: catPage === pg ? '#6366f1' : '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: catPage === pg ? '#fff' : '#374151' }}>
-                            {pg}
-                          </button>
-                        );
-                      })}
-                      <button className="page-btn" disabled={catPage === catTotalPages} onClick={() => setCatPage(p => p + 1)}
-                        style={{ padding: '7px 14px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff', cursor: catPage === catTotalPages ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 600, color: catPage === catTotalPages ? '#d1d5db' : '#374151' }}>
-                        Next →
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* ── PRODUCTS TAB ── */}
-            {activeTab === 'products' && (
-              <>
-                {/* Filters */}
-                <div className="filter-row" style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
-                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', display: 'flex' }}><Icon.Search /></span>
-                    <input className="filter-input" defaultValue={prodSearch} onChange={e => handleProdSearch(e.target.value)}
-                      placeholder="Search by name, SKU..." style={{ ...inputStyle, paddingLeft: '38px', background: '#f9fafb' }} />
-                  </div>
-                  <select className="filter-select" value={prodStatus} onChange={e => { setProdStatus(e.target.value); setProdPage(1); }}
-                    style={{ ...inputStyle, width: 'auto', minWidth: '130px', cursor: 'pointer' }}>
-                    <option value="">All Status</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                  <select className="filter-select" value={prodCategory} onChange={e => { setProdCategory(e.target.value); setProdPage(1); }}
-                    style={{ ...inputStyle, width: 'auto', minWidth: '160px', cursor: 'pointer' }}>
-                    <option value="">All Categories</option>
-                    {mainCategories.map(c => <option key={c._id} value={c._id}>{c.icon} {c.name}</option>)}
-                  </select>
-                  {(prodSearch || prodStatus || prodCategory) && (
-                    <button onClick={() => { setProdSearch(''); setProdStatus(''); setProdCategory(''); setProdPage(1); }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '9px 14px', borderRadius: '9px', border: '1px solid #fecaca', background: '#fff5f5', cursor: 'pointer', fontSize: '13px', color: '#ef4444', fontWeight: 600 }}>
-                      <Icon.X /> Clear
-                    </button>
-                  )}
-                </div>
-
-                {/* Products Table */}
-                <div style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                  <table className="masters-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                    <thead>
-                      <tr style={{ background: '#f8fafc' }}>
-                        {['Product', 'SKU', 'Category', 'MRP / Price', 'Stock', 'GST', 'Status', 'Actions'].map(h => (
-                          <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #f3f4f6', whiteSpace: 'nowrap' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {prodLoading ? (
-                        Array.from({ length: 6 }).map((_, i) => (
-                          <tr key={i}>
-                            {Array.from({ length: 8 }).map((_, j) => (
-                              <td key={j} style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6' }}>
-                                <div style={{ height: '14px', background: '#f3f4f6', borderRadius: '4px', animation: 'pulse 1.5s infinite', width: j === 0 ? '140px' : '70px' }} />
-                              </td>
-                            ))}
-                          </tr>
-                        ))
-                      ) : products.length === 0 ? (
-                        <tr>
-                          <td colSpan={8} style={{ padding: '48px', textAlign: 'center', color: '#9ca3af' }}>
-                            <div style={{ fontSize: '40px', marginBottom: '12px' }}>📦</div>
-                            <p style={{ margin: 0, fontWeight: 600 }}>No products found</p>
-                            <p style={{ margin: '4px 0 0', fontSize: '12px' }}>
-                              {prodSearch || prodStatus || prodCategory ? 'Try adjusting your filters' : 'Add your first product to get started'}
-                            </p>
-                          </td>
-                        </tr>
-                      ) : products.map(prod => (
-                        <tr key={prod._id}
-                          onMouseEnter={e => e.currentTarget.style.background = '#f8f9ff'}
-                          onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-                          style={{ background: '#fff', transition: 'background 0.15s' }}>
-                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              {prod.images?.[0] ? (
-                                <img src={prod.images[0]} alt={prod.productName} style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #f3f4f6', flexShrink: 0 }} />
-                              ) : (
-                                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#9ca3af', fontSize: '16px' }}>📦</div>
-                              )}
-                              <div>
-                                <p style={{ margin: 0, fontWeight: 700, color: '#111', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{prod.productName}</p>
-                                {prod.isOnSale && <span style={{ fontSize: '10px', background: '#fef3c7', color: '#d97706', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>SALE</span>}
-                              </div>
-                            </div>
-                          </td>
-                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-                            <code style={{ fontSize: '11px', background: '#f3f4f6', padding: '3px 7px', borderRadius: '5px', color: '#374151', fontWeight: 600 }}>{prod.sku}</code>
-                          </td>
-                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-                            <div>
-                              <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: '#374151' }}>{prod.category?.name || '—'}</p>
-                              {prod.subCategory?.name && <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af' }}>↳ {prod.subCategory.name}</p>}
-                            </div>
-                          </td>
-                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-                            <div>
-                              <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af', textDecoration: 'line-through' }}>₹{prod.mrp}</p>
-                              <p style={{ margin: 0, fontWeight: 800, color: '#111', fontSize: '14px' }}>₹{prod.discountPrice}</p>
-                            </div>
-                          </td>
-                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-                            <span style={{
-                              padding: '3px 9px', borderRadius: '20px', fontSize: '12px', fontWeight: 700,
-                              background: prod.stock === 0 ? '#fef2f2' : prod.stock <= 5 ? '#fffbeb' : '#f0fdf4',
-                              color: prod.stock === 0 ? '#ef4444' : prod.stock <= 5 ? '#d97706' : '#16a34a',
-                            }}>
-                              {prod.stock === 0 ? 'Out' : prod.stock <= 5 ? `Low: ${prod.stock}` : prod.stock}
-                            </span>
-                          </td>
-                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>
-                            {prod.gstRate}%
-                          </td>
-                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-                            <button type="button" onClick={() => handleToggleProduct(prod._id, !prod.isActive)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0' }}>
-                              <Icon.Toggle on={prod.isActive} />
-                            </button>
-                          </td>
-                          <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <button onClick={() => router.push(`/admin/products/productForm?id=${prod._id}`)} title="Edit"
-                                style={{ padding: '6px', borderRadius: '7px', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', display: 'flex', color: '#6366f1' }}>
-                                <Icon.Edit />
-                              </button>
-                              <button onClick={() => handleDeleteProduct(prod)} title="Delete"
-                                style={{ padding: '6px', borderRadius: '7px', border: '1px solid #fecaca', background: '#fff', cursor: 'pointer', display: 'flex', color: '#ef4444' }}>
-                                <Icon.Trash />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Products Pagination */}
-                {prodTotalPages > 1 && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', flexWrap: 'wrap', gap: '10px' }}>
-                    <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                      Showing {((prodPage - 1) * LIMIT) + 1}–{Math.min(prodPage * LIMIT, prodTotal)} of {prodTotal} products
-                    </span>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button className="page-btn" disabled={prodPage === 1} onClick={() => setProdPage(p => p - 1)}
-                        style={{ padding: '7px 14px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff', cursor: prodPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 600, color: prodPage === 1 ? '#d1d5db' : '#374151' }}>
-                        ← Prev
-                      </button>
-                      {Array.from({ length: Math.min(prodTotalPages, 5) }).map((_, i) => {
-                        const pg = i + 1;
-                        return (
-                          <button key={pg} className="page-btn" onClick={() => setProdPage(pg)}
-                            style={{ padding: '7px 12px', borderRadius: '8px', border: '1px solid', borderColor: prodPage === pg ? '#6366f1' : '#e5e7eb', background: prodPage === pg ? '#6366f1' : '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: prodPage === pg ? '#fff' : '#374151' }}>
-                            {pg}
-                          </button>
-                        );
-                      })}
-                      <button className="page-btn" disabled={prodPage === prodTotalPages} onClick={() => setProdPage(p => p + 1)}
-                        style={{ padding: '7px 14px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff', cursor: prodPage === prodTotalPages ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 600, color: prodPage === prodTotalPages ? '#d1d5db' : '#374151' }}>
-                        Next →
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* ── QUICK SUMMARY FOOTER ── */}
-        <div style={{ marginTop: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          {[
-            { label: 'Main Categories', value: stats?.categories?.main ?? '—', color: '#6366f1' },
-            { label: 'Subcategories', value: stats?.categories?.sub ?? '—', color: '#8b5cf6' },
-            { label: 'Active Products', value: stats?.products?.active ?? '—', color: '#10b981' },
-            { label: 'Low Stock', value: stats?.products?.lowStock ?? '—', color: '#f59e0b' },
-            { label: 'Out of Stock', value: stats?.products?.outOfStock ?? '—', color: '#ef4444' },
-          ].map(item => (
-            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', borderRadius: '10px', padding: '10px 16px', border: '1px solid #f0f0f0', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color }} />
-              <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500 }}>{item.label}:</span>
-              <span style={{ fontSize: '13px', fontWeight: 800, color: '#111' }}>{item.value}</span>
-            </div>
-          ))}
-        </div>
+  const renderStats = () => (
+    <div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+        gap: '24px',
+        marginBottom: '24px'
+      }}>
+        {renderStatCard('Categories Overview', <Folder size={24} />, {
+          total: stats.categories.total,
+          active: stats.categories.active,
+          main: stats.categories.main,
+          sub: stats.categories.sub
+        }, colors.primary)}
+        
+        {renderStatCard('Products Overview', <Package size={24} />, {
+          total: stats.products.total,
+          active: stats.products.active,
+          lowStock: stats.products.lowStock,
+          outOfStock: stats.products.outOfStock
+        }, colors.success)}
       </div>
 
-      {/* ── MODALS ── */}
-      <CategoryModal
-        open={catModalOpen}
-        onClose={() => { setCatModalOpen(false); setEditCat(null); }}
-        onSave={handleSaveCategory}
-        editData={editCat}
-        categories={categories}
-        loading={actionLoading}
-      />
+      {/* Recent Activity */}
+      {stats.recent && stats.recent.length > 0 && (
+        <div style={{
+          background: colors.backgroundCard,
+          borderRadius: '16px',
+          padding: '20px',
+          border: `1px solid ${colors.border}`
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', paddingBottom: '12px', borderBottom: `2px solid ${colors.border}` }}>
+            <div style={{
+              width: '44px',
+              height: '44px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: `${colors.info}15`,
+              borderRadius: '12px',
+              color: colors.info
+            }}>
+              <Clock size={24} />
+            </div>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: colors.textPrimary }}>Recent Activity</h3>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {stats.recent.map((item, index) => (
+              <div key={index} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px',
+                background: colors.backgroundLight,
+                borderRadius: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: `${item.color || colors.primary}15`,
+                  borderRadius: '10px',
+                  color: item.color || colors.primary
+                }}>
+                  {item.type === 'category' ? <Folder size={20} /> : <Package size={20} />}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 500, color: colors.textPrimary }}>{item.title}</div>
+                  <div style={{ fontSize: '12px', color: colors.textSecondary }}>{item.timeAgo}</div>
+                </div>
+                <ChevronRight size={16} color={colors.textSecondary} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-      <ConfirmModal
-        open={!!confirmDelete}
-        title={`Delete ${confirmDelete?.type === 'categories' ? 'Category' : 'Product'}`}
-        message={
-          confirmDelete?.type === 'categories'
-            ? `Are you sure you want to delete "${confirmDelete?.item?.name}"? This action cannot be undone. Products must be removed first.`
-            : `Are you sure you want to delete "${confirmDelete?.item?.productName}"? This action cannot be undone.`
-        }
-        onConfirm={confirmDeleteAction}
-        onCancel={() => setConfirmDelete(null)}
-        loading={deleteLoading}
-      />
+      {/* Quick Actions */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '16px',
+        marginTop: '24px'
+      }}>
+        <button
+          onClick={() => { setActiveTab('categories'); setShowCategoryModal(true); resetCategoryForm(); }}
+          style={{
+            padding: '16px',
+            background: colors.backgroundCard,
+            border: `1px solid ${colors.border}`,
+            borderRadius: '12px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            color: colors.primary,
+            fontWeight: 500,
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
+          <Plus size={18} />
+          Add Category
+        </button>
+        <button
+          onClick={() => { fetchCategories(); fetchStats(); }}
+          style={{
+            padding: '16px',
+            background: colors.backgroundCard,
+            border: `1px solid ${colors.border}`,
+            borderRadius: '12px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            color: colors.textSecondary,
+            fontWeight: 500,
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
+          <RefreshCw size={18} />
+          Refresh All
+        </button>
+      </div>
+    </div>
+  );
 
-      <Toast toasts={toasts} removeToast={removeToast} />
-    </>
+  const renderCategoryTree = (items, level = 0) => {
+    if (!items || items.length === 0) {
+      if (level === 0) {
+        return (
+          <div style={{ textAlign: 'center', padding: '60px', background: colors.backgroundCard, borderRadius: '12px' }}>
+            <div style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>📭</div>
+            <p style={{ color: colors.textSecondary, marginBottom: '20px' }}>No categories found</p>
+            <button
+              onClick={() => { setShowCategoryModal(true); resetCategoryForm(); }}
+              style={{
+                padding: '10px 20px',
+                background: colors.primary,
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <Plus size={16} />
+              Create First Category
+            </button>
+          </div>
+        );
+      }
+      return null;
+    }
+
+    return items.map(item => {
+      const isExpanded = expandedNodes[item._id] !== false;
+      const hasChildren = item.subcategories && item.subcategories.length > 0;
+      
+      return (
+        <div key={item._id} style={{ marginBottom: '8px' }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px 16px',
+            background: level === 0 ? colors.backgroundLight : colors.backgroundCard,
+            borderRadius: '10px',
+            border: `1px solid ${colors.border}`,
+            marginLeft: `${level * 30}px`,
+            transition: 'all 0.2s'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+              {hasChildren && (
+                <button
+                  onClick={() => toggleNode(item._id)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    color: colors.textSecondary
+                  }}
+                >
+                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </button>
+              )}
+              {!hasChildren && <div style={{ width: '24px' }} />}
+              
+              <span style={{ fontSize: '24px' }}>{item.icon || (item.parentId ? '📎' : '📂')}</span>
+              
+              <div>
+                <div style={{ fontWeight: 500, color: colors.textPrimary }}>{item.name}</div>
+                {item.description && <div style={{ fontSize: '12px', color: colors.textSecondary }}>{item.description}</div>}
+              </div>
+              
+              {item.productCount > 0 && (
+                <span style={{
+                  fontSize: '11px',
+                  padding: '2px 8px',
+                  background: colors.backgroundLight,
+                  borderRadius: '12px',
+                  color: colors.textSecondary
+                }}>
+                  {item.productCount} products
+                </span>
+              )}
+              
+              {level === 0 && !item.parentId && (
+                <span style={{
+                  fontSize: '10px',
+                  padding: '2px 8px',
+                  background: `${colors.primary}15`,
+                  color: colors.primary,
+                  borderRadius: '12px'
+                }}>Main</span>
+              )}
+              {level === 1 && (
+                <span style={{
+                  fontSize: '10px',
+                  padding: '2px 8px',
+                  background: `${colors.secondary}15`,
+                  color: colors.secondary,
+                  borderRadius: '12px'
+                }}>Sub</span>
+              )}
+              {level === 2 && (
+                <span style={{
+                  fontSize: '10px',
+                  padding: '2px 8px',
+                  background: `${colors.warning}15`,
+                  color: colors.warning,
+                  borderRadius: '12px'
+                }}>Sub-Sub</span>
+              )}
+            </div>
+            
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{
+                padding: '4px 10px',
+                borderRadius: '20px',
+                fontSize: '11px',
+                fontWeight: 500,
+                background: item.isActive ? `${colors.success}15` : `${colors.danger}15`,
+                color: item.isActive ? colors.success : colors.danger
+              }}>
+                {item.isActive ? 'Active' : 'Inactive'}
+              </span>
+              
+              <button
+                onClick={() => handleEditCategory(item)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  color: colors.textSecondary,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = colors.hover}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                title="Edit"
+              >
+                <Edit size={16} />
+              </button>
+              
+              <button
+                onClick={() => toggleCategoryStatus(item._id, item.isActive)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  color: colors.textSecondary,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = colors.hover}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                title={item.isActive ? 'Deactivate' : 'Activate'}
+              >
+                {item.isActive ? <XCircle size={16} /> : <CheckCircle size={16} />}
+              </button>
+              
+              <button
+                onClick={() => deleteCategory(item._id, item.name)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  color: colors.textSecondary,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = colors.hover}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                title="Delete"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </div>
+          
+          {hasChildren && isExpanded && (
+            <div>{renderCategoryTree(item.subcategories, level + 1)}</div>
+          )}
+        </div>
+      );
+    });
+  };
+
+  const renderFlatCategories = () => {
+    if (!categories || categories.length === 0) {
+      return (
+        <div style={{ textAlign: 'center', padding: '60px', background: colors.backgroundCard, borderRadius: '12px' }}>
+          <div style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>📭</div>
+          <p style={{ color: colors.textSecondary, marginBottom: '20px' }}>No categories found</p>
+          <button
+            onClick={() => { setShowCategoryModal(true); resetCategoryForm(); }}
+            style={{
+              padding: '10px 20px',
+              background: colors.primary,
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <Plus size={16} />
+            Create First Category
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{
+          width: '100%',
+          background: colors.backgroundCard,
+          borderRadius: '12px',
+          overflow: 'hidden',
+          borderCollapse: 'collapse'
+        }}>
+          <thead style={{ background: colors.backgroundLight, borderBottom: `2px solid ${colors.border}` }}>
+            <tr>
+              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 600, fontSize: '13px', color: colors.textSecondary }}>Level</th>
+              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 600, fontSize: '13px', color: colors.textSecondary }}>Name</th>
+              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 600, fontSize: '13px', color: colors.textSecondary }}>Description</th>
+              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 600, fontSize: '13px', color: colors.textSecondary }}>Products</th>
+              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 600, fontSize: '13px', color: colors.textSecondary }}>Status</th>
+              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 600, fontSize: '13px', color: colors.textSecondary }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {categories.map(cat => (
+              <tr key={cat._id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                <td style={{ padding: '12px 16px' }}>
+                  {cat.level === 0 && <span style={{ padding: '2px 8px', background: `${colors.primary}15`, color: colors.primary, borderRadius: '12px', fontSize: '11px' }}>Main</span>}
+                  {cat.level === 1 && <span style={{ padding: '2px 8px', background: `${colors.secondary}15`, color: colors.secondary, borderRadius: '12px', fontSize: '11px' }}>Sub</span>}
+                  {cat.level === 2 && <span style={{ padding: '2px 8px', background: `${colors.warning}15`, color: colors.warning, borderRadius: '12px', fontSize: '11px' }}>Sub-Sub</span>}
+                  {cat.level > 0 && <span style={{ color: colors.textSecondary, marginLeft: '8px' }}>{'—'.repeat(cat.level)}</span>}
+                </td>
+                <td style={{ padding: '12px 16px' }}>
+                  <span style={{ marginRight: '8px', fontSize: '18px' }}>{cat.icon || '📁'}</span>
+                  <span style={{ color: colors.textPrimary }}>{cat.name}</span>
+                </td>
+                <td style={{ padding: '12px 16px', color: colors.textSecondary, fontSize: '13px' }}>{cat.description?.substring(0, 50) || '-'}</td>
+                <td style={{ padding: '12px 16px', color: colors.textPrimary }}>{cat.productCount || 0}</td>
+                <td style={{ padding: '12px 16px' }}>
+                  <span style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    background: cat.isActive ? `${colors.success}15` : `${colors.danger}15`,
+                    color: cat.isActive ? colors.success : colors.danger
+                  }}>
+                    {cat.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td style={{ padding: '12px 16px' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => handleEditCategory(cat)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: colors.textSecondary }} title="Edit">
+                      <Edit size={16} />
+                    </button>
+                    <button onClick={() => toggleCategoryStatus(cat._id, cat.isActive)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: colors.textSecondary }} title={cat.isActive ? 'Deactivate' : 'Activate'}>
+                      {cat.isActive ? <XCircle size={16} /> : <CheckCircle size={16} />}
+                    </button>
+                    <button onClick={() => deleteCategory(cat._id, cat.name)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: colors.textSecondary }} title="Delete">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  // Category Modal Component
+  const CategoryModal = () => (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      backdropFilter: 'blur(4px)'
+    }} onClick={() => setShowCategoryModal(false)}>
+      <div style={{
+        background: colors.backgroundCard,
+        borderRadius: '16px',
+        width: '90%',
+        maxWidth: '550px',
+        maxHeight: '90vh',
+        overflow: 'auto'
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: `1px solid ${colors.border}` }}>
+          <h2 style={{ margin: 0, fontSize: '20px', color: colors.textPrimary }}>
+            {editingCategoryId ? 'Edit Category' : 'Create New Category'}
+          </h2>
+          <button onClick={() => setShowCategoryModal(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: colors.textSecondary }}>
+            <X size={20} />
+          </button>
+        </div>
+        
+        <form onSubmit={handleCategorySubmit}>
+          <div style={{ padding: '20px 24px' }}>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, fontSize: '14px', color: colors.textPrimary }}>
+                Category Name <span style={{ color: colors.danger }}>*</span>
+              </label>
+              <input
+                type="text"
+                value={categoryFormData.name}
+                onChange={e => setCategoryFormData({...categoryFormData, name: e.target.value})}
+                placeholder="Enter category name (e.g., Electronics, Clothing)"
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  background: colors.backgroundLight,
+                  color: colors.textPrimary
+                }}
+                required
+                autoFocus
+              />
+              <small style={{ fontSize: '11px', color: colors.textSecondary, marginTop: '4px', display: 'block' }}>
+                {categoryFormData.parentId ? 'This will be a subcategory' : 'This will be a main category'}
+              </small>
+            </div>
+            
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, fontSize: '14px', color: colors.textPrimary }}>Parent Category (Optional)</label>
+              <select
+                value={categoryFormData.parentId}
+                onChange={e => setCategoryFormData({...categoryFormData, parentId: e.target.value})}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  background: colors.backgroundLight,
+                  color: colors.textPrimary
+                }}
+                disabled={!!editingCategoryId}
+              >
+                <option value="">None (Main Category)</option>
+                {getParentCategories().map(cat => (
+                  <option key={cat._id} value={cat._id}>{cat.name}</option>
+                ))}
+              </select>
+              {categoryFormData.parentId && (
+                <small style={{ fontSize: '11px', color: colors.info, marginTop: '4px', display: 'block' }}>
+                  📎 This will be created as a SUB-category
+                </small>
+              )}
+            </div>
+            
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, fontSize: '14px', color: colors.textPrimary }}>Description</label>
+              <textarea
+                value={categoryFormData.description}
+                onChange={e => setCategoryFormData({...categoryFormData, description: e.target.value})}
+                placeholder="Enter category description"
+                rows="3"
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  resize: 'vertical',
+                  background: colors.backgroundLight,
+                  color: colors.textPrimary
+                }}
+              />
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, fontSize: '14px', color: colors.textPrimary }}>Icon</label>
+                <input
+                  type="text"
+                  value={categoryFormData.icon}
+                  onChange={e => setCategoryFormData({...categoryFormData, icon: e.target.value})}
+                  placeholder="📦"
+                  maxLength="10"
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    background: colors.backgroundLight,
+                    color: colors.textPrimary
+                  }}
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, fontSize: '14px', color: colors.textPrimary }}>Display Order</label>
+                <input
+                  type="number"
+                  value={categoryFormData.displayOrder}
+                  onChange={e => setCategoryFormData({...categoryFormData, displayOrder: parseInt(e.target.value) || 0})}
+                  min="0"
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    background: colors.backgroundLight,
+                    color: colors.textPrimary
+                  }}
+                />
+              </div>
+            </div>
+            
+            {editingCategoryId && (
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: colors.textPrimary }}>
+                  <input
+                    type="checkbox"
+                    checked={categoryFormData.isActive}
+                    onChange={e => setCategoryFormData({...categoryFormData, isActive: e.target.checked})}
+                  />
+                  <span>Active</span>
+                </label>
+              </div>
+            )}
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '20px 24px', borderTop: `1px solid ${colors.border}` }}>
+            <button
+              type="button"
+              onClick={() => setShowCategoryModal(false)}
+              style={{
+                padding: '10px 20px',
+                background: colors.backgroundLight,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                color: colors.textSecondary
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              style={{
+                padding: '10px 20px',
+                background: colors.primary,
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <Save size={16} />
+              {editingCategoryId ? 'Update Category' : 'Create Category'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
+  // Effects
+  useEffect(() => {
+    if (getCompanyId()) {
+      fetchStats();
+    }
+  }, [getCompanyId, refreshKey]);
+
+  useEffect(() => {
+    if (activeTab === 'categories' && getCompanyId()) {
+      fetchCategories();
+    }
+  }, [activeTab, fetchCategories, viewMode, categoryFilter, categorySearch, categoryPagination.page, refreshKey]);
+
+  // Loading state
+  if (authLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: colors.background }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: '50px', height: '50px', border: `4px solid ${colors.border}`, borderTop: `4px solid ${colors.primary}`, borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 20px' }}></div>
+          <p style={{ color: colors.textSecondary }}>Loading...</p>
+        </div>
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || (!isSuperAdmin && !isCompanyAdmin)) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', background: colors.background }}>
+        <div style={{ textAlign: 'center', padding: '40px', background: colors.backgroundCard, borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+          <AlertCircle size={48} color={colors.danger} style={{ marginBottom: '16px' }} />
+          <h2 style={{ color: colors.textPrimary }}>Access Denied</h2>
+          <p style={{ color: colors.textSecondary }}>You don't have permission to access this page.</p>
+          <button
+            onClick={() => router.push('/dashboard')}
+            style={{
+              padding: '10px 20px',
+              background: colors.primary,
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              marginTop: '16px'
+            }}
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: colors.background }}>
+      <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 600, color: colors.textPrimary }}>Masters Management</h1>
+            <p style={{ margin: '4px 0 0', color: colors.textSecondary, fontSize: '14px' }}>Manage categories and track your business metrics</p>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              style={{
+                padding: '10px',
+                background: colors.backgroundCard,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                color: colors.textPrimary,
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+            >
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+              <span style={{ fontSize: '14px', fontWeight: 500 }}>{theme === 'light' ? 'Dark' : 'Light'}</span>
+            </button>
+            
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => { setActiveTab('stats'); }}
+                style={{
+                  padding: '10px 20px',
+                  background: activeTab === 'stats' ? colors.primary : colors.backgroundCard,
+                  color: activeTab === 'stats' ? 'white' : colors.textSecondary,
+                  border: `1px solid ${activeTab === 'stats' ? colors.primary : colors.border}`,
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <BarChart3 size={16} />
+                Stats
+              </button>
+              <button
+                onClick={() => { setActiveTab('categories'); }}
+                style={{
+                  padding: '10px 20px',
+                  background: activeTab === 'categories' ? colors.primary : colors.backgroundCard,
+                  color: activeTab === 'categories' ? 'white' : colors.textSecondary,
+                  border: `1px solid ${activeTab === 'categories' ? colors.primary : colors.border}`,
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <FolderTree size={16} />
+                Categories
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Success/Error Messages */}
+        {successMessage && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '12px 20px',
+            background: `${colors.success}15`,
+            borderRadius: '10px',
+            marginBottom: '20px',
+            borderLeft: `4px solid ${colors.success}`
+          }}>
+            <CheckCircle size={20} color={colors.success} />
+            <p style={{ margin: 0, flex: 1, color: colors.success }}>{successMessage}</p>
+            <button onClick={() => setSuccessMessage(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.success }}>
+              <X size={18} />
+            </button>
+          </div>
+        )}
+        
+        {error && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '12px 20px',
+            background: `${colors.danger}15`,
+            borderRadius: '10px',
+            marginBottom: '20px',
+            borderLeft: `4px solid ${colors.danger}`
+          }}>
+            <AlertCircle size={20} color={colors.danger} />
+            <p style={{ margin: 0, flex: 1, color: colors.danger }}>{error}</p>
+            <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.danger }}>
+              <X size={18} />
+            </button>
+          </div>
+        )}
+
+        {/* Content */}
+        {activeTab === 'stats' && renderStats()}
+
+        {activeTab === 'categories' && (
+          <>
+            {/* Toolbar */}
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              marginBottom: '24px',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              background: colors.backgroundCard,
+              padding: '16px',
+              borderRadius: '12px',
+              border: `1px solid ${colors.border}`
+            }}>
+              <div style={{ flex: 1, minWidth: '250px', position: 'relative' }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: colors.textSecondary }} />
+                <input
+                  type="text"
+                  placeholder="Search categories..."
+                  value={categorySearch}
+                  onChange={e => { setCategorySearch(e.target.value); setCategoryPagination(prev => ({ ...prev, page: 1 })); }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px 10px 36px',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    background: colors.backgroundLight,
+                    color: colors.textPrimary
+                  }}
+                />
+              </div>
+              
+              <select
+                value={categoryFilter}
+                onChange={e => { setCategoryFilter(e.target.value); setCategoryPagination(prev => ({ ...prev, page: 1 })); }}
+                style={{
+                  padding: '10px 12px',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  background: colors.backgroundLight,
+                  color: colors.textPrimary,
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="all">All Categories</option>
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
+              </select>
+              
+              <div style={{ display: 'flex', gap: '4px', background: colors.backgroundLight, padding: '4px', borderRadius: '10px' }}>
+                <button
+                  onClick={() => setViewMode('tree')}
+                  style={{
+                    padding: '8px 16px',
+                    background: viewMode === 'tree' ? colors.backgroundCard : 'transparent',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: viewMode === 'tree' ? colors.primary : colors.textSecondary,
+                    boxShadow: viewMode === 'tree' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                  }}
+                >
+                  <FolderTree size={16} />
+                  Tree
+                </button>
+                <button
+                  onClick={() => setViewMode('flat')}
+                  style={{
+                    padding: '8px 16px',
+                    background: viewMode === 'flat' ? colors.backgroundCard : 'transparent',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: viewMode === 'flat' ? colors.primary : colors.textSecondary,
+                    boxShadow: viewMode === 'flat' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                  }}
+                >
+                  <List size={16} />
+                  List
+                </button>
+              </div>
+              
+              <button
+                onClick={() => { resetCategoryForm(); setShowCategoryModal(true); }}
+                style={{
+                  padding: '10px 20px',
+                  background: colors.primary,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontWeight: 500,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                <Plus size={16} />
+                Add Category
+              </button>
+            </div>
+
+            {/* Categories Content */}
+            {loading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ width: '40px', height: '40px', border: `3px solid ${colors.border}`, borderTopColor: colors.primary, borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }}></div>
+                  <p style={{ color: colors.textSecondary }}>Loading categories...</p>
+                </div>
+              </div>
+            ) : viewMode === 'tree' ? (
+              <div style={{
+                background: colors.backgroundCard,
+                borderRadius: '12px',
+                border: `1px solid ${colors.border}`,
+                overflow: 'hidden',
+                padding: '16px'
+              }}>
+                {renderCategoryTree(categoryTree)}
+              </div>
+            ) : (
+              <>
+                {renderFlatCategories()}
+                {categoryPagination.totalPages > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px', padding: '16px' }}>
+                    <button
+                      onClick={() => setCategoryPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                      disabled={categoryPagination.page === 1}
+                      style={{
+                        padding: '8px 16px',
+                        background: colors.backgroundLight,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '6px',
+                        cursor: categoryPagination.page === 1 ? 'not-allowed' : 'pointer',
+                        opacity: categoryPagination.page === 1 ? 0.5 : 1,
+                        color: colors.textPrimary
+                      }}
+                    >
+                      Previous
+                    </button>
+                    <span style={{ color: colors.textSecondary }}>
+                      Page {categoryPagination.page} of {categoryPagination.totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCategoryPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                      disabled={categoryPagination.page === categoryPagination.totalPages}
+                      style={{
+                        padding: '8px 16px',
+                        background: colors.backgroundLight,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '6px',
+                        cursor: categoryPagination.page === categoryPagination.totalPages ? 'not-allowed' : 'pointer',
+                        opacity: categoryPagination.page === categoryPagination.totalPages ? 0.5 : 1,
+                        color: colors.textPrimary
+                      }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {/* Modals */}
+        {showCategoryModal && <CategoryModal />}
+      </div>
+    </div>
   );
 }
