@@ -845,13 +845,17 @@ export default function CatalogPage() {
     else { saveWishlist([...wishlist, product]); showToast('Added to wishlist', 'success'); }
   }, [wishlist, saveWishlist]);
 
-  const buyNow = useCallback((product) => {
-    const whatsappNumber = companyInfo?.whatsappNumber || '919876543210';
-    const cleanNumber = whatsappNumber.replace(/\D/g, '');
-    const finalNumber = cleanNumber.length === 10 ? `91${cleanNumber}` : cleanNumber;
-    const message = encodeURIComponent(`I'm interested in: ${product.productName}\nPrice: ₹${product.discountPrice?.toLocaleString()}`);
-    window.open(`https://wa.me/${finalNumber}?text=${message}`, '_blank');
-  }, [companyInfo]);
+const buyNow = useCallback((product) => {
+  const whatsappNumber = companyInfo?.whatsappNumber || '919876543210';
+
+  const cleanNumber = whatsappNumber.replace(/\D/g, '');
+  const finalNumber = cleanNumber.length === 10 ? `91${cleanNumber}` : cleanNumber;
+
+  // ✅ ONLY product name
+  const message = encodeURIComponent(product?.productName || 'Product');
+
+  window.open(`https://wa.me/${finalNumber}?text=${message}`, '_blank');
+}, [companyInfo]);
 
   const showToast = (message, type = 'success') => {
     const toast = document.createElement('div');
