@@ -1,4 +1,13 @@
 {
+  "dependencies": {
+    "mongod": "^2.0.0"
+  }
+}
+
+
+
+
+{
   "name": "ai-ecommerce",
   "lockfileVersion": 3,
   "requires": true,
