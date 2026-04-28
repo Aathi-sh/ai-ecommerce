@@ -66,25 +66,37 @@ import LogoSplash from '../src/components/logoSplash';
 const inter = Inter({ subsets: ['latin'] });
 
 export default function RootLayout({ children }) {
-  const [showSplash, setShowSplash] = useState(true);
+  // Start with null to indicate "not yet determined"
+  const [showSplash, setShowSplash] = useState(null);
   const [session, setSession] = useState(null);
 
   useEffect(() => {
     // Get session on client side
     const getSession = async () => {
-      const { getSession } = await import('next-auth/react');
-      const sessionData = await getSession();
-      setSession(sessionData);
+      try {
+        const { getSession } = await import('next-auth/react');
+        const sessionData = await getSession();
+        setSession(sessionData);
+      } catch (error) {
+        console.error('Failed to get session:', error);
+        setSession(null);
+      }
     };
     getSession();
 
     // Check if splash already shown in this browser session
-    const splashShown = sessionStorage.getItem('splashShown');
-    if (splashShown) {
-      setShowSplash(false);
-    } else {
+    try {
+      const splashShown = sessionStorage.getItem('splashShown');
+      if (splashShown) {
+        setShowSplash(false);
+      } else {
+        setShowSplash(true);
+        sessionStorage.setItem('splashShown', 'true');
+      }
+    } catch (error) {
+      // sessionStorage might not be available (SSR or private browsing)
+      console.warn('sessionStorage not available, showing splash by default');
       setShowSplash(true);
-      sessionStorage.setItem('splashShown', 'true');
     }
   }, []);
 
@@ -92,9 +104,36 @@ export default function RootLayout({ children }) {
     setShowSplash(false);
   };
 
+  // Show loading state while determining if splash should show
+  if (showSplash === null) {
+    return null; // Or a minimal loading indicator
+  }
+
   // Show splash for EVERYONE first
   if (showSplash) {
-    return <LogoSplash onComplete={handleSplashComplete} />;
+    return (
+      <html lang="en" suppressHydrationWarning>
+        <head>
+          <link rel="icon" href="/favicon.ico" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+          <meta name="theme-color" content="#ffffff" />
+          <meta name="description" content="Professional E-commerce Platform" />
+          
+          {/* Open Graph Meta Tags */}
+          <meta property="og:title" content="Steponext Product" />
+          <meta property="og:description" content="Professional E-commerce Platform" />
+          <meta property="og:type" content="website" />
+          
+          {/* Twitter Card Meta Tags */}
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content="Steponext Product" />
+          <meta name="twitter:description" content="Professional E-commerce Platform" />
+        </head>
+        <body className={inter.className}>
+          <LogoSplash onComplete={handleSplashComplete} />
+        </body>
+      </html>
+    );
   }
 
   return (
@@ -121,7 +160,7 @@ export default function RootLayout({ children }) {
         </Providers>
         
         {/* Global loading indicator */}
-        <div id="global-loader">
+        <div id="global-loader" style={{ display: 'none' }}>
           <div className="loader-spinner"></div>
         </div>
       </body>
