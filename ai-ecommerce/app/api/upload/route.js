@@ -75,32 +75,24 @@
 
 
 
-
-
-
 // ==================== FILE UPLOAD API WITH OPTIMAL CONFIGURATION ====================
 
 import { NextResponse } from "next/server";
-import { writeFile, mkdir, stat } from "fs/promises";
+import { writeFile, mkdir, stat, unlink } from "fs/promises";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import sharp from "sharp"; // Optional: for image optimization (install: npm install sharp)
 
-// ==================== CONFIGURATION ====================
-export const config = {
-  api: {
-    bodyParser: false, // Disable default body parser to handle large files
-    responseLimit: false, // Disable response size limit
-  },
-};
+// ==================== NEXT.JS 14+ ROUTE SEGMENT CONFIGURATION ====================
+// Note: The old `export const config = { api: { bodyParser: false } }` is DEPRECATED in Next.js 14+
+// Use these new route segment config options instead:
 
-// Server configuration for Next.js App Router
-export const maxDuration = 60; // Maximum duration for serverless function (Vercel)
+export const maxDuration = 60; // Maximum duration for serverless function (60 seconds)
 export const dynamic = 'force-dynamic'; // Prevent static optimization
+export const runtime = 'nodejs'; // Use Node.js runtime for filesystem operations
 
-// Image configuration
+// ==================== IMAGE CONFIGURATION ====================
 const IMAGE_CONFIG = {
-  MAX_FILE_SIZE_MB: 2, // Professional standard: 2MB per image (changed from 5MB)
+  MAX_FILE_SIZE_MB: 2, // Professional standard: 2MB per image
   MAX_FILE_SIZE_BYTES: 2 * 1024 * 1024, // 2,097,152 bytes
   MAX_TOTAL_PER_PRODUCT_MB: 8, // 8MB total across all images
   ALLOWED_TYPES: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
@@ -110,7 +102,7 @@ const IMAGE_CONFIG = {
     width: 1920,
     height: 1920,
   },
-  OPTIMIZE: true, // Enable image optimization
+  OPTIMIZE: true, // Enable image optimization (requires sharp)
 };
 
 // ==================== HELPER FUNCTIONS ====================
@@ -123,13 +115,13 @@ async function optimizeImage(buffer, originalName) {
   if (!IMAGE_CONFIG.OPTIMIZE) return buffer;
   
   try {
-    // Check if sharp is available
+    // Dynamically import sharp - will fail gracefully if not installed
     let sharpLib;
     try {
       sharpLib = await import('sharp');
       sharpLib = sharpLib.default;
     } catch (err) {
-      console.log("Sharp not installed, skipping optimization");
+      console.log("⚠️ Sharp not installed, skipping image optimization. Install with: npm install sharp --legacy-peer-deps");
       return buffer;
     }
     
@@ -167,11 +159,14 @@ async function optimizeImage(buffer, originalName) {
       optimizedBuffer = buffer;
     }
     
-    console.log(`Image optimized: ${(buffer.length / 1024).toFixed(2)}KB → ${(optimizedBuffer.length / 1024).toFixed(2)}KB`);
+    const savedPercent = ((buffer.length - optimizedBuffer.length) / buffer.length * 100).toFixed(1);
+    if (parseFloat(savedPercent) > 0) {
+      console.log(`✅ Image optimized: ${(buffer.length / 1024).toFixed(2)}KB → ${(optimizedBuffer.length / 1024).toFixed(2)}KB (saved ${savedPercent}%)`);
+    }
     return optimizedBuffer;
     
   } catch (error) {
-    console.error("Image optimization failed:", error);
+    console.error("❌ Image optimization failed:", error.message);
     return buffer; // Return original if optimization fails
   }
 }
@@ -197,7 +192,7 @@ export async function POST(request) {
   const startTime = Date.now();
   
   try {
-    // Parse multipart form data with larger limit
+    // Parse multipart form data - works without bodyParser config in Next.js 14+
     const formData = await request.formData();
     const file = formData.get("file");
     
@@ -247,7 +242,7 @@ export async function POST(request) {
       return NextResponse.json(
         { 
           success: false, 
-          message: `File too large. Maximum size is ${IMAGE_CONFIG.MAX_FILE_SIZE_MB}MB per image. Your file: ${getFileSizeMB(file.size)}MB`,
+          message: `File too large. Maximum size is ${IMAGE_CONFIG.MAX_FILE_SIZE_MB}MB per image. Your file: ${getFileSizeMB(file.size)}MB. Please compress your image.`,
           code: "FILE_TOO_LARGE",
           fileSize: file.size,
           maxSize: IMAGE_CONFIG.MAX_FILE_SIZE_BYTES
@@ -266,7 +261,7 @@ export async function POST(request) {
         return NextResponse.json(
           { 
             success: false, 
-            message: `Cannot upload. Total product images would exceed ${IMAGE_CONFIG.MAX_TOTAL_PER_PRODUCT_MB}MB limit. Remaining space: ${remainingMB}MB`,
+            message: `Cannot upload. Total product images would exceed ${IMAGE_CONFIG.MAX_TOTAL_PER_PRODUCT_MB}MB limit. Remaining space: ${remainingMB}MB. Remove some images first.`,
             code: "TOTAL_LIMIT_EXCEEDED",
             currentTotal: currentTotalSize,
             fileSize: file.size,
@@ -281,18 +276,19 @@ export async function POST(request) {
     // Read file buffer
     const bytes = await file.arrayBuffer();
     let buffer = Buffer.from(bytes);
-
-    // Optimize image (compress and resize)
     const originalSize = buffer.length;
+
+    // Optimize image (compress and resize) - graceful fallback if sharp not installed
     buffer = await optimizeImage(buffer, file.name);
     const optimizedSize = buffer.length;
-    const savedPercent = ((originalSize - optimizedSize) / originalSize * 100).toFixed(1);
+    const savedPercent = originalSize > 0 ? ((originalSize - optimizedSize) / originalSize * 100).toFixed(1) : "0";
 
     // Create uploads directory with date-based subfolders for organization
     const date = new Date();
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const uploadsDir = path.join(process.cwd(), "public/uploads", year.toString(), month);
+    const day = String(date.getDate()).padStart(2, '0');
+    const uploadsDir = path.join(process.cwd(), "public/uploads", year.toString(), month, day);
     
     try {
       await mkdir(uploadsDir, { recursive: true });
@@ -317,10 +313,12 @@ export async function POST(request) {
     }
 
     // Generate public URL
-    const imageUrl = `/uploads/${year}/${month}/${fileName}`;
+    const imageUrl = `/uploads/${year}/${month}/${day}/${fileName}`;
 
     // Calculate processing time
     const processingTime = Date.now() - startTime;
+
+    console.log(`✅ Upload successful: ${fileName} (${getFileSizeMB(optimizedSize)}MB) in ${processingTime}ms`);
 
     // Success response with detailed info
     return NextResponse.json({
@@ -336,18 +334,17 @@ export async function POST(request) {
         savedPercent: savedPercent,
         mimeType: file.type,
         processingTime: `${processingTime}ms`,
-        dimensions: IMAGE_CONFIG.MAX_DIMENSIONS
       }
     });
 
   } catch (error) {
-    console.error("Upload error details:", {
+    console.error("❌ Upload error details:", {
       message: error.message,
       stack: error.stack,
       timestamp: new Date().toISOString()
     });
     
-    // Handle specific errors
+    // Handle specific errors with user-friendly messages
     if (error.code === 'ENOSPC') {
       return NextResponse.json(
         { 
@@ -363,10 +360,22 @@ export async function POST(request) {
       return NextResponse.json(
         { 
           success: false, 
-          message: "Permission denied. Cannot save file.",
+          message: "Permission denied. Cannot save file. Please check folder permissions.",
           code: "PERMISSION_DENIED"
         },
         { status: 403 }
+      );
+    }
+    
+    // Check for specific file-related errors
+    if (error.message.includes("EISDIR")) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: "Invalid file path. Please try again.",
+          code: "INVALID_PATH"
+        },
+        { status: 400 }
       );
     }
     
@@ -382,7 +391,7 @@ export async function POST(request) {
   }
 }
 
-// ==================== OPTIONAL: DELETE UPLOADED FILE ====================
+// ==================== DELETE UPLOADED FILE ====================
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -395,20 +404,31 @@ export async function DELETE(request) {
       );
     }
     
-    // Convert URL to filesystem path
-    const filePath = path.join(process.cwd(), "public", fileUrl);
-    
     // Security: Ensure path is within uploads directory
-    if (!filePath.includes("/uploads/")) {
+    if (!fileUrl.includes("/uploads/")) {
       return NextResponse.json(
         { success: false, message: "Invalid file path" },
         { status: 400 }
       );
     }
     
-    // Delete file (implement fs.unlink)
-    const { unlink } = await import("fs/promises");
+    // Convert URL to filesystem path
+    const filePath = path.join(process.cwd(), "public", fileUrl);
+    
+    // Additional security: Normalize and verify path is within public/uploads
+    const normalizedPath = path.normalize(filePath);
+    const uploadsPath = path.normalize(path.join(process.cwd(), "public/uploads"));
+    if (!normalizedPath.startsWith(uploadsPath)) {
+      return NextResponse.json(
+        { success: false, message: "Access denied" },
+        { status: 403 }
+      );
+    }
+    
+    // Delete file
     await unlink(filePath);
+    
+    console.log(`🗑️ File deleted: ${fileUrl}`);
     
     return NextResponse.json({
       success: true,
@@ -416,7 +436,15 @@ export async function DELETE(request) {
     });
     
   } catch (error) {
-    console.error("Delete error:", error);
+    console.error("❌ Delete error:", error);
+    
+    if (error.code === 'ENOENT') {
+      return NextResponse.json(
+        { success: false, message: "File not found" },
+        { status: 404 }
+      );
+    }
+    
     return NextResponse.json(
       { success: false, message: "Failed to delete file" },
       { status: 500 }
