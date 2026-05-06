@@ -1,4 +1,3 @@
-
 // app/admin/products/page.js
 "use client";
 
@@ -209,7 +208,7 @@ const MobileProductCard = ({ product, onEdit, onDelete, onToggleStatus, appTheme
             </span>
           </div>
 
-          {/* Company Badge - NEW */}
+          {/* Company Badge */}
           {user?.companyName && (
             <div style={{
               display: "flex",
@@ -799,6 +798,31 @@ export default function ProductTablePage() {
     }
   }, [user]);
 
+  // ✅ FIX 3: Refresh products on window focus (when coming back from add/edit page)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (user?.companyId) {
+        fetchProducts();
+        fetchCategories();
+      }
+    };
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user?.companyId) {
+        fetchProducts();
+        fetchCategories();
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user?.companyId]);
+
   // Update subcategories when category changes
   useEffect(() => {
     if (selectedCategory && selectedCategory !== 'all') {
@@ -811,7 +835,7 @@ export default function ProductTablePage() {
     }
   }, [selectedCategory, categories]);
 
-  // Fetch all categories - FIXED
+  // Fetch all categories
   const fetchCategories = async () => {
     setLoadingCategories(true);
     try {
@@ -853,14 +877,20 @@ export default function ProductTablePage() {
     }
   };
 
-  // Fetch all products with company context
+  // ✅ FIX 1: Fetch all products with cache busting
   const fetchProducts = async () => {
     try {
       setLoading(true);
       setApiError(null);
       
-      const res = await fetch("/api/products?isActive=all", {
-        headers: getAuthHeaders()
+      // ✅ Add timestamp and cache control to prevent stale data
+      const res = await fetch(`/api/products?isActive=all&_t=${Date.now()}`, {
+        headers: {
+          ...getAuthHeaders(),
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        },
+        cache: 'no-store'
       });
       
       if (!res.ok) {
@@ -901,33 +931,16 @@ export default function ProductTablePage() {
     }
   }, [user]);
 
-  // Refresh products when page becomes visible (after returning from add/edit)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && user?.companyId) {
-        fetchProducts();
-        fetchCategories();
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [user?.companyId]);
-
   // Get unique brands for filters
   const brands = useMemo(() => {
     const br = [...new Set(products.map(p => p.brand).filter(Boolean))];
     return ["all", ...br];
   }, [products]);
 
-  // Filter and search products with enhanced criteria - FIXED
+  // Filter and search products
   useEffect(() => {
     let filtered = [...products];
 
-    // Apply status filter
     switch (activeFilter) {
       case "low":
         filtered = filtered.filter(product => 
@@ -955,7 +968,6 @@ export default function ProductTablePage() {
         break;
     }
 
-    // Apply category filter using ID - FIXED
     if (selectedCategory !== "all") {
       filtered = filtered.filter(product => {
         const productCategoryId = product.category?._id || product.category;
@@ -963,7 +975,6 @@ export default function ProductTablePage() {
       });
     }
 
-    // Apply subcategory filter using ID - FIXED
     if (selectedSubCategory !== "all") {
       filtered = filtered.filter(product => {
         const productSubCategoryId = product.subCategory?._id || product.subCategory;
@@ -971,12 +982,10 @@ export default function ProductTablePage() {
       });
     }
 
-    // Apply brand filter
     if (selectedBrand !== "all") {
       filtered = filtered.filter(product => product.brand === selectedBrand);
     }
 
-    // Apply price range filter
     if (priceRange.min) {
       const min = safeNumber(priceRange.min);
       filtered = filtered.filter(product => safeNumber(product.discountPrice) >= min);
@@ -986,7 +995,6 @@ export default function ProductTablePage() {
       filtered = filtered.filter(product => safeNumber(product.discountPrice) <= max);
     }
 
-    // Apply custom ID filter
     if (customIdFilter.trim()) {
       const idNum = parseInt(customIdFilter, 10);
       if (!isNaN(idNum)) {
@@ -999,7 +1007,6 @@ export default function ProductTablePage() {
       }
     }
 
-    // Apply search
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
       filtered = filtered.filter(product => {
@@ -1023,12 +1030,11 @@ export default function ProductTablePage() {
     setFilteredProducts(filtered);
   }, [activeFilter, searchTerm, products, selectedCategory, selectedSubCategory, selectedBrand, priceRange, customIdFilter]);
 
-  // Edit handler - using MongoDB _id for navigation
   const handleEdit = (product) => {
     router.push(`/admin/products/productForm?id=${product._id}`);
   };
 
-  // Delete handler
+  // ✅ FIX 2: Delete handler with immediate state removal
   const handleDelete = async (product) => {
     if (!confirm(`Are you sure you want to delete "${product.productName}" (ID: ${product.formattedId})? This action cannot be undone.`)) return;
 
@@ -1041,8 +1047,14 @@ export default function ProductTablePage() {
       const data = await res.json();
       
       if (data.success) {
+        // ✅ Remove from state immediately for instant UI update
+        setProducts(prev => prev.filter(p => p._id !== product._id));
+        setFilteredProducts(prev => prev.filter(p => p._id !== product._id));
+        
         alert(`"${product.productName}" has been deleted successfully.`);
-        fetchProducts();
+        
+        // ✅ Refresh from server after short delay to sync
+        setTimeout(() => fetchProducts(), 500);
       } else {
         alert(`Failed to delete product: ${data.message}`);
       }
@@ -1052,7 +1064,6 @@ export default function ProductTablePage() {
     }
   };
 
-  // Toggle product status
   const handleToggleStatus = async (product) => {
     const newStatus = !product.isActive;
     const action = newStatus ? "activate" : "deactivate";
@@ -1086,7 +1097,6 @@ export default function ProductTablePage() {
     }
   };
 
-  // Calculate comprehensive statistics
   const statistics = useMemo(() => {
     const stats = {
       total: products.length,
@@ -1119,7 +1129,6 @@ export default function ProductTablePage() {
     return stats;
   }, [products]);
 
-  // Reset all filters
   const resetFilters = () => {
     setActiveFilter("all");
     setSelectedCategory("all");
@@ -1130,7 +1139,6 @@ export default function ProductTablePage() {
     setSearchTerm("");
   };
 
-  // Show loading if auth not ready
   if (!isAuthenticated || !user) {
     return (
       <div style={{
@@ -1156,7 +1164,6 @@ export default function ProductTablePage() {
     );
   }
 
-  // Columns for desktop table with proper category display
   const columns = [
     { 
       header: "ID", 
@@ -1723,7 +1730,6 @@ export default function ProductTablePage() {
             gridTemplateColumns: isMobile ? "1fr" : "repeat(6, 1fr)",
             gap: "12px"
           }}>
-            {/* Category Filter with Hierarchy */}
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
@@ -1752,7 +1758,6 @@ export default function ProductTablePage() {
               ))}
             </select>
 
-            {/* SubCategory Filter */}
             <select
               value={selectedSubCategory}
               onChange={(e) => setSelectedSubCategory(e.target.value)}
@@ -1776,7 +1781,6 @@ export default function ProductTablePage() {
               ))}
             </select>
 
-            {/* Brand Filter */}
             <select
               value={selectedBrand}
               onChange={(e) => setSelectedBrand(e.target.value)}
@@ -1797,7 +1801,6 @@ export default function ProductTablePage() {
               ))}
             </select>
 
-            {/* Price Range */}
             <div style={{ display: "flex", gap: "8px" }}>
               <input
                 type="number"
@@ -1833,7 +1836,6 @@ export default function ProductTablePage() {
               />
             </div>
 
-            {/* Custom ID Filter */}
             <input
               type="text"
               placeholder="Product ID (00123)"
@@ -1936,381 +1938,97 @@ export default function ProductTablePage() {
           width: "100%"
         }}
       >
-        <StatCard
-          label="All Products"
-          value={statistics.total}
-          filter="all"
-          active={activeFilter === "all"}
-          onClick={() => setActiveFilter("all")}
-          color={appTheme.colors.primary}
-          icon="📦"
-          isMobile={isMobile}
-        />
-        <StatCard
-          label="Active"
-          value={statistics.active}
-          filter="active"
-          active={activeFilter === "active"}
-          onClick={() => setActiveFilter("active")}
-          color={appTheme.colors.success}
-          icon="✅"
-          isMobile={isMobile}
-        />
-        <StatCard
-          label="Low Stock"
-          value={statistics.lowStock}
-          filter="low"
-          active={activeFilter === "low"}
-          onClick={() => setActiveFilter("low")}
-          color={appTheme.colors.warning}
-          icon="⚠️"
-          isMobile={isMobile}
-        />
-        <StatCard
-          label="Out of Stock"
-          value={statistics.outOfStock}
-          filter="out"
-          active={activeFilter === "out"}
-          onClick={() => setActiveFilter("out")}
-          color={appTheme.colors.error}
-          icon="🚫"
-          isMobile={isMobile}
-        />
+        <StatCard label="All Products" value={statistics.total} filter="all" active={activeFilter === "all"} onClick={() => setActiveFilter("all")} color={appTheme.colors.primary} icon="📦" isMobile={isMobile} />
+        <StatCard label="Active" value={statistics.active} filter="active" active={activeFilter === "active"} onClick={() => setActiveFilter("active")} color={appTheme.colors.success} icon="✅" isMobile={isMobile} />
+        <StatCard label="Low Stock" value={statistics.lowStock} filter="low" active={activeFilter === "low"} onClick={() => setActiveFilter("low")} color={appTheme.colors.warning} icon="⚠️" isMobile={isMobile} />
+        <StatCard label="Out of Stock" value={statistics.outOfStock} filter="out" active={activeFilter === "out"} onClick={() => setActiveFilter("out")} color={appTheme.colors.error} icon="🚫" isMobile={isMobile} />
       </div>
 
       {/* Secondary Statistics */}
       {!isMobile && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(5, 1fr)",
-            gap: "16px",
-            marginBottom: "24px"
-          }}
-        >
-          <MetricCard
-            label="Inventory Value"
-            value={`₹${safeToFixed(statistics.totalValue)}`}
-            icon={<FaChartLine />}
-            color={appTheme.colors.info}
-          />
-          <MetricCard
-            label="Featured Products"
-            value={statistics.featured}
-            icon={<FaStar />}
-            color={appTheme.colors.warning}
-          />
-          <MetricCard
-            label="On Sale"
-            value={statistics.onSale}
-            icon={<FaFire />}
-            color={appTheme.colors.success}
-          />
-          <MetricCard
-            label="Avg Rating"
-            value={safeToFixed(statistics.avgRating, 1)}
-            icon="⭐"
-            color={appTheme.colors.secondary}
-          />
-          <MetricCard
-            label="ID Range"
-            value={`${statistics.minCustomId} - ${statistics.maxCustomId}`}
-            icon={<FaHashtag />}
-            color={appTheme.colors.primary}
-          />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "16px", marginBottom: "24px" }}>
+          <MetricCard label="Inventory Value" value={`₹${safeToFixed(statistics.totalValue)}`} icon={<FaChartLine />} color={appTheme.colors.info} />
+          <MetricCard label="Featured Products" value={statistics.featured} icon={<FaStar />} color={appTheme.colors.warning} />
+          <MetricCard label="On Sale" value={statistics.onSale} icon={<FaFire />} color={appTheme.colors.success} />
+          <MetricCard label="Avg Rating" value={safeToFixed(statistics.avgRating, 1)} icon="⭐" color={appTheme.colors.secondary} />
+          <MetricCard label="ID Range" value={`${statistics.minCustomId} - ${statistics.maxCustomId}`} icon={<FaHashtag />} color={appTheme.colors.primary} />
         </div>
       )}
 
       {/* Active Filter Info */}
       {activeFilter !== "all" && (
-        <div style={{ 
-          backgroundColor: appTheme.colors.surface, 
-          padding: "12px 16px", 
-          borderRadius: "10px", 
-          marginBottom: "16px", 
-          border: `1px solid ${appTheme.colors.border}`, 
-          display: "flex", 
-          flexDirection: isMobile ? "column" : "row",
-          justifyContent: "space-between", 
-          alignItems: isMobile ? "stretch" : "center",
-          gap: isMobile ? "10px" : "0",
-          width: "100%"
-        }}>
-          <div style={{ 
-            display: "flex", 
-            alignItems: "center", 
-            gap: isMobile ? "6px" : "8px",
-            flexWrap: "wrap" 
-          }}>
-            <span style={{ 
-              fontSize: isMobile ? "0.9rem" : "1rem", 
-              fontWeight: "600", 
-              color: appTheme.colors.textPrimary 
-            }}>
-              {activeFilter === "active" ? "Active Products" :
-               activeFilter === "low" ? "Low Stock Products" :
-               activeFilter === "out" ? "Out of Stock Products" :
-               activeFilter === "featured" ? "Featured Products" :
-               "Inactive Products"}
+        <div style={{ backgroundColor: appTheme.colors.surface, padding: "12px 16px", borderRadius: "10px", marginBottom: "16px", border: `1px solid ${appTheme.colors.border}`, display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", gap: isMobile ? "10px" : "0", width: "100%" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "6px" : "8px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: isMobile ? "0.9rem" : "1rem", fontWeight: "600", color: appTheme.colors.textPrimary }}>
+              {activeFilter === "active" ? "Active Products" : activeFilter === "low" ? "Low Stock Products" : activeFilter === "out" ? "Out of Stock Products" : activeFilter === "featured" ? "Featured Products" : "Inactive Products"}
             </span>
-            <span style={{ 
-              fontSize: "0.75rem", 
-              color: appTheme.colors.textSecondary,
-              backgroundColor: appTheme.colors.background,
-              padding: "4px 8px",
-              borderRadius: "6px",
-              fontWeight: "500",
-              whiteSpace: "nowrap"
-            }}>
+            <span style={{ fontSize: "0.75rem", color: appTheme.colors.textSecondary, backgroundColor: appTheme.colors.background, padding: "4px 8px", borderRadius: "6px", fontWeight: "500", whiteSpace: "nowrap" }}>
               {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''}
             </span>
           </div>
-          <button
-            onClick={() => setActiveFilter("all")}
-            style={{
-              backgroundColor: "transparent",
-              color: appTheme.colors.primary,
-              border: `1px solid ${appTheme.colors.primary}`,
-              padding: "6px 12px",
-              borderRadius: "8px",
-              cursor: "pointer",
-              fontSize: "0.8rem",
-              fontWeight: "500",
-              transition: "all 0.2s ease",
-              whiteSpace: "nowrap",
-              minHeight: "36px",
-              width: isMobile ? "100%" : "auto"
-            }}
-          >
+          <button onClick={() => setActiveFilter("all")} style={{ backgroundColor: "transparent", color: appTheme.colors.primary, border: `1px solid ${appTheme.colors.primary}`, padding: "6px 12px", borderRadius: "8px", cursor: "pointer", fontSize: "0.8rem", fontWeight: "500", transition: "all 0.2s ease", whiteSpace: "nowrap", minHeight: "36px", width: isMobile ? "100%" : "auto" }}>
             {isMobile ? "Show All" : "Show All Products"}
           </button>
         </div>
       )}
 
       {/* Products Content */}
-      <div style={{ 
-        backgroundColor: appTheme.colors.surface, 
-        padding: isMobile ? "8px" : "24px", 
-        borderRadius: "12px", 
-        boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
-        border: `1px solid ${appTheme.colors.border}`,
-        width: "100%",
-        boxSizing: "border-box"
-      }}>
+      <div style={{ backgroundColor: appTheme.colors.surface, padding: isMobile ? "8px" : "24px", borderRadius: "12px", boxShadow: "0 2px 12px rgba(0,0,0,0.05)", border: `1px solid ${appTheme.colors.border}`, width: "100%", boxSizing: "border-box" }}>
         {loading ? (
-          <div style={{ 
-            display: "flex", 
-            flexDirection: "column",
-            justifyContent: "center", 
-            alignItems: "center", 
-            padding: "60px 20px",
-            textAlign: "center"
-          }}>
-            <div style={{ 
-              width: "50px", 
-              height: "50px", 
-              border: `3px solid ${appTheme.colors.border}`,
-              borderTop: `3px solid ${appTheme.colors.primary}`,
-              borderRadius: "50%",
-              marginBottom: "16px",
-              animation: "spin 1s linear infinite"
-            }} />
-            <div style={{ 
-              fontWeight: "600",
-              fontSize: isMobile ? "0.9rem" : "1rem",
-              color: appTheme.colors.textPrimary,
-              marginBottom: "4px"
-            }}>
-              Loading products...
-            </div>
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "60px 20px", textAlign: "center" }}>
+            <div style={{ width: "50px", height: "50px", border: `3px solid ${appTheme.colors.border}`, borderTop: `3px solid ${appTheme.colors.primary}`, borderRadius: "50%", marginBottom: "16px", animation: "spin 1s linear infinite" }} />
+            <div style={{ fontWeight: "600", fontSize: isMobile ? "0.9rem" : "1rem", color: appTheme.colors.textPrimary, marginBottom: "4px" }}>Loading products...</div>
           </div>
         ) : filteredProducts.length === 0 ? (
-          <div style={{ 
-            display: "flex", 
-            flexDirection: "column",
-            justifyContent: "center", 
-            alignItems: "center", 
-            padding: "60px 20px",
-            textAlign: "center"
-          }}>
-            <div style={{ 
-              fontSize: isMobile ? "3rem" : "4rem", 
-              marginBottom: isMobile ? "16px" : "20px",
-              color: appTheme.colors.border
-            }}>📦</div>
-            <div style={{ 
-              fontWeight: "600", 
-              fontSize: isMobile ? "1rem" : "1.1rem", 
-              marginBottom: "8px",
-              color: appTheme.colors.textPrimary
-            }}>
-              {searchTerm || activeFilter !== "all" || selectedCategory !== "all" || selectedSubCategory !== "all" || selectedBrand !== "all" || priceRange.min || priceRange.max || customIdFilter
-                ? "No products match your filters"
-                : "No products available"}
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "60px 20px", textAlign: "center" }}>
+            <div style={{ fontSize: isMobile ? "3rem" : "4rem", marginBottom: isMobile ? "16px" : "20px", color: appTheme.colors.border }}>📦</div>
+            <div style={{ fontWeight: "600", fontSize: isMobile ? "1rem" : "1.1rem", marginBottom: "8px", color: appTheme.colors.textPrimary }}>
+              {searchTerm || activeFilter !== "all" || selectedCategory !== "all" || selectedSubCategory !== "all" || selectedBrand !== "all" || priceRange.min || priceRange.max || customIdFilter ? "No products match your filters" : "No products available"}
             </div>
-            <div style={{ 
-              fontSize: isMobile ? "0.85rem" : "0.9rem", 
-              marginBottom: isMobile ? "16px" : "20px",
-              maxWidth: "400px",
-              lineHeight: 1.5,
-              color: appTheme.colors.textSecondary
-            }}>
-              {searchTerm || activeFilter !== "all" || selectedCategory !== "all" || selectedSubCategory !== "all" || selectedBrand !== "all" || priceRange.min || priceRange.max || customIdFilter
-                ? "Try adjusting your filters or search term"
-                : "Get started by adding your first product"}
+            <div style={{ fontSize: isMobile ? "0.85rem" : "0.9rem", marginBottom: isMobile ? "16px" : "20px", maxWidth: "400px", lineHeight: 1.5, color: appTheme.colors.textSecondary }}>
+              {searchTerm || activeFilter !== "all" || selectedCategory !== "all" || selectedSubCategory !== "all" || selectedBrand !== "all" || priceRange.min || priceRange.max || customIdFilter ? "Try adjusting your filters or search term" : "Get started by adding your first product"}
             </div>
-            <button
-              onClick={resetFilters}
-              style={{
-                backgroundColor: appTheme.colors.primary,
-                color: "#fff",
-                padding: isMobile ? "10px 20px" : "12px 24px",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
-                fontWeight: "600",
-                fontSize: isMobile ? "0.85rem" : "0.875rem",
-                minHeight: "44px",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px"
-              }}
-            >
-              <FaTimes size={14} />
-              Clear All Filters
+            <button onClick={resetFilters} style={{ backgroundColor: appTheme.colors.primary, color: "#fff", padding: isMobile ? "10px 20px" : "12px 24px", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "600", fontSize: isMobile ? "0.85rem" : "0.875rem", minHeight: "44px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <FaTimes size={14} /> Clear All Filters
             </button>
           </div>
         ) : isMobile ? (
-          // Mobile Card View
           <div>
-            <h3 style={{
-              fontSize: "1rem",
-              fontWeight: "600",
-              color: appTheme.colors.textPrimary,
-              marginBottom: "16px",
-              paddingBottom: "12px",
-              borderBottom: `1px solid ${appTheme.colors.border}`,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center"
-            }}>
+            <h3 style={{ fontSize: "1rem", fontWeight: "600", color: appTheme.colors.textPrimary, marginBottom: "16px", paddingBottom: "12px", borderBottom: `1px solid ${appTheme.colors.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span>Products ({filteredProducts.length})</span>
-              <span style={{
-                fontSize: "0.7rem",
-                color: appTheme.colors.textSecondary,
-                backgroundColor: appTheme.colors.background,
-                padding: "4px 8px",
-                borderRadius: "6px"
-              }}>
-                {activeFilter !== "all" ? activeFilter : "all"}
-              </span>
+              <span style={{ fontSize: "0.7rem", color: appTheme.colors.textSecondary, backgroundColor: appTheme.colors.background, padding: "4px 8px", borderRadius: "6px" }}>{activeFilter !== "all" ? activeFilter : "all"}</span>
             </h3>
             <div>
               {filteredProducts.map((product) => (
-                <MobileProductCard
-                  key={product._id}
-                  product={product}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onToggleStatus={handleToggleStatus}
-                  appTheme={appTheme}
-                  user={user}
-                />
+                <MobileProductCard key={product._id} product={product} onEdit={handleEdit} onDelete={handleDelete} onToggleStatus={handleToggleStatus} appTheme={appTheme} user={user} />
               ))}
             </div>
           </div>
         ) : (
-          // Desktop Table View
           <div style={{ width: "100%", overflowX: "auto" }}>
-            <div style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "20px",
-              flexWrap: "wrap",
-              gap: "8px"
-            }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "8px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <h3 style={{
-                  fontSize: "1.2rem",
-                  fontWeight: "600",
-                  color: appTheme.colors.textPrimary,
-                  margin: 0
-                }}>
-                  Product Inventory
-                </h3>
+                <h3 style={{ fontSize: "1.2rem", fontWeight: "600", color: appTheme.colors.textPrimary, margin: 0 }}>Product Inventory</h3>
                 {activeFilter !== "all" && (
-                  <span style={{
-                    backgroundColor: appTheme.colors.primary + "15",
-                    color: appTheme.colors.primary,
-                    padding: "4px 10px",
-                    borderRadius: "20px",
-                    fontSize: "0.7rem",
-                    fontWeight: "600"
-                  }}>
-                    {activeFilter === "active" ? "Active" :
-                     activeFilter === "low" ? "Low Stock" :
-                     activeFilter === "out" ? "Out of Stock" :
-                     activeFilter === "featured" ? "Featured" :
-                     activeFilter === "sale" ? "On Sale" :
-                     "Inactive"}
+                  <span style={{ backgroundColor: appTheme.colors.primary + "15", color: appTheme.colors.primary, padding: "4px 10px", borderRadius: "20px", fontSize: "0.7rem", fontWeight: "600" }}>
+                    {activeFilter === "active" ? "Active" : activeFilter === "low" ? "Low Stock" : activeFilter === "out" ? "Out of Stock" : activeFilter === "featured" ? "Featured" : activeFilter === "sale" ? "On Sale" : "Inactive"}
                   </span>
                 )}
               </div>
-              <div style={{
-                fontSize: "0.8rem",
-                color: appTheme.colors.textSecondary,
-                backgroundColor: appTheme.colors.background,
-                padding: "4px 12px",
-                borderRadius: "8px",
-                fontWeight: "500"
-              }}>
+              <div style={{ fontSize: "0.8rem", color: appTheme.colors.textSecondary, backgroundColor: appTheme.colors.background, padding: "4px 12px", borderRadius: "8px", fontWeight: "500" }}>
                 Showing {filteredProducts.length} of {products.length} products
               </div>
             </div>
-            <DataTable
-              title=""
-              columns={columns}
-              data={filteredProducts}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onToggleStatus={handleToggleStatus}
-              loading={loading}
-              searchable={false}
-              pagination={true}
-              exportable={true}
-              itemsPerPage={10}
-              isMobile={false}
-            />
+            <DataTable title="" columns={columns} data={filteredProducts} onEdit={handleEdit} onDelete={handleDelete} onToggleStatus={handleToggleStatus} loading={loading} searchable={false} pagination={true} exportable={true} itemsPerPage={10} isMobile={false} />
           </div>
         )}
       </div>
 
       {/* Global Styles */}
       <style jsx global>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        @media (max-width: 767px) {
-          body {
-            overflow-x: hidden;
-          }
-          
-          * {
-            box-sizing: border-box;
-          }
-          
-          input, select, button {
-            font-size: 16px !important;
-          }
-        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 767px) { body { overflow-x: hidden; } * { box-sizing: border-box; } input, select, button { font-size: 16px !important; } }
       `}</style>
     </div>
   );
@@ -2318,93 +2036,21 @@ export default function ProductTablePage() {
 
 // Stat Card Component
 const StatCard = ({ label, value, filter, active, onClick, color, icon, isMobile }) => (
-  <div
-    onClick={onClick}
-    style={{
-      backgroundColor: active ? color + "15" : appTheme.colors.surface,
-      padding: isMobile ? "14px 8px" : "16px",
-      borderRadius: "10px",
-      boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
-      border: `2px solid ${active ? color : appTheme.colors.border}`,
-      textAlign: "center",
-      cursor: "pointer",
-      minHeight: isMobile ? "60px" : "70px",
-      display: "flex",
-      flexDirection: "column",
-      justifyContent: "center",
-      alignItems: "center",
-      transition: "all 0.2s ease"
-    }}
-  >
-    <div style={{ 
-      fontSize: isMobile ? "1.2rem" : "1.4rem", 
-      fontWeight: "700", 
-      color: active ? color : appTheme.colors.textPrimary, 
-      marginBottom: "2px",
-      lineHeight: 1,
-      display: "flex",
-      alignItems: "center",
-      gap: "4px"
-    }}>
-      <span>{value}</span>
-      <span style={{ fontSize: isMobile ? "0.8rem" : "1rem" }}>{icon}</span>
+  <div onClick={onClick} style={{ backgroundColor: active ? color + "15" : appTheme.colors.surface, padding: isMobile ? "14px 8px" : "16px", borderRadius: "10px", boxShadow: "0 2px 6px rgba(0,0,0,0.05)", border: `2px solid ${active ? color : appTheme.colors.border}`, textAlign: "center", cursor: "pointer", minHeight: isMobile ? "60px" : "70px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", transition: "all 0.2s ease" }}>
+    <div style={{ fontSize: isMobile ? "1.2rem" : "1.4rem", fontWeight: "700", color: active ? color : appTheme.colors.textPrimary, marginBottom: "2px", lineHeight: 1, display: "flex", alignItems: "center", gap: "4px" }}>
+      <span>{value}</span><span style={{ fontSize: isMobile ? "0.8rem" : "1rem" }}>{icon}</span>
     </div>
-    <div style={{ 
-      fontSize: isMobile ? "0.65rem" : "0.75rem", 
-      color: active ? color : appTheme.colors.textSecondary, 
-      fontWeight: "600",
-      lineHeight: 1.2,
-      textTransform: "uppercase",
-      letterSpacing: "0.5px"
-    }}>
-      {label}
-    </div>
+    <div style={{ fontSize: isMobile ? "0.65rem" : "0.75rem", color: active ? color : appTheme.colors.textSecondary, fontWeight: "600", lineHeight: 1.2, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</div>
   </div>
 );
 
-// Metric Card Component for additional stats
+// Metric Card Component
 const MetricCard = ({ label, value, icon, color }) => (
-  <div style={{
-    backgroundColor: appTheme.colors.surface,
-    padding: "16px",
-    borderRadius: "10px",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
-    border: `1px solid ${appTheme.colors.border}`,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between"
-  }}>
+  <div style={{ backgroundColor: appTheme.colors.surface, padding: "16px", borderRadius: "10px", boxShadow: "0 2px 6px rgba(0,0,0,0.05)", border: `1px solid ${appTheme.colors.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
     <div>
-      <div style={{
-        fontSize: "0.7rem",
-        color: appTheme.colors.textSecondary,
-        fontWeight: "600",
-        textTransform: "uppercase",
-        letterSpacing: "0.5px",
-        marginBottom: "4px"
-      }}>
-        {label}
-      </div>
-      <div style={{
-        fontSize: "1.2rem",
-        fontWeight: "700",
-        color: appTheme.colors.textPrimary
-      }}>
-        {value}
-      </div>
+      <div style={{ fontSize: "0.7rem", color: appTheme.colors.textSecondary, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>{label}</div>
+      <div style={{ fontSize: "1.2rem", fontWeight: "700", color: appTheme.colors.textPrimary }}>{value}</div>
     </div>
-    <div style={{
-      backgroundColor: color + "20",
-      color: color,
-      width: "40px",
-      height: "40px",
-      borderRadius: "10px",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: "1.2rem"
-    }}>
-      {icon}
-    </div>
+    <div style={{ backgroundColor: color + "20", color: color, width: "40px", height: "40px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem" }}>{icon}</div>
   </div>
 );
