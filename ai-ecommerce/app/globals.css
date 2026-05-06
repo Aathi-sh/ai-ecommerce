@@ -56,3 +56,20 @@ body {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+/* ==================== GLOBAL SCROLL FIX ==================== */
+html {
+  overflow-y: scroll !important;  /* ALWAYS show scrollbar */
+  scroll-behavior: smooth;
+}
+
+body {
+  overflow-y: scroll !important;
+  min-height: 100vh;
+}
+
+/* Ensure main app wrapper allows scroll */
+#__next {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
