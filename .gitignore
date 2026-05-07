@@ -28,7 +28,7 @@ shared_proto_db/
 *.log
 *.old
 .DS_Store
-.env
+
 
 
 
