@@ -215,145 +215,145 @@ class WhatsAppBot extends EventEmitter {
         }
     }
 
-    initializeClient() {
-    console.log('\n' + '🔍'.repeat(20));
-    console.log(`🔍 [DEBUG] Initializing client for company: ${this.companyId || 'null'}`);
-    console.log(`🔍 Current state - Connected: ${this.isConnected}, Authenticated: ${this.isAuthenticated}`);
-    console.log('🔍'.repeat(20) + '\n');
+//     initializeClient() {
+//     console.log('\n' + '🔍'.repeat(20));
+//     console.log(`🔍 [DEBUG] Initializing client for company: ${this.companyId || 'null'}`);
+//     console.log(`🔍 Current state - Connected: ${this.isConnected}, Authenticated: ${this.isAuthenticated}`);
+//     console.log('🔍'.repeat(20) + '\n');
     
-    return new Promise((resolve, reject) => {
-        try {
-            // Reset state before initialization
-            this.isConnected = false;
-            this.isAuthenticated = false;
-            this.currentQR = null;
-            this.isWaitingForScan = false;
+//     return new Promise((resolve, reject) => {
+//         try {
+//             // Reset state before initialization
+//             this.isConnected = false;
+//             this.isAuthenticated = false;
+//             this.currentQR = null;
+//             this.isWaitingForScan = false;
             
-            if (!fs.existsSync(this.sessionPath)) {
-                fs.mkdirSync(this.sessionPath, { recursive: true });
-            }
+//             if (!fs.existsSync(this.sessionPath)) {
+//                 fs.mkdirSync(this.sessionPath, { recursive: true });
+//             }
 
-            const clientId = this.companyId 
-                ? `company_${this.companyId}` 
-                : `whatsapp-bot-${Date.now()}`;
+//             const clientId = this.companyId 
+//                 ? `company_${this.companyId}` 
+//                 : `whatsapp-bot-${Date.now()}`;
             
-            console.log(`🆔 Client ID: ${clientId}`);
+//             console.log(`🆔 Client ID: ${clientId}`);
 
-            this.client = new Client({
-                authStrategy: new LocalAuth({
-                    clientId: clientId,
-                    dataPath: this.sessionPath
-                }),
-                puppeteer: {
-                    headless: 'new',
-                    args: [
-                        '--no-sandbox',
-                        '--disable-setuid-sandbox',
-                        '--disable-dev-shm-usage',
-                        '--disable-accelerated-2d-canvas',
-                        '--no-first-run',
-                        '--no-zygote',
-                        '--disable-gpu',
-                        '--disable-web-security',
-                        '--disable-features=VizDisplayCompositor',
-                        '--disable-features=TranslateUI',
-                        '--disable-ipc-flooding-protection',
-                        '--disable-renderer-backgrounding',
-                        '--disable-background-timer-throttling',
-                        '--disable-backgrounding-occluded-windows',
-                        '--disable-breakpad',
-                        '--disable-sync',
-                        '--disable-default-apps',
-                        '--disable-extensions',
-                        '--disable-component-extensions-with-background-pages',
-                        '--disable-features=TranslateUI,BlinkGenPropertyTrees',
-                        '--disable-features=IsolateOrigins,site-per-process',
-                        '--window-size=1920,1080',
-                        '--max_old_space_size=256'
-                    ],
-                    timeout: 60000,
-                    ignoreHTTPSErrors: true
-                },
-                qrMaxRetries: 3,
-                authTimeoutMs: 120000,
-                takeoverOnConflict: true,
-                takeoverTimeoutMs: 60000
-            });
+//             this.client = new Client({
+//                 authStrategy: new LocalAuth({
+//                     clientId: clientId,
+//                     dataPath: this.sessionPath
+//                 }),
+//                 puppeteer: {
+//                     headless: 'new',
+//                     args: [
+//                         '--no-sandbox',
+//                         '--disable-setuid-sandbox',
+//                         '--disable-dev-shm-usage',
+//                         '--disable-accelerated-2d-canvas',
+//                         '--no-first-run',
+//                         '--no-zygote',
+//                         '--disable-gpu',
+//                         '--disable-web-security',
+//                         '--disable-features=VizDisplayCompositor',
+//                         '--disable-features=TranslateUI',
+//                         '--disable-ipc-flooding-protection',
+//                         '--disable-renderer-backgrounding',
+//                         '--disable-background-timer-throttling',
+//                         '--disable-backgrounding-occluded-windows',
+//                         '--disable-breakpad',
+//                         '--disable-sync',
+//                         '--disable-default-apps',
+//                         '--disable-extensions',
+//                         '--disable-component-extensions-with-background-pages',
+//                         '--disable-features=TranslateUI,BlinkGenPropertyTrees',
+//                         '--disable-features=IsolateOrigins,site-per-process',
+//                         '--window-size=1920,1080',
+//                         '--max_old_space_size=256'
+//                     ],
+//                     timeout: 60000,
+//                     ignoreHTTPSErrors: true
+//                 },
+//                 qrMaxRetries: 3,
+//                 authTimeoutMs: 120000,
+//                 takeoverOnConflict: true,
+//                 takeoverTimeoutMs: 60000
+//             });
 
-            this.setupEventHandlers(resolve, reject);
-            this.client.initialize().catch(reject);
+//             this.setupEventHandlers(resolve, reject);
+//             this.client.initialize().catch(reject);
 
-        } catch (error) {
-            reject(new Error(`Client initialization failed: ${error.message}`));
-        }
-    });
-}
-    // initializeClient() {
-    //     console.log('\n' + '🔍'.repeat(20));
-    //     console.log(`🔍 [DEBUG] Initializing client for company: ${this.companyId || 'null'}`);
-    //     console.log('🔍'.repeat(20) + '\n');
+//         } catch (error) {
+//             reject(new Error(`Client initialization failed: ${error.message}`));
+//         }
+//     });
+// }
+    initializeClient() {
+        console.log('\n' + '🔍'.repeat(20));
+        console.log(`🔍 [DEBUG] Initializing client for company: ${this.companyId || 'null'}`);
+        console.log('🔍'.repeat(20) + '\n');
         
-    //     return new Promise((resolve, reject) => {
-    //         try {
-    //             if (!fs.existsSync(this.sessionPath)) {
-    //                 fs.mkdirSync(this.sessionPath, { recursive: true });
-    //             }
+        return new Promise((resolve, reject) => {
+            try {
+                if (!fs.existsSync(this.sessionPath)) {
+                    fs.mkdirSync(this.sessionPath, { recursive: true });
+                }
 
-    //             const clientId = this.companyId 
-    //                 ? `company_${this.companyId}` 
-    //                 : `whatsapp-bot-${Date.now()}`;
+                const clientId = this.companyId 
+                    ? `company_${this.companyId}` 
+                    : `whatsapp-bot-${Date.now()}`;
                 
-    //             console.log(`🆔 Client ID: ${clientId}`);
+                console.log(`🆔 Client ID: ${clientId}`);
 
-    //             this.client = new Client({
-    //                 authStrategy: new LocalAuth({
-    //                     clientId: clientId,
-    //                     dataPath: this.sessionPath
-    //                 }),
-    //                 puppeteer: {
-    //                     headless: 'new',
-    //                     args: [
-    //                         '--no-sandbox',
-    //                         '--disable-setuid-sandbox',
-    //                         '--disable-dev-shm-usage',
-    //                         '--disable-accelerated-2d-canvas',
-    //                         '--no-first-run',
-    //                         '--no-zygote',
-    //                         '--disable-gpu',
-    //                         '--disable-web-security',
-    //                         '--disable-features=VizDisplayCompositor',
-    //                         '--disable-features=TranslateUI',
-    //                         '--disable-ipc-flooding-protection',
-    //                         '--disable-renderer-backgrounding',
-    //                         '--disable-background-timer-throttling',
-    //                         '--disable-backgrounding-occluded-windows',
-    //                         '--disable-breakpad',
-    //                         '--disable-sync',
-    //                         '--disable-default-apps',
-    //                         '--disable-extensions',
-    //                         '--disable-component-extensions-with-background-pages',
-    //                         '--disable-features=TranslateUI,BlinkGenPropertyTrees',
-    //                         '--disable-features=IsolateOrigins,site-per-process',
-    //                         '--window-size=1920,1080',
-    //                         '--max_old_space_size=256'
-    //                     ],
-    //                     timeout: 60000,
-    //                     ignoreHTTPSErrors: true
-    //                 },
-    //                 qrMaxRetries: 3,
-    //                 authTimeoutMs: 120000,
-    //                 takeoverOnConflict: true,
-    //                 takeoverTimeoutMs: 60000
-    //             });
+                this.client = new Client({
+                    authStrategy: new LocalAuth({
+                        clientId: clientId,
+                        dataPath: this.sessionPath
+                    }),
+                    puppeteer: {
+                        headless: 'new',
+                        args: [
+                            '--no-sandbox',
+                            '--disable-setuid-sandbox',
+                            '--disable-dev-shm-usage',
+                            '--disable-accelerated-2d-canvas',
+                            '--no-first-run',
+                            '--no-zygote',
+                            '--disable-gpu',
+                            '--disable-web-security',
+                            '--disable-features=VizDisplayCompositor',
+                            '--disable-features=TranslateUI',
+                            '--disable-ipc-flooding-protection',
+                            '--disable-renderer-backgrounding',
+                            '--disable-background-timer-throttling',
+                            '--disable-backgrounding-occluded-windows',
+                            '--disable-breakpad',
+                            '--disable-sync',
+                            '--disable-default-apps',
+                            '--disable-extensions',
+                            '--disable-component-extensions-with-background-pages',
+                            '--disable-features=TranslateUI,BlinkGenPropertyTrees',
+                            '--disable-features=IsolateOrigins,site-per-process',
+                            '--window-size=1920,1080',
+                            '--max_old_space_size=256'
+                        ],
+                        timeout: 60000,
+                        ignoreHTTPSErrors: true
+                    },
+                    qrMaxRetries: 3,
+                    authTimeoutMs: 120000,
+                    takeoverOnConflict: true,
+                    takeoverTimeoutMs: 60000
+                });
 
-    //             this.setupEventHandlers(resolve, reject);
-    //             this.client.initialize().catch(reject);
+                this.setupEventHandlers(resolve, reject);
+                this.client.initialize().catch(reject);
 
-    //         } catch (error) {
-    //             reject(new Error(`Client initialization failed: ${error.message}`));
-    //         }
-    //     });
-    // }
+            } catch (error) {
+                reject(new Error(`Client initialization failed: ${error.message}`));
+            }
+        });
+    }
 
     setupEventHandlers(resolve, reject) {
         let initializationTimeout;
