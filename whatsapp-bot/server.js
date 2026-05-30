@@ -881,15 +881,62 @@ app.post('/api/restart', async (req, res) => {
   }
 });
 
-// Logout
+// Logout endpoint
 app.post('/api/logout', async (req, res) => {
-  try {
-    await bot.logout();
-    res.json({ success: true, message: 'Bot logged out successfully' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+    try {
+        const { companyId } = req.query;
+        
+        if (companyId) {
+            // Temporarily switch to that company
+            const currentCompanyId = bot.companyId;
+            if (currentCompanyId !== companyId) {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: `Cannot logout company ${companyId} - not currently active` 
+                });
+            }
+        }
+        
+        console.log(`🚪 Logout requested for company: ${companyId || 'current'}`);
+        
+        // Perform logout
+        await bot.logout();
+        
+        // Clear any cached QR for this company
+        if (companyId) {
+            qrSocketServer.companyQRs.delete(companyId);
+        }
+        
+        // Force emit final status to all listeners
+        bot.emitStatusChange({
+            connected: false,
+            authenticated: false,
+            hasQR: false,
+            status: 'logged_out',
+            message: 'Logged out successfully',
+            companyId: companyId || bot.companyId,
+            timestamp: new Date().toISOString()
+        });
+        
+        res.json({ 
+            success: true, 
+            message: 'Logged out successfully',
+            companyId: companyId || bot.companyId
+        });
+    } catch (error) {
+        console.error('Logout error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
+// // Logout
+// app.post('/api/logout', async (req, res) => {
+//   try {
+//     await bot.logout();
+//     res.json({ success: true, message: 'Bot logged out successfully' });
+//   } catch (error) {
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
 
 // Send message
 app.post('/api/send-message', async (req, res) => {

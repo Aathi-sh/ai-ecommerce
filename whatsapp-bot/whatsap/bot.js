@@ -216,71 +216,144 @@ class WhatsAppBot extends EventEmitter {
     }
 
     initializeClient() {
-        console.log('\n' + '🔍'.repeat(20));
-        console.log(`🔍 [DEBUG] Initializing client for company: ${this.companyId || 'null'}`);
-        console.log('🔍'.repeat(20) + '\n');
-        
-        return new Promise((resolve, reject) => {
-            try {
-                if (!fs.existsSync(this.sessionPath)) {
-                    fs.mkdirSync(this.sessionPath, { recursive: true });
-                }
-
-                const clientId = this.companyId 
-                    ? `company_${this.companyId}` 
-                    : `whatsapp-bot-${Date.now()}`;
-                
-                console.log(`🆔 Client ID: ${clientId}`);
-
-                this.client = new Client({
-                    authStrategy: new LocalAuth({
-                        clientId: clientId,
-                        dataPath: this.sessionPath
-                    }),
-                    puppeteer: {
-                        headless: 'new',
-                        args: [
-                            '--no-sandbox',
-                            '--disable-setuid-sandbox',
-                            '--disable-dev-shm-usage',
-                            '--disable-accelerated-2d-canvas',
-                            '--no-first-run',
-                            '--no-zygote',
-                            '--disable-gpu',
-                            '--disable-web-security',
-                            '--disable-features=VizDisplayCompositor',
-                            '--disable-features=TranslateUI',
-                            '--disable-ipc-flooding-protection',
-                            '--disable-renderer-backgrounding',
-                            '--disable-background-timer-throttling',
-                            '--disable-backgrounding-occluded-windows',
-                            '--disable-breakpad',
-                            '--disable-sync',
-                            '--disable-default-apps',
-                            '--disable-extensions',
-                            '--disable-component-extensions-with-background-pages',
-                            '--disable-features=TranslateUI,BlinkGenPropertyTrees',
-                            '--disable-features=IsolateOrigins,site-per-process',
-                            '--window-size=1920,1080',
-                            '--max_old_space_size=256'
-                        ],
-                        timeout: 60000,
-                        ignoreHTTPSErrors: true
-                    },
-                    qrMaxRetries: 3,
-                    authTimeoutMs: 120000,
-                    takeoverOnConflict: true,
-                    takeoverTimeoutMs: 60000
-                });
-
-                this.setupEventHandlers(resolve, reject);
-                this.client.initialize().catch(reject);
-
-            } catch (error) {
-                reject(new Error(`Client initialization failed: ${error.message}`));
+    console.log('\n' + '🔍'.repeat(20));
+    console.log(`🔍 [DEBUG] Initializing client for company: ${this.companyId || 'null'}`);
+    console.log(`🔍 Current state - Connected: ${this.isConnected}, Authenticated: ${this.isAuthenticated}`);
+    console.log('🔍'.repeat(20) + '\n');
+    
+    return new Promise((resolve, reject) => {
+        try {
+            // Reset state before initialization
+            this.isConnected = false;
+            this.isAuthenticated = false;
+            this.currentQR = null;
+            this.isWaitingForScan = false;
+            
+            if (!fs.existsSync(this.sessionPath)) {
+                fs.mkdirSync(this.sessionPath, { recursive: true });
             }
-        });
-    }
+
+            const clientId = this.companyId 
+                ? `company_${this.companyId}` 
+                : `whatsapp-bot-${Date.now()}`;
+            
+            console.log(`🆔 Client ID: ${clientId}`);
+
+            this.client = new Client({
+                authStrategy: new LocalAuth({
+                    clientId: clientId,
+                    dataPath: this.sessionPath
+                }),
+                puppeteer: {
+                    headless: 'new',
+                    args: [
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-accelerated-2d-canvas',
+                        '--no-first-run',
+                        '--no-zygote',
+                        '--disable-gpu',
+                        '--disable-web-security',
+                        '--disable-features=VizDisplayCompositor',
+                        '--disable-features=TranslateUI',
+                        '--disable-ipc-flooding-protection',
+                        '--disable-renderer-backgrounding',
+                        '--disable-background-timer-throttling',
+                        '--disable-backgrounding-occluded-windows',
+                        '--disable-breakpad',
+                        '--disable-sync',
+                        '--disable-default-apps',
+                        '--disable-extensions',
+                        '--disable-component-extensions-with-background-pages',
+                        '--disable-features=TranslateUI,BlinkGenPropertyTrees',
+                        '--disable-features=IsolateOrigins,site-per-process',
+                        '--window-size=1920,1080',
+                        '--max_old_space_size=256'
+                    ],
+                    timeout: 60000,
+                    ignoreHTTPSErrors: true
+                },
+                qrMaxRetries: 3,
+                authTimeoutMs: 120000,
+                takeoverOnConflict: true,
+                takeoverTimeoutMs: 60000
+            });
+
+            this.setupEventHandlers(resolve, reject);
+            this.client.initialize().catch(reject);
+
+        } catch (error) {
+            reject(new Error(`Client initialization failed: ${error.message}`));
+        }
+    });
+}
+    // initializeClient() {
+    //     console.log('\n' + '🔍'.repeat(20));
+    //     console.log(`🔍 [DEBUG] Initializing client for company: ${this.companyId || 'null'}`);
+    //     console.log('🔍'.repeat(20) + '\n');
+        
+    //     return new Promise((resolve, reject) => {
+    //         try {
+    //             if (!fs.existsSync(this.sessionPath)) {
+    //                 fs.mkdirSync(this.sessionPath, { recursive: true });
+    //             }
+
+    //             const clientId = this.companyId 
+    //                 ? `company_${this.companyId}` 
+    //                 : `whatsapp-bot-${Date.now()}`;
+                
+    //             console.log(`🆔 Client ID: ${clientId}`);
+
+    //             this.client = new Client({
+    //                 authStrategy: new LocalAuth({
+    //                     clientId: clientId,
+    //                     dataPath: this.sessionPath
+    //                 }),
+    //                 puppeteer: {
+    //                     headless: 'new',
+    //                     args: [
+    //                         '--no-sandbox',
+    //                         '--disable-setuid-sandbox',
+    //                         '--disable-dev-shm-usage',
+    //                         '--disable-accelerated-2d-canvas',
+    //                         '--no-first-run',
+    //                         '--no-zygote',
+    //                         '--disable-gpu',
+    //                         '--disable-web-security',
+    //                         '--disable-features=VizDisplayCompositor',
+    //                         '--disable-features=TranslateUI',
+    //                         '--disable-ipc-flooding-protection',
+    //                         '--disable-renderer-backgrounding',
+    //                         '--disable-background-timer-throttling',
+    //                         '--disable-backgrounding-occluded-windows',
+    //                         '--disable-breakpad',
+    //                         '--disable-sync',
+    //                         '--disable-default-apps',
+    //                         '--disable-extensions',
+    //                         '--disable-component-extensions-with-background-pages',
+    //                         '--disable-features=TranslateUI,BlinkGenPropertyTrees',
+    //                         '--disable-features=IsolateOrigins,site-per-process',
+    //                         '--window-size=1920,1080',
+    //                         '--max_old_space_size=256'
+    //                     ],
+    //                     timeout: 60000,
+    //                     ignoreHTTPSErrors: true
+    //                 },
+    //                 qrMaxRetries: 3,
+    //                 authTimeoutMs: 120000,
+    //                 takeoverOnConflict: true,
+    //                 takeoverTimeoutMs: 60000
+    //             });
+
+    //             this.setupEventHandlers(resolve, reject);
+    //             this.client.initialize().catch(reject);
+
+    //         } catch (error) {
+    //             reject(new Error(`Client initialization failed: ${error.message}`));
+    //         }
+    //     });
+    // }
 
     setupEventHandlers(resolve, reject) {
         let initializationTimeout;
@@ -689,25 +762,65 @@ class WhatsAppBot extends EventEmitter {
     }
 
     async safeDestroyClient() {
-        try {
-            if (this.client) {
-                console.log(`🛑 Destroying client...`);
-                this.isShuttingDown = true;
-                
-                if (this.companyId) {
-                    this.clients.delete(this.companyId);
-                }
-                
-                await this.client.destroy();
-                this.client = null;
+    try {
+        if (this.client) {
+            console.log(`🛑 Destroying client for company: ${this.companyId || 'unknown'}...`);
+            this.isShuttingDown = true;
+            
+            // Store company ID before deletion
+            const companyIdToRemove = this.companyId;
+            
+            if (companyIdToRemove) {
+                this.clients.delete(companyIdToRemove);
             }
-        } catch (error) {
-            console.error(`Destroy error:`, error.message);
+            
+            // Remove all event listeners to prevent memory leaks
+            if (this.client.removeAllListeners) {
+                this.client.removeAllListeners();
+            }
+            
+            // Destroy the client
+            await this.client.destroy();
             this.client = null;
-        } finally {
-            this.isShuttingDown = false;
+            
+            console.log(`✅ Client destroyed for company: ${companyIdToRemove || 'unknown'}`);
         }
+    } catch (error) {
+        console.error(`Destroy error:`, error.message);
+        this.client = null;
+    } finally {
+        this.isShuttingDown = false;
     }
+}
+    // async safeDestroyClient() {
+    //     try {
+    //         if (this.client) {
+    //             console.log(`🛑 Destroying client...`);
+    //             this.isShuttingDown = true;
+                
+    //             if (this.companyId) {
+    //                 this.clients.delete(this.companyId);
+    //             }
+                
+    //             await this.client.destroy();
+    //             this.client = null;
+    //         }
+    //     } catch (error) {
+    //         console.error(`Destroy error:`, error.message);
+    //         this.client = null;
+    //     } finally {
+    //         this.isShuttingDown = false;
+    //     }
+    // }
+
+    async hasValidSession(companyId) {
+    const sessionPath = path.join(this.sessionPath, `company_${companyId}`);
+    if (!fs.existsSync(sessionPath)) return false;
+    
+    // Check if session files exist
+    const files = fs.readdirSync(sessionPath);
+    return files.length > 0;
+}
 
     async clearSession() {
         try {
@@ -788,33 +901,72 @@ class WhatsAppBot extends EventEmitter {
     }
 
     getStatus() {
-        return {
-            connected: this.isConnected,
-            authenticated: this.isAuthenticated,
-            hasQR: !!this.getCurrentQR(),
-            qrData: this.getCurrentQR(),
-            connectionTime: this.connectionTime,
-            botInfo: this.botInfo,
-            stats: {
-                totalOrders: this.stats.totalOrders,
-                totalChats: this.stats.totalChats,
-                totalCustomers: this.stats.totalCustomers.size,
-                totalMessages: this.stats.totalMessages,
-                pendingOrders: this.stats.pendingOrders,
-                completedOrders: this.stats.completedOrders,
-                messagesPerMinute: this.stats.messagesPerMinute
-            },
-            reconnectAttempts: this.reconnectAttempts,
-            maxReconnectAttempts: this.maxReconnectAttempts,
-            uptime: this.getUptime(),
-            formattedUptime: this.getFormattedUptime(),
-            companyId: this.companyId,
-            multiTenant: {
-                activeCompanies: this.clients.size,
-                companies: this.getAllClients()
-            }
-        };
-    }
+    // Always check actual client state
+    const isActuallyConnected = this.client && 
+                               this.client.info && 
+                               this.client.info.wid && 
+                               this.isConnected;
+    
+    const isActuallyAuthenticated = this.client && 
+                                   this.isAuthenticated && 
+                                   !this.isShuttingDown;
+    
+    return {
+        connected: isActuallyConnected,
+        authenticated: isActuallyAuthenticated,
+        hasQR: !!this.getCurrentQR(),
+        qrData: this.getCurrentQR(),
+        connectionTime: this.connectionTime,
+        botInfo: this.botInfo,
+        stats: {
+            totalOrders: this.stats.totalOrders,
+            totalChats: this.stats.totalChats,
+            totalCustomers: this.stats.totalCustomers.size,
+            totalMessages: this.stats.totalMessages,
+            pendingOrders: this.stats.pendingOrders,
+            completedOrders: this.stats.completedOrders,
+            messagesPerMinute: this.stats.messagesPerMinute
+        },
+        reconnectAttempts: this.reconnectAttempts,
+        maxReconnectAttempts: this.maxReconnectAttempts,
+        uptime: this.getUptime(),
+        formattedUptime: this.getFormattedUptime(),
+        companyId: this.companyId,
+        isShuttingDown: this.isShuttingDown,
+        multiTenant: {
+            activeCompanies: this.clients.size,
+            companies: this.getAllClients()
+        }
+    };
+}
+    // getStatus() {
+    //     return {
+    //         connected: this.isConnected,
+    //         authenticated: this.isAuthenticated,
+    //         hasQR: !!this.getCurrentQR(),
+    //         qrData: this.getCurrentQR(),
+    //         connectionTime: this.connectionTime,
+    //         botInfo: this.botInfo,
+    //         stats: {
+    //             totalOrders: this.stats.totalOrders,
+    //             totalChats: this.stats.totalChats,
+    //             totalCustomers: this.stats.totalCustomers.size,
+    //             totalMessages: this.stats.totalMessages,
+    //             pendingOrders: this.stats.pendingOrders,
+    //             completedOrders: this.stats.completedOrders,
+    //             messagesPerMinute: this.stats.messagesPerMinute
+    //         },
+    //         reconnectAttempts: this.reconnectAttempts,
+    //         maxReconnectAttempts: this.maxReconnectAttempts,
+    //         uptime: this.getUptime(),
+    //         formattedUptime: this.getFormattedUptime(),
+    //         companyId: this.companyId,
+    //         multiTenant: {
+    //             activeCompanies: this.clients.size,
+    //             companies: this.getAllClients()
+    //         }
+    //     };
+    // }
 
     async sendMessage(phoneNumber, message) {
         try {
@@ -886,33 +1038,120 @@ class WhatsAppBot extends EventEmitter {
     }
 
     async logout() {
-        console.log('\n🚪 Logging out...');
-        const currentCompanyId = this.companyId;
+    console.log('\n🚪 Logging out...');
+    const currentCompanyId = this.companyId;
+    
+    try {
+        this.isShuttingDown = true;
         
-        try {
-            this.isShuttingDown = true;
-            await this.safeDestroyClient();
-            await this.clearSession();
-            
-            this.currentQR = null;
-            this.isWaitingForScan = false;
-            this.isConnected = false;
-            this.isAuthenticated = false;
-            this.qrWebSocketClients.clear();
-            
-            setTimeout(() => {
-                this.isShuttingDown = false;
-                if (currentCompanyId) {
-                    this.initializeForCompany(currentCompanyId).catch(console.error);
-                } else {
-                    this.initialize().catch(console.error);
-                }
-            }, 2000);
-        } catch (error) {
-            console.error('Logout error:', error);
-            this.isShuttingDown = false;
+        // CRITICAL: Clear all state BEFORE destroying client
+        this.isConnected = false;
+        this.isAuthenticated = false;
+        this.currentQR = null;
+        this.isWaitingForScan = false;
+        this.qrGeneratedAt = null;
+        
+        // Clear QR timeout if exists
+        if (this.qrTimeout) {
+            clearTimeout(this.qrTimeout);
+            this.qrTimeout = null;
         }
+        
+        // Stop stats broadcasting
+        this.stopStatsBroadcasting();
+        
+        // Clear any pending batch writes
+        if (this.batchWriteInterval) {
+            clearInterval(this.batchWriteInterval);
+            this.batchWriteInterval = null;
+        }
+        
+        // Emit immediate status change before destroying client
+        this.emitStatusChange({
+            connected: false,
+            authenticated: false,
+            hasQR: false,
+            status: 'logging_out',
+            message: 'Logging out...',
+            companyId: currentCompanyId
+        });
+        
+        // Destroy the client
+        await this.safeDestroyClient();
+        
+        // Clear session files
+        await this.clearSession();
+        
+        // Clear WebSocket clients set
+        this.qrWebSocketClients.clear();
+        
+        // Reset all connection-related properties
+        this.connectionTime = null;
+        this.botInfo = null;
+        this.reconnectAttempts = 0;
+        
+        // Clear any company client references
+        if (currentCompanyId) {
+            this.clients.delete(currentCompanyId);
+        }
+        
+        // Emit final disconnected status
+        this.emitStatusChange({
+            connected: false,
+            authenticated: false,
+            hasQR: false,
+            status: 'logged_out',
+            message: 'Logged out successfully',
+            companyId: currentCompanyId
+        });
+        
+        console.log(`✅ Logout complete for company: ${currentCompanyId || 'default'}`);
+        
+        // DO NOT auto-reinitialize - wait for manual reconnection
+        // The old code had setTimeout that called initialize again
+        // Remove or comment out the auto-reconnect
+        
+    } catch (error) {
+        console.error('Logout error:', error);
+        this.emitStatusChange({
+            connected: false,
+            authenticated: false,
+            status: 'logout_error',
+            message: `Logout error: ${error.message}`,
+            companyId: currentCompanyId
+        });
+    } finally {
+        this.isShuttingDown = false;
     }
+}
+    // async logout() {
+    //     console.log('\n🚪 Logging out...');
+    //     const currentCompanyId = this.companyId;
+        
+    //     try {
+    //         this.isShuttingDown = true;
+    //         await this.safeDestroyClient();
+    //         await this.clearSession();
+            
+    //         this.currentQR = null;
+    //         this.isWaitingForScan = false;
+    //         this.isConnected = false;
+    //         this.isAuthenticated = false;
+    //         this.qrWebSocketClients.clear();
+            
+    //         setTimeout(() => {
+    //             this.isShuttingDown = false;
+    //             if (currentCompanyId) {
+    //                 this.initializeForCompany(currentCompanyId).catch(console.error);
+    //             } else {
+    //                 this.initialize().catch(console.error);
+    //             }
+    //         }, 2000);
+    //     } catch (error) {
+    //         console.error('Logout error:', error);
+    //         this.isShuttingDown = false;
+    //     }
+    // }
 
     async restart() {
         console.log('\n🔄 Restarting...');
