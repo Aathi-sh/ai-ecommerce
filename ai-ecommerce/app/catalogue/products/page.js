@@ -1,4 +1,3 @@
-
 // app/catalogue/products/page.js
 'use client';
 
@@ -221,11 +220,10 @@ const ProductCard = ({ product, viewMode, onAddToWishlist, onBuyNow, onQuickView
         style={{ backgroundColor: '#FFFFFF', borderColor: borderColor, transition: transitionFast }}
       >
         <div className="flex flex-col sm:flex-row">
-          {/* Image Section */}
+          {/* Image Section - FIX: removed onQuickView from wrapper, kept carousel controls */}
           <div 
             className="relative w-full sm:w-48 md:w-56 h-48 sm:h-56 bg-gray-100"
             style={{ backgroundColor: backgroundColor }}
-            onClick={(e) => { e.stopPropagation(); onQuickView(product); }}
           >
             {!imageLoaded && !imageError && (
               <div className="absolute inset-0 flex items-center justify-center">
@@ -364,11 +362,10 @@ const ProductCard = ({ product, viewMode, onAddToWishlist, onBuyNow, onQuickView
       onMouseLeave={() => setIsHovered(false)}
       onClick={handleCardClick}
     >
-      {/* Image Section with Carousel */}
+      {/* Image Section - FIX: removed onQuickView from wrapper, kept carousel and hover buttons */}
       <div 
         className="relative pt-[100%] bg-gray-100 overflow-hidden"
         style={{ backgroundColor: backgroundColor }}
-        onClick={(e) => { e.stopPropagation(); onQuickView(product); }}
       >
         {!imageLoaded && !imageError && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -444,6 +441,7 @@ const ProductCard = ({ product, viewMode, onAddToWishlist, onBuyNow, onQuickView
               >
                 <Heart className={`w-3 h-3 sm:w-5 sm:h-5 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-700'}`} />
               </button>
+              {/* Keep zoom icon for quick view */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -784,6 +782,16 @@ export default function CatalogPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // FIX: Improved sort options - correct values for high/low price
+  const sortOptions = [
+    { value: 'createdAt', label: 'Newest First', icon: Clock, order: 'desc' },
+    { value: 'discountPrice', label: 'Price: High to Low', icon: ArrowUpDown, order: 'desc' },
+    { value: 'discountPrice', label: 'Price: Low to High', icon: ArrowUpDown, order: 'asc' },
+    { value: 'productName', label: 'Name: A to Z', icon: ArrowUpDown, order: 'asc' },
+    { value: 'productName', label: 'Name: Z to A', icon: ArrowUpDown, order: 'desc' },
+    { value: 'averageRating', label: 'Top Rated', icon: Star, order: 'desc' }
+  ];
+
   const [filters, setFilters] = useState({
     category: searchParams.get('category') || '',
     subCategory: searchParams.get('subCategory') || '',
@@ -797,18 +805,8 @@ export default function CatalogPage() {
     sortOrder: searchParams.get('sortOrder') || 'desc'
   });
 
-  const sortOptions = [
-    { value: 'createdAt', label: 'Newest First', icon: Clock },
-    { value: '-discountPrice', label: 'Price: High to Low', icon: ArrowUpDown },
-    { value: 'discountPrice', label: 'Price: Low to High', icon: ArrowUpDown },
-    { value: 'productName', label: 'Name: A to Z', icon: ArrowUpDown },
-    { value: '-productName', label: 'Name: Z to A', icon: ArrowUpDown },
-    { value: 'averageRating', label: 'Top Rated', icon: Star },
-    { value: '-averageRating', label: 'Best Rating', icon: Award }
-  ];
-
   const getCurrentSortLabel = () => {
-    const current = sortOptions.find(opt => opt.value === filters.sortBy);
+    const current = sortOptions.find(opt => opt.value === filters.sortBy && opt.order === filters.sortOrder);
     return current ? current.label : 'Sort By';
   };
 
@@ -845,17 +843,13 @@ export default function CatalogPage() {
     else { saveWishlist([...wishlist, product]); showToast('Added to wishlist', 'success'); }
   }, [wishlist, saveWishlist]);
 
-const buyNow = useCallback((product) => {
-  const whatsappNumber = companyInfo?.whatsappNumber || '919876543210';
-
-  const cleanNumber = whatsappNumber.replace(/\D/g, '');
-  const finalNumber = cleanNumber.length === 10 ? `91${cleanNumber}` : cleanNumber;
-
-  // ✅ ONLY product name
-  const message = encodeURIComponent(product?.productName || 'Product');
-
-  window.open(`https://wa.me/${finalNumber}?text=${message}`, '_blank');
-}, [companyInfo]);
+  const buyNow = useCallback((product) => {
+    const whatsappNumber = companyInfo?.whatsappNumber || '919876543210';
+    const cleanNumber = whatsappNumber.replace(/\D/g, '');
+    const finalNumber = cleanNumber.length === 10 ? `91${cleanNumber}` : cleanNumber;
+    const message = encodeURIComponent(product?.productName || 'Product');
+    window.open(`https://wa.me/${finalNumber}?text=${message}`, '_blank');
+  }, [companyInfo]);
 
   const showToast = (message, type = 'success') => {
     const toast = document.createElement('div');
@@ -999,10 +993,13 @@ const buyNow = useCallback((product) => {
                 border: `1px solid ${borderColor}`,
                 borderRadius: radiusLg,
                 fontSize: isMobile ? fontSizes.sm : fontSizes.base,
+                color: textPrimary, // FIX: make input text dark
+                backgroundColor: surfaceColor,
                 outline: "none",
                 transition: transitionFast,
                 fontFamily: fontFamily,
               }}
+              placeholderStyle={{ color: textSecondary }}
               onFocus={(e) => { e.target.style.borderColor = primaryColor; e.target.style.boxShadow = `0 0 0 3px ${primaryColor}20`; }}
               onBlur={(e) => { e.target.style.borderColor = borderColor; e.target.style.boxShadow = "none"; }}
             />
@@ -1013,13 +1010,13 @@ const buyNow = useCallback((product) => {
       <div style={{ maxWidth: "1280px", margin: "0 auto", padding: isMobile ? spacing.md : spacing.lg }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.md, flexWrap: "wrap", gap: spacing.sm }}>
           <div style={{ display: "flex", alignItems: "center", gap: spacing.sm }}>
-            <button onClick={() => setIsFilterOpen(true)} style={{ display: "flex", alignItems: "center", gap: spacing.xs, padding: isMobile ? `${spacing.xs} ${spacing.sm}` : `${spacing.xs} ${spacing.md}`, backgroundColor: surfaceColor, border: `1px solid ${borderColor}`, borderRadius: radiusMd, fontSize: fontSizes.sm, cursor: "pointer", transition: transitionFast }} className="hover:bg-gray-50">
+            <button onClick={() => setIsFilterOpen(true)} style={{ display: "flex", alignItems: "center", gap: spacing.xs, padding: isMobile ? `${spacing.xs} ${spacing.sm}` : `${spacing.xs} ${spacing.md}`, backgroundColor: surfaceColor, border: `1px solid ${borderColor}`, borderRadius: radiusMd, fontSize: fontSizes.sm, fontWeight: fontWeights.medium, color: textPrimary, cursor: "pointer", transition: transitionFast }} className="hover:bg-gray-50">
               <SlidersHorizontal style={{ width: isMobile ? "12px" : "16px", height: isMobile ? "12px" : "16px" }} />
               Filters
               {Object.values(filters).filter(v => v && v !== '' && v !== false).length > 0 && <span style={{ marginLeft: "4px", width: "6px", height: "6px", backgroundColor: primaryColor, borderRadius: "50%" }}></span>}
             </button>
             <div style={{ position: "relative" }}>
-              <button onClick={() => setSortMenuOpen(!sortMenuOpen)} style={{ display: "flex", alignItems: "center", gap: spacing.xs, padding: isMobile ? `${spacing.xs} ${spacing.sm}` : `${spacing.xs} ${spacing.md}`, backgroundColor: surfaceColor, border: `1px solid ${borderColor}`, borderRadius: radiusMd, fontSize: fontSizes.sm, cursor: "pointer", transition: transitionFast }} className="hover:bg-gray-50">
+              <button onClick={() => setSortMenuOpen(!sortMenuOpen)} style={{ display: "flex", alignItems: "center", gap: spacing.xs, padding: isMobile ? `${spacing.xs} ${spacing.sm}` : `${spacing.xs} ${spacing.md}`, backgroundColor: surfaceColor, border: `1px solid ${borderColor}`, borderRadius: radiusMd, fontSize: fontSizes.sm, fontWeight: fontWeights.medium, color: textPrimary, cursor: "pointer", transition: transitionFast }} className="hover:bg-gray-50">
                 <ArrowUpDown style={{ width: isMobile ? "12px" : "16px", height: isMobile ? "12px" : "16px" }} />
                 {getCurrentSortLabel()}
                 <ChevronDown style={{ width: isMobile ? "12px" : "16px", height: isMobile ? "12px" : "16px" }} />
@@ -1027,24 +1024,18 @@ const buyNow = useCallback((product) => {
               {sortMenuOpen && (
                 <>
                   <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setSortMenuOpen(false)} />
-                  <div style={{ position: "absolute", top: "100%", right: 0, marginTop: spacing.xs, width: "180px", backgroundColor: surfaceColor, borderRadius: radiusMd, boxShadow: shadowSm, border: `1px solid ${borderColor}`, zIndex: 50 }}>
+                  <div style={{ position: "absolute", top: "100%", right: 0, marginTop: spacing.xs, width: "200px", backgroundColor: surfaceColor, borderRadius: radiusMd, boxShadow: shadowSm, border: `1px solid ${borderColor}`, zIndex: 50 }}>
                     {sortOptions.map((option) => (
                       <button
-                        key={option.value}
-                        onClick={() => {
-                          if (option.value.startsWith('-')) handleSortChange(option.value.substring(1), 'desc');
-                          else if (option.value === 'discountPrice') handleSortChange('discountPrice', 'asc');
-                          else if (option.value === '-discountPrice') handleSortChange('discountPrice', 'desc');
-                          else if (option.value === '-productName') handleSortChange('productName', 'desc');
-                          else handleSortChange(option.value, 'desc');
-                        }}
+                        key={`${option.value}-${option.order}`}
+                        onClick={() => handleSortChange(option.value, option.order)}
                         style={{
                           width: "100%",
                           textAlign: "left",
                           padding: `${spacing.xs} ${spacing.md}`,
                           fontSize: fontSizes.sm,
-                          backgroundColor: (filters.sortBy === option.value || (option.value === '-discountPrice' && filters.sortBy === 'discountPrice' && filters.sortOrder === 'desc') || (option.value === 'discountPrice' && filters.sortBy === 'discountPrice' && filters.sortOrder === 'asc')) ? `${primaryColor}10` : "transparent",
-                          color: (filters.sortBy === option.value || (option.value === '-discountPrice' && filters.sortBy === 'discountPrice' && filters.sortOrder === 'desc') || (option.value === 'discountPrice' && filters.sortBy === 'discountPrice' && filters.sortOrder === 'asc')) ? primaryColor : textPrimary,
+                          backgroundColor: (filters.sortBy === option.value && filters.sortOrder === option.order) ? `${primaryColor}10` : "transparent",
+                          color: (filters.sortBy === option.value && filters.sortOrder === option.order) ? primaryColor : textPrimary,
                           border: "none",
                           cursor: "pointer",
                           display: "flex",

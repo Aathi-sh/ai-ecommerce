@@ -355,260 +355,268 @@ class WhatsAppBot extends EventEmitter {
         });
     }
 
-    setupEventHandlers(resolve, reject) {
-        let initializationTimeout;
-        let qrGeneratedFlag = false;
+setupEventHandlers(resolve, reject) {
+    let initializationTimeout;
+    let qrGeneratedFlag = false;
 
-        initializationTimeout = setTimeout(() => {
-            if (!this.isConnected) {
-                const error = new Error('Client initialization timeout');
-                console.error('❌', error.message);
+    initializationTimeout = setTimeout(() => {
+        if (!this.isConnected) {
+            const error = new Error('Client initialization timeout');
+            console.error('❌', error.message);
+            this.emitStatusChange({
+                connected: false,
+                status: 'error',
+                message: 'Initialization timeout'
+            });
+            reject(error);
+        }
+    }, 120000);
+
+    // ========== QR HANDLER - CRITICAL FIX ==========
+    this.client.on('qr', async (qr) => {
+        console.log('\n' + '='.repeat(60));
+        console.log(`📱 QR CODE GENERATED for company: ${this.companyId || 'unknown'}`);
+        console.log('='.repeat(60));
+        
+        clearTimeout(initializationTimeout);
+        
+        // Store QR
+        this.currentQR = qr;
+        this.qrGeneratedAt = Date.now();
+        this.isWaitingForScan = true;
+        
+        // Show QR in terminal (once)
+        if (!qrGeneratedFlag) {
+            qrcode.generate(qr, { small: true });
+            qrGeneratedFlag = true;
+            
+            console.log('\n📱 HOW TO CONNECT:');
+            console.log('1. Open WhatsApp → Menu → Linked Devices');
+            console.log('2. Tap "Link a Device"');
+            console.log('3. Scan the QR code above\n');
+        }
+        
+        // ========== CRITICAL: EMIT QR TO WEBSOCKET ==========
+        const qrData = {
+            qr: qr,
+            expiresIn: this.qrExpiryTime / 1000,
+            generatedAt: this.qrGeneratedAt,
+            isValid: true,
+            companyId: this.companyId,
+            clientId: this.client?.authStrategy?.clientId
+        };
+        
+        console.log(`📡 EMITTING QR to WebSocket for company: ${this.companyId}`);
+        this.emitQRCode(qrData);
+        
+        // Emit status change
+        this.emitStatusChange({
+            connected: false,
+            authenticated: false,
+            hasQR: true,
+            status: 'qr_required',
+            message: 'Scan QR code to connect WhatsApp',
+            companyId: this.companyId,
+            qrData: qr
+        });
+        
+        // Set QR expiry
+        if (this.qrTimeout) clearTimeout(this.qrTimeout);
+        this.qrTimeout = setTimeout(() => {
+            if (this.isWaitingForScan && this.currentQR === qr) {
+                console.log('⏰ QR code expired');
+                this.isWaitingForScan = false;
+                this.currentQR = null;
+                this.qrGeneratedAt = null;
+                
+                this.emitQRCode(null);
                 this.emitStatusChange({
                     connected: false,
-                    status: 'error',
-                    message: 'Initialization timeout'
+                    authenticated: false,
+                    hasQR: false,
+                    status: 'qr_expired',
+                    message: 'QR code expired',
+                    companyId: this.companyId
                 });
-                reject(error);
             }
-        }, 120000);
+        }, this.qrExpiryTime);
+    });
 
-        // ========== QR HANDLER - CRITICAL FIX ==========
-        this.client.on('qr', async (qr) => {
-            console.log('\n' + '='.repeat(60));
-            console.log(`📱 QR CODE GENERATED for company: ${this.companyId || 'unknown'}`);
-            console.log('='.repeat(60));
-            
-            clearTimeout(initializationTimeout);
-            
-            // Store QR
-            this.currentQR = qr;
-            this.qrGeneratedAt = Date.now();
-            this.isWaitingForScan = true;
-            
-            // Show QR in terminal (once)
-            if (!qrGeneratedFlag) {
-                qrcode.generate(qr, { small: true });
-                qrGeneratedFlag = true;
-                
-                console.log('\n📱 HOW TO CONNECT:');
-                console.log('1. Open WhatsApp → Menu → Linked Devices');
-                console.log('2. Tap "Link a Device"');
-                console.log('3. Scan the QR code above\n');
-            }
-            
-            // ========== CRITICAL: EMIT QR TO WEBSOCKET ==========
-            const qrData = {
-                qr: qr,
-                expiresIn: this.qrExpiryTime / 1000,
-                generatedAt: this.qrGeneratedAt,
-                isValid: true,
-                companyId: this.companyId,
-                clientId: this.client?.authStrategy?.clientId
-            };
-            
-            console.log(`📡 EMITTING QR to WebSocket for company: ${this.companyId}`);
-            this.emitQRCode(qrData);
-            
-            // Emit status change
-            this.emitStatusChange({
-                connected: false,
-                authenticated: false,
-                hasQR: true,
-                status: 'qr_required',
-                message: 'Scan QR code to connect WhatsApp',
-                companyId: this.companyId,
-                qrData: qr
-            });
-            
-            // Set QR expiry
-            if (this.qrTimeout) clearTimeout(this.qrTimeout);
-            this.qrTimeout = setTimeout(() => {
-                if (this.isWaitingForScan && this.currentQR === qr) {
-                    console.log('⏰ QR code expired');
-                    this.isWaitingForScan = false;
-                    this.currentQR = null;
-                    this.qrGeneratedAt = null;
-                    
-                    this.emitQRCode(null);
-                    this.emitStatusChange({
-                        connected: false,
-                        authenticated: false,
-                        hasQR: false,
-                        status: 'qr_expired',
-                        message: 'QR code expired',
-                        companyId: this.companyId
-                    });
-                }
-            }, this.qrExpiryTime);
+    this.client.on('ready', async () => {
+        console.log('\n' + '='.repeat(60));
+        console.log(`✅ WHATSAPP CONNECTED for company: ${this.companyId || 'unknown'}`);
+        console.log('='.repeat(60) + '\n');
+        
+        clearTimeout(initializationTimeout);
+
+        this.isConnected = true;
+        this.isAuthenticated = true;
+        this.currentQR = null;
+        this.isWaitingForScan = false;
+        this.qrGeneratedAt = null;
+        
+        if (this.qrTimeout) clearTimeout(this.qrTimeout);
+        
+        this.reconnectAttempts = 0;
+        this.connectionTime = new Date();
+
+        const clientId = this.client?.authStrategy?.clientId || 'unknown';
+
+        if (this.companyId) {
+            this.clients.set(this.companyId, this.client);
+        }
+
+        this.emitStatusChange({
+            connected: true,
+            authenticated: true,
+            hasQR: false,
+            status: 'connected',
+            message: 'WhatsApp is connected and ready',
+            companyId: this.companyId,
+            clientId: clientId
         });
 
-        this.client.on('ready', async () => {
-            console.log('\n' + '='.repeat(60));
-            console.log(`✅ WHATSAPP CONNECTED for company: ${this.companyId || 'unknown'}`);
-            console.log('='.repeat(60) + '\n');
-            
-            clearTimeout(initializationTimeout);
+        this.startStatsBroadcasting();
+        
+        setTimeout(() => {
+            this.displayBotInfo().catch(() => {});
+        }, 5000);
 
-            this.isConnected = true;
-            this.isAuthenticated = true;
-            this.currentQR = null;
-            this.isWaitingForScan = false;
-            this.qrGeneratedAt = null;
-            
-            if (this.qrTimeout) clearTimeout(this.qrTimeout);
-            
-            this.reconnectAttempts = 0;
-            this.connectionTime = new Date();
+        resolve();
+    });
 
-            const clientId = this.client?.authStrategy?.clientId || 'unknown';
+    this.client.on('authenticated', () => {
+        console.log(`🔐 Authentication successful for company: ${this.companyId || 'unknown'}`);
+        
+        this.isAuthenticated = true;
+        this.isWaitingForScan = false;
+        this.currentQR = null;
+        
+        if (this.qrTimeout) clearTimeout(this.qrTimeout);
 
-            if (this.companyId) {
-                this.clients.set(this.companyId, this.client);
-            }
+        this.emitStatusChange({
+            connected: false,
+            authenticated: true,
+            hasQR: false,
+            status: 'authenticated',
+            message: 'WhatsApp authentication successful',
+            companyId: this.companyId
+        });
+    });
 
-            this.emitStatusChange({
-                connected: true,
-                authenticated: true,
-                hasQR: false,
-                status: 'connected',
-                message: 'WhatsApp is connected and ready',
-                companyId: this.companyId,
-                clientId: clientId
-            });
+    this.client.on('auth_failure', (error) => {
+        clearTimeout(initializationTimeout);
+        console.error(`❌ Authentication failed:`, error.message);
+        
+        this.isAuthenticated = false;
+        
+        this.emitStatusChange({
+            connected: false,
+            authenticated: false,
+            status: 'auth_failed',
+            message: `Authentication failed: ${error.message}`,
+            companyId: this.companyId
+        });
+        
+        reject(new Error(`Authentication failed: ${error.message}`));
+    });
 
-            this.startStatsBroadcasting();
-            
+    this.client.on('disconnected', async (reason) => {
+        console.log(`🔌 Disconnected: ${reason} for company: ${this.companyId || 'unknown'}`);
+        
+        this.isConnected = false;
+        this.isAuthenticated = false;
+        this.currentQR = null;
+        
+        this.stopStatsBroadcasting();
+        
+        this.emitStatusChange({
+            connected: false,
+            authenticated: false,
+            status: 'disconnected',
+            message: `WhatsApp disconnected: ${reason}`,
+            companyId: this.companyId
+        });
+        
+        if (this.isShuttingDown) return;
+        
+        if (reason === 'LOGOUT' || reason === 'UNAUTHORIZED') {
             setTimeout(() => {
-                this.displayBotInfo().catch(() => {});
-            }, 5000);
+                this.initialize().catch(console.error);
+            }, 3000);
+        } else {
+            await this.handleReconnection();
+        }
+    });
 
-            resolve();
-        });
-
-        this.client.on('authenticated', () => {
-            console.log(`🔐 Authentication successful for company: ${this.companyId || 'unknown'}`);
+    // ========== MESSAGE HANDLER WITH PERFORMANCE OPTIMIZATIONS ==========
+    // ✅ FIX ADDED: Ignore old/unread messages
+    this.client.on('message', async (message) => {
+        // 1️⃣ Ignore status broadcasts and group messages
+        if (message.from === 'status@broadcast' || message.isGroupMsg) return;
+        
+        // 2️⃣ ✅ IGNORE OLD/UNREAD MESSAGES (the professional fix)
+        if (!message.isNewMsg) {
+            console.log(`⏭️ Ignoring old/unread message from ${message.from} (timestamp: ${message.timestamp})`);
+            return;
+        }
+        
+        const startTime = Date.now();
+        
+        try {
+            let companyId = this.companyId;
             
-            this.isAuthenticated = true;
-            this.isWaitingForScan = false;
-            this.currentQR = null;
-            
-            if (this.qrTimeout) clearTimeout(this.qrTimeout);
-
-            this.emitStatusChange({
-                connected: false,
-                authenticated: true,
-                hasQR: false,
-                status: 'authenticated',
-                message: 'WhatsApp authentication successful',
-                companyId: this.companyId
-            });
-        });
-
-        this.client.on('auth_failure', (error) => {
-            clearTimeout(initializationTimeout);
-            console.error(`❌ Authentication failed:`, error.message);
-            
-            this.isAuthenticated = false;
-            
-            this.emitStatusChange({
-                connected: false,
-                authenticated: false,
-                status: 'auth_failed',
-                message: `Authentication failed: ${error.message}`,
-                companyId: this.companyId
-            });
-            
-            reject(new Error(`Authentication failed: ${error.message}`));
-        });
-
-        this.client.on('disconnected', async (reason) => {
-            console.log(`🔌 Disconnected: ${reason} for company: ${this.companyId || 'unknown'}`);
-            
-            this.isConnected = false;
-            this.isAuthenticated = false;
-            this.currentQR = null;
-            
-            this.stopStatsBroadcasting();
-            
-            this.emitStatusChange({
-                connected: false,
-                authenticated: false,
-                status: 'disconnected',
-                message: `WhatsApp disconnected: ${reason}`,
-                companyId: this.companyId
-            });
-            
-            if (this.isShuttingDown) return;
-            
-            if (reason === 'LOGOUT' || reason === 'UNAUTHORIZED') {
-                setTimeout(() => {
-                    this.initialize().catch(console.error);
-                }, 3000);
-            } else {
-                await this.handleReconnection();
-            }
-        });
-
-        // ========== MESSAGE HANDLER WITH PERFORMANCE OPTIMIZATIONS ==========
-        this.client.on('message', async (message) => {
-            if (message.from === 'status@broadcast' || message.isGroupMsg) return;
-            
-            const startTime = Date.now();
-            
-            try {
-                let companyId = this.companyId;
+            if (message.to) {
+                const phoneNumber = message.to.split('@')[0];
                 
-                if (message.to) {
-                    const phoneNumber = message.to.split('@')[0];
-                    
-                    if (apiService && typeof apiService.identifyCompanyFromWhatsApp === 'function') {
-                        const identifiedCompanyId = await apiService.identifyCompanyFromWhatsApp(phoneNumber);
-                        if (identifiedCompanyId) {
-                            companyId = identifiedCompanyId;
-                            if (this.companyId !== identifiedCompanyId) {
-                                this.companyId = identifiedCompanyId;
-                            }
+                if (apiService && typeof apiService.identifyCompanyFromWhatsApp === 'function') {
+                    const identifiedCompanyId = await apiService.identifyCompanyFromWhatsApp(phoneNumber);
+                    if (identifiedCompanyId) {
+                        companyId = identifiedCompanyId;
+                        if (this.companyId !== identifiedCompanyId) {
+                            this.companyId = identifiedCompanyId;
                         }
                     }
                 }
-                
-                // Update stats efficiently
-                this.updateMessageStats(message.from);
-                
-                // Queue message for processing (non-blocking)
-                const processMessage = async () => {
-                    await handleMessage(message, this.client, companyId);
-                    
-                    const duration = Date.now() - startTime;
-                    if (duration > 200) {
-                        console.log(`⚠️ Slow message processing: ${duration}ms`);
-                    }
-                };
-                
-                // Process without blocking
-                processMessage().catch(error => {
-                    console.error('Message processing error:', error);
-                });
-                
-            } catch (error) {
-                console.error('Message handler error:', error);
-                await this.handleMessageError(message, error);
             }
-        });
-
-        this.client.on('change_state', (state) => {
-            console.log(`🔄 Connection state: ${state}`);
-            this.emitStatusChange({
-                connected: this.isConnected,
-                authenticated: this.isAuthenticated,
-                status: 'state_change',
-                message: `Connection state: ${state}`,
-                companyId: this.companyId
+            
+            // Update stats efficiently
+            this.updateMessageStats(message.from);
+            
+            // Queue message for processing (non-blocking)
+            const processMessage = async () => {
+                await handleMessage(message, this.client, companyId);
+                
+                const duration = Date.now() - startTime;
+                if (duration > 200) {
+                    console.log(`⚠️ Slow message processing: ${duration}ms`);
+                }
+            };
+            
+            // Process without blocking
+            processMessage().catch(error => {
+                console.error('Message processing error:', error);
             });
+            
+        } catch (error) {
+            console.error('Message handler error:', error);
+            await this.handleMessageError(message, error);
+        }
+    });
+
+    this.client.on('change_state', (state) => {
+        console.log(`🔄 Connection state: ${state}`);
+        this.emitStatusChange({
+            connected: this.isConnected,
+            authenticated: this.isAuthenticated,
+            status: 'state_change',
+            message: `Connection state: ${state}`,
+            companyId: this.companyId
         });
-        
-        console.log(`✅ Event handlers setup complete`);
-    }
+    });
+    
+    console.log(`✅ Event handlers setup complete`);
+}
 
     // ========== PERFORMANCE OPTIMIZATIONS ==========
     

@@ -17,8 +17,8 @@ export const revalidate = 0;
 
 // ========== CONSTANTS ==========
 const VALID_SORT_FIELDS = ['discountPrice', 'createdAt', 'productName', 'averageRating', 'totalReviews', 'customId'];
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 100;
+const DEFAULT_LIMIT = 500;
+const MAX_LIMIT = 2000;
 
 // ========== HELPER FUNCTIONS ==========
 
