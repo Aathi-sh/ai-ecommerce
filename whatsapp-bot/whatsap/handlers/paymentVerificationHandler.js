@@ -4803,7 +4803,8 @@ async function generateAndSendInvoice(order, message, companyId) {
         console.log(`📄 Generating invoice for order: ${order.orderNumber} in company: ${companyId}`);
         
         try {
-            const pdfBuffer = await invoiceGenerator.generateInvoicePDF(order, companyId);
+            const pdfBuffer = await invoiceGenerator.generateInvoicePDF(order,null, companyId);
+            //const pdfBuffer = await invoiceGenerator.generateInvoicePDF(order, companyId);
             
             const media = new MessageMedia(
                 'application/pdf',

@@ -1169,7 +1169,7 @@ class OCREngine {
             // UPI validation (would be done by qrProcessor)
             // This is just a placeholder - actual validation happens in qrProcessor
             if (result.extractedFields.upiId) {
-                result.validation.upiMatch = true; // Will be overridden by qrProcessor
+                //result.validation.upiMatch = true; // Will be overridden by qrProcessor
             }
         }
 
