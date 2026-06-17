@@ -2197,8 +2197,8 @@ import {
   Loader2
 } from 'lucide-react';
 
-// ✅ FIXED import path – points to the actual file (socket-client)
-import getSocketIOClient from '../../../lib/websocket/socket-client';
+// ✅ FIXED import path – points to the actual file (socket-client
+import getSocketIOClient from '../../../lib/websocket/socketio-client';
 
 export default function WhatsAppDashboard() {
   // ========== SESSION & COMPANY ==========
