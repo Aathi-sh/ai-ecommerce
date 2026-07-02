@@ -1,6 +1,7 @@
 // server.js - COMPLETE WITH MULTI-TENANT SUPPORT - PROFESSIONAL VERSION (LocalAuth)
 // FIXED: QR WebSocket routing, bot event listeners, session pre-warming
 // FIXED: CORS headers for cross-domain Socket.IO connections
+// FIXED: Connect, Logout, Restart endpoints for correct multi-tenant behavior
 
 import express from 'express';
 import cors from 'cors';
@@ -829,7 +830,9 @@ app.get('/api/multi-tenant/stats', (req, res) => {
   }
 });
 
-// Connect company
+// ==========================================================
+// FIXED: Connect company – force fresh initialization
+// ==========================================================
 app.post('/api/connect', async (req, res) => {
   try {
     const { companyId } = req.query;
@@ -838,6 +841,8 @@ app.post('/api/connect', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Company ID is required' });
     }
     
+    // 🔧 FIX: Remove any existing client and session, then add fresh
+    await bot.removeCompany(companyId).catch(() => {});
     await bot.addCompany(companyId);
     
     res.json({
@@ -871,72 +876,71 @@ app.post('/api/disconnect', async (req, res) => {
   }
 });
 
-// Restart
+// ==========================================================
+// FIXED: Restart – accept companyId and force fresh start
+// ==========================================================
 app.post('/api/restart', async (req, res) => {
   try {
-    await bot.restart();
-    res.json({ success: true, message: 'Bot restart initiated' });
+    const { companyId } = req.query;
+    
+    if (!companyId) {
+      return res.status(400).json({ success: false, error: 'Company ID is required' });
+    }
+    
+    // 🔧 FIX: Remove and re-add to force fresh initialization
+    await bot.removeCompany(companyId).catch(() => {});
+    await bot.addCompany(companyId);
+    
+    res.json({ 
+      success: true, 
+      message: `Restart initiated for company ${companyId}`,
+      companyId
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Logout endpoint
+// ==========================================================
+// FIXED: Logout – directly remove company and clear cache
+// ==========================================================
 app.post('/api/logout', async (req, res) => {
-    try {
-        const { companyId } = req.query;
-        
-        if (companyId) {
-            // Temporarily switch to that company
-            const currentCompanyId = bot.companyId;
-            if (currentCompanyId !== companyId) {
-                return res.status(400).json({ 
-                    success: false, 
-                    error: `Cannot logout company ${companyId} - not currently active` 
-                });
-            }
-        }
-        
-        console.log(`🚪 Logout requested for company: ${companyId || 'current'}`);
-        
-        // Perform logout
-        await bot.logout();
-        
-        // Clear any cached QR for this company
-        if (companyId) {
-            qrSocketServer.companyQRs.delete(companyId);
-        }
-        
-        // Force emit final status to all listeners
-        bot.emitStatusChange({
-            connected: false,
-            authenticated: false,
-            hasQR: false,
-            status: 'logged_out',
-            message: 'Logged out successfully',
-            companyId: companyId || bot.companyId,
-            timestamp: new Date().toISOString()
-        });
-        
-        res.json({ 
-            success: true, 
-            message: 'Logged out successfully',
-            companyId: companyId || bot.companyId
-        });
-    } catch (error) {
-        console.error('Logout error:', error);
-        res.status(500).json({ success: false, error: error.message });
+  try {
+    const { companyId } = req.query;
+    
+    if (!companyId) {
+      return res.status(400).json({ success: false, error: 'Company ID is required' });
     }
+    
+    console.log(`🚪 Logout requested for company: ${companyId}`);
+    
+    // 🔧 FIX: Remove the company's client and session
+    await bot.removeCompany(companyId);
+    
+    // Clear any cached QR for this company
+    qrSocketServer.companyQRs.delete(companyId);
+    
+    // Force emit final status to all listeners
+    bot.emitStatusChange({
+      connected: false,
+      authenticated: false,
+      hasQR: false,
+      status: 'logged_out',
+      message: 'Logged out successfully',
+      companyId: companyId,
+      timestamp: new Date().toISOString()
+    });
+    
+    res.json({ 
+      success: true, 
+      message: 'Logged out successfully',
+      companyId: companyId
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
-// // Logout
-// app.post('/api/logout', async (req, res) => {
-//   try {
-//     await bot.logout();
-//     res.json({ success: true, message: 'Bot logged out successfully' });
-//   } catch (error) {
-//     res.status(500).json({ success: false, error: error.message });
-//   }
-// });
 
 // Send message
 app.post('/api/send-message', async (req, res) => {
@@ -1120,6 +1124,7 @@ server.listen(PORT, () => {
   console.log('   ✅ QR cache with expiry');
   console.log('   ✅ Bot event listeners');
   console.log('   ✅ CORS configured for cross-domain access');
+  console.log('   ✅ Fixed Connect/Logout/Restart for proper QR generation');
   console.log('='.repeat(70) + '\n');
   
   // Initialize QR Socket Server
