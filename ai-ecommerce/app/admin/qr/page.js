@@ -1,6 +1,4 @@
-
-
-// app/admin/qr/page.js
+// app/admin/qr/page.js - COMPLETE FIXED VERSION
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -34,7 +32,7 @@ import {
   Loader2
 } from 'lucide-react';
 
-// ✅ FIXED import path – points to the actual file (socket-client
+// Socket.IO client for notifications
 import getSocketIOClient from '../../../lib/websocket/socketio-client';
 
 export default function WhatsAppDashboard() {
@@ -49,7 +47,7 @@ export default function WhatsAppDashboard() {
   const [statusMessage, setStatusMessage] = useState('Connecting to WhatsApp service...');
   const [connectionError, setConnectionError] = useState(null);
 
-  // ========== WEBSOCKET STATE (✅ ADDED) ==========
+  // ========== WEBSOCKET STATE ==========
   const [wsConnected, setWsConnected] = useState(false);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
 
@@ -97,6 +95,8 @@ export default function WhatsAppDashboard() {
   const socketClientRef = useRef(null);
   const isMountedRef = useRef(true);
   const initialDataFetchedRef = useRef(false);
+  const isConnectingRef = useRef(false); // Prevent multiple connections
+  const qrReceivedRef = useRef(false); // Track if QR was received
 
   // Debounce timers
   const pendingStatsRef = useRef(null);
@@ -208,7 +208,10 @@ export default function WhatsAppDashboard() {
       const res = await fetch(`/api/whatsapp?action=status&companyId=${companyId}`);
       const data = await res.json();
       if (data.success && isMountedRef.current) {
-        if (data.qr) setQrCode(data.qr);
+        if (data.qr) {
+          setQrCode(data.qr);
+          qrReceivedRef.current = true;
+        }
         if (data.status) setConnectionStatus(safeString(data.status, 'disconnected'));
         if (data.message) setStatusMessage(safeString(data.message, 'WhatsApp service'));
         if (data.botInfo && typeof data.botInfo === 'object' && !Array.isArray(data.botInfo)) {
@@ -225,7 +228,7 @@ export default function WhatsAppDashboard() {
     } catch (error) { /* silent */ }
   }, [companyId]);
 
-  // ========== SOCKET.IO (notifications) – unchanged ==========
+  // ========== SOCKET.IO (notifications) ==========
   const initializeSocketIO = useCallback(() => {
     if (!companyId || !session?.user) return;
     try {
@@ -313,7 +316,7 @@ export default function WhatsAppDashboard() {
     }
   }, [companyId, session, addToActivityLog, debouncedFetchRecentOrders, debouncedFetchStats]);
 
-  // ========== WEBSOCKET CONNECTION FOR QR (with polling fallback) ==========
+  // ========== POLLING FALLBACK FOR QR ==========
   const startPolling = useCallback(() => {
     if (pollingIntervalRef.current) return;
     console.log('⏳ Starting polling fallback for QR...');
@@ -323,7 +326,9 @@ export default function WhatsAppDashboard() {
         const res = await fetch(`/api/whatsapp?action=qr&companyId=${companyId}`);
         const data = await res.json();
         if (data.qr) {
+          console.log('📱 QR received via polling');
           setQrCode(data.qr);
+          qrReceivedRef.current = true;
           setConnectionStatus('qr_required');
           setStatusMessage('Scan QR code with WhatsApp to connect');
           if (pollingIntervalRef.current) {
@@ -342,8 +347,15 @@ export default function WhatsAppDashboard() {
     }
   }, []);
 
+  // ========== CONNECT WEBSOCKET ==========
   const connectWebSocket = useCallback(() => {
     if (!companyId) return;
+    
+    // Prevent multiple connection attempts
+    if (isConnectingRef.current) {
+      console.log('⏳ Connection already in progress, skipping...');
+      return;
+    }
 
     if (wsRef.current) {
       try { wsRef.current.close(); } catch (e) {}
@@ -356,28 +368,39 @@ export default function WhatsAppDashboard() {
     }
 
     setConnectionError(null);
+    isConnectingRef.current = true;
 
     try {
-      const baseWsUrl = process.env.NEXT_PUBLIC_QR_WS_URL || 'ws://localhost:3001';
+      const baseWsUrl = process.env.NEXT_PUBLIC_QR_WS_URL || 'wss://bot.steponextai.tech';
       const wsUrl = `${baseWsUrl}/ws/qr?companyId=${companyId}`;
+      
+      console.log('🔌 Connecting to WebSocket:', wsUrl);
       wsRef.current = new WebSocket(wsUrl);
-
+      
       wsRef.current.onopen = () => {
+        console.log('✅ WebSocket connected');
+        isConnectingRef.current = false;
         if (isMountedRef.current) {
           setWsConnected(true);
           setConnectionStatus('connected');
-          setStatusMessage('WhatsApp is connected and ready');
+          setStatusMessage('Connected to WhatsApp service');
           setConnectionError(null);
           setReconnectAttempts(0);
+          
+          // Request QR immediately
           setTimeout(() => {
             if (wsRef.current?.readyState === WebSocket.OPEN) {
+              console.log('📤 Requesting QR on connection...');
+              wsRef.current.send(JSON.stringify({ type: 'get_qr' }));
               wsRef.current.send(JSON.stringify({ type: 'get_status' }));
               wsRef.current.send(JSON.stringify({ type: 'get_stats' }));
-              wsRef.current.send(JSON.stringify({ type: 'get_qr' }));
             }
           }, 500);
+          
+          // Start polling fallback after 5 seconds if no QR received
           setTimeout(() => {
-            if (isMountedRef.current && !qrCode) {
+            if (isMountedRef.current && !qrReceivedRef.current) {
+              console.log('⏳ No QR received via WebSocket, starting polling fallback...');
               startPolling();
             }
           }, 5000);
@@ -387,14 +410,48 @@ export default function WhatsAppDashboard() {
       wsRef.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          console.log('📨 WebSocket message received:', data.type || 'unknown');
+          
           if (data.companyId && data.companyId !== companyId) return;
           if (!isMountedRef.current) return;
 
           switch (data.type) {
             case 'qr':
             case 'qr_update':
+            case 'qr_response':
+              console.log('📱 QR data received:', {
+                type: data.type,
+                hasQr: !!data.qr,
+                qrLength: data.qr?.length || 0,
+                source: data.source || 'unknown'
+              });
+              
               if (data.qr) {
+                console.log('📱 Setting QR code in state');
                 setQrCode(data.qr);
+                qrReceivedRef.current = true;
+                setConnectionStatus('qr_required');
+                setStatusMessage('Scan QR code with WhatsApp to connect');
+                stopPolling();
+                addToActivityLog('QR code received - Scan to connect', 'success');
+              } else {
+                console.log('⚠️ QR response with no QR data');
+              }
+              break;
+
+            case 'connected':
+              console.log('✅ Connected to QR WebSocket');
+              if (data.qrData) {
+                console.log('📱 QR data in welcome message');
+                setQrCode(data.qrData);
+                qrReceivedRef.current = true;
+                setConnectionStatus('qr_required');
+                setStatusMessage('Scan QR code with WhatsApp to connect');
+                stopPolling();
+              }
+              if (data.status === 'qr_required' && data.qrData) {
+                setQrCode(data.qrData);
+                qrReceivedRef.current = true;
                 setConnectionStatus('qr_required');
                 setStatusMessage('Scan QR code with WhatsApp to connect');
                 stopPolling();
@@ -403,10 +460,13 @@ export default function WhatsAppDashboard() {
 
             case 'status':
             case 'status_update':
+              console.log('📊 Status update:', data);
               if (data.status) setConnectionStatus(safeString(data.status, 'disconnected'));
               if (data.message) setStatusMessage(safeString(data.message, 'WhatsApp service'));
               if (data.qr) {
+                console.log('📱 QR in status message');
                 setQrCode(data.qr);
+                qrReceivedRef.current = true;
                 stopPolling();
               }
               if (data.connected !== undefined) {
@@ -414,9 +474,18 @@ export default function WhatsAppDashboard() {
               }
               if (data.status === 'disconnected' || data.status === 'logged_out' || data.status === 'logout') {
                 setQrCode(null);
+                qrReceivedRef.current = false;
                 setConnectionStatus('disconnected');
                 setStatusMessage('Logged out successfully');
                 stopPolling();
+              }
+              if (data.authenticated && data.connected) {
+                setConnectionStatus('connected');
+                setStatusMessage('WhatsApp is connected and ready');
+                setQrCode(null);
+                qrReceivedRef.current = false;
+                stopPolling();
+                addToActivityLog('WhatsApp connected successfully', 'success');
               }
               break;
 
@@ -431,6 +500,7 @@ export default function WhatsAppDashboard() {
               setConnectionStatus('connected');
               setStatusMessage('WhatsApp is connected and ready');
               setQrCode(null);
+              qrReceivedRef.current = false;
               stopPolling();
               addToActivityLog('WhatsApp connected successfully', 'success');
               break;
@@ -439,6 +509,7 @@ export default function WhatsAppDashboard() {
               setConnectionStatus('disconnected');
               setStatusMessage(`Disconnected: ${safeString(data.reason, 'Unknown reason')}`);
               setQrCode(null);
+              qrReceivedRef.current = false;
               stopPolling();
               addToActivityLog(`Disconnected: ${safeString(data.reason, 'Unknown reason')}`, 'warning');
               break;
@@ -474,6 +545,16 @@ export default function WhatsAppDashboard() {
 
             case 'pong':
               break;
+
+            default:
+              if (data.qr) {
+                console.log('📱 QR found in unknown message type');
+                setQrCode(data.qr);
+                qrReceivedRef.current = true;
+                setConnectionStatus('qr_required');
+                setStatusMessage('Scan QR code with WhatsApp to connect');
+                stopPolling();
+              }
           }
         } catch (error) {
           console.log('Error parsing WebSocket message:', error.message);
@@ -481,6 +562,8 @@ export default function WhatsAppDashboard() {
       };
 
       wsRef.current.onclose = (event) => {
+        console.log('🔌 WebSocket closed:', event.code, event.reason);
+        isConnectingRef.current = false;
         if (isMountedRef.current) {
           setWsConnected(false);
         }
@@ -493,28 +576,35 @@ export default function WhatsAppDashboard() {
             if (isMountedRef.current) connectWebSocket();
           }, delay);
         }
-        if (!qrCode && isMountedRef.current) {
+        if (!qrReceivedRef.current && isMountedRef.current) {
           startPolling();
         }
       };
 
       wsRef.current.onerror = (error) => {
+        console.error('❌ WebSocket error:', error);
+        isConnectingRef.current = false;
         if (isMountedRef.current) {
           setConnectionError('Failed to connect to WhatsApp service');
-          startPolling();
+          if (!qrReceivedRef.current) {
+            startPolling();
+          }
         }
         fetchBotStatus();
       };
 
     } catch (error) {
       console.error('WebSocket setup error:', error);
+      isConnectingRef.current = false;
       if (isMountedRef.current) {
         setConnectionError('Failed to initialize connection');
-        startPolling();
+        if (!qrReceivedRef.current) {
+          startPolling();
+        }
       }
       fetchBotStatus();
     }
-  }, [companyId, fetchBotStatus, addToActivityLog, debouncedFetchRecentOrders, debouncedFetchStats, qrCode, startPolling, stopPolling]);
+  }, [companyId, fetchBotStatus, addToActivityLog, debouncedFetchRecentOrders, debouncedFetchStats, startPolling, stopPolling]);
 
   // ========== WEBSOCKET PING ==========
   useEffect(() => {
@@ -532,9 +622,43 @@ export default function WhatsAppDashboard() {
   const clearQRCache = useCallback(async () => {
     if (!companyId) return;
     try {
-      await fetch(`/api/clear-qr-cache?companyId=${companyId}`, { method: 'POST' });
-    } catch (error) { /* silent */ }
+      const response = await fetch(`/api/clear-qr-cache?companyId=${companyId}`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!response.ok) {
+        console.warn('QR cache clear endpoint returned:', response.status);
+      }
+    } catch (error) {
+      console.warn('Could not clear QR cache:', error.message);
+    }
   }, [companyId]);
+
+  // ========== FETCH QR DIRECTLY ==========
+  const fetchQRDirectly = useCallback(async () => {
+    if (!companyId) return false;
+    
+    try {
+      console.log('📤 Fetching QR directly from API...');
+      const response = await fetch(`http://localhost:3001/api/qr?companyId=${companyId}`);
+      const data = await response.json();
+      
+      if (data.success && data.qr) {
+        console.log('✅ QR fetched directly from API');
+        setQrCode(data.qr);
+        qrReceivedRef.current = true;
+        setConnectionStatus('qr_required');
+        setStatusMessage('Scan QR code with WhatsApp to connect');
+        stopPolling();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.warn('Direct QR fetch failed:', error.message);
+      return false;
+    }
+  }, [companyId, stopPolling]);
 
   // ========== BOT ACTIONS ==========
   const handleBotAction = async (action, confirmMessage = null) => {
@@ -542,42 +666,128 @@ export default function WhatsAppDashboard() {
       alert('Company ID not found');
       return;
     }
-      console.log('Connect res before confirm');
-    
-    // if (confirmMessage && !window.confirm(confirmMessage)) return;
+
+    if (confirmMessage && !window.confirm(confirmMessage)) return;
 
     setIsLoading(true);
     setLoadingAction(action);
     setConnectionError(null);
 
     try {
+      // Handle connect action specially
+      if (action === 'connect') {
+        // Clear existing QR
+        await clearQRCache();
+        setQrCode(null);
+        qrReceivedRef.current = false;
+        setConnectionStatus('loading');
+        setStatusMessage('Connecting to WhatsApp...');
+        
+        // Call connect API
+        const response = await fetch('/api/whatsapp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, companyId })
+        });
+        const data = await response.json();
+        console.log('📡 Connect response:', data);
+        
+        if (data.success) {
+          setStatusMessage('Connection initiated. Waiting for QR code...');
+          addToActivityLog('WhatsApp connection initiated', 'info');
+          
+          // Request QR via WebSocket
+          setTimeout(() => {
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({ type: 'get_qr' }));
+            }
+            fetchBotStatus();
+          }, 1000);
+          
+          // Start polling fallback
+          setTimeout(() => {
+            if (!qrReceivedRef.current) {
+              console.log('⏳ No QR yet, starting polling fallback...');
+              startPolling();
+            }
+          }, 3000);
+          
+          // Force QR via force endpoint as fallback
+          setTimeout(async () => {
+            if (!qrReceivedRef.current) {
+              console.log('🔧 Attempting force QR generation...');
+              try {
+                const forceResponse = await fetch(`http://localhost:3001/api/force-qr?companyId=${companyId}`, {
+                  method: 'POST'
+                });
+                const forceData = await forceResponse.json();
+                console.log('Force QR response:', forceData);
+                
+                if (forceData.success && forceData.hasQR) {
+                  // Request QR again after force generation
+                  setTimeout(() => {
+                    if (wsRef.current?.readyState === WebSocket.OPEN) {
+                      wsRef.current.send(JSON.stringify({ type: 'get_qr' }));
+                    }
+                    fetchQRDirectly();
+                  }, 1000);
+                }
+              } catch (error) {
+                console.warn('Force QR failed:', error.message);
+              }
+            }
+          }, 5000);
+          
+          // Final fallback: direct fetch
+          setTimeout(async () => {
+            if (!qrReceivedRef.current) {
+              console.log('📤 Final attempt: direct QR fetch...');
+              await fetchQRDirectly();
+            }
+          }, 8000);
+        } else {
+          setConnectionError(data.error || 'Connection failed');
+          setStatusMessage('Connection failed. Please try again.');
+        }
+        
+        setIsLoading(false);
+        setLoadingAction(null);
+        return;
+      }
+
+      // Handle other actions
       const response = await fetch('/api/whatsapp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, companyId })
       });
       const data = await response.json();
-      console.log('Connect res', data);
+      console.log('📡 Action response:', action, data);
       
       if (data.success) {
-        if (action === 'connect') {
-          setStatusMessage('WhatsApp connected successfully');
-          addToActivityLog('WhatsApp connected', 'success');
-          await fetchBotStatus();
-          debouncedFetchStats();
-        } else if (action === 'disconnect') {
+        if (action === 'disconnect') {
           setStatusMessage('WhatsApp disconnected');
           setConnectionStatus('disconnected');
           setQrCode(null);
+          qrReceivedRef.current = false;
           addToActivityLog('WhatsApp disconnected', 'warning');
+          stopPolling();
         } else if (action === 'restart') {
           setStatusMessage('WhatsApp service restarted');
           addToActivityLog('WhatsApp restarted', 'info');
-          setTimeout(() => connectWebSocket(), 2000);
+          setQrCode(null);
+          qrReceivedRef.current = false;
+          setTimeout(() => {
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({ type: 'get_qr' }));
+            }
+            fetchBotStatus();
+          }, 2000);
         } else if (action === 'logout') {
           setStatusMessage('Logged out successfully');
           setConnectionStatus('disconnected');
           setQrCode(null);
+          qrReceivedRef.current = false;
           addToActivityLog('Logged out', 'warning');
           if (wsRef.current) {
             try { wsRef.current.close(); } catch (e) {}
@@ -589,6 +799,8 @@ export default function WhatsAppDashboard() {
         } else if (action === 'refresh-qr') {
           setStatusMessage('Generating new QR code...');
           addToActivityLog('Requested new QR code', 'info');
+          setQrCode(null);
+          qrReceivedRef.current = false;
           await clearQRCache();
           setTimeout(() => {
             if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -678,6 +890,11 @@ export default function WhatsAppDashboard() {
       debouncedFetchRecentOrders();
       debouncedFetchActivityLog();
       requestNotificationPermission();
+      
+      // Try to fetch QR directly on load
+      setTimeout(() => {
+        fetchQRDirectly();
+      }, 2000);
     }
     return () => {
       isMountedRef.current = false;
@@ -690,7 +907,7 @@ export default function WhatsAppDashboard() {
       if (socketClientRef.current) socketClientRef.current.disconnect('Component unmount');
       if (wsRef.current) { try { wsRef.current.close(); } catch(e) {} }
     };
-  }, [companyId, session, connectWebSocket, initializeSocketIO, fetchBotStatus, debouncedFetchStats, debouncedFetchRecentOrders, debouncedFetchActivityLog, requestNotificationPermission]);
+  }, [companyId, session, connectWebSocket, initializeSocketIO, fetchBotStatus, debouncedFetchStats, debouncedFetchRecentOrders, debouncedFetchActivityLog, requestNotificationPermission, fetchQRDirectly]);
 
   // ========== PERIODIC REFRESH ==========
   useEffect(() => {
@@ -919,22 +1136,34 @@ export default function WhatsAppDashboard() {
                   <div className="connected-icon">
                     {connectionStatus === 'loading' ? (
                       <Loader2 size={isMobile ? 32 : 40} className="spin" color="#3b82f6" />
+                    ) : connectionStatus === 'disconnected' ? (
+                      <WifiOff size={isMobile ? 32 : 40} color="#ef4444" />
                     ) : (
                       <CheckCircle size={isMobile ? 32 : 40} color="#10b981" />
                     )}
                   </div>
-                  <h3>{connectionStatus === 'loading' ? 'Connecting...' : 'WhatsApp is '+ connectionStatus }</h3>
-                  <p>{connectionStatus === 'loading' ? 'Establishing connection...' : 'Your WhatsApp business account is not ready'}</p>
-                  <div className="bot-info-grid">
-                    <div className="bot-info-item">
-                      <Phone size={isMobile ? 12 : 14} />
-                      <span>{safeString(botInfo.phoneNumber, 'N/A')}</span>
+                  <h3>
+                    {connectionStatus === 'loading' ? 'Connecting...' : 
+                     connectionStatus === 'disconnected' ? 'Disconnected' :
+                     'WhatsApp is ' + connectionStatus}
+                  </h3>
+                  <p>
+                    {connectionStatus === 'loading' ? 'Establishing connection...' : 
+                     connectionStatus === 'disconnected' ? 'Click "Connect" to start' :
+                     'Your WhatsApp business account is ready'}
+                  </p>
+                  {botInfo.phoneNumber && (
+                    <div className="bot-info-grid">
+                      <div className="bot-info-item">
+                        <Phone size={isMobile ? 12 : 14} />
+                        <span>{safeString(botInfo.phoneNumber, 'N/A')}</span>
+                      </div>
+                      <div className="bot-info-item">
+                        <User size={isMobile ? 12 : 14} />
+                        <span>{safeString(botInfo.pushname, 'N/A')}</span>
+                      </div>
                     </div>
-                    <div className="bot-info-item">
-                      <User size={isMobile ? 12 : 14} />
-                      <span>{safeString(botInfo.pushname, 'N/A')}</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>

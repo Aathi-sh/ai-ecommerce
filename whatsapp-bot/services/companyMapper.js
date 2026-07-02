@@ -1227,7 +1227,7 @@ normalizePhoneNumber(phoneNumber) {
             console.log(`✅ [CompanyMapper] Cache warmed up with ${companies.length} companies, ${totalNumbers} phone numbers`);
             
         } catch (error) {
-            console.error('❌ [CompanyMapper] Cache warm-up failed:', error.message);
+            console.error('❌ [CompanyMapper] Cache warm-up failed: ---', error.message);
         }
     }
 

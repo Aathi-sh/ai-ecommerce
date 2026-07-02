@@ -1,4 +1,4 @@
-// services/qrSocketServer.js - COMPLETE MULTI-TENANT VERSION (FIXED)
+// services/qrSocketServer.js - COMPLETE MULTI-TENANT VERSION (FULLY FIXED)
 // Handles QR code WebSocket connections with company isolation
 
 import { WebSocketServer } from 'ws';
@@ -83,6 +83,7 @@ class QRSocketServer {
             console.log(`\n🔍 [QR Socket] Received QR update event from bot`);
             console.log(`🔍 CompanyId: ${qrData?.companyId || 'unknown'}`);
             console.log(`🔍 QR exists: ${!!qrData?.qr}`);
+            console.log(`🔍 QR length: ${qrData?.qr?.length || 0}`);
             
             if (qrData && qrData.companyId && qrData.qr) {
                 // Broadcast to all clients for this company
@@ -96,6 +97,8 @@ class QRSocketServer {
                     timestamp: new Date().toISOString(),
                     hasQr: true
                 });
+            } else {
+                console.log(`⚠️ QR update received but missing QR data:`, qrData);
             }
         });
         
@@ -229,130 +232,132 @@ class QRSocketServer {
     /**
      * Handle new WebSocket connection with company context
      */
-    handleConnection(ws, req) {
-        this.connectionCounter++;
-        const clientId = Date.now().toString() + '_' + this.connectionCounter;
-        const clientIp = req.socket.remoteAddress || 'unknown';
-        const userAgent = req.headers['user-agent'] || 'Unknown';
-        
-        // Extract companyId from query string - MULTI-TENANT SUPPORT
-        const parsedUrl = url.parse(req.url, true);
-        const companyId = parsedUrl.query.companyId || null;
-        
-        // Check if localhost/development
-        const isLocalhost = clientIp === '::1' || clientIp === '127.0.0.1' || 
-                           clientIp.includes('localhost') || 
-                           clientIp.includes('192.168.') ||
-                           clientIp.includes('10.0.');
-        
-        // Apply rate limiting only for non-localhost connections
-        if (!isLocalhost && !this.checkRateLimit(clientIp)) {
-            console.log(`⛔ Rate limit exceeded for IP: ${clientIp}`);
-            ws.close(1008, 'Rate limit exceeded');
-            return;
-        }
-        
-        console.log(`🔗 New QR WebSocket client: ${clientId} from ${clientIp} for company: ${companyId || 'unknown'}`);
-        
-        // Store client with company context - MULTI-TENANT SUPPORT
-        this.clients.set(ws, {
-            id: clientId,
-            companyId: companyId,
-            connectedAt: new Date(),
-            ip: clientIp,
-            userAgent: userAgent,
-            isAlive: true,
-            isLocalhost: isLocalhost,
-            authenticated: false,
-            lastPing: Date.now()
-        });
-        
-        // Setup heartbeat detection
-        ws.isAlive = true;
-        
-        ws.on('pong', () => {
-            ws.isAlive = true;
-            const client = this.clients.get(ws);
-            if (client) {
-                client.lastPing = Date.now();
-            }
-        });
-        
-        // Send welcome message with initial status - COMPANY SPECIFIC
-        setTimeout(() => {
-            if (ws.readyState === 1) { // WebSocket.OPEN
-                try {
-                    // ✅ FIX: First check our QR cache for this company
-                    let qrData = null;
-                    let connectionStatus = 'disconnected';
-                    let isConnected = false;
-                    
-                    // ✅ PRIORITY 1: Check our own QR cache (most reliable)
-                    if (companyId && this.companyQRs.has(companyId)) {
-                        const cachedQR = this.companyQRs.get(companyId);
-                        if (cachedQR.expiresAt > Date.now()) {
-                            qrData = cachedQR.qr;
-                            connectionStatus = 'qr_required';
-                            console.log(`✅ Found QR in cache for company ${companyId}`);
-                        }
-                    }
-                    
-                    // ✅ PRIORITY 2: Try session manager if no cache hit
-                    if (!qrData && this.sessionManager && companyId) {
-                        const session = this.sessionManager.getSessionStatus(companyId);
-                        qrData = session?.qrData || null;
-                        connectionStatus = session?.status || 'disconnected';
-                        isConnected = session?.connected || false;
-                    } 
-                    // ✅ PRIORITY 3: Fallback to bot
-                    else if (!qrData && this.bot && companyId) {
-                        const botStatus = this.bot.getStatus();
-                        if (botStatus.companyId === companyId) {
-                            qrData = botStatus.qrData?.qr || null;
-                            connectionStatus = botStatus.connected ? 'connected' : 
-                                              botStatus.hasQR ? 'qr_required' : 'disconnected';
-                            isConnected = botStatus.connected;
-                        }
-                    }
-                    
-                    ws.send(JSON.stringify({
-                        type: 'connected',
-                        message: 'Connected to WhatsApp QR WebSocket',
-                        clientId: clientId,
-                        companyId: companyId,
-                        serverTime: new Date().toISOString(),
-                        version: '1.0.0',
-                        qrData: qrData,
-                        status: connectionStatus,
-                        connected: isConnected,
-                        endpoint: 'qr'
-                    }));
-                    
-                    console.log(`✅ Welcome sent to QR client ${clientId} for company: ${companyId}`);
-                    
-                    // ✅ If we have QR in cache, also send it as separate update
-                    if (qrData) {
-                        setTimeout(() => {
-                            if (ws.readyState === 1) {
-                                ws.send(JSON.stringify({
-                                    type: 'qr_update',
-                                    qr: qrData,
-                                    companyId: companyId,
-                                    timestamp: new Date().toISOString(),
-                                    hasQr: true,
-                                    fromCache: true
-                                }));
-                            }
-                        }, 500);
-                    }
-                    
-                } catch (error) {
-                    console.log(`❌ Error sending welcome to ${clientId}:`, error.message);
+ handleConnection(ws, req) {
+    this.connectionCounter++;
+    const clientId = Date.now().toString() + '_' + this.connectionCounter;
+    const clientIp = req.socket.remoteAddress || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'Unknown';
+    
+    const parsedUrl = url.parse(req.url, true);
+    const companyId = parsedUrl.query.companyId || null;
+    
+    // ... rest of connection code ...
+    
+    // Store client with company context
+    this.clients.set(ws, {
+        id: clientId,
+        companyId: companyId,
+        connectedAt: new Date(),
+        ip: clientIp,
+        userAgent: userAgent,
+        isAlive: true,
+        isLocalhost: isLocalhost,
+        authenticated: false,
+        lastPing: Date.now()
+    });
+    
+    // ========== CRITICAL FIX: Send QR immediately on connection ==========
+    setTimeout(() => {
+        if (ws.readyState === 1) {
+            // Check if we have QR for this company
+            let qrData = null;
+            
+            // 1. Check cache
+            if (companyId && this.companyQRs.has(companyId)) {
+                const cachedQR = this.companyQRs.get(companyId);
+                if (cachedQR.expiresAt > Date.now()) {
+                    qrData = cachedQR.qr;
+                    console.log(`✅ Found QR in cache for company ${companyId}, sending to new client`);
                 }
             }
-        }, 100);
-        
-        ws.on('message', (message) => {
+            
+            // 2. Check global cache
+            if (!qrData && global._qrCache && global._qrCache.has(companyId)) {
+                const cachedQR = global._qrCache.get(companyId);
+                if (cachedQR.expiresAt > Date.now()) {
+                    qrData = cachedQR.qr;
+                    console.log(`✅ Found QR in global cache for company ${companyId}`);
+                }
+            }
+            
+            // 3. Check bot status
+            if (!qrData && this.bot) {
+                try {
+                    const status = this.bot.getStatus();
+                    if (status.multiTenant) {
+                        const companySession = status.multiTenant.companies?.find(c => c.companyId === companyId);
+                        if (companySession && companySession.qrData) {
+                            qrData = companySession.qrData.qr;
+                            console.log(`✅ Found QR in bot multi-tenant for company ${companyId}`);
+                        }
+                    } else if (status.qrData && status.qrData.qr) {
+                        qrData = status.qrData.qr;
+                        console.log(`✅ Found QR in bot status for company ${companyId}`);
+                    }
+                } catch (error) {
+                    console.error('Error getting QR from bot:', error);
+                }
+            }
+            
+            // If we found QR, send it to the client immediately
+            if (qrData) {
+                // Store in cache for future clients
+                this.companyQRs.set(companyId, {
+                    qr: qrData,
+                    expiresAt: Date.now() + 120000
+                });
+                
+                // Send QR update
+                ws.send(JSON.stringify({
+                    type: 'qr_update',
+                    qr: qrData,
+                    companyId: companyId,
+                    timestamp: new Date().toISOString(),
+                    hasQr: true,
+                    fromCache: true
+                }));
+                
+                // Send QR response
+                ws.send(JSON.stringify({
+                    type: 'qr_response',
+                    qr: qrData,
+                    hasQr: true,
+                    companyId: companyId,
+                    timestamp: new Date().toISOString(),
+                    source: 'connection-cache'
+                }));
+                
+                // Send status
+                ws.send(JSON.stringify({
+                    type: 'status',
+                    connected: false,
+                    authenticated: false,
+                    hasQR: true,
+                    qr: qrData,
+                    companyId: companyId,
+                    message: 'QR code required - Scan to connect',
+                    timestamp: new Date().toISOString()
+                }));
+                
+                console.log(`✅ QR sent to new client ${clientId} for company ${companyId}`);
+            } else {
+                console.log(`ℹ️ No QR available for new client ${clientId} for company ${companyId}`);
+                
+                // Send a status update that QR is not available
+                ws.send(JSON.stringify({
+                    type: 'status',
+                    connected: false,
+                    authenticated: false,
+                    hasQR: false,
+                    qr: null,
+                    companyId: companyId,
+                    message: 'Waiting for QR code generation...',
+                    timestamp: new Date().toISOString()
+                }));
+            }
+        }
+    }, 500); 
+           ws.on('message', (message) => {
             try {
                 const data = JSON.parse(message.toString());
                 this.handleMessage(ws, data);
@@ -444,7 +449,20 @@ class QRSocketServer {
                     // Fallback to bot (single tenant mode)
                     else if (this.bot && companyId) {
                         const botStatus = this.bot.getStatus();
-                        if (botStatus.companyId === companyId) {
+                        // Check multi-tenant
+                        if (botStatus.multiTenant) {
+                            const companySession = botStatus.multiTenant.companies?.find(c => c.companyId === companyId);
+                            if (companySession) {
+                                status = {
+                                    connected: companySession.isConnected || false,
+                                    authenticated: companySession.isConnected || false,
+                                    hasQR: !!companySession.qrData || !!qrData,
+                                    qr: companySession.qrData?.qr || qrData
+                                };
+                                message = status.connected ? 'WhatsApp is connected' : 
+                                         status.hasQR ? 'QR code required' : 'Not connected';
+                            }
+                        } else if (botStatus.companyId === companyId) {
                             status = {
                                 connected: botStatus.connected || false,
                                 authenticated: botStatus.authenticated || false,
@@ -470,40 +488,72 @@ class QRSocketServer {
                 break;
                 
             case 'get_qr':
-                if (ws.readyState === 1) {
-                    const companyId = client?.companyId || data.companyId;
-                    let qr = null;
-                    
-                    // ✅ Check QR cache first
-                    if (companyId && this.companyQRs.has(companyId)) {
-                        const cachedQR = this.companyQRs.get(companyId);
-                        if (cachedQR.expiresAt > Date.now()) {
-                            qr = cachedQR.qr;
-                            console.log(`✅ Returning QR from cache for company ${companyId}`);
-                        }
-                    }
-                    
-                    // If not in cache, try other sources
-                    if (!qr && this.sessionManager && companyId) {
-                        const session = this.sessionManager.getSessionStatus(companyId);
-                        qr = session?.qrData || null;
-                    } else if (!qr && this.bot && companyId) {
-                        const botStatus = this.bot.getStatus();
-                        if (botStatus.companyId === companyId) {
-                            qr = botStatus.qrData?.qr || null;
-                        }
-                    }
-                    
-                    ws.send(JSON.stringify({
-                        type: 'qr_response',
-                        qr: qr,
-                        hasQr: !!qr,
-                        companyId: companyId,
-                        timestamp: new Date().toISOString()
-                    }));
-                }
-                break;
+    if (ws.readyState === 1) {
+        const companyId = client?.companyId || data.companyId;
+        let qr = null;
+        let source = 'none';
+        
+        // ✅ Check QR cache first
+        if (companyId && this.companyQRs.has(companyId)) {
+            const cachedQR = this.companyQRs.get(companyId);
+            if (cachedQR.expiresAt > Date.now()) {
+                qr = cachedQR.qr;
+                source = 'cache';
+                console.log(`✅ Returning QR from cache for company ${companyId}`);
+            }
+        }
+        
+        // ✅ If not in cache, try to get from bot directly
+        if (!qr && this.bot) {
+            try {
+                const status = this.bot.getStatus();
+                console.log(`🔍 Checking bot status for QR:`, {
+                    hasQR: !!status.qrData,
+                    qrLength: status.qrData?.qr?.length || 0,
+                    connected: status.connected,
+                    companyId: status.companyId
+                });
                 
+                // Check multi-tenant
+                if (status.multiTenant) {
+                    const companySession = status.multiTenant.companies?.find(c => c.companyId === companyId);
+                    if (companySession && companySession.qrData && companySession.qrData.qr) {
+                        qr = companySession.qrData.qr;
+                        source = 'bot-multi';
+                        console.log(`✅ Found QR in bot multi-tenant for company ${companyId}`);
+                    }
+                } else if (status.qrData && status.qrData.qr) {
+                    qr = status.qrData.qr;
+                    source = 'bot-single';
+                    console.log(`✅ Found QR in bot status for company ${companyId}`);
+                }
+            } catch (error) {
+                console.error('Error getting QR from bot:', error);
+            }
+        }
+        
+        // ✅ If we found QR, store in cache
+        if (qr) {
+            this.companyQRs.set(companyId, {
+                qr: qr,
+                expiresAt: Date.now() + 60000
+            });
+            console.log(`✅ QR stored in cache for company ${companyId}`);
+        }
+        
+        // Send response
+        ws.send(JSON.stringify({
+            type: 'qr_response',
+            qr: qr,
+            hasQr: !!qr,
+            companyId: companyId,
+            source: source,
+            timestamp: new Date().toISOString()
+        }));
+        
+        console.log(`📤 Sent qr_response to client ${client?.id}: hasQr=${!!qr}, source=${source}`);
+    }
+    break;
             case 'get_stats':
                 if (ws.readyState === 1) {
                     let stats = {};
@@ -585,60 +635,105 @@ class QRSocketServer {
 
     // ========== BROADCAST METHODS WITH COMPANY ISOLATION ==========
 
-    /**
-     * Broadcast QR code to clients for a specific company
-     */
-    broadcastQR(companyId, qrData) {
-        console.log(`\n📢 [QR Socket] broadcastQR called for company: ${companyId}`);
-        console.log(`📢 QR Data length: ${qrData?.length || 0}`);
-        
-        if (!companyId || !qrData) {
-            console.log(`⚠️ Missing companyId or qrData, skipping broadcast`);
-            return;
-        }
-        
-        const now = Date.now();
-        
-        // ✅ Store in company cache immediately (before throttling check)
-        this.companyQRs.set(companyId, {
-            qr: qrData,
-            expiresAt: now + 60000 // 60 seconds
-        });
-        console.log(`✅ QR stored in cache for company ${companyId}, expires in 60s`);
-        
-        // Throttle broadcasts
-        if (now - this.lastQrBroadcast < this.qrBroadcastInterval && this.lastQrBroadcast !== 0) {
-            console.log(`⏱️ Throttling QR broadcast for company ${companyId} (${now - this.lastQrBroadcast}ms < ${this.qrBroadcastInterval}ms)`);
-            return;
-        }
-        
-        this.lastQrBroadcast = now;
-        
-        // Create message payload
-        const message = {
-            type: 'qr_update',
-            qr: qrData,
-            companyId: companyId,
-            timestamp: new Date().toISOString(),
-            hasQr: true,
-            expiresIn: 60
-        };
-        
-        // Broadcast only to clients viewing this company
-        const sentCount = this.broadcastToCompany(companyId, message);
-        console.log(`📤 QR broadcast to ${sentCount} client(s) for company ${companyId}`);
-        
-        // Also broadcast to Socket.IO QR namespace if available
-        if (this.io) {
-            try {
-                const qrNamespace = this.io.of('/qr');
-                qrNamespace.to(`company:${companyId}`).emit('qr_update', message);
-                console.log(`📤 QR broadcast to Socket.IO for company ${companyId}`);
-            } catch (error) {
-                console.error(`❌ Socket.IO broadcast failed:`, error.message);
-            }
+/**
+ * Broadcast QR code to clients for a specific company
+ */
+broadcastQR(companyId, qrData) {
+    console.log(`\n📢 [QR Socket] broadcastQR called for company: ${companyId}`);
+    console.log(`📢 QR Data length: ${qrData?.length || 0}`);
+    console.log(`📢 QR Data preview: ${qrData ? qrData.substring(0, 50) + '...' : 'null'}`);
+    
+    if (!companyId || !qrData) {
+        console.log(`⚠️ Missing companyId or qrData, skipping broadcast`);
+        return;
+    }
+    
+    const now = Date.now();
+    
+    // ✅ Store in company cache immediately (before throttling check)
+    this.companyQRs.set(companyId, {
+        qr: qrData,
+        expiresAt: now + 120000 // 2 minutes for safety
+    });
+    console.log(`✅ QR stored in cache for company ${companyId}, expires in 120s`);
+    
+    // Create message payloads
+    const qrUpdateMessage = {
+        type: 'qr_update',
+        qr: qrData,
+        companyId: companyId,
+        timestamp: new Date().toISOString(),
+        hasQr: true,
+        expiresIn: 120
+    };
+    
+    const qrResponseMessage = {
+        type: 'qr_response',
+        qr: qrData,
+        hasQr: true,
+        companyId: companyId,
+        timestamp: new Date().toISOString(),
+        source: 'broadcast'
+    };
+    
+    const statusMessage = {
+        type: 'status',
+        connected: false,
+        authenticated: false,
+        hasQR: true,
+        qr: qrData,
+        companyId: companyId,
+        message: 'QR code required - Scan to connect',
+        timestamp: new Date().toISOString()
+    };
+    
+    // ========== BROADCAST TO WEB SOCKET CLIENTS ==========
+    // Broadcast QR update
+    const sentCount1 = this.broadcastToCompany(companyId, qrUpdateMessage);
+    console.log(`📤 QR update broadcast to ${sentCount1} WebSocket client(s)`);
+    
+    // Broadcast QR response
+    const sentCount2 = this.broadcastToCompany(companyId, qrResponseMessage);
+    console.log(`📤 QR response broadcast to ${sentCount2} WebSocket client(s)`);
+    
+    // Broadcast status
+    const sentCount3 = this.broadcastToCompany(companyId, statusMessage);
+    console.log(`📤 Status broadcast to ${sentCount3} WebSocket client(s)`);
+    
+    // ========== BROADCAST TO SOCKET.IO CLIENTS ==========
+    if (this.io) {
+        try {
+            const qrNamespace = this.io.of('/qr');
+            
+            // Send to company room
+            qrNamespace.to(`company:${companyId}`).emit('qr_update', qrUpdateMessage);
+            qrNamespace.to(`company:${companyId}`).emit('qr_response', qrResponseMessage);
+            qrNamespace.to(`company:${companyId}`).emit('status', statusMessage);
+            
+            // Also send to all clients in QR namespace (for clients without company room)
+            qrNamespace.emit('qr_update', qrUpdateMessage);
+            qrNamespace.emit('qr_response', qrResponseMessage);
+            qrNamespace.emit('status', statusMessage);
+            
+            console.log(`📤 QR broadcast to Socket.IO for company ${companyId}`);
+        } catch (error) {
+            console.error(`❌ Socket.IO broadcast failed:`, error.message);
         }
     }
+    
+    // ========== STORE IN GLOBAL FOR DIRECT ACCESS ==========
+    // Store in global QR cache for direct access
+    if (!global._qrCache) {
+        global._qrCache = new Map();
+    }
+    global._qrCache.set(companyId, {
+        qr: qrData,
+        timestamp: now,
+        expiresAt: now + 120000
+    });
+    
+    console.log(`✅ QR broadcast complete for company ${companyId}`);
+}
 
     /**
      * Broadcast status update to clients for a specific company
@@ -827,6 +922,24 @@ class QRSocketServer {
         }
     }
 
+    /**
+     * Manually set QR for a company (for testing/debugging)
+     */
+    setQRForCompany(companyId, qrData, expiresInSeconds = 60) {
+        if (!companyId || !qrData) return;
+        
+        const now = Date.now();
+        this.companyQRs.set(companyId, {
+            qr: qrData,
+            expiresAt: now + (expiresInSeconds * 1000)
+        });
+        
+        console.log(`✅ Manually set QR for company ${companyId}, expires in ${expiresInSeconds}s`);
+        
+        // Broadcast to all clients
+        this.broadcastQR(companyId, qrData);
+    }
+
     // ========== UTILITY METHODS ==========
 
     /**
@@ -949,7 +1062,31 @@ class QRSocketServer {
             cachedCompanies: Array.from(this.companyQRs.keys())
         };
     }
-
+getQRFromBot(companyId) {
+    if (!this.bot) return null;
+    
+    try {
+        const status = this.bot.getStatus();
+        
+        // Check multi-tenant
+        if (status.multiTenant) {
+            const companySession = status.multiTenant.companies?.find(c => c.companyId === companyId);
+            if (companySession && companySession.qrData) {
+                return companySession.qrData;
+            }
+        }
+        
+        // Check single tenant
+        if (status.qrData && status.qrData.qr) {
+            return status.qrData;
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Error getting QR from bot:', error);
+        return null;
+    }
+}
     /**
      * Get QR for a specific company (for debugging)
      */
