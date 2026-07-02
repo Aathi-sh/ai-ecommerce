@@ -854,6 +854,20 @@ app.post('/api/connect', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+// Clear QR cache for a company
+app.post('/api/clear-qr-cache', async (req, res) => {
+  try {
+    const { companyId } = req.query;
+    if (!companyId) {
+      return res.status(400).json({ success: false, error: 'Company ID required' });
+    }
+    qrSocketServer.companyQRs.delete(companyId);
+    console.log(`🗑️ QR cache cleared for company ${companyId}`);
+    res.json({ success: true, message: 'QR cache cleared', companyId });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // Disconnect company
 app.post('/api/disconnect', async (req, res) => {
