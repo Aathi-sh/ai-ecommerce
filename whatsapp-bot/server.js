@@ -1,8 +1,4 @@
-// server.js - COMPLETE WITH MULTI-TENANT SUPPORT - PROFESSIONAL VERSION (LocalAuth)
-// FIXED: QR WebSocket routing, bot event listeners, session pre-warming
-// FIXED: CORS headers for cross-domain Socket.IO connections
-// FIXED: Connect, Logout, Restart endpoints for correct multi-tenant behavior
-
+// server.js - COMPLETE FIXED VERSION
 import express from 'express';
 import cors from 'cors';
 import http from 'http';
@@ -20,6 +16,7 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.BOT_PORT || 3001;
+global._qrCache = new Map();
 
 // ========== ALLOWED ORIGINS FOR CORS ==========
 const ALLOWED_ORIGINS = [
@@ -32,20 +29,17 @@ const ALLOWED_ORIGINS = [
 ];
 
 // ========== CORS MIDDLEWARE (BEFORE EVERYTHING) ==========
-// Handle preflight requests for all routes
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   
   if (ALLOWED_ORIGINS.includes(origin)) {
     res.header('Access-Control-Allow-Origin', '*');
-    // res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    res.header('Access-Control-Max-Age', '86400'); // 24 hours
+    res.header('Access-Control-Max-Age', '86400');
   }
   
-  // Handle preflight requests
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -85,7 +79,7 @@ const io = new Server(server, {
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"]
   },
-  transports: ['polling'],
+  transports: ['polling', 'websocket'],
   pingTimeout: 60000,
   pingInterval: 25000,
   allowEIO3: true,
@@ -128,28 +122,23 @@ app.use((req, res, next) => {
   next();
 });
 
-// ========== WEBSOCKET UPGRADE HANDLER - FIXED ==========
+// ========== WEBSOCKET UPGRADE HANDLER ==========
 server.on('upgrade', (request, socket, head) => {
   try {
     const pathname = url.parse(request.url).pathname;
     
     console.log(`🔌 WebSocket upgrade request: ${pathname}`);
     
-    // Let Socket.IO handle its own upgrades
     if (pathname.startsWith('/socket.io/')) {
       console.log(`📡 Forwarding to Socket.IO: ${pathname}`);
       return;
     }
     
-    // Let QR WebSocket server handle /ws/qr paths
     if (pathname === '/ws/qr' || pathname.startsWith('/ws/qr')) {
       console.log(`📱 Forwarding QR WebSocket to qrSocketServer`);
-      // The QR socket server will handle this via its own WebSocketServer
-      // We don't need to do anything here as the QR server is attached to the same HTTP server
       return;
     }
     
-    // If no handler, destroy the socket to prevent hanging
     console.log(`⚠️ No handler for WebSocket path: ${pathname}, destroying socket`);
     socket.destroy();
   } catch (error) {
@@ -175,11 +164,10 @@ io.on('connection', (socket) => {
   });
 });
 
-// ========== QR NAMESPACE HANDLER - IMPROVED WITH BOT EVENTS ==========
+// ========== QR NAMESPACE HANDLER ==========
 qrNamespace.on('connection', (socket) => {
   console.log(`🔗 QR Client connected: ${socket.id}`);
   
-  // Get companyId from handshake query
   const companyId = socket.handshake.query.companyId || null;
   
   if (companyId) {
@@ -187,9 +175,8 @@ qrNamespace.on('connection', (socket) => {
     socket.join(`company:${companyId}`);
     socket.join('qr-clients');
     
-    // ========== SEND INITIAL STATUS FROM QR CACHE ==========
+    // Send initial status from QR cache
     try {
-      // Check QR Socket Server cache first
       const cachedQR = qrSocketServer.getQRForCompany(companyId);
       
       if (cachedQR) {
@@ -215,7 +202,6 @@ qrNamespace.on('connection', (socket) => {
           timestamp: new Date().toISOString()
         });
       } else {
-        // Fallback to bot status
         const botStatus = bot.getStatus();
         const qrData = botStatus.qrData?.qr || null;
         
@@ -246,7 +232,6 @@ qrNamespace.on('connection', (socket) => {
     }
   }
   
-  // ========== HANDLE GET_QR REQUESTS ==========
   socket.on('get_qr', () => {
     try {
       if (companyId) {
@@ -273,13 +258,30 @@ qrNamespace.on('connection', (socket) => {
           timestamp: new Date().toISOString(),
           hasQr: true
         });
+      } else {
+        // Send empty QR response
+        socket.emit('qr_response', {
+          type: 'qr_response',
+          qr: null,
+          hasQr: false,
+          companyId: companyId,
+          timestamp: new Date().toISOString(),
+          message: 'No QR code available'
+        });
       }
     } catch (error) {
       console.error('❌ Error handling get_qr:', error.message);
+      socket.emit('qr_response', {
+        type: 'qr_response',
+        qr: null,
+        hasQr: false,
+        companyId: companyId,
+        timestamp: new Date().toISOString(),
+        error: error.message
+      });
     }
   });
   
-  // ========== HANDLE GET_STATUS REQUESTS ==========
   socket.on('get_status', () => {
     try {
       let qrData = null;
@@ -317,7 +319,6 @@ qrNamespace.on('connection', (socket) => {
     }
   });
   
-  // ========== HANDLE GET_STATS REQUESTS ==========
   socket.on('get_stats', () => {
     try {
       const botStatus = bot.getStatus();
@@ -331,7 +332,6 @@ qrNamespace.on('connection', (socket) => {
     }
   });
   
-  // ========== HANDLE PING FOR KEEP-ALIVE ==========
   socket.on('ping', () => {
     socket.emit('pong', {
       type: 'pong',
@@ -360,7 +360,6 @@ notificationNamespace.on('connection', (socket) => {
     console.error(`❌ Notification Socket error from ${socket.id}:`, error);
   });
   
-  // ===== AUTHENTICATION HANDLER =====
   socket.on('authenticate', (data) => {
     console.log(`🔐 Authentication attempt from ${socket.id}:`, {
       userId: data?.userId,
@@ -489,41 +488,103 @@ if (qrSocketServer.setIO) {
   console.log('✅ Socket.IO passed to QR Socket Server');
 }
 
+app.get('/api/test-qr', async (req, res) => {
+    try {
+        const { companyId } = req.query;
+        
+        if (!companyId) {
+            return res.status(400).json({ error: 'Company ID required' });
+        }
+        
+        // Check QR cache
+        const cachedQR = qrSocketServer.getQRForCompany(companyId);
+        
+        // Check bot status
+        const status = bot.getStatus();
+        let botQR = null;
+        let botQRSource = 'none';
+        
+        if (status.multiTenant) {
+            const companySession = status.multiTenant.companies?.find(c => c.companyId === companyId);
+            if (companySession) {
+                botQR = companySession.qrData?.qr || null;
+                botQRSource = 'multi-tenant';
+            }
+        } else if (status.qrData) {
+            botQR = status.qrData.qr || null;
+            botQRSource = 'single-tenant';
+        }
+        
+        res.json({
+            success: true,
+            companyId,
+            cachedQR: cachedQR ? {
+                hasQR: true,
+                expiresIn: cachedQR.expiresIn,
+                qrPreview: cachedQR.qr.substring(0, 50) + '...'
+            } : null,
+            botQR: botQR ? {
+                hasQR: true,
+                source: botQRSource,
+                qrPreview: botQR.substring(0, 50) + '...'
+            } : null,
+            botConnected: status.connected,
+            botAuthenticated: status.authenticated,
+            hasActiveClient: !!bot.client,
+            clientInfo: bot.client?.info?.wid ? {
+                phoneNumber: bot.client.info.wid.user,
+                platform: bot.client.info.platform
+            } : null
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 // ========== REGISTER BOT EVENT LISTENERS FOR QR FORWARDING ==========
 const registerBotEventListeners = () => {
   console.log('📡 Registering bot event listeners for QR forwarding...');
   
   // Listen for QR updates from bot
   bot.on('qr-update', (qrData) => {
-    console.log(`📡 Bot QR update received for company: ${qrData?.companyId}`);
+    console.log(`🔴 [SERVER] Direct QR update received:`, {
+        companyId: qrData?.companyId,
+        hasQR: !!qrData?.qr,
+        qrLength: qrData?.qr?.length || 0
+    });
     
     if (qrData && qrData.companyId && qrData.qr) {
-      // Broadcast to QR namespace
-      qrNamespace.to(`company:${qrData.companyId}`).emit('qr_update', {
-        type: 'qr_update',
-        qr: qrData.qr,
-        companyId: qrData.companyId,
-        timestamp: new Date().toISOString(),
-        hasQr: true,
-        expiresIn: qrData.expiresIn
-      });
-      
-      // Also broadcast to all clients in company room
-      qrNamespace.to(`company:${qrData.companyId}`).emit('status', {
-        type: 'status',
-        connected: false,
-        authenticated: false,
-        hasQR: true,
-        qr: qrData.qr,
-        companyId: qrData.companyId,
-        message: 'QR code required - Scan to connect',
-        timestamp: new Date().toISOString()
-      });
-      
-      console.log(`📤 QR broadcasted to company: ${qrData.companyId}`);
+        // Store in QR Socket Server cache
+        qrSocketServer.companyQRs.set(qrData.companyId, {
+            qr: qrData.qr,
+            expiresAt: Date.now() + 60000
+        });
+        
+        // Broadcast via QR Socket Server
+        qrSocketServer.broadcastQR(qrData.companyId, qrData.qr);
+        
+        // Also broadcast via Socket.IO
+        const qrNamespace = io.of('/qr');
+        qrNamespace.to(`company:${qrData.companyId}`).emit('qr_update', {
+            type: 'qr_update',
+            qr: qrData.qr,
+            companyId: qrData.companyId,
+            timestamp: new Date().toISOString(),
+            hasQr: true
+        });
+        
+        // Send qr_response to WebSocket clients
+        qrSocketServer.broadcastToCompany(qrData.companyId, {
+            type: 'qr_response',
+            qr: qrData.qr,
+            hasQr: true,
+            companyId: qrData.companyId,
+            timestamp: new Date().toISOString(),
+            source: 'direct'
+        });
+        
+        console.log(`✅ QR stored and broadcasted for company ${qrData.companyId}`);
     }
-  });
-  
+});
   // Listen for status changes
   bot.on('status-change', (statusData) => {
     console.log(`📡 Bot status change: ${statusData?.status} for company: ${statusData?.companyId}`);
@@ -545,11 +606,6 @@ const registerBotEventListeners = () => {
   console.log('✅ Bot event listeners registered');
 };
 
-// Call after bot is ready
-setTimeout(() => {
-  registerBotEventListeners();
-}, 1000);
-
 // ========== INITIALIZE COMPANY MAPPER CACHE ==========
 (async () => {
   try {
@@ -565,19 +621,16 @@ setTimeout(() => {
 const preWarmSessions = async () => {
   console.log('🔥 Pre-warming sessions for active companies...');
   try {
-    // Get active companies from database
     const response = await apiService.getActiveCompanies?.() || [];
     const activeCompanies = response.data || [];
     
     if (activeCompanies.length > 0) {
       console.log(`📱 Found ${activeCompanies.length} active companies, pre-warming...`);
       
-      // Pre-warm in background (don't block startup)
       setTimeout(() => {
         activeCompanies.forEach(company => {
           if (company.whatsapp?.phoneNumber) {
             console.log(`🔥 Pre-warming session for company: ${company._id}`);
-            // Initialize in background
             bot.initializeForCompany(company._id).catch(err => {
               console.log(`⚠️ Pre-warm failed for ${company._id}:`, err.message);
             });
@@ -831,7 +884,7 @@ app.get('/api/multi-tenant/stats', (req, res) => {
 });
 
 // ==========================================================
-// FIXED: Connect company – force fresh initialization
+// FIXED: Connect company – force fresh initialization with QR broadcast
 // ==========================================================
 app.post('/api/connect', async (req, res) => {
   try {
@@ -841,19 +894,142 @@ app.post('/api/connect', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Company ID is required' });
     }
     
-    // 🔧 FIX: Remove any existing client and session, then add fresh
+    console.log(`📱 Connect requested for company: ${companyId}`);
+    
+    // Remove any existing client and session
     await bot.removeCompany(companyId).catch(() => {});
+    
+    // Add company - this should trigger QR generation
     await bot.addCompany(companyId);
+    
+    console.log(`✅ Company ${companyId} added, waiting for QR...`);
+    
+    // 🔥 IMPORTANT: Wait for QR to generate, then fetch and broadcast
+    const broadcastQR = async (retryCount = 0) => {
+      try {
+        // Try to get QR from various sources
+        let qrData = null;
+        
+        // 1. Check QR Socket Server cache
+        const cachedQR = qrSocketServer.getQRForCompany(companyId);
+        if (cachedQR) {
+          qrData = cachedQR.qr;
+          console.log(`✅ Found QR in cache for company ${companyId}`);
+        }
+        
+        // 2. Check bot status
+        if (!qrData) {
+          const botStatus = bot.getStatus();
+          qrData = botStatus.qrData?.qr || null;
+          if (qrData) {
+            console.log(`✅ Found QR in bot status for company ${companyId}`);
+          }
+        }
+        
+        // 3. If we have QR, broadcast it
+        if (qrData) {
+          console.log(`📤 Broadcasting QR to company: ${companyId}`);
+          console.log(`📤 QR length: ${qrData.length}`);
+          
+          // Use QR Socket Server's broadcast method
+          qrSocketServer.broadcastQR(companyId, qrData);
+          
+          // Also broadcast to QR namespace
+          qrNamespace.to(`company:${companyId}`).emit('qr_update', {
+            type: 'qr_update',
+            qr: qrData,
+            companyId: companyId,
+            timestamp: new Date().toISOString(),
+            hasQr: true
+          });
+          
+          qrNamespace.to(`company:${companyId}`).emit('status', {
+            type: 'status',
+            connected: false,
+            authenticated: false,
+            hasQR: true,
+            qr: qrData,
+            companyId: companyId,
+            message: 'QR code required - Scan to connect',
+            timestamp: new Date().toISOString()
+          });
+          
+          console.log(`✅ QR broadcasted successfully for company ${companyId}`);
+          return true;
+        }
+        
+        // If no QR and we haven't exceeded retries, try again
+        if (retryCount < 10) {
+          console.log(`⏳ QR not ready yet for company ${companyId}, retry ${retryCount + 1}/10...`);
+          setTimeout(() => broadcastQR(retryCount + 1), 2000);
+          return false;
+        }
+        
+        console.log(`⚠️ No QR found after ${retryCount} retries for company ${companyId}`);
+        
+        // Send a status update that QR is not available
+        qrNamespace.to(`company:${companyId}`).emit('status', {
+          type: 'status',
+          connected: false,
+          authenticated: false,
+          hasQR: false,
+          qr: null,
+          companyId: companyId,
+          message: 'QR code generation in progress...',
+          timestamp: new Date().toISOString()
+        });
+        
+        return false;
+        
+      } catch (error) {
+        console.error('❌ Error broadcasting QR:', error.message);
+        return false;
+      }
+    };
+    
+    // Start QR broadcasting with retries
+    setTimeout(() => {
+      broadcastQR(0);
+    }, 1000);
+    
+    // Also listen for QR update from bot as a fallback
+    const qrListener = (qrData) => {
+      if (qrData && qrData.companyId === companyId && qrData.qr) {
+        console.log(`📡 QR received via bot event for company ${companyId}`);
+        qrSocketServer.broadcastQR(companyId, qrData.qr);
+        
+        qrNamespace.to(`company:${companyId}`).emit('qr_update', {
+          type: 'qr_update',
+          qr: qrData.qr,
+          companyId: companyId,
+          timestamp: new Date().toISOString(),
+          hasQr: true
+        });
+        
+        // Remove listener after receiving QR
+        bot.removeListener('qr-update', qrListener);
+      }
+    };
+    
+    bot.on('qr-update', qrListener);
+    
+    // Remove listener after 30 seconds to prevent memory leak
+    setTimeout(() => {
+      bot.removeListener('qr-update', qrListener);
+    }, 30000);
     
     res.json({
       success: true,
       message: `WhatsApp connection initiated for company ${companyId}`,
       companyId
     });
+    
   } catch (error) {
+    console.error('❌ Connect error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
 // Clear QR cache for a company
 app.post('/api/clear-qr-cache', async (req, res) => {
   try {
@@ -890,9 +1066,7 @@ app.post('/api/disconnect', async (req, res) => {
   }
 });
 
-// ==========================================================
-// FIXED: Restart – accept companyId and force fresh start
-// ==========================================================
+// Restart – accept companyId and force fresh start
 app.post('/api/restart', async (req, res) => {
   try {
     const { companyId } = req.query;
@@ -901,9 +1075,30 @@ app.post('/api/restart', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Company ID is required' });
     }
     
-    // 🔧 FIX: Remove and re-add to force fresh initialization
+    // Remove and re-add to force fresh initialization
     await bot.removeCompany(companyId).catch(() => {});
     await bot.addCompany(companyId);
+    
+    // Broadcast QR after restart
+    setTimeout(async () => {
+      try {
+        const cachedQR = qrSocketServer.getQRForCompany(companyId);
+        const qrData = cachedQR?.qr || bot.getStatus().qrData?.qr || null;
+        
+        if (qrData) {
+          qrSocketServer.broadcastQR(companyId, qrData);
+          qrNamespace.to(`company:${companyId}`).emit('qr_update', {
+            type: 'qr_update',
+            qr: qrData,
+            companyId: companyId,
+            timestamp: new Date().toISOString(),
+            hasQr: true
+          });
+        }
+      } catch (error) {
+        console.error('❌ Error broadcasting QR after restart:', error.message);
+      }
+    }, 2000);
     
     res.json({ 
       success: true, 
@@ -915,9 +1110,7 @@ app.post('/api/restart', async (req, res) => {
   }
 });
 
-// ==========================================================
-// FIXED: Logout – directly remove company and clear cache
-// ==========================================================
+// Logout – directly remove company and clear cache
 app.post('/api/logout', async (req, res) => {
   try {
     const { companyId } = req.query;
@@ -928,7 +1121,7 @@ app.post('/api/logout', async (req, res) => {
     
     console.log(`🚪 Logout requested for company: ${companyId}`);
     
-    // 🔧 FIX: Remove the company's client and session
+    // Remove the company's client and session
     await bot.removeCompany(companyId);
     
     // Clear any cached QR for this company
@@ -993,6 +1186,30 @@ app.post('/api/refresh-qr', async (req, res) => {
     
     // Clear QR cache for this company
     qrSocketServer.companyQRs.delete(companyId);
+    
+    // Request new QR from bot
+    await bot.refreshQR(companyId);
+    
+    // Broadcast new QR after a moment
+    setTimeout(async () => {
+      try {
+        const cachedQR = qrSocketServer.getQRForCompany(companyId);
+        const qrData = cachedQR?.qr || bot.getStatus().qrData?.qr || null;
+        
+        if (qrData) {
+          qrSocketServer.broadcastQR(companyId, qrData);
+          qrNamespace.to(`company:${companyId}`).emit('qr_update', {
+            type: 'qr_update',
+            qr: qrData,
+            companyId: companyId,
+            timestamp: new Date().toISOString(),
+            hasQr: true
+          });
+        }
+      } catch (error) {
+        console.error('❌ Error broadcasting refreshed QR:', error.message);
+      }
+    }, 1500);
     
     res.json({
       success: true,
@@ -1082,6 +1299,233 @@ app.post('/api/test-notification', async (req, res) => {
   }
 });
 
+// ========== UNIFIED WHATSAPP API ROUTE ==========
+app.all('/api/whatsapp', async (req, res) => {
+  try {
+    const { action, companyId } = req.query;
+    const body = req.body;
+    
+    console.log(`📡 API Call: action=${action}, companyId=${companyId}`);
+    
+    switch (action) {
+      case 'status':
+        const status = bot.getStatus();
+        const qrData = qrSocketServer.getQRForCompany(companyId);
+        
+        res.json({
+          success: true,
+          status: status.connected ? 'connected' : (qrData ? 'qr_required' : 'disconnected'),
+          connected: status.connected || false,
+          qr: qrData?.qr || null,
+          message: status.connected ? 'WhatsApp is connected' : 
+                   qrData ? 'QR code required' : 'Not connected',
+          botInfo: {
+            pushname: status.botInfo?.pushname || '',
+            platform: 'WhatsApp Business',
+            version: '2.24.12',
+            phoneNumber: status.botInfo?.phoneNumber || 'Not available'
+          }
+        });
+        break;
+        
+      case 'qr':
+        const cachedQR = qrSocketServer.getQRForCompany(companyId);
+        res.json({
+          success: true,
+          qr: cachedQR?.qr || null,
+          hasQr: !!cachedQR,
+          companyId
+        });
+        break;
+        
+      case 'stats':
+        const stats = bot.getStatus().stats || {};
+        res.json({
+          success: true,
+          stats: stats
+        });
+        break;
+        
+      case 'connect':
+        // Forward to connect handler
+        req.url = `/api/connect?companyId=${companyId}`;
+        return app._router.handle(req, res);
+        
+      case 'disconnect':
+        req.url = `/api/disconnect?companyId=${companyId}`;
+        return app._router.handle(req, res);
+        
+      case 'restart':
+        req.url = `/api/restart?companyId=${companyId}`;
+        return app._router.handle(req, res);
+        
+      case 'logout':
+        req.url = `/api/logout?companyId=${companyId}`;
+        return app._router.handle(req, res);
+        
+      case 'refresh-qr':
+        req.url = `/api/refresh-qr?companyId=${companyId}`;
+        return app._router.handle(req, res);
+        
+      case 'send_message':
+        const { to, message } = body;
+        if (!to || !message) {
+          return res.status(400).json({ success: false, error: 'Phone and message required' });
+        }
+        // Send message logic
+        try {
+          if (companyId) {
+            const client = bot.getClientForCompany(companyId);
+            if (!client) {
+              return res.status(404).json({ success: false, error: `No active session for company ${companyId}` });
+            }
+            await client.sendMessage(to, message);
+          } else {
+            await bot.sendMessage(to, message);
+          }
+          res.json({ success: true, message: 'Message sent successfully' });
+        } catch (error) {
+          res.status(500).json({ success: false, error: error.message });
+        }
+        break;
+        
+      default:
+        res.status(400).json({ success: false, error: `Unknown action: ${action}` });
+    }
+  } catch (error) {
+    console.error('API error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ========== DEBUG ENDPOINTS ==========
+
+// Debug QR endpoint
+app.get('/api/debug-qr', async (req, res) => {
+  try {
+    const { companyId } = req.query;
+    
+    if (!companyId) {
+      return res.status(400).json({ error: 'Company ID required' });
+    }
+    
+    // Get bot status
+    const status = bot.getStatus();
+    const qrFromBot = status.qrData?.qr || null;
+    
+    // Get QR from cache
+    const cachedQR = qrSocketServer.getQRForCompany(companyId);
+    
+    // Check if company exists in bot
+    const companyExists = status.multiTenant?.companies?.some(c => c.companyId === companyId);
+    
+    res.json({
+      success: true,
+      companyId,
+      qrFromBot: !!qrFromBot,
+      qrFromBotData: qrFromBot ? qrFromBot.substring(0, 50) + '...' : null,
+      qrFromCache: !!cachedQR,
+      qrFromCacheData: cachedQR ? cachedQR.qr.substring(0, 50) + '...' : null,
+      companyExists,
+      botConnected: status.connected,
+      botStatus: status,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/force-qr', async (req, res) => {
+    try {
+        const { companyId } = req.query;
+        
+        if (!companyId) {
+            return res.status(400).json({ error: 'Company ID required' });
+        }
+        
+        console.log(`🔧 Force QR generation for company: ${companyId}`);
+        
+        // Remove and re-add to force QR generation
+        await bot.removeCompany(companyId).catch(() => {});
+        await bot.addCompany(companyId);
+        
+        // Wait for QR to generate
+        let qrData = null;
+        let attempts = 0;
+        const maxAttempts = 20;
+        
+        while (!qrData && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            // Check cache
+            const cached = qrSocketServer.getQRForCompany(companyId);
+            if (cached) {
+                qrData = cached.qr;
+                console.log(`✅ Found QR in cache on attempt ${attempts + 1}`);
+                break;
+            }
+            
+            // Check bot status directly
+            const status = bot.getStatus();
+            if (status.qrData?.qr) {
+                qrData = status.qrData.qr;
+                console.log(`✅ Found QR in bot status on attempt ${attempts + 1}`);
+                break;
+            }
+            
+            // Check multi-tenant
+            if (status.multiTenant) {
+                const companySession = status.multiTenant.companies?.find(c => c.companyId === companyId);
+                if (companySession?.qrData?.qr) {
+                    qrData = companySession.qrData.qr;
+                    console.log(`✅ Found QR in multi-tenant on attempt ${attempts + 1}`);
+                    break;
+                }
+            }
+            
+            attempts++;
+            console.log(`⏳ Attempt ${attempts}/${maxAttempts}: QR not found yet`);
+        }
+        
+        if (qrData) {
+            // Store in global cache for future clients
+            global._qrCache.set(companyId, {
+                qr: qrData,
+                timestamp: Date.now(),
+                expiresAt: Date.now() + 120000
+            });
+            
+            // Store in QR Socket Server cache
+            qrSocketServer.companyQRs.set(companyId, {
+                qr: qrData,
+                expiresAt: Date.now() + 120000
+            });
+            
+            // Broadcast to existing clients
+            qrSocketServer.broadcastQR(companyId, qrData);
+            
+            console.log(`✅ QR stored in global cache for company ${companyId}`);
+            
+            res.json({
+                success: true,
+                message: 'QR generated and broadcasted',
+                companyId,
+                hasQR: true,
+                qrLength: qrData.length
+            });
+        } else {
+            res.json({
+                success: false,
+                message: `QR not generated after ${maxAttempts} attempts`,
+                companyId
+            });
+        }
+    } catch (error) {
+        console.error('Force QR error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 // Root endpoint
 app.get('/', (req, res) => {
   const status = bot.getStatus();
@@ -1111,11 +1555,18 @@ app.get('/', (req, res) => {
       websocketStatus: '/api/websocket-status',
       status: '/api/status',
       qr: '/api/qr',
-      stats: '/api/stats'
+      stats: '/api/stats',
+      debug: '/api/debug-qr?companyId=YOUR_COMPANY_ID',
+      forceQR: '/api/force-qr?companyId=YOUR_COMPANY_ID'
     },
     timestamp: new Date().toISOString()
   });
 });
+
+// ========== REGISTER BOT EVENT LISTENERS ==========
+setTimeout(() => {
+  registerBotEventListeners();
+}, 1000);
 
 // ========== START SERVER ==========
 server.listen(PORT, () => {
@@ -1129,6 +1580,8 @@ server.listen(PORT, () => {
   console.log(`📱 QR WebSocket: ws://localhost:${PORT}/ws/qr`);
   console.log(`📊 Health: http://localhost:${PORT}/health`);
   console.log(`🔍 WebSocket Status: http://localhost:${PORT}/api/websocket-status`);
+  console.log(`🐛 Debug QR: http://localhost:${PORT}/api/debug-qr?companyId=YOUR_ID`);
+  console.log(`🔧 Force QR: http://localhost:${PORT}/api/force-qr?companyId=YOUR_ID`);
   console.log('='.repeat(70));
   console.log('⚡ FEATURES ENABLED:');
   console.log('   ✅ Multi-tenant company isolation');
@@ -1139,6 +1592,8 @@ server.listen(PORT, () => {
   console.log('   ✅ Bot event listeners');
   console.log('   ✅ CORS configured for cross-domain access');
   console.log('   ✅ Fixed Connect/Logout/Restart for proper QR generation');
+  console.log('   ✅ QR broadcast on connect with retry logic');
+  console.log('   ✅ Debug and force QR endpoints');
   console.log('='.repeat(70) + '\n');
   
   // Initialize QR Socket Server

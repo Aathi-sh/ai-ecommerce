@@ -56,6 +56,7 @@ export async function GET(request) {
 
     // Get total count for pagination
     const total = await Company.countDocuments(query);
+    console.log('total data', total);
     
     // Fetch companies with selected fields
     const companies = await Company.find(query)

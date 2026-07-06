@@ -1,6 +1,5 @@
-
-// bot.js - PROFESSIONAL MULTI-TENANT VERSION with LocalAuth (File-based sessions)
-// OPTIMIZED: High performance, proper QR emission, handles many customers
+// bot.js - PROFESSIONAL MULTI-TENANT VERSION with LocalAuth (FIXED)
+// FIXED: QR emission, multi-tenant support, connection handling
 
 import pkg from 'whatsapp-web.js';
 import qrcode from 'qrcode-terminal';
@@ -35,13 +34,14 @@ class WhatsAppBot extends EventEmitter {
         // Session management
         this.sessionPath = path.join(process.cwd(), 'sessions');
         
-        // QR properties - IMPROVED
+        // QR properties - FIXED
         this.currentQR = null;
         this.qrGeneratedAt = null;
         this.qrTimeout = null;
-        this.qrExpiryTime = 3000000;
+        this.qrExpiryTime = 60000; // 60 seconds
         this.isWaitingForScan = false;
         this.qrGenerated = false;
+        this.lastEmittedQR = null; // Track last emitted QR to avoid duplicates
         
         // Connection management
         this.reconnectAttempts = 0;
@@ -55,12 +55,12 @@ class WhatsAppBot extends EventEmitter {
         this.qrWebSocketClients = new Set();
         
         // Performance optimizations
-        this.messageQueue = new Map(); // Per-company message queue
+        this.messageQueue = new Map();
         this.processingQueue = new Map();
         this.batchWriteQueue = [];
         this.batchWriteInterval = null;
         
-        // Initialize statistics with proper defaults
+        // Initialize statistics
         this.stats = {
             totalOrders: 0,
             totalChats: 0,
@@ -90,7 +90,6 @@ class WhatsAppBot extends EventEmitter {
                 this.batchWriteQueue = [];
                 
                 try {
-                    // Process batch writes in parallel with concurrency limit
                     const concurrency = 5;
                     for (let i = 0; i < batch.length; i += concurrency) {
                         const chunk = batch.slice(i, i + concurrency);
@@ -100,7 +99,7 @@ class WhatsAppBot extends EventEmitter {
                     console.error('Batch write error:', error.message);
                 }
             }
-        }, 5000); // Every 5 seconds
+        }, 5000);
     }
 
     async processBatchItem(item) {
@@ -119,6 +118,16 @@ class WhatsAppBot extends EventEmitter {
     emitQRCode(qrData) {
         console.log(`\n📡 [BOT] Emitting QR update for company: ${qrData?.companyId || 'unknown'}`);
         console.log(`📡 QR Data length: ${qrData?.qr?.length || 0}`);
+        
+        // Prevent duplicate emissions of the same QR
+        if (qrData?.qr === this.lastEmittedQR && qrData?.companyId === this.companyId) {
+            console.log(`⏭️ Skipping duplicate QR emission`);
+            return;
+        }
+        
+        if (qrData?.qr) {
+            this.lastEmittedQR = qrData.qr;
+        }
         
         const eventData = {
             ...qrData,
@@ -215,86 +224,21 @@ class WhatsAppBot extends EventEmitter {
         }
     }
 
-//     initializeClient() {
-//     console.log('\n' + '🔍'.repeat(20));
-//     console.log(`🔍 [DEBUG] Initializing client for company: ${this.companyId || 'null'}`);
-//     console.log(`🔍 Current state - Connected: ${this.isConnected}, Authenticated: ${this.isAuthenticated}`);
-//     console.log('🔍'.repeat(20) + '\n');
-    
-//     return new Promise((resolve, reject) => {
-//         try {
-//             // Reset state before initialization
-//             this.isConnected = false;
-//             this.isAuthenticated = false;
-//             this.currentQR = null;
-//             this.isWaitingForScan = false;
-            
-//             if (!fs.existsSync(this.sessionPath)) {
-//                 fs.mkdirSync(this.sessionPath, { recursive: true });
-//             }
-
-//             const clientId = this.companyId 
-//                 ? `company_${this.companyId}` 
-//                 : `whatsapp-bot-${Date.now()}`;
-            
-//             console.log(`🆔 Client ID: ${clientId}`);
-
-//             this.client = new Client({
-//                 authStrategy: new LocalAuth({
-//                     clientId: clientId,
-//                     dataPath: this.sessionPath
-//                 }),
-//                 puppeteer: {
-//                     headless: 'new',
-//                     args: [
-//                         '--no-sandbox',
-//                         '--disable-setuid-sandbox',
-//                         '--disable-dev-shm-usage',
-//                         '--disable-accelerated-2d-canvas',
-//                         '--no-first-run',
-//                         '--no-zygote',
-//                         '--disable-gpu',
-//                         '--disable-web-security',
-//                         '--disable-features=VizDisplayCompositor',
-//                         '--disable-features=TranslateUI',
-//                         '--disable-ipc-flooding-protection',
-//                         '--disable-renderer-backgrounding',
-//                         '--disable-background-timer-throttling',
-//                         '--disable-backgrounding-occluded-windows',
-//                         '--disable-breakpad',
-//                         '--disable-sync',
-//                         '--disable-default-apps',
-//                         '--disable-extensions',
-//                         '--disable-component-extensions-with-background-pages',
-//                         '--disable-features=TranslateUI,BlinkGenPropertyTrees',
-//                         '--disable-features=IsolateOrigins,site-per-process',
-//                         '--window-size=1920,1080',
-//                         '--max_old_space_size=256'
-//                     ],
-//                     timeout: 60000,
-//                     ignoreHTTPSErrors: true
-//                 },
-//                 qrMaxRetries: 3,
-//                 authTimeoutMs: 120000,
-//                 takeoverOnConflict: true,
-//                 takeoverTimeoutMs: 60000
-//             });
-
-//             this.setupEventHandlers(resolve, reject);
-//             this.client.initialize().catch(reject);
-
-//         } catch (error) {
-//             reject(new Error(`Client initialization failed: ${error.message}`));
-//         }
-//     });
-// }
     initializeClient() {
         console.log('\n' + '🔍'.repeat(20));
         console.log(`🔍 [DEBUG] Initializing client for company: ${this.companyId || 'null'}`);
+        console.log(`🔍 Current state - Connected: ${this.isConnected}, Authenticated: ${this.isAuthenticated}`);
         console.log('🔍'.repeat(20) + '\n');
         
         return new Promise((resolve, reject) => {
             try {
+                // Reset state before initialization
+                this.isConnected = false;
+                this.isAuthenticated = false;
+                this.currentQR = null;
+                this.isWaitingForScan = false;
+                this.lastEmittedQR = null;
+                
                 if (!fs.existsSync(this.sessionPath)) {
                     fs.mkdirSync(this.sessionPath, { recursive: true });
                 }
@@ -355,268 +299,278 @@ class WhatsAppBot extends EventEmitter {
         });
     }
 
-setupEventHandlers(resolve, reject) {
-    let initializationTimeout;
-    let qrGeneratedFlag = false;
+    setupEventHandlers(resolve, reject) {
+        let initializationTimeout;
+        let qrGeneratedFlag = false;
 
-    initializationTimeout = setTimeout(() => {
-        if (!this.isConnected) {
-            const error = new Error('Client initialization timeout');
-            console.error('❌', error.message);
-            this.emitStatusChange({
-                connected: false,
-                status: 'error',
-                message: 'Initialization timeout'
-            });
-            reject(error);
-        }
-    }, 120000);
-
-    // ========== QR HANDLER - CRITICAL FIX ==========
-    this.client.on('qr', async (qr) => {
-        console.log('\n' + '='.repeat(60));
-        console.log(`📱 QR CODE GENERATED for company: ${this.companyId || 'unknown'}`);
-        console.log('='.repeat(60));
-        
-        clearTimeout(initializationTimeout);
-        
-        // Store QR
-        this.currentQR = qr;
-        this.qrGeneratedAt = Date.now();
-        this.isWaitingForScan = true;
-        
-        // Show QR in terminal (once)
-        if (!qrGeneratedFlag) {
-            qrcode.generate(qr, { small: true });
-            qrGeneratedFlag = true;
-            
-            console.log('\n📱 HOW TO CONNECT:');
-            console.log('1. Open WhatsApp → Menu → Linked Devices');
-            console.log('2. Tap "Link a Device"');
-            console.log('3. Scan the QR code above\n');
-        }
-        
-        // ========== CRITICAL: EMIT QR TO WEBSOCKET ==========
-        const qrData = {
-            qr: qr,
-            expiresIn: this.qrExpiryTime / 1000,
-            generatedAt: this.qrGeneratedAt,
-            isValid: true,
-            companyId: this.companyId,
-            clientId: this.client?.authStrategy?.clientId
-        };
-        
-        console.log(`📡 EMITTING QR to WebSocket for company: ${this.companyId}`);
-        this.emitQRCode(qrData);
-        
-        // Emit status change
-        this.emitStatusChange({
-            connected: false,
-            authenticated: false,
-            hasQR: true,
-            status: 'qr_required',
-            message: 'Scan QR code to connect WhatsApp',
-            companyId: this.companyId,
-            qrData: qr
-        });
-        
-        // Set QR expiry
-        if (this.qrTimeout) clearTimeout(this.qrTimeout);
-        this.qrTimeout = setTimeout(() => {
-            if (this.isWaitingForScan && this.currentQR === qr) {
-                console.log('⏰ QR code expired');
-                this.isWaitingForScan = false;
-                this.currentQR = null;
-                this.qrGeneratedAt = null;
-                
-                this.emitQRCode(null);
+        initializationTimeout = setTimeout(() => {
+            if (!this.isConnected) {
+                const error = new Error('Client initialization timeout');
+                console.error('❌', error.message);
                 this.emitStatusChange({
                     connected: false,
-                    authenticated: false,
-                    hasQR: false,
-                    status: 'qr_expired',
-                    message: 'QR code expired',
+                    status: 'error',
+                    message: 'Initialization timeout',
                     companyId: this.companyId
                 });
+                reject(error);
             }
-        }, this.qrExpiryTime);
-    });
+        }, 120000);
 
-    this.client.on('ready', async () => {
-        console.log('\n' + '='.repeat(60));
-        console.log(`✅ WHATSAPP CONNECTED for company: ${this.companyId || 'unknown'}`);
-        console.log('='.repeat(60) + '\n');
-        
-        clearTimeout(initializationTimeout);
-
-        this.isConnected = true;
-        this.isAuthenticated = true;
-        this.currentQR = null;
-        this.isWaitingForScan = false;
-        this.qrGeneratedAt = null;
-        
-        if (this.qrTimeout) clearTimeout(this.qrTimeout);
-        
-        this.reconnectAttempts = 0;
-        this.connectionTime = new Date();
-
-        const clientId = this.client?.authStrategy?.clientId || 'unknown';
-
-        if (this.companyId) {
-            this.clients.set(this.companyId, this.client);
-        }
-
-        this.emitStatusChange({
-            connected: true,
-            authenticated: true,
-            hasQR: false,
-            status: 'connected',
-            message: 'WhatsApp is connected and ready',
-            companyId: this.companyId,
-            clientId: clientId
-        });
-
-        this.startStatsBroadcasting();
-        
-        setTimeout(() => {
-            this.displayBotInfo().catch(() => {});
-        }, 5000);
-
-        resolve();
-    });
-
-    this.client.on('authenticated', () => {
-        console.log(`🔐 Authentication successful for company: ${this.companyId || 'unknown'}`);
-        
-        this.isAuthenticated = true;
-        this.isWaitingForScan = false;
-        this.currentQR = null;
-        
-        if (this.qrTimeout) clearTimeout(this.qrTimeout);
-
-        this.emitStatusChange({
-            connected: false,
-            authenticated: true,
-            hasQR: false,
-            status: 'authenticated',
-            message: 'WhatsApp authentication successful',
-            companyId: this.companyId
-        });
-    });
-
-    this.client.on('auth_failure', (error) => {
-        clearTimeout(initializationTimeout);
-        console.error(`❌ Authentication failed:`, error.message);
-        
-        this.isAuthenticated = false;
-        
-        this.emitStatusChange({
-            connected: false,
-            authenticated: false,
-            status: 'auth_failed',
-            message: `Authentication failed: ${error.message}`,
-            companyId: this.companyId
-        });
-        
-        reject(new Error(`Authentication failed: ${error.message}`));
-    });
-
-    this.client.on('disconnected', async (reason) => {
-        console.log(`🔌 Disconnected: ${reason} for company: ${this.companyId || 'unknown'}`);
-        
-        this.isConnected = false;
-        this.isAuthenticated = false;
-        this.currentQR = null;
-        
-        this.stopStatsBroadcasting();
-        
-        this.emitStatusChange({
-            connected: false,
-            authenticated: false,
-            status: 'disconnected',
-            message: `WhatsApp disconnected: ${reason}`,
-            companyId: this.companyId
-        });
-        
-        if (this.isShuttingDown) return;
-        
-        if (reason === 'LOGOUT' || reason === 'UNAUTHORIZED') {
-            setTimeout(() => {
-                this.initialize().catch(console.error);
-            }, 3000);
-        } else {
-            await this.handleReconnection();
-        }
-    });
-
-    // ========== MESSAGE HANDLER WITH PERFORMANCE OPTIMIZATIONS ==========
-    // ✅ FIX ADDED: Ignore old/unread messages
-    this.client.on('message', async (message) => {
-        // 1️⃣ Ignore status broadcasts and group messages
-        if (message.from === 'status@broadcast' || message.isGroupMsg) return;
-        
-        // 2️⃣ ✅ IGNORE OLD/UNREAD MESSAGES (the professional fix)
-        if (!message.isNewMsg) {
-            console.log(`⏭️ Ignoring old/unread message from ${message.from} (timestamp: ${message.timestamp})`);
-            return;
-        }
-        
-        const startTime = Date.now();
-        
-        try {
-            let companyId = this.companyId;
+        // ========== QR HANDLER - CRITICAL FIX ==========
+        this.client.on('qr', async (qr) => {
+            console.log('\n' + '='.repeat(60));
+            console.log(`📱 QR CODE GENERATED for company: ${this.companyId || 'unknown'}`);
+            console.log('='.repeat(60));
             
-            if (message.to) {
-                const phoneNumber = message.to.split('@')[0];
+            clearTimeout(initializationTimeout);
+            
+            // Store QR
+            this.currentQR = qr;
+            this.qrGeneratedAt = Date.now();
+            this.isWaitingForScan = true;
+            this.qrGenerated = true;
+            
+            // Show QR in terminal (once)
+            if (!qrGeneratedFlag) {
+                qrcode.generate(qr, { small: true });
+                qrGeneratedFlag = true;
                 
-                if (apiService && typeof apiService.identifyCompanyFromWhatsApp === 'function') {
-                    const identifiedCompanyId = await apiService.identifyCompanyFromWhatsApp(phoneNumber);
-                    if (identifiedCompanyId) {
-                        companyId = identifiedCompanyId;
-                        if (this.companyId !== identifiedCompanyId) {
-                            this.companyId = identifiedCompanyId;
+                console.log('\n📱 HOW TO CONNECT:');
+                console.log('1. Open WhatsApp → Menu → Linked Devices');
+                console.log('2. Tap "Link a Device"');
+                console.log('3. Scan the QR code above\n');
+            }
+            
+            // ========== CRITICAL: EMIT QR TO WEBSOCKET ==========
+            const qrData = {
+                qr: qr,
+                expiresIn: this.qrExpiryTime / 1000,
+                generatedAt: this.qrGeneratedAt,
+                isValid: true,
+                companyId: this.companyId,
+                clientId: this.client?.authStrategy?.clientId
+            };
+            
+            console.log(`📡 EMITTING QR to WebSocket for company: ${this.companyId}`);
+            console.log(`📡 QR Data: ${qr.substring(0, 50)}...`);
+            
+            // Emit QR to all listeners
+            this.emitQRCode(qrData);
+            
+            // Also emit via the global QR update event (for Socket.IO)
+            this.emit('qr-update', qrData);
+            
+            // Emit status change
+            this.emitStatusChange({
+                connected: false,
+                authenticated: false,
+                hasQR: true,
+                status: 'qr_required',
+                message: 'Scan QR code to connect WhatsApp',
+                companyId: this.companyId,
+                qrData: qr
+            });
+            
+            // Set QR expiry
+            if (this.qrTimeout) clearTimeout(this.qrTimeout);
+            this.qrTimeout = setTimeout(() => {
+                if (this.isWaitingForScan && this.currentQR === qr) {
+                    console.log('⏰ QR code expired');
+                    this.isWaitingForScan = false;
+                    this.currentQR = null;
+                    this.qrGeneratedAt = null;
+                    this.qrGenerated = false;
+                    
+                    this.emitQRCode({ 
+                        qr: null, 
+                        companyId: this.companyId,
+                        expired: true 
+                    });
+                    this.emitStatusChange({
+                        connected: false,
+                        authenticated: false,
+                        hasQR: false,
+                        status: 'qr_expired',
+                        message: 'QR code expired',
+                        companyId: this.companyId
+                    });
+                }
+            }, this.qrExpiryTime);
+        });
+
+        this.client.on('ready', async () => {
+            console.log('\n' + '='.repeat(60));
+            console.log(`✅ WHATSAPP CONNECTED for company: ${this.companyId || 'unknown'}`);
+            console.log('='.repeat(60) + '\n');
+            
+            clearTimeout(initializationTimeout);
+
+            this.isConnected = true;
+            this.isAuthenticated = true;
+            this.currentQR = null;
+            this.isWaitingForScan = false;
+            this.qrGeneratedAt = null;
+            this.qrGenerated = false;
+            this.lastEmittedQR = null;
+            
+            if (this.qrTimeout) clearTimeout(this.qrTimeout);
+            
+            this.reconnectAttempts = 0;
+            this.connectionTime = new Date();
+
+            const clientId = this.client?.authStrategy?.clientId || 'unknown';
+
+            if (this.companyId) {
+                this.clients.set(this.companyId, this.client);
+            }
+
+            this.emitStatusChange({
+                connected: true,
+                authenticated: true,
+                hasQR: false,
+                status: 'connected',
+                message: 'WhatsApp is connected and ready',
+                companyId: this.companyId,
+                clientId: clientId
+            });
+
+            this.startStatsBroadcasting();
+            
+            setTimeout(() => {
+                this.displayBotInfo().catch(() => {});
+            }, 5000);
+
+            resolve();
+        });
+
+        this.client.on('authenticated', () => {
+            console.log(`🔐 Authentication successful for company: ${this.companyId || 'unknown'}`);
+            
+            this.isAuthenticated = true;
+            this.isWaitingForScan = false;
+            this.currentQR = null;
+            this.qrGenerated = false;
+            
+            if (this.qrTimeout) clearTimeout(this.qrTimeout);
+
+            this.emitStatusChange({
+                connected: false,
+                authenticated: true,
+                hasQR: false,
+                status: 'authenticated',
+                message: 'WhatsApp authentication successful',
+                companyId: this.companyId
+            });
+        });
+
+        this.client.on('auth_failure', (error) => {
+            clearTimeout(initializationTimeout);
+            console.error(`❌ Authentication failed:`, error.message);
+            
+            this.isAuthenticated = false;
+            
+            this.emitStatusChange({
+                connected: false,
+                authenticated: false,
+                status: 'auth_failed',
+                message: `Authentication failed: ${error.message}`,
+                companyId: this.companyId
+            });
+            
+            reject(new Error(`Authentication failed: ${error.message}`));
+        });
+
+        this.client.on('disconnected', async (reason) => {
+            console.log(`🔌 Disconnected: ${reason} for company: ${this.companyId || 'unknown'}`);
+            
+            this.isConnected = false;
+            this.isAuthenticated = false;
+            this.currentQR = null;
+            this.qrGenerated = false;
+            
+            this.stopStatsBroadcasting();
+            
+            this.emitStatusChange({
+                connected: false,
+                authenticated: false,
+                status: 'disconnected',
+                message: `WhatsApp disconnected: ${reason}`,
+                companyId: this.companyId
+            });
+            
+            if (this.isShuttingDown) return;
+            
+            if (reason === 'LOGOUT' || reason === 'UNAUTHORIZED') {
+                // Clear session and wait for manual reconnect
+                await this.clearSession();
+            } else {
+                await this.handleReconnection();
+            }
+        });
+
+        // ========== MESSAGE HANDLER ==========
+        this.client.on('message', async (message) => {
+            if (message.from === 'status@broadcast' || message.isGroupMsg) return;
+            
+            if (!message.isNewMsg) {
+                console.log(`⏭️ Ignoring old/unread message from ${message.from}`);
+                return;
+            }
+            
+            const startTime = Date.now();
+            
+            try {
+                let companyId = this.companyId;
+                
+                if (message.to) {
+                    const phoneNumber = message.to.split('@')[0];
+                    
+                    if (apiService && typeof apiService.identifyCompanyFromWhatsApp === 'function') {
+                        const identifiedCompanyId = await apiService.identifyCompanyFromWhatsApp(phoneNumber);
+                        if (identifiedCompanyId) {
+                            companyId = identifiedCompanyId;
+                            if (this.companyId !== identifiedCompanyId) {
+                                this.companyId = identifiedCompanyId;
+                            }
                         }
                     }
                 }
-            }
-            
-            // Update stats efficiently
-            this.updateMessageStats(message.from);
-            
-            // Queue message for processing (non-blocking)
-            const processMessage = async () => {
-                await handleMessage(message, this.client, companyId);
                 
-                const duration = Date.now() - startTime;
-                if (duration > 200) {
-                    console.log(`⚠️ Slow message processing: ${duration}ms`);
-                }
-            };
-            
-            // Process without blocking
-            processMessage().catch(error => {
-                console.error('Message processing error:', error);
-            });
-            
-        } catch (error) {
-            console.error('Message handler error:', error);
-            await this.handleMessageError(message, error);
-        }
-    });
-
-    this.client.on('change_state', (state) => {
-        console.log(`🔄 Connection state: ${state}`);
-        this.emitStatusChange({
-            connected: this.isConnected,
-            authenticated: this.isAuthenticated,
-            status: 'state_change',
-            message: `Connection state: ${state}`,
-            companyId: this.companyId
+                this.updateMessageStats(message.from);
+                
+                const processMessage = async () => {
+                    await handleMessage(message, this.client, companyId);
+                    
+                    const duration = Date.now() - startTime;
+                    if (duration > 200) {
+                        console.log(`⚠️ Slow message processing: ${duration}ms`);
+                    }
+                };
+                
+                processMessage().catch(error => {
+                    console.error('Message processing error:', error);
+                });
+                
+            } catch (error) {
+                console.error('Message handler error:', error);
+                await this.handleMessageError(message, error);
+            }
         });
-    });
-    
-    console.log(`✅ Event handlers setup complete`);
-}
+
+        this.client.on('change_state', (state) => {
+            console.log(`🔄 Connection state: ${state}`);
+            this.emitStatusChange({
+                connected: this.isConnected,
+                authenticated: this.isAuthenticated,
+                status: 'state_change',
+                message: `Connection state: ${state}`,
+                companyId: this.companyId
+            });
+        });
+        
+        console.log(`✅ Event handlers setup complete`);
+    }
 
     // ========== PERFORMANCE OPTIMIZATIONS ==========
     
@@ -625,7 +579,6 @@ setupEventHandlers(resolve, reject) {
         this.stats.totalCustomers.add(from);
         this.stats.totalChats = this.stats.totalCustomers.size;
         
-        // Track messages per minute
         const now = Date.now();
         if (now - this.stats.lastMessageReset >= 60000) {
             this.stats.messagesPerMinute = this.stats.totalMessages - this.stats.lastMessageCount;
@@ -633,7 +586,6 @@ setupEventHandlers(resolve, reject) {
             this.stats.lastMessageReset = now;
         }
         
-        // Throttle stats broadcast
         if (this.stats.totalMessages % 10 === 0) {
             this.broadcastCurrentStats();
         }
@@ -644,7 +596,7 @@ setupEventHandlers(resolve, reject) {
         
         this.statsInterval = setInterval(() => {
             this.broadcastCurrentStats();
-        }, 10000); // Every 10 seconds instead of 3
+        }, 10000);
         
         console.log('📊 Started statistics broadcasting (10s interval)');
     }
@@ -681,16 +633,20 @@ setupEventHandlers(resolve, reject) {
 
     async addCompany(companyId) {
         if (this.clients.has(companyId)) {
+            console.log(`ℹ️ Company ${companyId} already exists, returning existing client`);
             return this.clients.get(companyId);
         }
         
+        // Store previous company ID
         const previousCompany = this.companyId;
         this.companyId = companyId;
         
         try {
             await this.initialize();
+            // Client will be stored in the map when 'ready' event fires
             return this.client;
         } catch (error) {
+            // Restore previous company ID on error
             this.companyId = previousCompany;
             throw error;
         }
@@ -802,65 +758,41 @@ async removeCompany(companyId) {
     }
 
     async safeDestroyClient() {
-    try {
-        if (this.client) {
-            console.log(`🛑 Destroying client for company: ${this.companyId || 'unknown'}...`);
-            this.isShuttingDown = true;
-            
-            // Store company ID before deletion
-            const companyIdToRemove = this.companyId;
-            
-            if (companyIdToRemove) {
-                this.clients.delete(companyIdToRemove);
+        try {
+            if (this.client) {
+                console.log(`🛑 Destroying client for company: ${this.companyId || 'unknown'}...`);
+                this.isShuttingDown = true;
+                
+                const companyIdToRemove = this.companyId;
+                
+                if (companyIdToRemove) {
+                    this.clients.delete(companyIdToRemove);
+                }
+                
+                if (this.client.removeAllListeners) {
+                    this.client.removeAllListeners();
+                }
+                
+                await this.client.destroy();
+                this.client = null;
+                
+                console.log(`✅ Client destroyed for company: ${companyIdToRemove || 'unknown'}`);
             }
-            
-            // Remove all event listeners to prevent memory leaks
-            if (this.client.removeAllListeners) {
-                this.client.removeAllListeners();
-            }
-            
-            // Destroy the client
-            await this.client.destroy();
+        } catch (error) {
+            console.error(`Destroy error:`, error.message);
             this.client = null;
-            
-            console.log(`✅ Client destroyed for company: ${companyIdToRemove || 'unknown'}`);
+        } finally {
+            this.isShuttingDown = false;
         }
-    } catch (error) {
-        console.error(`Destroy error:`, error.message);
-        this.client = null;
-    } finally {
-        this.isShuttingDown = false;
     }
-}
-    // async safeDestroyClient() {
-    //     try {
-    //         if (this.client) {
-    //             console.log(`🛑 Destroying client...`);
-    //             this.isShuttingDown = true;
-                
-    //             if (this.companyId) {
-    //                 this.clients.delete(this.companyId);
-    //             }
-                
-    //             await this.client.destroy();
-    //             this.client = null;
-    //         }
-    //     } catch (error) {
-    //         console.error(`Destroy error:`, error.message);
-    //         this.client = null;
-    //     } finally {
-    //         this.isShuttingDown = false;
-    //     }
-    // }
 
     async hasValidSession(companyId) {
-    const sessionPath = path.join(this.sessionPath, `company_${companyId}`);
-    if (!fs.existsSync(sessionPath)) return false;
-    
-    // Check if session files exist
-    const files = fs.readdirSync(sessionPath);
-    return files.length > 0;
-}
+        const sessionPath = path.join(this.sessionPath, `company_${companyId}`);
+        if (!fs.existsSync(sessionPath)) return false;
+        
+        const files = fs.readdirSync(sessionPath);
+        return files.length > 0;
+    }
 
     async clearSession() {
         try {
@@ -941,72 +873,45 @@ async removeCompany(companyId) {
     }
 
     getStatus() {
-    // Always check actual client state
-    const isActuallyConnected = this.client && 
-                               this.client.info && 
-                               this.client.info.wid && 
-                               this.isConnected;
-    
-    const isActuallyAuthenticated = this.client && 
-                                   this.isAuthenticated && 
-                                   !this.isShuttingDown;
-    
-    return {
-        connected: isActuallyConnected,
-        authenticated: isActuallyAuthenticated,
-        hasQR: !!this.getCurrentQR(),
-        qrData: this.getCurrentQR(),
-        connectionTime: this.connectionTime,
-        botInfo: this.botInfo,
-        stats: {
-            totalOrders: this.stats.totalOrders,
-            totalChats: this.stats.totalChats,
-            totalCustomers: this.stats.totalCustomers.size,
-            totalMessages: this.stats.totalMessages,
-            pendingOrders: this.stats.pendingOrders,
-            completedOrders: this.stats.completedOrders,
-            messagesPerMinute: this.stats.messagesPerMinute
-        },
-        reconnectAttempts: this.reconnectAttempts,
-        maxReconnectAttempts: this.maxReconnectAttempts,
-        uptime: this.getUptime(),
-        formattedUptime: this.getFormattedUptime(),
-        companyId: this.companyId,
-        isShuttingDown: this.isShuttingDown,
-        multiTenant: {
-            activeCompanies: this.clients.size,
-            companies: this.getAllClients()
-        }
-    };
-}
-    // getStatus() {
-    //     return {
-    //         connected: this.isConnected,
-    //         authenticated: this.isAuthenticated,
-    //         hasQR: !!this.getCurrentQR(),
-    //         qrData: this.getCurrentQR(),
-    //         connectionTime: this.connectionTime,
-    //         botInfo: this.botInfo,
-    //         stats: {
-    //             totalOrders: this.stats.totalOrders,
-    //             totalChats: this.stats.totalChats,
-    //             totalCustomers: this.stats.totalCustomers.size,
-    //             totalMessages: this.stats.totalMessages,
-    //             pendingOrders: this.stats.pendingOrders,
-    //             completedOrders: this.stats.completedOrders,
-    //             messagesPerMinute: this.stats.messagesPerMinute
-    //         },
-    //         reconnectAttempts: this.reconnectAttempts,
-    //         maxReconnectAttempts: this.maxReconnectAttempts,
-    //         uptime: this.getUptime(),
-    //         formattedUptime: this.getFormattedUptime(),
-    //         companyId: this.companyId,
-    //         multiTenant: {
-    //             activeCompanies: this.clients.size,
-    //             companies: this.getAllClients()
-    //         }
-    //     };
-    // }
+        const isActuallyConnected = this.client && 
+                                   this.client.info && 
+                                   this.client.info.wid && 
+                                   this.isConnected;
+        
+        const isActuallyAuthenticated = this.client && 
+                                       this.isAuthenticated && 
+                                       !this.isShuttingDown;
+        
+        const currentQR = this.getCurrentQR();
+        
+        return {
+            connected: isActuallyConnected,
+            authenticated: isActuallyAuthenticated,
+            hasQR: !!currentQR,
+            qrData: currentQR,
+            connectionTime: this.connectionTime,
+            botInfo: this.botInfo,
+            stats: {
+                totalOrders: this.stats.totalOrders,
+                totalChats: this.stats.totalChats,
+                totalCustomers: this.stats.totalCustomers.size,
+                totalMessages: this.stats.totalMessages,
+                pendingOrders: this.stats.pendingOrders,
+                completedOrders: this.stats.completedOrders,
+                messagesPerMinute: this.stats.messagesPerMinute
+            },
+            reconnectAttempts: this.reconnectAttempts,
+            maxReconnectAttempts: this.maxReconnectAttempts,
+            uptime: this.getUptime(),
+            formattedUptime: this.getFormattedUptime(),
+            companyId: this.companyId,
+            isShuttingDown: this.isShuttingDown,
+            multiTenant: {
+                activeCompanies: this.clients.size,
+                companies: this.getAllClients()
+            }
+        };
+    }
 
     async sendMessage(phoneNumber, message) {
         try {
@@ -1020,6 +925,48 @@ async removeCompany(companyId) {
         } catch (error) {
             return { success: false, error: error.message };
         }
+    }
+
+    async refreshQR(companyId) {
+        console.log(`🔄 Refreshing QR for company: ${companyId || this.companyId}`);
+        
+        const targetCompanyId = companyId || this.companyId;
+        
+        // Clear current QR
+        this.currentQR = null;
+        this.isWaitingForScan = false;
+        this.qrGeneratedAt = null;
+        this.qrGenerated = false;
+        this.lastEmittedQR = null;
+        
+        if (this.qrTimeout) {
+            clearTimeout(this.qrTimeout);
+            this.qrTimeout = null;
+        }
+        
+        // If we have a client, destroy and reinitialize
+        if (this.client) {
+            await this.safeDestroyClient();
+            
+            // Wait a moment before reinitializing
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Reinitialize with the same company
+            if (targetCompanyId) {
+                await this.initializeForCompany(targetCompanyId);
+            } else {
+                await this.initialize();
+            }
+        } else {
+            // Just initialize if no client exists
+            if (targetCompanyId) {
+                await this.initializeForCompany(targetCompanyId);
+            } else {
+                await this.initialize();
+            }
+        }
+        
+        return { success: true };
     }
 
     async displayBotInfo() {
@@ -1078,120 +1025,78 @@ async removeCompany(companyId) {
     }
 
     async logout() {
-    console.log('\n🚪 Logging out...');
-    const currentCompanyId = this.companyId;
-    
-    try {
-        this.isShuttingDown = true;
+        console.log('\n🚪 Logging out...');
+        const currentCompanyId = this.companyId;
         
-        // CRITICAL: Clear all state BEFORE destroying client
-        this.isConnected = false;
-        this.isAuthenticated = false;
-        this.currentQR = null;
-        this.isWaitingForScan = false;
-        this.qrGeneratedAt = null;
-        
-        // Clear QR timeout if exists
-        if (this.qrTimeout) {
-            clearTimeout(this.qrTimeout);
-            this.qrTimeout = null;
+        try {
+            this.isShuttingDown = true;
+            
+            // Clear all state
+            this.isConnected = false;
+            this.isAuthenticated = false;
+            this.currentQR = null;
+            this.isWaitingForScan = false;
+            this.qrGeneratedAt = null;
+            this.qrGenerated = false;
+            this.lastEmittedQR = null;
+            
+            if (this.qrTimeout) {
+                clearTimeout(this.qrTimeout);
+                this.qrTimeout = null;
+            }
+            
+            this.stopStatsBroadcasting();
+            
+            if (this.batchWriteInterval) {
+                clearInterval(this.batchWriteInterval);
+                this.batchWriteInterval = null;
+            }
+            
+            this.emitStatusChange({
+                connected: false,
+                authenticated: false,
+                hasQR: false,
+                status: 'logging_out',
+                message: 'Logging out...',
+                companyId: currentCompanyId
+            });
+            
+            await this.safeDestroyClient();
+            await this.clearSession();
+            
+            this.qrWebSocketClients.clear();
+            this.connectionTime = null;
+            this.botInfo = null;
+            this.reconnectAttempts = 0;
+            
+            if (currentCompanyId) {
+                this.clients.delete(currentCompanyId);
+            }
+            
+            this.emitStatusChange({
+                connected: false,
+                authenticated: false,
+                hasQR: false,
+                status: 'logged_out',
+                message: 'Logged out successfully',
+                companyId: currentCompanyId
+            });
+            
+            console.log(`✅ Logout complete for company: ${currentCompanyId || 'default'}`);
+            
+        } catch (error) {
+            console.error('Logout error:', error);
+            this.emitStatusChange({
+                connected: false,
+                authenticated: false,
+                status: 'logout_error',
+                message: `Logout error: ${error.message}`,
+                companyId: currentCompanyId
+            });
+        } finally {
+            this.isShuttingDown = false;
         }
-        
-        // Stop stats broadcasting
-        this.stopStatsBroadcasting();
-        
-        // Clear any pending batch writes
-        if (this.batchWriteInterval) {
-            clearInterval(this.batchWriteInterval);
-            this.batchWriteInterval = null;
-        }
-        
-        // Emit immediate status change before destroying client
-        this.emitStatusChange({
-            connected: false,
-            authenticated: false,
-            hasQR: false,
-            status: 'logging_out',
-            message: 'Logging out...',
-            companyId: currentCompanyId
-        });
-        
-        // Destroy the client
-        await this.safeDestroyClient();
-        
-        // Clear session files
-        await this.clearSession();
-        
-        // Clear WebSocket clients set
-        this.qrWebSocketClients.clear();
-        
-        // Reset all connection-related properties
-        this.connectionTime = null;
-        this.botInfo = null;
-        this.reconnectAttempts = 0;
-        
-        // Clear any company client references
-        if (currentCompanyId) {
-            this.clients.delete(currentCompanyId);
-        }
-        
-        // Emit final disconnected status
-        this.emitStatusChange({
-            connected: false,
-            authenticated: false,
-            hasQR: false,
-            status: 'logged_out',
-            message: 'Logged out successfully',
-            companyId: currentCompanyId
-        });
-        
-        console.log(`✅ Logout complete for company: ${currentCompanyId || 'default'}`);
-        
-        // DO NOT auto-reinitialize - wait for manual reconnection
-        // The old code had setTimeout that called initialize again
-        // Remove or comment out the auto-reconnect
-        
-    } catch (error) {
-        console.error('Logout error:', error);
-        this.emitStatusChange({
-            connected: false,
-            authenticated: false,
-            status: 'logout_error',
-            message: `Logout error: ${error.message}`,
-            companyId: currentCompanyId
-        });
-    } finally {
-        this.isShuttingDown = false;
     }
-}
-    // async logout() {
-    //     console.log('\n🚪 Logging out...');
-    //     const currentCompanyId = this.companyId;
-        
-    //     try {
-    //         this.isShuttingDown = true;
-    //         await this.safeDestroyClient();
-    //         await this.clearSession();
-            
-    //         this.currentQR = null;
-    //         this.isWaitingForScan = false;
-    //         this.isConnected = false;
-    //         this.isAuthenticated = false;
-    //         this.qrWebSocketClients.clear();
-            
-    //         setTimeout(() => {
-    //             this.isShuttingDown = false;
-    //             if (currentCompanyId) {
-    //                 this.initializeForCompany(currentCompanyId).catch(console.error);
-    //             } else {
-    //                 this.initialize().catch(console.error);
-    //             }
-    //         }, 2000);
-    //     } catch (error) {
-    //         console.error('Logout error:', error);
-    //         this.isShuttingDown = false;
-    //     }
-    // }
 
     async restart() {
         console.log('\n🔄 Restarting...');
@@ -1231,7 +1136,7 @@ function getWhatsAppBot() {
     if (!botInstance) {
         throw new Error('WhatsAppBot not initialized');
     }
-    return botInstance;this.qrExpiryTime = 60000;
+    return botInstance;
 }
 
 const bot = createWhatsAppBot();
