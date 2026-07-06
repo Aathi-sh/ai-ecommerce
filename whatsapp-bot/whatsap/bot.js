@@ -696,73 +696,59 @@ setupEventHandlers(resolve, reject) {
         }
     }
 
-  async removeCompany(companyId) {
+async removeCompany(companyId) {
     const client = this.clients.get(companyId);
     if (!client) {
         console.log(`⚠️ No client found for company ${companyId}, skipping removal.`);
         return;
     }
 
+    const wasCurrent = (this.companyId === companyId);
     const previousClient = this.client;
     const previousCompany = this.companyId;
 
+    // Temporarily switch to the target company
     this.client = client;
     this.companyId = companyId;
 
     try {
-        // 1. Gracefully destroy the client (closes WhatsApp connection)
-        await this.safeDestroyClient();
-
-        // 2. Remove the client from the internal map
+        await this.safeDestroyClient();  // this.client becomes null inside
         this.clients.delete(companyId);
 
-        // 3. Delete the session folder to force a fresh QR on next connect
+        // Delete the session folder
         const companySessionPath = path.join(this.sessionPath, `company_${companyId}`);
         if (fs.existsSync(companySessionPath)) {
             fs.rmSync(companySessionPath, { recursive: true, force: true });
             console.log(`🗑️ Session folder deleted for company ${companyId}`);
         }
 
-        // ========== 🔥 CRITICAL FIX – RESET ALL BOT STATE ==========
-        // This ensures a subsequent `addCompany()` will start a clean initialization.
-        this.isInitializing = false;          // Unblock future initializations
-        this.isConnected = false;
-        this.isAuthenticated = false;
-        this.currentQR = null;
-        this.isWaitingForScan = false;
-        this.qrGenerated = false;
-        this.reconnectAttempts = 0;           // Reset reconnection counter
-        this.isShuttingDown = false;          // In case it was set
-
-        // Clear any pending QR timeout
-        if (this.qrTimeout) {
-            clearTimeout(this.qrTimeout);
-            this.qrTimeout = null;
-        }
-
-        // Optionally, clear the stats broadcasting interval if it's still running
-        this.stopStatsBroadcasting();
-
-        console.log(`✅ Company ${companyId} removed and bot state fully reset.`);
-
-    } catch (error) {
-        console.error(`❌ Failed to remove company ${companyId}:`, error.message);
-        // Even on error, reset flags to avoid stuck state
-        this.isInitializing = false;
+        // Reset all state flags
         this.isConnected = false;
         this.isAuthenticated = false;
         this.currentQR = null;
         this.isWaitingForScan = false;
         this.qrGenerated = false;
         this.reconnectAttempts = 0;
+        this.isShuttingDown = false;
         if (this.qrTimeout) {
             clearTimeout(this.qrTimeout);
             this.qrTimeout = null;
         }
+        this.stopStatsBroadcasting();
+
+        console.log(`✅ Company ${companyId} removed and bot state fully reset.`);
+    } catch (error) {
+        console.error(`❌ Failed to remove company ${companyId}:`, error.message);
     } finally {
-        // Restore the previous client and company ID (important for multi‑tenant)
-        this.client = previousClient;
-        this.companyId = previousCompany;
+        // Restore only if we removed a DIFFERENT company
+        if (!wasCurrent) {
+            this.client = previousClient;
+            this.companyId = previousCompany;
+        } else {
+            // We removed the current company → set to null
+            this.client = null;
+            this.companyId = null;
+        }
     }
 }
 
